@@ -92,20 +92,28 @@ def create_high_trust_options(
     model: Optional[str] = None,
     system_prompt_append: Optional[str] = None,
     max_thinking_tokens: Optional[int] = None,
+    max_turns: Optional[int] = None,
 ) -> Any:
     """Create ClaudeCodeOptions with High-Trust settings.
 
     This function enforces the design principles for agentic execution:
     - bypassPermissions mode for "hands-off" construction
     - Project-only settings (CLAUDE.md visibility)
+    - System prompt preset for consistent Claude Code behavior
     - Explicit tool surface
 
+    MANDATORY SETTINGS (always enforced):
+    - setting_sources=["project"]: Loads CLAUDE.md and .claude/skills
+    - permission_mode: Controls file/command permissions
+    - system_prompt preset: "claude_code" for consistent behavior
+
     Args:
-        cwd: Working directory for the SDK session.
+        cwd: Working directory for the SDK session (REQUIRED for reliable execution).
         permission_mode: Permission mode ("bypassPermissions" by default).
         model: Model override (uses DEFAULT_MODEL if not specified).
-        system_prompt_append: Optional text to append to system prompt.
+        system_prompt_append: Optional text to append to system prompt (persona, context).
         max_thinking_tokens: Optional max tokens for extended thinking.
+        max_turns: Optional max conversation turns within this query (default: unlimited).
 
     Returns:
         ClaudeCodeOptions instance configured for high-trust execution.
@@ -115,31 +123,44 @@ def create_high_trust_options(
     """
     sdk = get_sdk_module()
 
-    # Build system prompt with preset
-    system_prompt: Optional[Dict[str, Any]] = None
+    # ALWAYS use system prompt preset for consistent Claude Code behavior
+    # This ensures the agent behaves like Claude Code (tools, file ops, etc.)
+    system_prompt: Dict[str, Any] = {
+        "type": "preset",
+        "preset": SYSTEM_PROMPT_PRESET,
+    }
     if system_prompt_append:
-        system_prompt = {
-            "type": "preset",
-            "preset": SYSTEM_PROMPT_PRESET,
-            "append": system_prompt_append,
-        }
+        system_prompt["append"] = system_prompt_append
 
-    # Build options dict
+    # Build options dict with MANDATORY settings
+    # CRITICAL: These settings are required for reliable agentic execution
     options_kwargs: Dict[str, Any] = {
+        # 1. Permission mode: "bypassPermissions" for autonomous execution
         "permission_mode": permission_mode,
+        # 2. Setting sources: ["project"] ensures CLAUDE.md and skills are loaded
+        "setting_sources": ["project"],
+        # 3. System prompt: preset for Claude Code behavior
+        "system_prompt": system_prompt,
     }
 
+    # Working directory (strongly recommended)
     if cwd:
         options_kwargs["cwd"] = str(cwd)
+    else:
+        logger.warning(
+            "create_high_trust_options called without cwd - "
+            "execution may fail or use unexpected working directory"
+        )
 
+    # Optional overrides
     if model:
         options_kwargs["model"] = model
 
-    if system_prompt:
-        options_kwargs["system_prompt"] = system_prompt
-
     if max_thinking_tokens is not None:
         options_kwargs["max_thinking_tokens"] = max_thinking_tokens
+
+    if max_turns is not None:
+        options_kwargs["max_turns"] = max_turns
 
     return sdk.ClaudeCodeOptions(**options_kwargs)
 

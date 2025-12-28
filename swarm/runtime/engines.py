@@ -97,6 +97,13 @@ from .diff_scanner import (
     create_file_changes_event,
 )
 
+# Import ContextPack for structured context hydration
+# Use TYPE_CHECKING to avoid circular import (context_pack imports StepContext from here)
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .context_pack import ContextPack
+
 # Module logger
 logger = logging.getLogger(__name__)
 
@@ -1122,7 +1129,7 @@ class ClaudeStepEngine(LifecycleCapableEngine):
     ANALYSIS_STEP_PATTERNS = ["context", "analyze", "assess", "review", "audit", "check"]
     BUILD_STEP_PATTERNS = ["implement", "author", "write", "fix", "create", "mutate"]
 
-    # JIT Finalization prompt template
+    # JIT Finalization prompt template (for fallback separate-call finalization)
     JIT_FINALIZATION_PROMPT = """
 ---
 Your work session is complete. Now create a structured handoff for the next step.
@@ -1154,6 +1161,41 @@ Guidelines:
 - confidence: How confident are you in this handoff? (1.0 = very confident)
 
 Write the file now.
+---
+"""
+
+    # Inline finalization prompt (appended to work prompt for single-call pattern)
+    # This preserves "hot context" by having the agent finalize in the same session
+    INLINE_FINALIZATION_PROMPT = """
+---
+## Finalization (REQUIRED)
+
+When you have completed all work above, you MUST create a handoff file.
+
+Use the `Write` tool to create: {handoff_path}
+
+The file MUST be valid JSON:
+```json
+{{
+  "step_id": "{step_id}",
+  "flow_key": "{flow_key}",
+  "run_id": "{run_id}",
+  "status": "VERIFIED | UNVERIFIED | PARTIAL | BLOCKED",
+  "summary": "2-paragraph summary: what you accomplished, any issues encountered",
+  "artifacts": {{"artifact_name": "relative/path/from/run_base"}},
+  "proposed_next_step": "next_step_id or null",
+  "notes_for_next_step": "What the next agent should know",
+  "confidence": 0.0 to 1.0
+}}
+```
+
+Status meanings:
+- VERIFIED: Task completed successfully
+- UNVERIFIED: Tests fail or work incomplete
+- PARTIAL: Some work done but blocked on something
+- BLOCKED: Cannot proceed (missing inputs, invalid state)
+
+DO NOT finish without writing this handoff file.
 ---
 """
 
@@ -1227,6 +1269,114 @@ Note: For backward compatibility, "proceed" maps to "advance", and "rerun" maps 
 
 Analyze the handoff and emit your routing decision now.
 """
+
+    # ==========================================================================
+    # ContextPack-First Prompt Building
+    # ==========================================================================
+
+    @staticmethod
+    def _build_context_from_pack(
+        context_pack: ContextPack,
+        max_summary_chars: int = 2000,
+    ) -> Tuple[List[str], int]:
+        """Build context lines from a ContextPack's previous envelopes.
+
+        This method extracts structured context from HandoffEnvelopes,
+        providing higher-fidelity context than raw history dicts.
+
+        The ContextPack approach:
+        - Uses HandoffEnvelope.summary (compressed, high-signal)
+        - Includes routing decisions and status
+        - Provides artifact pointers (not full content)
+        - Preserves file_changes forensics
+
+        Args:
+            context_pack: The ContextPack with previous_envelopes.
+            max_summary_chars: Max chars per envelope summary.
+
+        Returns:
+            Tuple of (context_lines, total_chars_used).
+        """
+        lines: List[str] = []
+        chars_used = 0
+
+        if not context_pack.previous_envelopes:
+            return lines, chars_used
+
+        lines.append("## Previous Steps (from ContextPack)")
+        lines.append("")
+
+        for envelope in context_pack.previous_envelopes:
+            # Status indicator
+            status_emoji = {
+                "verified": "[✓]",
+                "unverified": "[?]",
+                "partial": "[~]",
+                "blocked": "[✗]",
+            }.get(envelope.status.lower(), "[?]")
+
+            lines.append(f"### Step: {envelope.step_id} {status_emoji}")
+
+            # Summary (the key context - compressed by the previous agent)
+            if envelope.summary:
+                summary = envelope.summary
+                if len(summary) > max_summary_chars:
+                    summary = summary[:max_summary_chars] + "... (truncated)"
+                lines.append(f"**Summary:** {summary}")
+
+            # Routing decision (what did the previous step decide?)
+            if envelope.routing_signal:
+                rs = envelope.routing_signal
+                lines.append(
+                    f"**Routing:** {rs.decision.value} → {rs.reason}"
+                )
+
+            # File changes (what was mutated?)
+            if envelope.file_changes and envelope.file_changes.get("summary"):
+                lines.append(f"**Changes:** {envelope.file_changes['summary']}")
+
+            # Artifacts (file pointers, not content)
+            if envelope.artifacts:
+                artifact_list = ", ".join(envelope.artifacts.keys())
+                lines.append(f"**Artifacts:** {artifact_list}")
+
+            lines.append("")
+
+        # Calculate total chars
+        context_text = "\n".join(lines)
+        chars_used = len(context_text)
+
+        return lines, chars_used
+
+    @staticmethod
+    def _build_artifact_pointers(context_pack: ContextPack) -> List[str]:
+        """Build artifact pointer lines from upstream artifacts.
+
+        Lists file paths that the agent should read for context.
+
+        Args:
+            context_pack: The ContextPack with upstream_artifacts.
+
+        Returns:
+            List of formatted lines describing available artifacts.
+        """
+        lines: List[str] = []
+
+        if not context_pack.upstream_artifacts:
+            return lines
+
+        lines.append("## Available Upstream Artifacts")
+        lines.append("The following artifacts from previous flows are available:")
+        lines.append("")
+
+        for name, path in context_pack.upstream_artifacts.items():
+            lines.append(f"- **{name}**: `{path}`")
+
+        lines.append("")
+        lines.append("Use the `Read` tool to load relevant artifacts before starting work.")
+        lines.append("")
+
+        return lines
 
     def __init__(
         self,
@@ -2007,6 +2157,31 @@ Error: {step_result.error or "None"}
         # for ensuring this is not called from within an async context.
         return _run_async_safely(self._run_worker_async(ctx))
 
+    async def run_worker_async(
+        self, ctx: StepContext
+    ) -> Tuple[StepResult, List[RunEvent], str]:
+        """Async version of run_worker for async-native orchestration.
+
+        Directly calls the internal async implementation without sync bridges.
+        Use this from async contexts (WebUI, async CLI) for proper cancellation.
+
+        Args:
+            ctx: Step execution context.
+
+        Returns:
+            Tuple of (StepResult, events, work_summary).
+        """
+        # Stub mode: return synthetic result without SDK
+        if self.stub_mode or self._mode == "stub":
+            return self._run_worker_stub(ctx)
+
+        # SDK mode requires the claude_code_sdk
+        if not self._check_sdk_available():
+            logger.warning("SDK not available for run_worker_async, falling back to stub")
+            return self._run_worker_stub(ctx)
+
+        return await self._run_worker_async(ctx)
+
     def _run_worker_stub(
         self, ctx: StepContext
     ) -> Tuple[StepResult, List[RunEvent], str]:
@@ -2106,16 +2281,18 @@ Error: {step_result.error or "None"}
         ensure_llm_dir(ctx.run_base)
         ensure_receipts_dir(ctx.run_base)
 
-        # Build prompt
+        # Build prompt (returns agent_persona for system prompt injection)
         prompt, truncation_info, agent_persona = self._build_prompt(ctx)
 
         # Set up working directory
         cwd = str(ctx.repo_root) if ctx.repo_root else str(Path.cwd())
 
         # High-trust options via adapter
+        # Pass agent_persona to system_prompt_append for identity grounding
         options = create_high_trust_options(
             cwd=cwd,
             permission_mode="bypassPermissions",
+            system_prompt_append=agent_persona,  # Agent identity in system prompt
         )
 
         # Record step start in stats DB
@@ -2352,9 +2529,10 @@ Error: {step_result.error or "None"}
     ) -> FinalizationResult:
         """Execute JIT finalization to extract handoff state.
 
-        This method injects a finalization prompt into a fresh LLM session
-        to have the agent write a structured handoff draft file. It then
-        reads the draft and creates a HandoffEnvelope.
+        With inline finalization, the work phase prompt includes instructions
+        to write the handoff file. This method first checks if the handoff
+        was already written during work (hot context preserved). If not,
+        it falls back to a separate SDK call for finalization.
 
         Args:
             ctx: Step execution context.
@@ -2364,6 +2542,23 @@ Error: {step_result.error or "None"}
         Returns:
             FinalizationResult with handoff data and envelope.
         """
+        # Check if handoff was already written during work phase (inline finalization)
+        handoff_dir = ctx.run_base / "handoff"
+        handoff_path = handoff_dir / f"{ctx.step_id}.draft.json"
+
+        if handoff_path.exists():
+            logger.debug(
+                "Handoff already written during work phase for step %s (inline finalization)",
+                ctx.step_id,
+            )
+            return self._finalize_from_existing_handoff(ctx, step_result, work_summary, handoff_path)
+
+        # Handoff not written during work - fall back to separate finalization call
+        logger.debug(
+            "Handoff not found after work phase for step %s, running fallback finalization",
+            ctx.step_id,
+        )
+
         # Stub mode: return synthetic finalization result
         if self.stub_mode or self._mode == "stub":
             return self._finalize_step_stub(ctx, step_result, work_summary)
@@ -2376,6 +2571,184 @@ Error: {step_result.error or "None"}
         # Run async finalization in a clean event loop
         return _run_async_safely(
             self._finalize_step_async(ctx, step_result, work_summary)
+        )
+
+    async def finalize_step_async(
+        self,
+        ctx: StepContext,
+        step_result: StepResult,
+        work_summary: str,
+    ) -> FinalizationResult:
+        """Async version of finalize_step for async-native orchestration.
+
+        Directly calls the internal async implementation without sync bridges.
+        Use this from async contexts (WebUI, async CLI) for proper cancellation.
+
+        Args:
+            ctx: Step execution context.
+            step_result: Result from run_worker phase.
+            work_summary: Raw assistant output from work phase.
+
+        Returns:
+            FinalizationResult with handoff data and envelope.
+        """
+        # Check if handoff was already written during work phase (inline finalization)
+        handoff_dir = ctx.run_base / "handoff"
+        handoff_path = handoff_dir / f"{ctx.step_id}.draft.json"
+
+        if handoff_path.exists():
+            logger.debug(
+                "Handoff already written during work phase for step %s (inline finalization)",
+                ctx.step_id,
+            )
+            return self._finalize_from_existing_handoff(ctx, step_result, work_summary, handoff_path)
+
+        # Handoff not written during work - fall back to separate finalization call
+        logger.debug(
+            "Handoff not found after work phase for step %s, running fallback finalization",
+            ctx.step_id,
+        )
+
+        # Stub mode: return synthetic finalization result
+        if self.stub_mode or self._mode == "stub":
+            return self._finalize_step_stub(ctx, step_result, work_summary)
+
+        # SDK mode requires the claude_code_sdk
+        if not self._check_sdk_available():
+            logger.warning("SDK not available for finalize_step_async, falling back to stub")
+            return self._finalize_step_stub(ctx, step_result, work_summary)
+
+        return await self._finalize_step_async(ctx, step_result, work_summary)
+
+    def _finalize_from_existing_handoff(
+        self,
+        ctx: StepContext,
+        step_result: StepResult,
+        work_summary: str,
+        handoff_path: Path,
+    ) -> FinalizationResult:
+        """Create FinalizationResult from handoff written during work phase.
+
+        When inline finalization succeeds (agent writes handoff during work),
+        this method reads the existing handoff and creates the result without
+        making another SDK call. This preserves "hot context" and saves latency.
+
+        Args:
+            ctx: Step execution context.
+            step_result: Result from work phase.
+            work_summary: Raw assistant output from work phase.
+            handoff_path: Path to the handoff draft file written by the agent.
+
+        Returns:
+            FinalizationResult with handoff data and envelope.
+        """
+        events: List[RunEvent] = []
+        agent_key = ctx.step_agents[0] if ctx.step_agents else "unknown"
+
+        # Read the existing handoff draft
+        handoff_data: Optional[Dict[str, Any]] = None
+        try:
+            handoff_data = json.loads(handoff_path.read_text(encoding="utf-8"))
+            logger.debug(
+                "Read inline handoff from %s: status=%s",
+                handoff_path,
+                handoff_data.get("status"),
+            )
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("Failed to parse inline handoff file %s: %s", handoff_path, e)
+            # Fall through to create envelope from work_summary
+
+        # Scan for file changes (forensic - captures all mutations)
+        file_changes = scan_file_changes_sync(ctx.repo_root)
+        file_changes_dict = file_changes_to_dict(file_changes)
+
+        if file_changes.has_changes:
+            logger.debug(
+                "Diff scan for step %s: %s",
+                ctx.step_id,
+                file_changes.summary,
+            )
+            events.append(RunEvent(
+                run_id=ctx.run_id,
+                ts=datetime.now(timezone.utc),
+                kind="file_changes",
+                flow_key=ctx.flow_key,
+                step_id=ctx.step_id,
+                agent_key=agent_key,
+                payload=file_changes_dict,
+            ))
+
+        # Log that inline finalization was used
+        events.append(RunEvent(
+            run_id=ctx.run_id,
+            ts=datetime.now(timezone.utc),
+            kind="log",
+            flow_key=ctx.flow_key,
+            step_id=ctx.step_id,
+            agent_key=agent_key,
+            payload={
+                "message": f"Inline finalization: handoff read from {handoff_path}",
+                "mode": "inline",
+            },
+        ))
+
+        # Create envelope from handoff data or work summary
+        envelope: Optional[HandoffEnvelope] = None
+        if handoff_data:
+            # Use handoff data written by the agent
+            status_str = handoff_data.get("status", "UNVERIFIED")
+            envelope = HandoffEnvelope(
+                step_id=ctx.step_id,
+                flow_key=ctx.flow_key,
+                run_id=ctx.run_id,
+                routing_signal=None,  # Will be set by orchestrator after route_step()
+                summary=handoff_data.get("summary", work_summary[:500]),
+                status=status_str.lower() if isinstance(status_str, str) else "unverified",
+                error=step_result.error,
+                duration_ms=step_result.duration_ms,
+                timestamp=datetime.now(timezone.utc),
+                artifacts=handoff_data.get("artifacts"),
+                file_changes=file_changes_dict,
+            )
+        else:
+            # Fallback: create envelope from work summary
+            envelope = HandoffEnvelope(
+                step_id=ctx.step_id,
+                flow_key=ctx.flow_key,
+                run_id=ctx.run_id,
+                routing_signal=None,
+                summary=work_summary[:500] if work_summary else f"Step {ctx.step_id} completed",
+                status="verified" if step_result.status == "succeeded" else "unverified",
+                error=step_result.error,
+                duration_ms=step_result.duration_ms,
+                timestamp=datetime.now(timezone.utc),
+                file_changes=file_changes_dict,
+            )
+
+        # Write committed envelope to disk
+        envelope_path = make_handoff_envelope_path(ctx.run_base, ctx.step_id)
+        ensure_handoff_dir(ctx.run_base)
+        with envelope_path.open("w", encoding="utf-8") as f:
+            json.dump(handoff_envelope_to_dict(envelope), f, indent=2)
+
+        events.append(RunEvent(
+            run_id=ctx.run_id,
+            ts=datetime.now(timezone.utc),
+            kind="log",
+            flow_key=ctx.flow_key,
+            step_id=ctx.step_id,
+            agent_key=agent_key,
+            payload={
+                "message": f"Handoff envelope written to {envelope_path}",
+                "status": envelope.status,
+            },
+        ))
+
+        return FinalizationResult(
+            handoff_data=handoff_data,
+            envelope=envelope,
+            work_summary=work_summary,
+            events=events,
         )
 
     def _finalize_step_stub(
@@ -2732,6 +3105,34 @@ The file must be valid JSON matching the HandoffEnvelope schema.
         # Run async routing in a clean event loop
         return _run_async_safely(self._route_step_async(ctx, handoff_data))
 
+    async def route_step_async(
+        self,
+        ctx: StepContext,
+        handoff_data: Dict[str, Any],
+    ) -> Optional[RoutingSignal]:
+        """Async version of route_step for async-native orchestration.
+
+        Directly calls the internal async implementation without sync bridges.
+        Use this from async contexts (WebUI, async CLI) for proper cancellation.
+
+        Args:
+            ctx: Step execution context with routing configuration.
+            handoff_data: Parsed handoff data from finalization.
+
+        Returns:
+            RoutingSignal if routing was determined, None if routing failed.
+        """
+        # Stub mode: return deterministic routing signal
+        if self.stub_mode or self._mode == "stub":
+            return self._route_step_stub(ctx, handoff_data)
+
+        # SDK mode requires the claude_code_sdk
+        if not self._check_sdk_available():
+            logger.warning("SDK not available for route_step_async, falling back to stub")
+            return self._route_step_stub(ctx, handoff_data)
+
+        return await self._route_step_async(ctx, handoff_data)
+
     def _route_step_stub(
         self,
         ctx: StepContext,
@@ -2927,10 +3328,56 @@ The file must be valid JSON matching the HandoffEnvelope schema.
             ]
         )
 
-        # Previous step context with priority-aware budget management
-        truncation_info: Optional[HistoryTruncationInfo] = None
+        # =======================================================================
+        # Context Injection: ContextPack-First Strategy
+        # =======================================================================
+        # Priority order:
+        # 1. ContextPack (structured envelopes + artifact pointers) - PREFERRED
+        # 2. Raw history (Dict-based fallback for backward compatibility)
+        #
+        # ContextPack provides higher-fidelity context because:
+        # - Summaries are pre-compressed by the previous agent
+        # - Routing decisions and status are explicit
+        # - Artifact pointers enable on-demand loading
+        # - File changes are forensically accurate
+        # =======================================================================
 
-        if ctx.history:
+        truncation_info: Optional[HistoryTruncationInfo] = None
+        context_pack: Optional[ContextPack] = ctx.extra.get("context_pack")
+
+        if context_pack and context_pack.previous_envelopes:
+            # ContextPack-first: use structured envelopes
+            logger.debug(
+                "Using ContextPack for step %s (envelopes: %d, artifacts: %d)",
+                ctx.step_id,
+                len(context_pack.previous_envelopes),
+                len(context_pack.upstream_artifacts),
+            )
+
+            # Add artifact pointers first (tells agent what to read)
+            artifact_lines = self._build_artifact_pointers(context_pack)
+            lines.extend(artifact_lines)
+
+            # Add previous step context from envelopes
+            context_lines, chars_used = self._build_context_from_pack(context_pack)
+            lines.extend(context_lines)
+
+            # Create truncation info for observability (no truncation with ContextPack)
+            truncation_info = HistoryTruncationInfo(
+                steps_included=len(context_pack.previous_envelopes),
+                steps_total=len(context_pack.previous_envelopes),
+                chars_used=chars_used,
+                budget_chars=chars_used,  # No budget exceeded
+                truncated=False,
+                priority_aware=False,  # ContextPack doesn't use priority
+            )
+
+        elif ctx.history:
+            # Fallback: use raw history dicts with priority-aware budget management
+            logger.debug(
+                "Using raw history for step %s (no ContextPack available)",
+                ctx.step_id,
+            )
             lines.append("## Previous Steps Context")
             lines.append("The following steps have already been completed:")
             lines.append("")
@@ -3036,19 +3483,37 @@ The file must be valid JSON matching the HandoffEnvelope schema.
 
             lines.extend(history_lines)
 
-        # Instructions
+        # =======================================================================
+        # Work Phase Instructions
+        # =======================================================================
         lines.extend(
             [
-                "## Instructions",
-                "1. Execute the step role as described above",
-                "2. Use the assigned agent's capabilities and perspective",
-                "3. Read any required inputs from previous steps or RUN_BASE",
-                "4. Write all outputs to the correct RUN_BASE location",
-                "5. Be concise and focused on the specific step",
-                "6. When finished, wait for finalization instructions",
+                "## Work Phase Instructions",
+                "",
+                "Execute your assigned role following these steps:",
+                "",
+                "1. **Read inputs**: Load any required artifacts from previous steps or RUN_BASE",
+                "2. **Execute work**: Perform the step role as described above",
+                "3. **Write outputs**: Save all artifacts to the correct RUN_BASE location",
+                "4. **Create handoff**: Write the handoff file as specified below (REQUIRED)",
                 "",
             ]
         )
+
+        # =======================================================================
+        # Finalization Phase (MANDATORY - within same session)
+        # =======================================================================
+        # The Two-Turn JIT Pattern: Work + Finalize in one query
+        # This preserves "hot context" - the agent still has memory of its work
+        handoff_dir = ctx.run_base / "handoff"
+        handoff_path = handoff_dir / f"{ctx.step_id}.draft.json"
+        inline_finalization = self.INLINE_FINALIZATION_PROMPT.format(
+            handoff_path=str(handoff_path),
+            step_id=ctx.step_id,
+            flow_key=ctx.flow_key,
+            run_id=ctx.run_id,
+        )
+        lines.append(inline_finalization)
 
         return "\n".join(lines), truncation_info, agent_persona
 

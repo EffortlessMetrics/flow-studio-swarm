@@ -24,6 +24,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import threading
@@ -1252,6 +1253,648 @@ class GeminiStepOrchestrator:
                 error = step_end.payload.get("error")
                 if error is not None:
                     result["error"] = error
+
+        return result
+
+    # =========================================================================
+    # ASYNC-NATIVE METHODS
+    # =========================================================================
+    # These methods provide async-first execution for WebUI and CLI integration.
+    # They support proper cancellation handling for clean PARTIAL save-points.
+
+    async def run_stepwise_flow_async(
+        self,
+        flow_key: str,
+        spec: RunSpec,
+        start_step: Optional[str] = None,
+        end_step: Optional[str] = None,
+        resume: bool = False,
+    ) -> RunId:
+        """Async version of run_stepwise_flow.
+
+        Unlike the sync version which spawns a background thread, this method
+        executes the flow directly in the current async context. This enables:
+        - Proper cancellation via asyncio.CancelledError
+        - Clean PARTIAL save-points on interruption
+        - WebUI/CLI integration without thread management
+
+        Args:
+            flow_key: The flow to execute (e.g., "build", "plan").
+            spec: Run specification with params and initiator info.
+            start_step: Optional step ID to start from (skip earlier steps).
+            end_step: Optional step ID to stop at (skip later steps).
+            resume: Whether to resume from existing run_state.json.
+
+        Returns:
+            The generated run ID.
+
+        Raises:
+            ValueError: If flow_key is invalid or has no steps defined.
+            asyncio.CancelledError: If execution is cancelled (PARTIAL saved).
+        """
+        # Validate flow exists
+        flow_def = self._flow_registry.get_flow(flow_key)
+        if not flow_def:
+            raise ValueError(f"Unknown flow: {flow_key}")
+
+        if not flow_def.steps:
+            raise ValueError(f"Flow '{flow_key}' has no steps defined")
+
+        # Create run
+        run_id = generate_run_id()
+        now = datetime.now(timezone.utc)
+
+        # Ensure flow_keys includes our flow
+        flow_keys = spec.flow_keys if spec.flow_keys else [flow_key]
+        if flow_key not in flow_keys:
+            flow_keys = [flow_key] + list(flow_keys)
+
+        # Create updated spec with flow_keys
+        run_spec = RunSpec(
+            flow_keys=flow_keys,
+            profile_id=spec.profile_id,
+            backend=spec.backend,
+            initiator=spec.initiator,
+            params={**spec.params, "stepwise": True, "resume": resume, "async": True},
+        )
+
+        # Persist initial state
+        storage_module.create_run_dir(run_id)
+        storage_module.write_spec(run_id, run_spec)
+
+        # Initialize or load run state
+        if resume:
+            existing_state = storage_module.read_run_state(run_id)
+            if existing_state and existing_state.flow_key == flow_key:
+                run_state = existing_state
+                logger.info("Resuming run %s from step %s", run_id, existing_state.current_step_id)
+            else:
+                run_state = RunState(
+                    run_id=run_id,
+                    flow_key=flow_key,
+                    status="running",
+                    timestamp=datetime.now(timezone.utc),
+                )
+                storage_module.write_run_state(run_id, run_state)
+        else:
+            run_state = RunState(
+                run_id=run_id,
+                flow_key=flow_key,
+                status="pending",
+                timestamp=datetime.now(timezone.utc),
+            )
+            storage_module.write_run_state(run_id, run_state)
+
+        summary = RunSummary(
+            id=run_id,
+            spec=run_spec,
+            status=RunStatus.PENDING,
+            sdlc_status=SDLCStatus.UNKNOWN,
+            created_at=now,
+            updated_at=now,
+        )
+        storage_module.write_summary(run_id, summary)
+
+        # Log run creation
+        storage_module.append_event(
+            run_id,
+            RunEvent(
+                run_id=run_id,
+                ts=now,
+                kind="run_created",
+                flow_key=flow_key,
+                payload={
+                    "flows": flow_keys,
+                    "backend": spec.backend,
+                    "initiator": spec.initiator,
+                    "stepwise": True,
+                    "async": True,
+                },
+            ),
+        )
+
+        # Execute directly (no background thread)
+        await self._execute_stepwise_async(
+            run_id, flow_key, flow_def, run_spec, run_state, start_step, end_step
+        )
+
+        return run_id
+
+    async def _execute_stepwise_async(
+        self,
+        run_id: RunId,
+        flow_key: str,
+        flow_def: FlowDefinition,
+        spec: RunSpec,
+        run_state: RunState,
+        start_step: Optional[str],
+        end_step: Optional[str],
+    ) -> None:
+        """Async version of _execute_stepwise with cancellation handling.
+
+        Supports asyncio.CancelledError for clean interruption:
+        - Catches cancellation at step boundaries
+        - Attempts to finalize current step if interrupted mid-work
+        - Writes PARTIAL status to run_state for resumability
+
+        Args:
+            run_id: The run identifier.
+            flow_key: The flow being executed.
+            flow_def: The flow definition with steps.
+            spec: The run specification.
+            run_state: The current run state (for resume support).
+            start_step: Optional step ID to start from.
+            end_step: Optional step ID to stop at.
+        """
+        now = datetime.now(timezone.utc)
+
+        # Update status to running
+        storage_module.update_summary(run_id, {
+            "status": RunStatus.RUNNING.value,
+            "started_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        })
+
+        storage_module.append_event(
+            run_id,
+            RunEvent(
+                run_id=run_id,
+                ts=now,
+                kind="run_started",
+                flow_key=flow_key,
+                payload={
+                    "mode": "stepwise_async",
+                    "routing_enabled": True,
+                    "resume": run_state.current_step_id is not None,
+                },
+            ),
+        )
+
+        storage_module.update_run_state(run_id, {"status": "running"})
+
+        # Determine starting step
+        if start_step:
+            current_step = self._get_step_by_id(flow_def, start_step)
+            if not current_step:
+                current_step = flow_def.steps[0] if flow_def.steps else None
+        elif run_state.current_step_id:
+            current_step = self._get_step_by_id(flow_def, run_state.current_step_id)
+            if not current_step:
+                current_step = flow_def.steps[0] if flow_def.steps else None
+        else:
+            current_step = flow_def.steps[0] if flow_def.steps else None
+
+        loop_state = dict(run_state.loop_state)
+        error_msg = None
+        final_status = RunStatus.SUCCEEDED
+        sdlc_status = SDLCStatus.OK
+        step_history: List[Dict[str, Any]] = []
+
+        # Reconstruct step history from saved handoff envelopes
+        for step_id, envelope in run_state.handoff_envelopes.items():
+            step_history.append({
+                "step_id": envelope.step_id,
+                "status": envelope.status,
+                "output": envelope.summary,
+            })
+
+        total_steps_executed = 0
+        max_total_steps = len(flow_def.steps) * 10
+        cancelled = False
+
+        try:
+            while current_step is not None:
+                # Safety limit check
+                total_steps_executed += 1
+                if total_steps_executed > max_total_steps:
+                    logger.error(
+                        "Safety limit reached: %d steps executed, aborting",
+                        total_steps_executed,
+                    )
+                    final_status = RunStatus.FAILED
+                    sdlc_status = SDLCStatus.ERROR
+                    error_msg = f"Safety limit reached: {total_steps_executed} steps"
+                    break
+
+                # Build routing context
+                routing_ctx = self._build_routing_context(current_step, loop_state)
+
+                # Execute the current step (async)
+                try:
+                    step_result = await self._execute_single_step_async(
+                        run_id=run_id,
+                        flow_key=flow_key,
+                        flow_def=flow_def,
+                        step=current_step,
+                        spec=spec,
+                        history=step_history,
+                        routing_ctx=routing_ctx,
+                        run_state=run_state,
+                    )
+                except asyncio.CancelledError:
+                    # Cancellation during step execution
+                    logger.warning(
+                        "Cancellation during step %s, attempting PARTIAL save",
+                        current_step.id,
+                    )
+                    cancelled = True
+                    final_status = RunStatus.CANCELLED
+                    sdlc_status = SDLCStatus.PARTIAL
+                    error_msg = f"Cancelled during step {current_step.id}"
+
+                    # Write PARTIAL state
+                    storage_module.update_run_state(run_id, {
+                        "status": "partial",
+                        "current_step_id": current_step.id,
+                        "loop_state": dict(loop_state),
+                    })
+                    break
+
+                # Add to history
+                step_history.append(step_result)
+
+                # Create handoff envelope
+                handoff_envelope = HandoffEnvelope(
+                    step_id=current_step.id,
+                    flow_key=flow_key,
+                    run_id=run_id,
+                    routing_signal=self._create_routing_signal(
+                        current_step, step_result, loop_state
+                    ),
+                    summary=step_result.get("output", "")[:2000],
+                    status=step_result.get("status", "succeeded"),
+                    error=step_result.get("error"),
+                    duration_ms=step_result.get("duration_ms", 0),
+                    timestamp=datetime.now(timezone.utc),
+                )
+
+                run_state.handoff_envelopes[current_step.id] = handoff_envelope
+
+                # Atomic commit
+                storage_module.commit_step_completion(
+                    run_id=run_id,
+                    flow_key=flow_key,
+                    envelope=handoff_envelope,
+                    run_state_updates={
+                        "current_step_id": current_step.id,
+                        "step_index": current_step.index,
+                        "loop_state": dict(loop_state),
+                        "status": "running",
+                    },
+                )
+
+                # Check for step failure
+                if step_result.get("status") == "failed":
+                    final_status = RunStatus.FAILED
+                    sdlc_status = SDLCStatus.ERROR
+                    error_msg = step_result.get("error", f"Step {current_step.id} failed")
+                    break
+
+                # Check end_step condition
+                if end_step and current_step.id == end_step:
+                    logger.info("Reached end_step %s, stopping execution", end_step)
+                    break
+
+                # Route to next step
+                next_step_id, route_reason = self._route(
+                    flow_def=flow_def,
+                    current_step=current_step,
+                    result=step_result,
+                    loop_state=loop_state,
+                    run_id=run_id,
+                    flow_key=flow_key,
+                    handoff_envelope=handoff_envelope,
+                )
+
+                # Update routing context
+                if routing_ctx:
+                    routing_ctx.reason = route_reason
+                    routing = current_step.routing
+                    if next_step_id is None:
+                        routing_ctx.decision = "terminate"
+                    elif routing and routing.loop_target and next_step_id == routing.loop_target:
+                        routing_ctx.decision = "loop"
+                    else:
+                        routing_ctx.decision = "advance"
+
+                    agent_key = current_step.agents[0] if current_step.agents else "unknown"
+                    self._update_receipt_routing(
+                        run_id, flow_key, current_step.id, agent_key, routing_ctx
+                    )
+
+                # Emit routing decision event
+                storage_module.append_event(
+                    run_id,
+                    RunEvent(
+                        run_id=run_id,
+                        ts=datetime.now(timezone.utc),
+                        kind="route_decision",
+                        flow_key=flow_key,
+                        step_id=current_step.id,
+                        payload={
+                            "from_step": current_step.id,
+                            "to_step": next_step_id,
+                            "reason": route_reason,
+                            "loop_state": dict(loop_state),
+                            "decision": routing_ctx.decision if routing_ctx else "unknown",
+                            "confidence": handoff_envelope.routing_signal.confidence,
+                            "needs_human": handoff_envelope.routing_signal.needs_human,
+                        },
+                    ),
+                )
+
+                if next_step_id is None:
+                    logger.info("Flow complete: %s", route_reason)
+                    break
+
+                current_step = self._get_step_by_id(flow_def, next_step_id)
+                if current_step is None:
+                    logger.error("Next step '%s' not found in flow", next_step_id)
+                    final_status = RunStatus.FAILED
+                    sdlc_status = SDLCStatus.ERROR
+                    error_msg = f"Invalid routing: step '{next_step_id}' not found"
+                    break
+
+                # Yield control to allow cancellation checks
+                await asyncio.sleep(0)
+
+        except asyncio.CancelledError:
+            logger.warning("Run %s cancelled at step boundary", run_id)
+            cancelled = True
+            final_status = RunStatus.CANCELLED
+            sdlc_status = SDLCStatus.PARTIAL
+            error_msg = "Run cancelled"
+
+            storage_module.update_run_state(run_id, {
+                "status": "partial",
+                "loop_state": dict(loop_state),
+            })
+
+        except Exception as e:
+            logger.exception("Error in async stepwise execution for run %s", run_id)
+            final_status = RunStatus.FAILED
+            sdlc_status = SDLCStatus.ERROR
+            error_msg = str(e)
+
+        # Update final status
+        completed_at = datetime.now(timezone.utc)
+        storage_module.update_summary(run_id, {
+            "status": final_status.value,
+            "sdlc_status": sdlc_status.value,
+            "completed_at": completed_at.isoformat(),
+            "updated_at": completed_at.isoformat(),
+            "error": error_msg,
+        })
+
+        storage_module.append_event(
+            run_id,
+            RunEvent(
+                run_id=run_id,
+                ts=completed_at,
+                kind="run_completed" if not cancelled else "run_cancelled",
+                flow_key=flow_key,
+                payload={
+                    "status": final_status.value,
+                    "error": error_msg,
+                    "steps_completed": len(step_history),
+                    "total_steps_executed": total_steps_executed,
+                    "loop_state_final": dict(loop_state),
+                    "cancelled": cancelled,
+                },
+            ),
+        )
+
+        # Re-raise CancelledError if we were cancelled
+        if cancelled:
+            raise asyncio.CancelledError(error_msg)
+
+    async def _execute_single_step_async(
+        self,
+        run_id: RunId,
+        flow_key: str,
+        flow_def: FlowDefinition,
+        step: StepDefinition,
+        spec: RunSpec,
+        history: List[Dict[str, Any]],
+        routing_ctx: Optional["RoutingContext"] = None,
+        run_state: Optional[RunState] = None,
+    ) -> Dict[str, Any]:
+        """Async version of _execute_single_step.
+
+        Uses engine's async methods when available, otherwise falls back
+        to running sync methods in a thread pool.
+
+        Args:
+            run_id: The run identifier.
+            flow_key: The flow being executed.
+            flow_def: The flow definition.
+            step: The step to execute.
+            spec: The run specification.
+            history: List of previous step results.
+            routing_ctx: Optional routing context for microloop metadata.
+            run_state: Optional RunState for building context pack.
+
+        Returns:
+            Dictionary with step execution result.
+        """
+        step_start = datetime.now(timezone.utc)
+
+        # Log step start
+        storage_module.append_event(
+            run_id,
+            RunEvent(
+                run_id=run_id,
+                ts=step_start,
+                kind="step_start",
+                flow_key=flow_key,
+                step_id=step.id,
+                agent_key=step.agents[0] if step.agents else None,
+                payload={
+                    "role": step.role,
+                    "agents": list(step.agents),
+                    "step_index": step.index,
+                    "engine": self._engine.engine_id,
+                    "async": True,
+                },
+            ),
+        )
+
+        result: Dict[str, Any] = {
+            "step_id": step.id,
+            "step_index": step.index,
+            "agents": list(step.agents),
+            "started_at": step_start.isoformat(),
+            "run_id": run_id,
+            "flow_key": flow_key,
+        }
+
+        status = "failed"
+        error: Optional[str] = None
+        output = ""
+        duration_ms = 0
+
+        try:
+            # Build step context
+            ctx = StepContext(
+                repo_root=self._repo_root,
+                run_id=run_id,
+                flow_key=flow_key,
+                step_id=step.id,
+                step_index=step.index,
+                total_steps=len(flow_def.steps),
+                spec=spec,
+                flow_title=flow_def.title,
+                step_role=step.role,
+                step_agents=tuple(step.agents),
+                history=history,
+                extra={},
+                teaching_notes=step.teaching_notes,
+                routing=routing_ctx,
+            )
+
+            # Build context pack
+            context_pack = build_context_pack(ctx, run_state, self._repo_root)
+
+            logger.debug(
+                "Built context pack for step %s: %d artifacts, %d prior envelopes",
+                step.id,
+                len(context_pack.upstream_artifacts),
+                len(context_pack.previous_envelopes),
+            )
+
+            # Enrich step definition
+            enriched_step = enrich_step_definition_with_flow(
+                step, flow_key, self._repo_root
+            )
+
+            ctx.extra["orchestrator_prompt"] = enriched_step.orchestrator_prompt
+            ctx.extra["agent_prompts"] = enriched_step.agent_prompts
+            ctx.extra["context_pack"] = context_pack
+
+            if step.routing:
+                ctx.extra["routing"] = {
+                    "kind": step.routing.kind,
+                    "next": step.routing.next,
+                    "loop_target": step.routing.loop_target,
+                    "loop_condition_field": step.routing.loop_condition_field,
+                    "loop_success_values": list(step.routing.loop_success_values),
+                    "max_iterations": step.routing.max_iterations,
+                }
+
+            # Check for lifecycle-capable engine with async support
+            if isinstance(self._engine, LifecycleCapableEngine):
+                # Check if engine has async methods
+                if hasattr(self._engine, 'run_worker_async'):
+                    # Use native async methods
+                    step_result, work_events, work_summary = await self._engine.run_worker_async(ctx)
+                else:
+                    # Fall back to sync methods in thread pool
+                    loop = asyncio.get_event_loop()
+                    step_result, work_events, work_summary = await loop.run_in_executor(
+                        None, self._engine.run_worker, ctx
+                    )
+
+                # Persist work events
+                for event in work_events:
+                    storage_module.append_event(run_id, event)
+
+                # Finalization
+                if hasattr(self._engine, 'finalize_step_async'):
+                    finalization_result = await self._engine.finalize_step_async(
+                        ctx, step_result, work_summary
+                    )
+                else:
+                    loop = asyncio.get_event_loop()
+                    finalization_result = await loop.run_in_executor(
+                        None, self._engine.finalize_step, ctx, step_result, work_summary
+                    )
+
+                for event in finalization_result.events:
+                    storage_module.append_event(run_id, event)
+
+                # Routing
+                routing_signal: Optional[RoutingSignal] = None
+                if finalization_result.handoff_data:
+                    if hasattr(self._engine, 'route_step_async'):
+                        routing_signal = await self._engine.route_step_async(
+                            ctx, finalization_result.handoff_data
+                        )
+                    else:
+                        loop = asyncio.get_event_loop()
+                        routing_signal = await loop.run_in_executor(
+                            None, self._engine.route_step, ctx, finalization_result.handoff_data
+                        )
+
+                    if routing_signal:
+                        result["routing_signal"] = routing_signal
+
+                if finalization_result.envelope:
+                    result["handoff_envelope"] = finalization_result.envelope
+
+                status = step_result.status
+                error = step_result.error
+                output = step_result.output
+                duration_ms = step_result.duration_ms
+
+            else:
+                # Legacy engine - use run_step
+                if hasattr(self._engine, 'run_step_async'):
+                    step_result, engine_events = await self._engine.run_step_async(ctx)
+                else:
+                    loop = asyncio.get_event_loop()
+                    step_result, engine_events = await loop.run_in_executor(
+                        None, self._engine.run_step, ctx
+                    )
+
+                for event in engine_events:
+                    storage_module.append_event(run_id, event)
+
+                status = step_result.status
+                error = step_result.error
+                output = step_result.output
+                duration_ms = step_result.duration_ms
+
+        except asyncio.CancelledError:
+            # Re-raise cancellation
+            raise
+
+        except Exception as e:
+            logger.warning("Step %s failed: %s", step.id, e)
+            status = "failed"
+            error = str(e)
+
+        step_end = datetime.now(timezone.utc)
+
+        if not duration_ms:
+            duration_ms = int((step_end - step_start).total_seconds() * 1000)
+
+        result.update({
+            "status": status,
+            "error": error,
+            "output": output,
+            "completed_at": step_end.isoformat(),
+            "duration_ms": duration_ms,
+        })
+
+        # Log step completion
+        storage_module.append_event(
+            run_id,
+            RunEvent(
+                run_id=run_id,
+                ts=step_end,
+                kind="step_end" if status == "succeeded" else "step_error",
+                flow_key=flow_key,
+                step_id=step.id,
+                agent_key=step.agents[0] if step.agents else None,
+                payload={
+                    "status": status,
+                    "duration_ms": duration_ms,
+                    "error": error,
+                    "engine": self._engine.engine_id,
+                    "async": True,
+                },
+            ),
+        )
 
         return result
 
