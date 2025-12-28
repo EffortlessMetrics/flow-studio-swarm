@@ -940,11 +940,100 @@ class ClaudeStepEngine(StepEngine):
     ANALYSIS_STEP_PATTERNS = ["context", "analyze", "assess", "review", "audit", "check"]
     BUILD_STEP_PATTERNS = ["implement", "author", "write", "fix", "create", "mutate"]
 
+    # JIT Finalization prompt template
+    JIT_FINALIZATION_PROMPT = """
+---
+Your work session is complete. Now create a structured handoff for the next step.
+
+Use the `Write` tool to create a file at: {handoff_path}
+
+The file MUST be valid JSON with this exact structure:
+```json
+{{
+  "step_id": "{step_id}",
+  "flow_key": "{flow_key}",
+  "run_id": "{run_id}",
+  "status": "VERIFIED | UNVERIFIED | PARTIAL | BLOCKED",
+  "summary": "2-paragraph summary of what you accomplished and any issues encountered",
+  "artifacts": {{
+    "artifact_name": "relative/path/from/run_base"
+  }},
+  "proposed_next_step": "step_id or null if flow should terminate",
+  "notes_for_next_step": "What the next agent should know",
+  "confidence": 0.0 to 1.0
+}}
+```
+
+Guidelines:
+- status: VERIFIED if you completed the task successfully, UNVERIFIED if tests fail or work is incomplete, PARTIAL if some work done but blocked, BLOCKED if you cannot proceed
+- summary: Be concise but include what changed, what was tested, any concerns
+- artifacts: List ALL files you created or modified (paths relative to run base)
+- proposed_next_step: Based on your status and the flow spec, where should we go next?
+- confidence: How confident are you in this handoff? (1.0 = very confident)
+
+Write the file now.
+---
+"""
+
+    # Router prompt template for agentic routing decisions
+    ROUTER_PROMPT_TEMPLATE = """
+You are a routing resolver. Your job is to analyze a step's handoff and decide the next move in the flow.
+
+## Handoff from Previous Step
+
+```json
+{handoff_json}
+```
+
+## Step Routing Configuration
+
+```yaml
+step_id: {step_id}
+flow_key: {flow_key}
+routing:
+  kind: {routing_kind}
+  next: {routing_next}
+  loop_target: {loop_target}
+  loop_condition_field: {loop_condition_field}
+  loop_success_values: {loop_success_values}
+  max_iterations: {max_iterations}
+current_iteration: {current_iteration}
+```
+
+## Decision Logic
+
+Based on the handoff status and routing configuration:
+
+1. If status is VERIFIED and routing kind is "linear" → decision: "advance" to next step
+2. If status is VERIFIED and routing kind is "microloop" → decision: "advance" (exit loop)
+3. If status is UNVERIFIED and routing kind is "microloop" and iterations < max → decision: "loop" back to loop_target
+4. If status is UNVERIFIED and iterations >= max → decision: "advance" (exit loop with documented concerns)
+5. If status is BLOCKED → decision: "terminate" (cannot proceed)
+6. If status is PARTIAL → decision: "advance" but flag needs_human: true
+
+## Output Format
+
+Output ONLY a valid JSON object with this structure:
+```json
+{{
+  "decision": "advance" | "loop" | "terminate" | "branch",
+  "next_step_id": "<step_id or null>",
+  "route": null,
+  "reason": "<explanation for this routing decision>",
+  "confidence": <0.0 to 1.0>,
+  "needs_human": <true | false>
+}}
+```
+
+Analyze the handoff and emit your routing decision now.
+"""
+
     def __init__(
         self,
         repo_root: Optional[Path] = None,
         mode: Optional[str] = None,
         profile_id: Optional[str] = None,
+        enable_stats_db: bool = True,
     ):
         """Initialize the Claude step engine.
 
@@ -953,6 +1042,7 @@ class ClaudeStepEngine(StepEngine):
             mode: Override mode selection ("stub", "sdk", or "cli").
                   If None, reads from config/environment.
             profile_id: Optional profile ID for flow-aware budget resolution.
+            enable_stats_db: Whether to record stats to DuckDB. Default True.
         """
         from swarm.config.runtime_config import (
             get_cli_path,
@@ -977,11 +1067,21 @@ class ClaudeStepEngine(StepEngine):
         self._provider = get_engine_provider("claude")
         self._cli_cmd = get_cli_path("claude")
 
+        # Stats database for telemetry
+        self._stats_db = None
+        if enable_stats_db:
+            try:
+                from swarm.runtime.db import get_stats_db
+                self._stats_db = get_stats_db()
+            except Exception as e:
+                logger.debug("StatsDB not available: %s", e)
+
         logger.debug(
-            "ClaudeStepEngine initialized: mode=%s, provider=%s, cli_cmd=%s",
+            "ClaudeStepEngine initialized: mode=%s, provider=%s, cli_cmd=%s, stats_db=%s",
             self._mode,
             self._provider,
             self._cli_cmd,
+            self._stats_db is not None,
         )
 
     @property
@@ -1070,20 +1170,197 @@ class ClaudeStepEngine(StepEngine):
         # Default to full tools
         return self.DEFAULT_TOOLS
 
+    def _load_agent_persona(self, agent_key: str) -> Optional[str]:
+        """Load agent persona from .claude/agents/<agent_key>.md.
+
+        Strips YAML frontmatter and returns the Markdown body containing
+        the agent's identity, behavior, and constraints.
+
+        Args:
+            agent_key: The agent identifier (e.g., "code-implementer").
+
+        Returns:
+            The agent's persona markdown (without frontmatter), or None if not found.
+        """
+        if not self.repo_root:
+            return None
+
+        agent_path = Path(self.repo_root) / ".claude" / "agents" / f"{agent_key}.md"
+        if not agent_path.exists():
+            logger.debug("Agent persona not found: %s", agent_path)
+            return None
+
+        try:
+            content = agent_path.read_text(encoding="utf-8")
+
+            # Strip YAML frontmatter (between --- markers)
+            if content.startswith("---"):
+                # Find the closing ---
+                end_marker = content.find("---", 3)
+                if end_marker != -1:
+                    # Skip past the closing --- and any immediate newline
+                    body_start = end_marker + 3
+                    if body_start < len(content) and content[body_start] == "\n":
+                        body_start += 1
+                    content = content[body_start:]
+
+            return content.strip()
+
+        except (OSError, IOError) as e:
+            logger.warning("Failed to load agent persona %s: %s", agent_key, e)
+            return None
+
+    async def _run_router_session(
+        self,
+        handoff_data: Dict[str, Any],
+        ctx: StepContext,
+        cwd: str,
+    ) -> Optional["RoutingSignal"]:
+        """Run a lightweight router session to decide the next step.
+
+        This is a fresh, short-lived session that analyzes the handoff
+        and produces a routing decision. Uses the ROUTER_PROMPT_TEMPLATE.
+
+        Args:
+            handoff_data: The handoff JSON from JIT finalization.
+            ctx: Step execution context with routing configuration.
+            cwd: Working directory for the session.
+
+        Returns:
+            RoutingSignal if routing was determined, None if routing failed.
+        """
+        from claude_code_sdk import ClaudeCodeOptions, query
+        from .types import RoutingDecision, RoutingSignal
+
+        # Extract routing config from context
+        routing = ctx.routing or RoutingContext()
+        routing_config = ctx.extra.get("routing", {})
+
+        # Build router prompt
+        router_prompt = self.ROUTER_PROMPT_TEMPLATE.format(
+            handoff_json=json.dumps(handoff_data, indent=2),
+            step_id=ctx.step_id,
+            flow_key=ctx.flow_key,
+            routing_kind=routing_config.get("kind", "linear"),
+            routing_next=routing_config.get("next", "null"),
+            loop_target=routing_config.get("loop_target", "null"),
+            loop_condition_field=routing_config.get("loop_condition_field", "status"),
+            loop_success_values=routing_config.get("loop_success_values", ["VERIFIED"]),
+            max_iterations=routing_config.get("max_iterations", 3),
+            current_iteration=routing.loop_iteration,
+        )
+
+        # Router uses minimal options - just needs to analyze and respond
+        options = ClaudeCodeOptions(
+            permission_mode="bypassPermissions",
+        )
+
+        # Collect router response
+        router_response = ""
+
+        try:
+            logger.debug("Starting router session for step %s", ctx.step_id)
+
+            async for event in query(
+                prompt=router_prompt,
+                cwd=cwd,
+                options=options,
+            ):
+                # Extract text content from messages
+                if hasattr(event, "message"):
+                    message = getattr(event, "message", event)
+                    content = getattr(message, "content", "")
+                    if isinstance(content, list):
+                        text_parts = [
+                            getattr(b, "text", str(getattr(b, "content", "")))
+                            for b in content
+                        ]
+                        content = "\n".join(text_parts)
+                    if content:
+                        router_response += content
+
+            logger.debug("Router session complete, parsing response")
+
+            # Parse JSON from response (may be wrapped in markdown)
+            json_match = None
+            # Try to find JSON block in response
+            if "```json" in router_response:
+                start = router_response.find("```json") + 7
+                end = router_response.find("```", start)
+                if end > start:
+                    json_match = router_response[start:end].strip()
+            elif "```" in router_response:
+                start = router_response.find("```") + 3
+                end = router_response.find("```", start)
+                if end > start:
+                    json_match = router_response[start:end].strip()
+            else:
+                # Try to parse entire response as JSON
+                json_match = router_response.strip()
+
+            if not json_match:
+                logger.warning("Router response contained no parseable JSON")
+                return None
+
+            routing_data = json.loads(json_match)
+
+            # Map decision string to enum
+            decision_str = routing_data.get("decision", "advance").lower()
+            decision_map = {
+                "advance": RoutingDecision.ADVANCE,
+                "loop": RoutingDecision.LOOP,
+                "terminate": RoutingDecision.TERMINATE,
+                "branch": RoutingDecision.BRANCH,
+            }
+            decision = decision_map.get(decision_str, RoutingDecision.ADVANCE)
+
+            return RoutingSignal(
+                decision=decision,
+                next_step_id=routing_data.get("next_step_id"),
+                route=routing_data.get("route"),
+                reason=routing_data.get("reason", ""),
+                confidence=float(routing_data.get("confidence", 0.7)),
+                needs_human=bool(routing_data.get("needs_human", False)),
+            )
+
+        except json.JSONDecodeError as e:
+            logger.warning("Failed to parse router response as JSON: %s", e)
+            logger.debug("Router response was: %s", router_response[:500])
+            return None
+        except Exception as e:
+            logger.warning("Router session failed: %s", e)
+            return None
+
     def _build_prompt(
         self, ctx: StepContext
-    ) -> Tuple[str, Optional[HistoryTruncationInfo]]:
+    ) -> Tuple[str, Optional[HistoryTruncationInfo], Optional[str]]:
         """Build a context-aware prompt for a step.
 
-        Uses the same pattern as GeminiStepEngine for consistency.
+        Composes the prompt with agent persona (if available) and step context.
+        Returns the persona separately for system_prompt composition.
 
         Args:
             ctx: Step execution context.
 
         Returns:
-            Tuple of (formatted prompt string, truncation info or None if no history).
+            Tuple of (formatted prompt string, truncation info or None, agent persona or None).
         """
-        lines = [
+        lines = []
+
+        # Load agent persona for the primary agent
+        agent_persona = None
+        if ctx.step_agents:
+            agent_persona = self._load_agent_persona(ctx.step_agents[0])
+            if agent_persona:
+                lines.append("# Your Identity")
+                lines.append("")
+                lines.append(agent_persona)
+                lines.append("")
+                lines.append("---")
+                lines.append("")
+
+        # Flow and step context
+        lines.extend([
             f"# Flow: {ctx.flow_title}",
             f"# Step: {ctx.step_id} (Step {ctx.step_index} of {ctx.total_steps})",
             f"# Run ID: {ctx.run_id}",
@@ -1091,10 +1368,10 @@ class ClaudeStepEngine(StepEngine):
             "## Step Role",
             ctx.step_role,
             "",
-        ]
+        ])
 
-        # Agent assignments
-        if ctx.step_agents:
+        # Agent assignments (for multi-agent steps)
+        if ctx.step_agents and len(ctx.step_agents) > 1:
             lines.append("## Assigned Agents")
             for agent in ctx.step_agents:
                 lines.append(f"- {agent}")
@@ -1260,11 +1537,12 @@ class ClaudeStepEngine(StepEngine):
                 "3. Read any required inputs from previous steps or RUN_BASE",
                 "4. Write all outputs to the correct RUN_BASE location",
                 "5. Be concise and focused on the specific step",
+                "6. When finished, wait for finalization instructions",
                 "",
             ]
         )
 
-        return "\n".join(lines), truncation_info
+        return "\n".join(lines), truncation_info, agent_persona
 
     def run_step(self, ctx: StepContext) -> Tuple[StepResult, Iterable[RunEvent]]:
         """Execute a step using Claude Agent SDK, CLI, or stub mode.
@@ -1369,7 +1647,7 @@ class ClaudeStepEngine(StepEngine):
         r_path = make_receipt_path(ctx.run_base, ctx.step_id, agent_key)
 
         # Build prompt to get truncation info (even in stub mode for consistency)
-        _, truncation_info = self._build_prompt(ctx)
+        _, truncation_info, _ = self._build_prompt(ctx)
 
         # Write transcript JSONL (stub messages)
         transcript_messages = [
@@ -1478,8 +1756,8 @@ class ClaudeStepEngine(StepEngine):
         t_path = make_transcript_path(ctx.run_base, ctx.step_id, agent_key, "claude")
         r_path = make_receipt_path(ctx.run_base, ctx.step_id, agent_key)
 
-        # Build prompt (returns tuple with truncation info)
-        prompt, truncation_info = self._build_prompt(ctx)
+        # Build prompt (returns tuple with truncation info and persona)
+        prompt, truncation_info, _ = self._build_prompt(ctx)
 
         # Build CLI command
         args = [
@@ -1713,19 +1991,38 @@ class ClaudeStepEngine(StepEngine):
         t_path = make_transcript_path(ctx.run_base, ctx.step_id, agent_key, "claude")
         r_path = make_receipt_path(ctx.run_base, ctx.step_id, agent_key)
 
-        # Build prompt (returns tuple with truncation info)
-        prompt, truncation_info = self._build_prompt(ctx)
-
-        # Get tools for this step
-        allowed_tools = self._get_tools_for_step(ctx)
+        # Build prompt (returns tuple with truncation info and persona)
+        prompt, truncation_info, agent_persona = self._build_prompt(ctx)
 
         # Set up working directory
         cwd = str(ctx.repo_root) if ctx.repo_root else str(Path.cwd())
 
-        # Prepare options
+        # Prepare options with HIGH TRUST configuration
+        # - permission_mode="bypassPermissions": No interactive approval needed
+        # - No allowed_tools restriction: Full access to all tools
+        # - system_prompt uses preset + persona append for identity injection
         options = ClaudeCodeOptions(
-            allowed_tools=allowed_tools,
+            permission_mode="bypassPermissions",
+            # Note: We pass persona in the user prompt rather than system_prompt
+            # because the SDK's preset handling is more reliable there
         )
+
+        # Compute handoff path for JIT finalization
+        handoff_dir = ctx.run_base / "handoff"
+        handoff_path = handoff_dir / f"{ctx.step_id}.draft.json"
+
+        # Record step start in stats DB
+        if self._stats_db:
+            try:
+                self._stats_db.record_step_start(
+                    run_id=ctx.run_id,
+                    flow_key=ctx.flow_key,
+                    step_id=ctx.step_id,
+                    step_index=ctx.step_index,
+                    agent_key=agent_key,
+                )
+            except Exception as db_err:
+                logger.debug("Failed to record step start: %s", db_err)
 
         # Collect transcript entries and assistant output
         raw_events: List[Dict[str, Any]] = []
@@ -1830,6 +2127,25 @@ class ClaudeStepEngine(StepEngine):
                         )
                     )
 
+                    # Record tool call in stats DB
+                    if self._stats_db:
+                        try:
+                            # Extract file path for file operations
+                            target_path = None
+                            if tool_name in ("Edit", "Write", "Read"):
+                                target_path = str(getattr(event, "file_path", ""))[:500]
+
+                            self._stats_db.record_tool_call(
+                                run_id=ctx.run_id,
+                                step_id=ctx.step_id,
+                                tool_name=tool_name,
+                                phase="work",
+                                success=success,
+                                target_path=target_path,
+                            )
+                        except Exception as db_err:
+                            logger.debug("Failed to record tool call: %s", db_err)
+
                 elif event_type == "ResultEvent" or hasattr(event, "result"):
                     # Final result event
                     result = getattr(event, "result", event)
@@ -1864,6 +2180,130 @@ class ClaudeStepEngine(StepEngine):
 
                 raw_events.append(event_dict)
 
+            # ===== JIT FINALIZATION =====
+            # Work session complete. Now inject finalization prompt to extract state.
+            logger.debug("Work session complete for step %s, starting JIT finalization", ctx.step_id)
+
+            # Ensure handoff directory exists
+            handoff_dir.mkdir(parents=True, exist_ok=True)
+
+            # Build finalization prompt
+            finalization_prompt = self.JIT_FINALIZATION_PROMPT.format(
+                handoff_path=str(handoff_path),
+                step_id=ctx.step_id,
+                flow_key=ctx.flow_key,
+                run_id=ctx.run_id,
+            )
+
+            # Add context about what was accomplished
+            work_summary = "".join(full_assistant_text)
+            if len(work_summary) > 4000:
+                work_summary = work_summary[:4000] + "... (truncated)"
+
+            finalization_with_context = f"""
+## Work Session Summary
+{work_summary}
+
+{finalization_prompt}
+"""
+
+            # Execute finalization query (same options, fresh prompt)
+            finalization_events: List[Dict[str, Any]] = []
+            try:
+                async for event in query(
+                    prompt=finalization_with_context,
+                    cwd=cwd,
+                    options=options,
+                ):
+                    now = datetime.now(timezone.utc)
+                    event_dict = {"timestamp": now.isoformat() + "Z", "phase": "finalization"}
+
+                    event_type = getattr(event, "type", None) or type(event).__name__
+
+                    if event_type == "AssistantMessageEvent" or hasattr(event, "message"):
+                        message = getattr(event, "message", event)
+                        content = getattr(message, "content", "")
+                        if isinstance(content, list):
+                            text_parts = [getattr(b, "text", str(getattr(b, "content", ""))) for b in content]
+                            content = "\n".join(text_parts)
+                        event_dict["type"] = "message"
+                        event_dict["content"] = content[:500]
+
+                    elif event_type == "ToolUseEvent" or hasattr(event, "tool_name"):
+                        tool_name = getattr(event, "tool_name", getattr(event, "name", "unknown"))
+                        event_dict["type"] = "tool_use"
+                        event_dict["tool"] = tool_name
+
+                    elif event_type == "ToolResultEvent" or hasattr(event, "tool_result"):
+                        event_dict["type"] = "tool_result"
+                        event_dict["success"] = getattr(event, "success", True)
+
+                    else:
+                        event_dict["type"] = event_type
+
+                    finalization_events.append(event_dict)
+                    raw_events.append(event_dict)
+
+                logger.debug("JIT finalization complete for step %s", ctx.step_id)
+
+            except Exception as fin_error:
+                logger.warning("JIT finalization failed for step %s: %s", ctx.step_id, fin_error)
+                raw_events.append({
+                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                    "phase": "finalization",
+                    "type": "error",
+                    "error": str(fin_error),
+                })
+
+            # ===== HANDOFF EXTRACTION =====
+            # Try to read the handoff file written by the agent
+            handoff_data: Optional[Dict[str, Any]] = None
+            if handoff_path.exists():
+                try:
+                    handoff_data = json.loads(handoff_path.read_text(encoding="utf-8"))
+                    logger.debug("Handoff extracted from %s: status=%s", handoff_path, handoff_data.get("status"))
+                except (json.JSONDecodeError, OSError) as e:
+                    logger.warning("Failed to parse handoff file %s: %s", handoff_path, e)
+            else:
+                logger.warning("Handoff file not created by agent: %s", handoff_path)
+
+            # ===== AGENTIC ROUTING =====
+            # Run a lightweight router session to decide the next step
+            routing_signal: Optional["RoutingSignal"] = None
+            if handoff_data:
+                try:
+                    routing_signal = await self._run_router_session(
+                        handoff_data=handoff_data,
+                        ctx=ctx,
+                        cwd=cwd,
+                    )
+                    if routing_signal:
+                        logger.debug(
+                            "Router decision for step %s: %s -> %s (confidence=%.2f)",
+                            ctx.step_id,
+                            routing_signal.decision.value,
+                            routing_signal.next_step_id,
+                            routing_signal.confidence,
+                        )
+                        # Record routing event
+                        raw_events.append({
+                            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                            "phase": "routing",
+                            "type": "routing_decision",
+                            "decision": routing_signal.decision.value,
+                            "next_step_id": routing_signal.next_step_id,
+                            "confidence": routing_signal.confidence,
+                            "reason": routing_signal.reason,
+                        })
+                except Exception as route_error:
+                    logger.warning("Router session failed for step %s: %s", ctx.step_id, route_error)
+                    raw_events.append({
+                        "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                        "phase": "routing",
+                        "type": "error",
+                        "error": str(route_error),
+                    })
+
             status = "succeeded"
             error = None
 
@@ -1871,6 +2311,8 @@ class ClaudeStepEngine(StepEngine):
             logger.warning("SDK query failed for step %s: %s", ctx.step_id, e)
             status = "failed"
             error = str(e)
+            handoff_data = None  # Ensure defined for receipt/result building
+            routing_signal = None  # Ensure defined for receipt/result building
             raw_events.append(
                 {
                     "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
@@ -1903,23 +2345,90 @@ class ClaudeStepEngine(StepEngine):
             "status": status,
             "tokens": token_counts,
             "transcript_path": str(t_path.relative_to(ctx.run_base)),
-            "tools_allowed": allowed_tools,
+            "permission_mode": "bypassPermissions",  # High-trust mode
+            "jit_finalization": handoff_path.exists(),
         }
         # Add context truncation info if provided
         if truncation_info:
             receipt["context_truncation"] = truncation_info.to_dict()
 
+        # Add handoff data if extracted
+        if handoff_data:
+            receipt["handoff"] = {
+                "status": handoff_data.get("status"),
+                "proposed_next_step": handoff_data.get("proposed_next_step"),
+                "confidence": handoff_data.get("confidence"),
+                "artifacts": handoff_data.get("artifacts", {}),
+            }
+            # Use handoff status if available
+            handoff_status = handoff_data.get("status", "").upper()
+            if handoff_status in ("VERIFIED", "UNVERIFIED", "PARTIAL", "BLOCKED"):
+                receipt["handoff_status"] = handoff_status
+
+        # Add routing signal if determined
+        if routing_signal:
+            receipt["routing_signal"] = {
+                "decision": routing_signal.decision.value,
+                "next_step_id": routing_signal.next_step_id,
+                "route": routing_signal.route,
+                "reason": routing_signal.reason,
+                "confidence": routing_signal.confidence,
+                "needs_human": routing_signal.needs_human,
+            }
+
         with r_path.open("w", encoding="utf-8") as f:
             json.dump(receipt, f, indent=2)
 
-        # Build output text
-        combined_text = "".join(full_assistant_text)
-        if len(combined_text) > 2000:
-            output_text = combined_text[:2000] + "... (truncated)"
-        elif combined_text:
-            output_text = combined_text
+        # Build output text - prefer handoff summary if available
+        if handoff_data and handoff_data.get("summary"):
+            output_text = handoff_data["summary"]
+            if len(output_text) > 2000:
+                output_text = output_text[:2000] + "... (truncated)"
         else:
-            output_text = f"Step {ctx.step_id} completed. Events: {len(raw_events)}"
+            combined_text = "".join(full_assistant_text)
+            if len(combined_text) > 2000:
+                output_text = combined_text[:2000] + "... (truncated)"
+            elif combined_text:
+                output_text = combined_text
+            else:
+                output_text = f"Step {ctx.step_id} completed. Events: {len(raw_events)}"
+
+        # Build artifacts dict including handoff and routing
+        artifacts = {
+            "transcript_path": str(t_path),
+            "receipt_path": str(r_path),
+        }
+        if handoff_path.exists():
+            artifacts["handoff_path"] = str(handoff_path)
+        if handoff_data and handoff_data.get("artifacts"):
+            artifacts["step_artifacts"] = handoff_data["artifacts"]
+        if routing_signal:
+            artifacts["routing_signal"] = {
+                "decision": routing_signal.decision.value,
+                "next_step_id": routing_signal.next_step_id,
+                "confidence": routing_signal.confidence,
+                "needs_human": routing_signal.needs_human,
+            }
+
+        # Record step end in stats DB
+        if self._stats_db:
+            try:
+                self._stats_db.record_step_end(
+                    run_id=ctx.run_id,
+                    flow_key=ctx.flow_key,
+                    step_id=ctx.step_id,
+                    status=status,
+                    duration_ms=duration_ms,
+                    prompt_tokens=token_counts.get("prompt", 0),
+                    completion_tokens=token_counts.get("completion", 0),
+                    handoff_status=handoff_data.get("status") if handoff_data else None,
+                    routing_decision=routing_signal.decision.value if routing_signal else None,
+                    routing_next_step=routing_signal.next_step_id if routing_signal else None,
+                    routing_confidence=routing_signal.confidence if routing_signal else None,
+                    error_message=error,
+                )
+            except Exception as db_err:
+                logger.debug("Failed to record step end: %s", db_err)
 
         result = StepResult(
             step_id=ctx.step_id,
@@ -1927,10 +2436,7 @@ class ClaudeStepEngine(StepEngine):
             output=output_text,
             error=error,
             duration_ms=duration_ms,
-            artifacts={
-                "transcript_path": str(t_path),
-                "receipt_path": str(r_path),
-            },
+            artifacts=artifacts,
         )
 
         return result, events
