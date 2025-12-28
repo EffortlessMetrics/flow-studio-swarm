@@ -88,6 +88,15 @@ from .resolvers import (
     load_envelope_writer_prompt,
 )
 
+# Import diff scanner for forensic file change detection
+from .diff_scanner import (
+    FileChanges,
+    file_changes_to_dict,
+    scan_file_changes,
+    scan_file_changes_sync,
+    create_file_changes_event,
+)
+
 # Module logger
 logger = logging.getLogger(__name__)
 
@@ -1722,6 +1731,7 @@ current_iteration: {template_vars['current_iteration']}
         step_result: StepResult,
         routing_signal: Optional[RoutingSignal],
         work_summary: str,
+        file_changes: Optional[Dict[str, Any]] = None,
     ) -> Optional[HandoffEnvelope]:
         """Write structured HandoffEnvelope using envelope_writer resolver.
 
@@ -1734,6 +1744,7 @@ current_iteration: {template_vars['current_iteration']}
             step_result: Result from step execution.
             routing_signal: Routing decision from router session (may be None).
             work_summary: Summary text from the step's work session.
+            file_changes: Forensic file mutation scan results (optional).
 
         Returns:
             HandoffEnvelope if successfully created, None otherwise.
@@ -1750,13 +1761,13 @@ current_iteration: {template_vars['current_iteration']}
         if not template_path.exists():
             logger.warning("envelope_writer.md template not found at %s", template_path)
             # Create a default envelope without LLM assistance
-            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary)
+            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary, file_changes)
 
         try:
             template_content = template_path.read_text(encoding="utf-8")
         except (OSError, IOError) as e:
             logger.warning("Failed to load envelope_writer.md: %s", e)
-            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary)
+            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary, file_changes)
 
         # Build input data for the envelope writer
         routing_data = {
@@ -1846,7 +1857,7 @@ Error: {step_result.error or "None"}
 
             if not json_match:
                 logger.warning("Envelope writer response contained no parseable JSON")
-                return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary)
+                return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary, file_changes)
 
             envelope_data = json.loads(json_match)
 
@@ -1862,6 +1873,7 @@ Error: {step_result.error or "None"}
                 ),
                 summary=envelope_data.get("summary", work_summary[:2000] if work_summary else ""),
                 artifacts=envelope_data.get("artifacts", {}),
+                file_changes=file_changes or {},
                 status=envelope_data.get("status", step_result.status),
                 error=envelope_data.get("error"),
                 duration_ms=envelope_data.get("duration_ms", step_result.duration_ms),
@@ -1876,10 +1888,10 @@ Error: {step_result.error or "None"}
 
         except json.JSONDecodeError as e:
             logger.warning("Failed to parse envelope writer response as JSON: %s", e)
-            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary)
+            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary, file_changes)
         except Exception as e:
             logger.warning("Envelope writer session failed for step %s: %s", ctx.step_id, e)
-            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary)
+            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary, file_changes)
 
     def _create_fallback_envelope(
         self,
@@ -1887,6 +1899,7 @@ Error: {step_result.error or "None"}
         step_result: StepResult,
         routing_signal: Optional[RoutingSignal],
         work_summary: str,
+        file_changes: Optional[Dict[str, Any]] = None,
     ) -> HandoffEnvelope:
         """Create a fallback HandoffEnvelope without LLM assistance.
 
@@ -1897,6 +1910,7 @@ Error: {step_result.error or "None"}
             step_result: Result from step execution.
             routing_signal: Routing decision from router session (may be None).
             work_summary: Summary text from the step's work session.
+            file_changes: Forensic file mutation scan results (optional).
 
         Returns:
             HandoffEnvelope with basic step information.
@@ -1912,6 +1926,7 @@ Error: {step_result.error or "None"}
             ),
             summary=work_summary[:2000] if work_summary else f"Step {ctx.step_id} completed with status {step_result.status}",
             artifacts=step_result.artifacts or {},
+            file_changes=file_changes or {},
             status=step_result.status,
             error=step_result.error,
             duration_ms=step_result.duration_ms,
@@ -2379,9 +2394,33 @@ Error: {step_result.error or "None"}
         Returns:
             FinalizationResult with stub handoff data and envelope.
         """
+        events: List[RunEvent] = []
+        agent_key = ctx.step_agents[0] if ctx.step_agents else None
+
         # Create handoff directory
         handoff_dir = ctx.run_base / "handoff"
         handoff_dir.mkdir(parents=True, exist_ok=True)
+
+        # Scan for file changes (forensic - captures all mutations)
+        file_changes = scan_file_changes_sync(ctx.repo_root)
+        file_changes_dict = file_changes_to_dict(file_changes)
+
+        if file_changes.has_changes:
+            logger.debug(
+                "Diff scan for step %s: %s",
+                ctx.step_id,
+                file_changes.summary,
+            )
+            # Create file_changes event
+            events.append(RunEvent(
+                run_id=ctx.run_id,
+                ts=datetime.now(timezone.utc),
+                kind="file_changes",
+                flow_key=ctx.flow_key,
+                step_id=ctx.step_id,
+                agent_key=agent_key,
+                payload=file_changes_dict,
+            ))
 
         # Create stub handoff data
         handoff_data: Dict[str, Any] = {
@@ -2392,6 +2431,7 @@ Error: {step_result.error or "None"}
             "summary": work_summary[:500] if work_summary else f"[STUB] Step {ctx.step_id} completed",
             "can_further_iteration_help": "no",  # Allow loop exit in stub mode
             "artifacts": [],
+            "file_changes": file_changes_dict,
             "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
         }
 
@@ -2400,7 +2440,7 @@ Error: {step_result.error or "None"}
         with handoff_path.open("w", encoding="utf-8") as f:
             json.dump(handoff_data, f, indent=2)
 
-        # Create stub envelope
+        # Create stub envelope with file_changes
         envelope = HandoffEnvelope(
             step_id=ctx.step_id,
             flow_key=ctx.flow_key,
@@ -2412,6 +2452,7 @@ Error: {step_result.error or "None"}
                 needs_human=False,
             ),
             summary=handoff_data["summary"],
+            file_changes=file_changes_dict,
             status=handoff_data["status"],
             duration_ms=step_result.duration_ms,
             timestamp=datetime.now(timezone.utc),
@@ -2427,7 +2468,7 @@ Error: {step_result.error or "None"}
             handoff_data=handoff_data,
             envelope=envelope,
             work_summary=work_summary,
-            events=[],
+            events=events,
         )
 
     def _build_finalization_prompt(
@@ -2605,6 +2646,27 @@ The file must be valid JSON matching the HandoffEnvelope schema.
         else:
             logger.warning("Handoff file not created by agent: %s", handoff_path)
 
+        # Scan for file changes (forensic - captures all mutations)
+        file_changes = await scan_file_changes(ctx.repo_root)
+        file_changes_dict = file_changes_to_dict(file_changes)
+
+        if file_changes.has_changes:
+            logger.debug(
+                "Diff scan for step %s: %s",
+                ctx.step_id,
+                file_changes.summary,
+            )
+            # Create file_changes event
+            events.append(RunEvent(
+                run_id=ctx.run_id,
+                ts=datetime.now(timezone.utc),
+                kind="file_changes",
+                flow_key=ctx.flow_key,
+                step_id=ctx.step_id,
+                agent_key=agent_key,
+                payload=file_changes_dict,
+            ))
+
         # Create envelope (with None routing_signal for now - routing happens separately)
         envelope: Optional[HandoffEnvelope] = None
         try:
@@ -2613,6 +2675,7 @@ The file must be valid JSON matching the HandoffEnvelope schema.
                 step_result=step_result,
                 routing_signal=None,  # Will be added by orchestrator after route_step()
                 work_summary=work_summary,
+                file_changes=file_changes_dict,
             )
             if envelope:
                 logger.debug("Handoff envelope created for step %s: status=%s", ctx.step_id, envelope.status)

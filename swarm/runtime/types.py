@@ -112,6 +112,7 @@ class HandoffEnvelope:
         routing_signal: The routing decision signal for this step.
         summary: Compressed summary of step output (1-2k chars max).
         artifacts: Map of artifact names to their file paths (relative to RUN_BASE).
+        file_changes: Forensic file mutation scan results (authoritative, not agent-reported).
         status: Execution status of the step.
         error: Error message if the step failed.
         duration_ms: Execution duration in milliseconds.
@@ -124,6 +125,7 @@ class HandoffEnvelope:
     routing_signal: RoutingSignal
     summary: str
     artifacts: Dict[str, str] = field(default_factory=dict)
+    file_changes: Dict[str, Any] = field(default_factory=dict)
     status: str = "succeeded"
     error: Optional[str] = None
     duration_ms: int = 0
@@ -491,6 +493,7 @@ def handoff_envelope_to_dict(envelope: HandoffEnvelope) -> Dict[str, Any]:
         "routing_signal": routing_signal_to_dict(envelope.routing_signal),
         "summary": envelope.summary,
         "artifacts": dict(envelope.artifacts),
+        "file_changes": dict(envelope.file_changes),
         "status": envelope.status,
         "error": envelope.error,
         "duration_ms": envelope.duration_ms,
@@ -517,6 +520,7 @@ def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
         routing_signal=routing_signal,
         summary=data.get("summary", ""),
         artifacts=dict(data.get("artifacts", {})),
+        file_changes=dict(data.get("file_changes", {})),
         status=data.get("status", "succeeded"),
         error=data.get("error"),
         duration_ms=data.get("duration_ms", 0),
