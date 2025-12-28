@@ -1,0 +1,62 @@
+[1m============================= test session starts =============================[0m
+platform win32 -- Python 3.13.4, pytest-9.0.2, pluggy-1.6.0 -- C:\Code\Swarm\flow-studio-swarm\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: C:\Code\Swarm\flow-studio-swarm
+configfile: pyproject.toml
+plugins: anyio-4.12.0, bdd-8.1.0, benchmark-5.2.3
+[1mcollecting ... [0mcollected 51 items
+
+tests/test_step_engine_sdk_smoke.py::TestClaudeSDKSmoke::test_sdk_mode_produces_receipt [33mSKIPPED[0m[32m [  1%][0m
+tests/test_step_engine_sdk_smoke.py::TestClaudeSDKSmoke::test_sdk_mode_produces_transcript [33mSKIPPED[0m[32m [  3%][0m
+tests/test_step_engine_sdk_smoke.py::TestClaudeSDKSmoke::test_sdk_mode_reports_tokens [33mSKIPPED[0m[32m [  5%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendRegistration::test_list_backends_includes_claude_step_orchestrator [32mPASSED[0m[32m [  7%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendRegistration::test_get_backend_returns_claude_stepwise_backend [32mPASSED[0m[32m [  9%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendCapabilities::test_capabilities_id [32mPASSED[0m[32m [ 11%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendCapabilities::test_capabilities_label [32mPASSED[0m[32m [ 13%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendCapabilities::test_capabilities_streaming_support [32mPASSED[0m[32m [ 15%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendCapabilities::test_capabilities_events_support [32mPASSED[0m[32m [ 17%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendCapabilities::test_capabilities_cancel_support [32mPASSED[0m[32m [ 19%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendCapabilities::test_capabilities_no_replay_support [32mPASSED[0m[32m [ 21%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendRunCreation::test_start_creates_run [32mPASSED[0m[32m [ 23%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendTranscripts::test_run_writes_transcript_and_receipt_files [32mPASSED[0m[32m [ 25%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendEdgeCases::test_get_summary_nonexistent_run [32mPASSED[0m[32m [ 27%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendEdgeCases::test_get_events_nonexistent_run [32mPASSED[0m[32m [ 29%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendEdgeCases::test_list_summaries_returns_runs [32mPASSED[0m[32m [ 31%][0m
+tests/test_claude_stepwise_backend.py::TestClaudeStepwiseBackendSummary::test_get_summary_returns_correct_data [32mPASSED[0m[32m [ 33%][0m
+tests/test_step_engine_contract.py::TestStepResultContract::test_duration_ms_is_non_negative [32mPASSED[0m[32m [ 35%][0m
+tests/test_step_engine_contract.py::TestStepResultContract::test_duration_ms_is_non_negative_claude [32mPASSED[0m[32m [ 37%][0m
+tests/test_step_engine_contract.py::TestStepResultContract::test_status_is_valid_succeeded [32mPASSED[0m[32m [ 39%][0m
+tests/test_step_engine_contract.py::TestStepResultContract::test_status_is_valid_claude [32mPASSED[0m[32m [ 41%][0m
+tests/test_step_engine_contract.py::TestStepResultContract::test_output_is_not_excessively_long [32mPASSED[0m[32m [ 43%][0m
+tests/test_step_engine_contract.py::TestStepResultContract::test_output_is_not_excessively_long_claude [32mPASSED[0m[32m [ 45%][0m
+tests/test_step_engine_contract.py::TestStepResultContract::test_step_id_matches_context [32mPASSED[0m[32m [ 47%][0m
+tests/test_step_engine_contract.py::TestStepResultContract::test_step_id_matches_context_claude [32mPASSED[0m[32m [ 49%][0m
+tests/test_step_engine_contract.py::TestStepResultContract::test_dataclass_construction_validates_duration [32mPASSED[0m[32m [ 50%][0m
+tests/test_step_engine_contract.py::TestStepResultContract::test_all_status_values_are_valid [32mPASSED[0m[32m [ 52%][0m
+tests/test_step_engine_contract.py::TestStepContextContract::test_run_base_returns_valid_path [32mPASSED[0m[32m [ 54%][0m
+tests/test_step_engine_contract.py::TestStepContextContract::test_run_base_path_structure [32mPASSED[0m[32m [ 56%][0m
+tests/test_step_engine_contract.py::TestStepContextContract::test_run_base_is_relative_to_repo_root [32mPASSED[0m[32m [ 58%][0m
+tests/test_step_engine_contract.py::TestStepContextContract::test_context_preserves_step_metadata [32mPASSED[0m[32m [ 60%][0m
+tests/test_step_engine_contract.py::TestEngineTranscriptContract::test_transcript_is_valid_jsonl_claude [32mPASSED[0m[32m [ 62%][0m
+tests/test_step_engine_contract.py::TestEngineTranscriptContract::test_transcript_messages_have_required_fields_claude [32mPASSED[0m[32m [ 64%][0m
+tests/test_step_engine_contract.py::TestEngineTranscriptContract::test_transcript_has_timestamp_claude [32mPASSED[0m[32m [ 66%][0m
+tests/test_step_engine_contract.py::TestEngineReceiptContract::test_receipt_is_valid_json_claude [32mPASSED[0m[32m [ 68%][0m
+tests/test_step_engine_contract.py::TestEngineReceiptContract::test_receipt_has_required_fields_claude [32mPASSED[0m[32m [ 70%][0m
+tests/test_step_engine_contract.py::TestEngineReceiptContract::test_receipt_engine_field_matches_claude [32mPASSED[0m[32m [ 72%][0m
+tests/test_step_engine_contract.py::TestEngineReceiptContract::test_receipt_step_id_matches_context_claude [32mPASSED[0m[32m [ 74%][0m
+tests/test_step_engine_contract.py::TestEngineReceiptContract::test_receipt_flow_key_matches_context_claude [32mPASSED[0m[32m [ 76%][0m
+tests/test_step_engine_contract.py::TestEngineReceiptContract::test_receipt_run_id_matches_context_claude [32mPASSED[0m[32m [ 78%][0m
+tests/test_step_engine_contract.py::TestEngineReceiptContract::test_receipt_duration_ms_is_non_negative_claude [32mPASSED[0m[32m [ 80%][0m
+tests/test_step_engine_contract.py::TestEngineReceiptContract::test_receipt_status_is_valid_claude [32mPASSED[0m[32m [ 82%][0m
+tests/test_step_engine_contract.py::TestEngineIdContract::test_gemini_engine_id [32mPASSED[0m[32m [ 84%][0m
+tests/test_step_engine_contract.py::TestEngineIdContract::test_claude_engine_id [32mPASSED[0m[32m [ 86%][0m
+tests/test_step_engine_contract.py::TestEngineIdContract::test_engine_ids_are_different [32mPASSED[0m[32m [ 88%][0m
+tests/test_step_engine_contract.py::TestReceiptModeProviderContract::test_receipt_has_mode_field_claude [32mPASSED[0m[32m [ 90%][0m
+tests/test_step_engine_contract.py::TestReceiptModeProviderContract::test_receipt_has_provider_field_claude [32mPASSED[0m[32m [ 92%][0m
+tests/test_step_engine_contract.py::TestReceiptModeProviderContract::test_receipt_has_mode_field_gemini [32mPASSED[0m[32m [ 94%][0m
+tests/test_step_engine_contract.py::TestReceiptModeProviderContract::test_receipt_has_provider_field_gemini [32mPASSED[0m[32m [ 96%][0m
+tests/test_step_engine_contract.py::TestRunStepReturnContract::test_run_step_returns_tuple_gemini [32mPASSED[0m[32m [ 98%][0m
+tests/test_step_engine_contract.py::TestRunStepReturnContract::test_run_step_returns_tuple_claude [32mPASSED[0m[32m [100%][0m
+
+[32m======================== [32m[1m48 passed[0m, [33m3 skipped[0m[32m in 2.24s[0m[32m ========================[0m

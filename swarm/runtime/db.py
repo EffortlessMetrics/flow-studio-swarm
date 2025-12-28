@@ -30,14 +30,91 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Projection-Only Mode
+# =============================================================================
+# When enabled, direct record_* calls are no-ops. Only ingest_events() should
+# mutate projection tables. This ensures DuckDB is a pure projection of
+# events.jsonl, fully rebuildable from disk.
+#
+# Configuration is evaluated at StatsDB construction time, not import time,
+# allowing tests to set env vars after import and before creating the instance.
+
+# Thread-local flag to indicate we're inside ingest_events()
+# When True, record_* calls are allowed even in projection-only mode
+_ingestion_context = threading.local()
+
+
+def _is_in_ingestion_context() -> bool:
+    """Check if we're currently inside ingest_events()."""
+    return getattr(_ingestion_context, 'active', False)
+
+
+# =============================================================================
+# Event Kind Canonicalization
+# =============================================================================
+# Canonical event kinds and aliases for backwards compatibility.
+# The alias map rewrites legacy names to canonical during ingestion.
+#
+# Canonical names follow the pattern: {entity}_{action}
+#   - run_created, run_started, run_completed
+#   - step_start, step_end
+#   - tool_start, tool_end
+#   - file_changes, route_decision
+
+# Canonical event kinds (the "truth" names)
+CANONICAL_EVENT_KINDS = frozenset({
+    # Run lifecycle
+    "run_created",
+    "run_started",
+    "run_completed",
+    "run_stop_requested",
+    # Step lifecycle
+    "step_start",
+    "step_end",
+    # Tool lifecycle
+    "tool_start",
+    "tool_end",
+    # Data events
+    "file_changes",
+    "route_decision",
+})
+
+# Alias map: legacy_name -> canonical_name
+# Entries map to canonical names; missing keys mean name is already canonical
+EVENT_KIND_ALIASES: Dict[str, str] = {
+    # Run aliases
+    "run_start": "run_started",
+    "run_end": "run_completed",
+    "run_cancelled": "run_completed",  # Status indicates actual outcome
+    "run_failed": "run_completed",     # Status indicates actual outcome
+    # Step aliases
+    "step_complete": "step_end",
+    "step_error": "step_end",          # Status indicates actual outcome
+}
+
+
+def normalize_event_kind(kind: str) -> str:
+    """Normalize an event kind to its canonical form.
+
+    Args:
+        kind: The event kind string (may be legacy alias).
+
+    Returns:
+        The canonical event kind.
+    """
+    return EVENT_KIND_ALIASES.get(kind, kind)
+
 
 # Lazy import to avoid hard dependency at module load time
 _duckdb = None
@@ -148,6 +225,31 @@ CREATE INDEX IF NOT EXISTS idx_steps_flow_step ON steps(flow_key, step_id);
 CREATE INDEX IF NOT EXISTS idx_tool_calls_run_id ON tool_calls(run_id);
 CREATE INDEX IF NOT EXISTS idx_tool_calls_step_id ON tool_calls(step_id);
 CREATE INDEX IF NOT EXISTS idx_file_changes_run_id ON file_changes(run_id);
+
+-- Events table: raw event storage for idempotent ingestion
+CREATE TABLE IF NOT EXISTS events (
+    event_id VARCHAR PRIMARY KEY,
+    seq INTEGER NOT NULL,
+    run_id VARCHAR NOT NULL,
+    ts TIMESTAMP NOT NULL,
+    kind VARCHAR NOT NULL,
+    flow_key VARCHAR NOT NULL,
+    step_id VARCHAR,
+    agent_key VARCHAR,
+    payload JSON,
+    ingested_at TIMESTAMP DEFAULT (now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_run_seq ON events(run_id, seq);
+CREATE INDEX IF NOT EXISTS idx_events_run_kind ON events(run_id, kind);
+
+-- Ingestion state table: offset tracking for incremental ingestion
+CREATE TABLE IF NOT EXISTS ingestion_state (
+    run_id VARCHAR PRIMARY KEY,
+    last_offset INTEGER NOT NULL DEFAULT 0,
+    last_seq INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT (now())
+);
 """
 
 
@@ -213,16 +315,73 @@ class StatsDB:
         connection: Active DuckDB connection (lazy initialized).
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(
+        self,
+        db_path: Optional[Path] = None,
+        projection_only: Optional[bool] = None,
+        projection_strict: Optional[bool] = None,
+    ):
         """Initialize the stats database.
 
         Args:
             db_path: Path to the DuckDB file. If None, uses in-memory database.
+            projection_only: If True, direct record_* calls are no-ops.
+                Defaults to SWARM_DB_PROJECTION_ONLY env var (default: true).
+            projection_strict: If True, direct record_* calls raise RuntimeError.
+                Defaults to SWARM_DB_PROJECTION_STRICT env var (default: false).
         """
         self.db_path = db_path
         self._connection = None
         self._lock = threading.RLock()
         self._initialized = False
+
+        # Capture projection config at construction time (not import time)
+        # This allows tests to set env vars after import but before construction
+        if projection_only is None:
+            projection_only = os.environ.get(
+                "SWARM_DB_PROJECTION_ONLY", "true"
+            ).lower() == "true"
+        if projection_strict is None:
+            projection_strict = os.environ.get(
+                "SWARM_DB_PROJECTION_STRICT", "false"
+            ).lower() == "true"
+
+        self._projection_only = projection_only
+        self._projection_strict = projection_strict
+
+    def _projection_guard(self, method_name: str) -> bool:
+        """Check if direct projection writes are allowed.
+
+        In projection-only mode, direct record_* calls are skipped (or raise in
+        strict mode). This ensures all DB state comes from event ingestion.
+
+        Calls from within ingest_events() are always allowed.
+
+        Args:
+            method_name: Name of the calling method for logging.
+
+        Returns:
+            True if write should proceed, False if should be skipped.
+
+        Raises:
+            RuntimeError: In strict mode when direct writes are attempted.
+        """
+        # Always allow calls from ingestion context
+        if _is_in_ingestion_context():
+            return True
+
+        if not self._projection_only:
+            return True  # Legacy mode, allow direct writes
+
+        if self._projection_strict:
+            raise RuntimeError(
+                f"Direct DB write via {method_name}() blocked in projection-only mode. "
+                "Use event emission + ingest_events() instead. "
+                "Set SWARM_DB_PROJECTION_ONLY=false to disable this check."
+            )
+
+        logger.debug("Projection-only mode: skipping direct %s() call", method_name)
+        return False
 
     @property
     def connection(self):
@@ -292,6 +451,62 @@ class StatsDB:
                 self._connection = None
 
     # =========================================================================
+    # Raw Event Storage (Idempotent)
+    # =========================================================================
+
+    def _insert_raw_event(self, event: Dict[str, Any]) -> bool:
+        """Insert raw event if not already present. Returns True if inserted."""
+        try:
+            # Use RETURNING to detect if insert happened (empty result = conflict/no insert)
+            result = self.connection.execute("""
+                INSERT INTO events (event_id, seq, run_id, ts, kind, flow_key, step_id, agent_key, payload)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (event_id) DO NOTHING
+                RETURNING event_id
+            """, [
+                event.get("event_id"),
+                event.get("seq", 0),
+                event["run_id"],
+                event["ts"],
+                event["kind"],
+                event["flow_key"],
+                event.get("step_id"),
+                event.get("agent_key"),
+                json.dumps(event.get("payload", {}))
+            ])
+            return len(result.fetchall()) > 0
+        except Exception as e:
+            logger.warning(f"Failed to insert event {event.get('event_id')}: {e}")
+            return False
+
+    def get_ingestion_offset(self, run_id: str) -> Tuple[int, int]:
+        """Get (byte_offset, last_seq) for incremental ingestion."""
+        if self.connection is None:
+            return (0, 0)
+
+        with self._lock:
+            result = self.connection.execute(
+                "SELECT last_offset, last_seq FROM ingestion_state WHERE run_id = ?",
+                [run_id]
+            ).fetchone()
+            return (result[0], result[1]) if result else (0, 0)
+
+    def set_ingestion_offset(self, run_id: str, offset: int, seq: int) -> None:
+        """Update ingestion offset after successful tail."""
+        if self.connection is None:
+            return
+
+        with self._lock:
+            self.connection.execute("""
+                INSERT INTO ingestion_state (run_id, last_offset, last_seq, updated_at)
+                VALUES (?, ?, ?, now())
+                ON CONFLICT (run_id) DO UPDATE SET
+                    last_offset = excluded.last_offset,
+                    last_seq = excluded.last_seq,
+                    updated_at = excluded.updated_at
+            """, [run_id, offset, seq])
+
+    # =========================================================================
     # Write Operations
     # =========================================================================
 
@@ -302,11 +517,23 @@ class StatsDB:
         profile_id: Optional[str] = None,
         engine_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        ts: Optional[datetime] = None,
     ):
-        """Record the start of a new run."""
+        """Record the start of a new run.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+                For replay/rebuild, always pass the event timestamp.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_run_start"):
+            return
 
+        started_at = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
@@ -318,7 +545,7 @@ class StatsDB:
                     status = 'running'
                 """,
                 [run_id, flow_keys, profile_id, engine_id,
-                 datetime.now(timezone.utc), json.dumps(metadata or {})]
+                 started_at, json.dumps(metadata or {})]
             )
 
     def record_run_end(
@@ -329,11 +556,22 @@ class StatsDB:
         completed_steps: int,
         total_tokens: int,
         total_duration_ms: int,
+        ts: Optional[datetime] = None,
     ):
-        """Record the completion of a run."""
+        """Record the completion of a run.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_run_end"):
+            return
 
+        completed_at = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
@@ -346,7 +584,7 @@ class StatsDB:
                     total_duration_ms = ?
                 WHERE run_id = ?
                 """,
-                [datetime.now(timezone.utc), status, total_steps, completed_steps,
+                [completed_at, status, total_steps, completed_steps,
                  total_tokens, total_duration_ms, run_id]
             )
 
@@ -357,18 +595,29 @@ class StatsDB:
         step_id: str,
         step_index: int,
         agent_key: Optional[str] = None,
+        ts: Optional[datetime] = None,
     ):
-        """Record the start of a step execution."""
+        """Record the start of a step execution.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_step_start"):
+            return
 
+        started_at = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
                 INSERT INTO steps (run_id, flow_key, step_id, step_index, agent_key, started_at, status)
                 VALUES (?, ?, ?, ?, ?, ?, 'running')
                 """,
-                [run_id, flow_key, step_id, step_index, agent_key, datetime.now(timezone.utc)]
+                [run_id, flow_key, step_id, step_index, agent_key, started_at]
             )
 
     def record_step_end(
@@ -385,11 +634,22 @@ class StatsDB:
         routing_next_step: Optional[str] = None,
         routing_confidence: Optional[float] = None,
         error_message: Optional[str] = None,
+        ts: Optional[datetime] = None,
     ):
-        """Record the completion of a step execution."""
+        """Record the completion of a step execution.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_step_end"):
+            return
 
+        completed_at = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
@@ -407,7 +667,7 @@ class StatsDB:
                     error_message = ?
                 WHERE run_id = ? AND flow_key = ? AND step_id = ? AND status = 'running'
                 """,
-                [datetime.now(timezone.utc), status, duration_ms,
+                [completed_at, status, duration_ms,
                  prompt_tokens, completion_tokens, prompt_tokens + completion_tokens,
                  handoff_status, routing_decision, routing_next_step, routing_confidence,
                  error_message, run_id, flow_key, step_id]
@@ -426,12 +686,22 @@ class StatsDB:
         diff_lines_removed: Optional[int] = None,
         exit_code: Optional[int] = None,
         error_message: Optional[str] = None,
+        ts: Optional[datetime] = None,
     ):
-        """Record a tool call."""
+        """Record a tool call.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_tool_call"):
+            return
 
-        now = datetime.now(timezone.utc)
+        tool_ts = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
@@ -441,7 +711,7 @@ class StatsDB:
                     exit_code, error_message
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                [run_id, step_id, tool_name, phase, now, now,
+                [run_id, step_id, tool_name, phase, tool_ts, tool_ts,
                  duration_ms, success, target_path, diff_lines_added, diff_lines_removed,
                  exit_code, error_message]
             )
@@ -454,11 +724,22 @@ class StatsDB:
         change_type: str,
         lines_added: int = 0,
         lines_removed: int = 0,
+        ts: Optional[datetime] = None,
     ):
-        """Record a file change."""
+        """Record a file change.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_file_change"):
+            return
 
+        change_ts = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
@@ -470,28 +751,90 @@ class StatsDB:
                     lines_removed = file_changes.lines_removed + EXCLUDED.lines_removed
                 """,
                 [run_id, step_id, file_path, change_type, lines_added, lines_removed,
-                 datetime.now(timezone.utc)]
+                 change_ts]
             )
 
     # =========================================================================
     # Batch Operations
     # =========================================================================
 
-    def ingest_events(self, events: List[Dict[str, Any]], run_id: str):
-        """Batch ingest events from events.jsonl format.
+    def ingest_events(self, events: List[Dict[str, Any]], run_id: str) -> int:
+        """Batch ingest events from events.jsonl format (idempotent).
 
         This is the primary interface for the event sink pattern.
-        Parses RunEvent-style dicts and routes to appropriate record_* methods.
+        First inserts raw events into the events table (dedup by event_id),
+        then updates projections (runs, steps, tool_calls, file_changes).
+
+        This method sets the ingestion context flag, allowing internal
+        record_* calls to proceed even in projection-only mode.
 
         Args:
             events: List of event dicts (from events.jsonl).
             run_id: The run ID these events belong to.
+
+        Returns:
+            Number of newly ingested events (events that were not already present).
         """
         if self.connection is None:
-            return
+            return 0
+
+        # Set ingestion context to allow record_* calls
+        _ingestion_context.active = True
+        try:
+            return self._ingest_events_internal(events, run_id)
+        finally:
+            _ingestion_context.active = False
+
+    def _parse_event_ts(self, ts_str: Any) -> Optional[datetime]:
+        """Parse event timestamp string to datetime.
+
+        Args:
+            ts_str: ISO format timestamp string, datetime, or None.
+
+        Returns:
+            Parsed datetime in UTC, or None if parsing fails.
+        """
+        if ts_str is None:
+            return None
+        if isinstance(ts_str, datetime):
+            return ts_str
+        if not isinstance(ts_str, str):
+            return None
+
+        try:
+            # Handle ISO format with or without timezone
+            if ts_str.endswith("Z"):
+                ts_str = ts_str[:-1] + "+00:00"
+            dt = datetime.fromisoformat(ts_str)
+            # Ensure UTC timezone
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except (ValueError, TypeError):
+            return None
+
+    def _ingest_events_internal(self, events: List[Dict[str, Any]], run_id: str) -> int:
+        """Internal implementation of ingest_events."""
+        newly_ingested = 0
 
         for event in events:
-            kind = event.get("kind", "")
+            # Ensure run_id is set on the event for raw storage
+            event_with_run = {**event, "run_id": run_id}
+
+            # Insert raw event first (idempotent - skips if event_id exists)
+            if not self._insert_raw_event(event_with_run):
+                # Event already exists, skip projection updates
+                continue
+
+            newly_ingested += 1
+
+            # Parse event timestamp - CRITICAL: use event's ts, not "now"
+            # This ensures replays and rebuilds produce identical projections
+            event_ts = self._parse_event_ts(event.get("ts"))
+
+            # Normalize event kind to canonical form (handles legacy aliases)
+            raw_kind = event.get("kind", "")
+            kind = normalize_event_kind(raw_kind)
             payload = event.get("payload", {})
             step_id = event.get("step_id", "")
             flow_key = event.get("flow_key", "")
@@ -503,9 +846,10 @@ class StatsDB:
                     step_id=step_id,
                     step_index=payload.get("step_index", 0),
                     agent_key=payload.get("agent_key"),
+                    ts=event_ts,
                 )
 
-            elif kind == "step_complete":
+            elif kind == "step_end":  # Canonical: step_complete/step_error -> step_end
                 self.record_step_end(
                     run_id=run_id,
                     flow_key=flow_key,
@@ -519,6 +863,7 @@ class StatsDB:
                     routing_next_step=payload.get("routing_next_step"),
                     routing_confidence=payload.get("routing_confidence"),
                     error_message=payload.get("error"),
+                    ts=event_ts,
                 )
 
             elif kind == "tool_start":
@@ -538,7 +883,48 @@ class StatsDB:
                     diff_lines_removed=payload.get("diff_lines_removed"),
                     exit_code=payload.get("exit_code"),
                     error_message=payload.get("error"),
+                    ts=event_ts,
                 )
+
+            elif kind == "file_changes":
+                # File changes from DiffScanner (forensic truth)
+                files = payload.get("files", [])
+                for fc in files:
+                    self.record_file_change(
+                        run_id=run_id,
+                        step_id=step_id,
+                        file_path=fc.get("path", ""),
+                        change_type=fc.get("status", "modified"),
+                        lines_added=fc.get("insertions", 0),
+                        lines_removed=fc.get("deletions", 0),
+                        ts=event_ts,
+                    )
+
+            elif kind == "run_started":  # Canonical: run_start -> run_started
+                # Run initialization
+                flow_keys = payload.get("flow_keys", [])
+                self.record_run_start(
+                    run_id=run_id,
+                    flow_keys=flow_keys,
+                    profile_id=payload.get("profile_id"),
+                    engine_id=payload.get("engine"),
+                    metadata=payload.get("metadata"),
+                    ts=event_ts,
+                )
+
+            elif kind == "run_completed":
+                # Run completion
+                self.record_run_end(
+                    run_id=run_id,
+                    status=payload.get("status", "completed"),
+                    total_steps=payload.get("total_steps", 0),
+                    completed_steps=payload.get("steps_completed", 0),
+                    total_tokens=payload.get("total_tokens", 0),
+                    total_duration_ms=payload.get("duration_ms", 0),
+                    ts=event_ts,
+                )
+
+        return newly_ingested
 
     # =========================================================================
     # Query Operations (for TypeScript UI)
@@ -773,3 +1159,326 @@ def close_stats_db():
         if _global_db is not None:
             _global_db.close()
             _global_db = None
+
+
+# =============================================================================
+# Disk-as-Truth Recovery: Rebuild DuckDB from events.jsonl
+# =============================================================================
+
+
+def rebuild_stats_db(
+    runs_dir: Optional[Path] = None,
+    db_path: Optional[Path] = None,
+    run_ids: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Rebuild the DuckDB stats database from disk artifacts.
+
+    This function implements the "disk-as-truth" principle:
+    - events.jsonl is the append-only journal (durable, crash-safe)
+    - DuckDB is a projection that can be rebuilt at any time
+
+    The rebuild process:
+    1. Scan runs_dir for run directories (or use provided run_ids)
+    2. For each run, read events.jsonl
+    3. Parse events and call ingest_events to populate DuckDB
+    4. Read handoff envelopes for additional routing/status data
+
+    Args:
+        runs_dir: Path to the runs directory. Defaults to swarm/runs/.
+        db_path: Path to the DuckDB file. If None, uses default.
+        run_ids: Optional list of specific run IDs to rebuild.
+                 If None, rebuilds all runs found in runs_dir.
+
+    Returns:
+        Dict with rebuild statistics:
+        - runs_processed: Number of runs processed
+        - events_ingested: Total events ingested
+        - errors: List of any errors encountered
+    """
+    from . import storage as storage_module
+
+    if runs_dir is None:
+        runs_dir = storage_module.RUNS_DIR
+
+    if db_path is None:
+        db_path = runs_dir / ".stats.duckdb"
+
+    # Create fresh database (drop existing)
+    if db_path.exists():
+        logger.info("Removing existing stats database: %s", db_path)
+        db_path.unlink()
+
+    db = StatsDB(db_path)
+
+    stats = {
+        "runs_processed": 0,
+        "events_ingested": 0,
+        "envelopes_processed": 0,
+        "errors": [],
+    }
+
+    # Get list of run IDs to process
+    if run_ids is None:
+        # Scan runs directory
+        if not runs_dir.exists():
+            logger.warning("Runs directory does not exist: %s", runs_dir)
+            return stats
+
+        run_ids = [
+            d.name for d in runs_dir.iterdir()
+            if d.is_dir() and not d.name.startswith(".")
+        ]
+
+    logger.info("Rebuilding stats DB from %d runs", len(run_ids))
+
+    for run_id in run_ids:
+        try:
+            run_path = runs_dir / run_id
+            events_file = run_path / storage_module.EVENTS_FILE
+
+            if not events_file.exists():
+                logger.debug("No events.jsonl for run %s, skipping", run_id)
+                continue
+
+            # Read and parse events
+            events: List[Dict[str, Any]] = []
+            with events_file.open("r", encoding="utf-8") as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                        events.append(event)
+                    except json.JSONDecodeError as e:
+                        stats["errors"].append({
+                            "run_id": run_id,
+                            "file": "events.jsonl",
+                            "line": line_num,
+                            "error": str(e),
+                        })
+
+            if events:
+                # Ingest events into DuckDB
+                db.ingest_events(events, run_id)
+                stats["events_ingested"] += len(events)
+
+            # Also process handoff envelopes for routing info
+            # Set ingestion context to allow record_* calls (projection-only mode)
+            _ingestion_context.active = True
+            try:
+                for flow_dir in run_path.iterdir():
+                    if not flow_dir.is_dir() or flow_dir.name.startswith("."):
+                        continue
+
+                    handoff_dir = flow_dir / "handoff"
+                    if not handoff_dir.exists():
+                        continue
+
+                    for envelope_file in handoff_dir.glob("*.json"):
+                        try:
+                            with envelope_file.open("r", encoding="utf-8") as f:
+                                envelope_data = json.load(f)
+
+                            # Record file changes from envelope if present
+                            file_changes = envelope_data.get("file_changes", {})
+                            if file_changes and "files" in file_changes:
+                                step_id = envelope_data.get("step_id", envelope_file.stem)
+                                for fc in file_changes.get("files", []):
+                                    db.record_file_change(
+                                        run_id=run_id,
+                                        step_id=step_id,
+                                        file_path=fc.get("path", ""),
+                                        change_type=fc.get("status", "modified"),
+                                        lines_added=fc.get("insertions", 0),
+                                        lines_removed=fc.get("deletions", 0),
+                                    )
+
+                            stats["envelopes_processed"] += 1
+
+                        except (json.JSONDecodeError, IOError) as e:
+                            stats["errors"].append({
+                                "run_id": run_id,
+                                "file": str(envelope_file),
+                                "error": str(e),
+                            })
+            finally:
+                _ingestion_context.active = False
+
+            stats["runs_processed"] += 1
+
+        except Exception as e:
+            logger.warning("Error processing run %s: %s", run_id, e)
+            stats["errors"].append({
+                "run_id": run_id,
+                "error": str(e),
+            })
+
+    db.close()
+
+    logger.info(
+        "Rebuild complete: %d runs, %d events, %d envelopes, %d errors",
+        stats["runs_processed"],
+        stats["events_ingested"],
+        stats["envelopes_processed"],
+        len(stats["errors"]),
+    )
+
+    return stats
+
+
+# =============================================================================
+# CLI Entry Point
+# =============================================================================
+
+
+def main():
+    """CLI entry point for stats database operations.
+
+    Usage:
+        python -m swarm.runtime.db rebuild [--runs-dir PATH] [--db-path PATH]
+        python -m swarm.runtime.db stats <run_id>
+        python -m swarm.runtime.db doctor <run_id> [--strict] [--from-disk]
+    """
+    import argparse
+    import sys
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
+    parser = argparse.ArgumentParser(
+        description="Flow Studio Stats Database CLI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Rebuild command
+    rebuild_parser = subparsers.add_parser(
+        "rebuild",
+        help="Rebuild DuckDB from events.jsonl (disk-as-truth)",
+    )
+    rebuild_parser.add_argument(
+        "--runs-dir",
+        type=Path,
+        default=None,
+        help="Path to runs directory (default: swarm/runs/)",
+    )
+    rebuild_parser.add_argument(
+        "--db-path",
+        type=Path,
+        default=None,
+        help="Path to DuckDB file (default: <runs-dir>/.stats.duckdb)",
+    )
+    rebuild_parser.add_argument(
+        "--run-id",
+        action="append",
+        dest="run_ids",
+        help="Specific run ID to rebuild (can be repeated)",
+    )
+
+    # Stats command
+    stats_parser = subparsers.add_parser(
+        "stats",
+        help="Show statistics for a run",
+    )
+    stats_parser.add_argument("run_id", help="Run ID to query")
+
+    # Doctor command (event contract validation)
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Validate event stream contract for a run",
+    )
+    doctor_parser.add_argument("run_id", help="Run ID to validate")
+    doctor_parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat warnings as errors",
+    )
+    doctor_parser.add_argument(
+        "--from-disk",
+        action="store_true",
+        help="Read events from disk (events.jsonl) instead of DB",
+    )
+    doctor_parser.add_argument(
+        "--runs-dir",
+        type=Path,
+        default=None,
+        help="Path to runs directory (for --from-disk mode)",
+    )
+
+    args = parser.parse_args()
+
+    if args.command == "rebuild":
+        print("Rebuilding stats database...")
+        result = rebuild_stats_db(
+            runs_dir=args.runs_dir,
+            db_path=args.db_path,
+            run_ids=args.run_ids,
+        )
+        print(f"\nRebuild complete:")
+        print(f"  Runs processed: {result['runs_processed']}")
+        print(f"  Events ingested: {result['events_ingested']}")
+        print(f"  Envelopes processed: {result['envelopes_processed']}")
+        if result["errors"]:
+            print(f"  Errors: {len(result['errors'])}")
+            for err in result["errors"][:5]:
+                print(f"    - {err}")
+        sys.exit(0)
+
+    elif args.command == "stats":
+        db = get_stats_db()
+        run_stats = db.get_run_stats(args.run_id)
+        if run_stats is None:
+            print(f"Run not found: {args.run_id}")
+            sys.exit(1)
+
+        print(f"Run: {run_stats.run_id}")
+        print(f"  Status: {run_stats.status}")
+        print(f"  Flows: {', '.join(run_stats.flow_keys)}")
+        print(f"  Steps: {run_stats.completed_steps}/{run_stats.total_steps}")
+        print(f"  Tokens: {run_stats.total_tokens}")
+        print(f"  Duration: {run_stats.total_duration_ms}ms")
+        print(f"  Tool calls: {run_stats.tool_call_count}")
+        print(f"  File changes: {run_stats.file_change_count}")
+        sys.exit(0)
+
+    elif args.command == "doctor":
+        from .event_validator import (
+            validate_run_from_db,
+            validate_run_from_disk,
+            format_violations,
+        )
+        from .storage import RUNS_DIR
+
+        runs_dir = args.runs_dir or RUNS_DIR
+
+        if args.from_disk:
+            violations = validate_run_from_disk(
+                args.run_id, runs_dir, strict=args.strict
+            )
+        else:
+            db = get_stats_db()
+            violations = validate_run_from_db(args.run_id, db, strict=args.strict)
+
+        errors = [v for v in violations if v.severity == "error"]
+        warnings = [v for v in violations if v.severity == "warning"]
+
+        if not violations:
+            print(f"✓ Run {args.run_id}: event stream valid")
+            sys.exit(0)
+
+        print(f"Run {args.run_id}: {len(errors)} error(s), {len(warnings)} warning(s)")
+        print(format_violations(violations))
+
+        # Exit with error code if there are errors
+        sys.exit(1 if errors else 0)
+
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

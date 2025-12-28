@@ -1,0 +1,145 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowstudio.dev/schemas/routing_signal.schema.json",
+  "title": "RoutingSignal",
+  "description": "A routing signal communicates the station's recommendation for next action in the flow.",
+  "type": "object",
+  "required": ["decision", "confidence", "reason"],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["advance", "loop", "terminate", "branch"],
+      "description": "The routing decision made by the station"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "Confidence level in the routing decision"
+    },
+    "next_step": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "Recommended next step ID (for advance/branch decisions)"
+    },
+    "next_flow": {
+      "type": "string",
+      "pattern": "^[0-9]+-[a-z]+$",
+      "description": "Recommended next flow ID (for cross-flow transitions)"
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Human-readable explanation for the routing decision"
+    },
+    "loop_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Current iteration count in a microloop"
+    },
+    "exit_condition_met": {
+      "type": "boolean",
+      "description": "Whether the exit condition for a microloop has been met"
+    },
+    "can_further_iteration_help": {
+      "type": "boolean",
+      "description": "Whether additional iterations could improve the outcome"
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "description"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["missing_input", "validation_failure", "external_dependency", "scope_exceeded", "other"],
+            "description": "Type of blocker"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the blocker"
+          },
+          "artifact": {
+            "type": "string",
+            "description": "Related artifact path if applicable"
+          },
+          "recoverable": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether this blocker can be resolved by retry or upstream fix"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "List of blockers if decision is terminate or loop"
+    },
+    "branch_target": {
+      "type": "string",
+      "description": "Target identifier for branch decisions (condition key or step ID)"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "station_id": {
+          "type": "string",
+          "description": "Station that produced this signal"
+        },
+        "step_id": {
+          "type": "string",
+          "description": "Step that produced this signal"
+        },
+        "flow_id": {
+          "type": "string",
+          "description": "Flow that this signal was produced in"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the signal was produced"
+        },
+        "turn_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of conversation turns taken"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": { "const": "advance" }
+        }
+      },
+      "then": {
+        "anyOf": [
+          { "required": ["next_step"] },
+          { "required": ["next_flow"] }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": { "const": "branch" }
+        }
+      },
+      "then": {
+        "required": ["branch_target"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": { "const": "loop" }
+        }
+      },
+      "then": {
+        "required": ["can_further_iteration_help"]
+      }
+    }
+  ],
+  "additionalProperties": false
+}

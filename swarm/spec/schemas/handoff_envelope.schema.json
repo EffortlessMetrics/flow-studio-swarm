@@ -1,0 +1,272 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowstudio.dev/schemas/handoff_envelope.schema.json",
+  "title": "HandoffEnvelope",
+  "description": "A handoff envelope captures the complete state transfer from one station to the next.",
+  "type": "object",
+  "required": ["status", "summary", "routing_signal"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["VERIFIED", "UNVERIFIED", "BLOCKED", "PARTIAL"],
+      "description": "Outcome status of the station's work"
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Human-readable summary of what was accomplished"
+    },
+    "routing_signal": {
+      "$ref": "routing_signal.schema.json",
+      "description": "Routing recommendation for the orchestrator"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ArtifactReference"
+      },
+      "description": "List of artifacts produced or modified by this station"
+    },
+    "file_changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/FileChange"
+      },
+      "description": "List of file changes made by this station"
+    },
+    "can_further_iteration_help": {
+      "type": "boolean",
+      "description": "Whether additional iterations could improve the outcome"
+    },
+    "proposed_next_step": {
+      "type": "string",
+      "description": "Suggested next step ID (advisory, orchestrator may override)"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "Confidence in the work produced"
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "description"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["missing_input", "validation_failure", "external_dependency", "scope_exceeded", "other"],
+            "description": "Type of blocker"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the blocker"
+          },
+          "artifact": {
+            "type": "string",
+            "description": "Related artifact path if applicable"
+          },
+          "recoverable": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether this blocker can be resolved by retry or upstream fix"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "List of blockers encountered"
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["assumption", "impact_if_wrong"],
+        "properties": {
+          "assumption": {
+            "type": "string",
+            "description": "What was assumed"
+          },
+          "why": {
+            "type": "string",
+            "description": "Why this assumption was made"
+          },
+          "impact_if_wrong": {
+            "type": "string",
+            "description": "What would need to change if assumption is wrong"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Assumptions made during execution"
+    },
+    "concerns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["concern", "severity"],
+        "properties": {
+          "concern": {
+            "type": "string",
+            "description": "Description of the concern"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "Severity of the concern"
+          },
+          "recommendation": {
+            "type": "string",
+            "description": "Recommended action to address the concern"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Concerns that should be reviewed"
+    },
+    "iteration_context": {
+      "type": "object",
+      "properties": {
+        "iteration": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Current iteration number in a microloop"
+        },
+        "previous_status": {
+          "type": "string",
+          "enum": ["VERIFIED", "UNVERIFIED", "BLOCKED", "PARTIAL"],
+          "description": "Status from previous iteration"
+        },
+        "improvements_made": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of improvements made since last iteration"
+        },
+        "remaining_issues": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Issues remaining from critic feedback"
+        }
+      },
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "station_id": {
+          "type": "string",
+          "description": "Station that produced this envelope"
+        },
+        "station_version": {
+          "type": "integer",
+          "description": "Version of the station spec used"
+        },
+        "step_id": {
+          "type": "string",
+          "description": "Step that produced this envelope"
+        },
+        "flow_id": {
+          "type": "string",
+          "description": "Flow this envelope belongs to"
+        },
+        "flow_version": {
+          "type": "integer",
+          "description": "Version of the flow spec used"
+        },
+        "run_id": {
+          "type": "string",
+          "description": "Unique run identifier"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the envelope was produced"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Execution duration in milliseconds"
+        },
+        "turn_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of conversation turns taken"
+        },
+        "model_used": {
+          "type": "string",
+          "description": "Model that was used for execution"
+        },
+        "prompt_hash": {
+          "type": "string",
+          "description": "Hash of the compiled prompt for traceability"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "ArtifactReference": {
+      "type": "object",
+      "required": ["path", "action"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the artifact (relative to run_base)"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["created", "modified", "read", "deleted"],
+          "description": "Action performed on the artifact"
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of the artifact"
+        },
+        "hash": {
+          "type": "string",
+          "description": "Content hash for verification"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Size of the artifact in bytes"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FileChange": {
+      "type": "object",
+      "required": ["path", "change_type"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the file (absolute or relative to repo root)"
+        },
+        "change_type": {
+          "type": "string",
+          "enum": ["added", "modified", "deleted", "renamed"],
+          "description": "Type of change made to the file"
+        },
+        "old_path": {
+          "type": "string",
+          "description": "Original path if file was renamed"
+        },
+        "lines_added": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of lines added"
+        },
+        "lines_removed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of lines removed"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Brief description of the change"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

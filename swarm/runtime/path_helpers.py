@@ -29,6 +29,7 @@ from typing import List, Optional, Tuple
 # Directory names
 LLM_DIR = "llm"
 RECEIPTS_DIR = "receipts"
+HANDOFF_DIR = "handoff"
 
 # File extensions
 TRANSCRIPT_EXT = ".jsonl"
@@ -132,6 +133,47 @@ def ensure_receipts_dir(run_base: Path) -> Path:
     receipts_path = run_base / RECEIPTS_DIR
     receipts_path.mkdir(parents=True, exist_ok=True)
     return receipts_path
+
+
+def ensure_handoff_dir(run_base: Path) -> Path:
+    """Ensure handoff/ directory exists and return its path.
+
+    Creates the directory and any parent directories if they don't exist.
+    Handoff files contain structured HandoffEnvelope JSON artifacts
+    for cross-step communication.
+
+    Args:
+        run_base: The RUN_BASE path
+
+    Returns:
+        Path to the handoff/ directory
+
+    Example:
+        >>> handoff_dir = ensure_handoff_dir(Path("/runs/abc/build"))
+        >>> handoff_dir.exists()
+        True
+    """
+    handoff_path = run_base / HANDOFF_DIR
+    handoff_path.mkdir(parents=True, exist_ok=True)
+    return handoff_path
+
+
+def handoff_envelope_path(run_base: Path, step_id: str) -> Path:
+    """Generate handoff envelope file path.
+
+    Args:
+        run_base: The RUN_BASE path (e.g., swarm/runs/<run-id>/<flow-key>)
+        step_id: Step identifier within the flow
+
+    Returns:
+        Path to the handoff envelope file: RUN_BASE/handoff/<step_id>.json
+
+    Example:
+        >>> handoff_envelope_path(Path("/runs/abc/build"), "1")
+        PosixPath('/runs/abc/build/handoff/1.json')
+    """
+    filename = f"{step_id}.json"
+    return run_base / HANDOFF_DIR / filename
 
 
 def parse_transcript_filename(filename: str) -> Optional[Tuple[str, str, str]]:

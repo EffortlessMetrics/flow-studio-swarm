@@ -23,6 +23,7 @@ Usage:
         append_event, read_events,
         write_run_state, read_run_state, update_run_state,
         write_envelope, read_envelope, list_envelopes,
+        commit_step_completion,
         list_runs, discover_legacy_runs,
     )
 """
@@ -80,6 +81,74 @@ LEGACY_META_FILE = "run.json"  # Old-style optional metadata
 
 _RUN_LOCKS: Dict[RunId, threading.Lock] = {}
 _RUN_LOCKS_LOCK = threading.Lock()
+
+# -----------------------------------------------------------------------------
+# Per-run sequence tracking for monotonic event ordering
+# -----------------------------------------------------------------------------
+# Each run has a monotonically increasing sequence counter that is assigned
+# to events before writing. This enables reliable ordering even when timestamps
+# have limited precision or clock skew occurs.
+
+_run_sequences: Dict[str, int] = {}
+_seq_lock = threading.Lock()
+
+
+def _next_seq(run_id: str) -> int:
+    """Get the next monotonic sequence number for a run.
+
+    Thread-safe counter that increments on each call for a given run_id.
+    Sequence numbers start at 1 and increase monotonically.
+
+    Args:
+        run_id: The unique run identifier.
+
+    Returns:
+        The next sequence number for this run.
+    """
+    with _seq_lock:
+        seq = _run_sequences.get(run_id, 0) + 1
+        _run_sequences[run_id] = seq
+        return seq
+
+
+def _init_seq_from_disk(run_id: str, run_dir: Path) -> None:
+    """Initialize sequence counter from existing events.jsonl.
+
+    This function handles recovery scenarios where a run is being resumed
+    after a restart. It scans existing events to find the highest sequence
+    number and initializes the counter to continue from there.
+
+    Args:
+        run_id: The unique run identifier.
+        run_dir: Path to the run directory.
+    """
+    events_file = run_dir / EVENTS_FILE
+    if not events_file.exists():
+        return
+
+    max_seq = 0
+    try:
+        with open(events_file, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        event = json.loads(line)
+                        max_seq = max(max_seq, event.get("seq", 0))
+                    except json.JSONDecodeError:
+                        continue
+    except (OSError, IOError):
+        pass
+
+    if max_seq > 0:
+        with _seq_lock:
+            # Only update if disk has higher seq than in-memory
+            current = _run_sequences.get(run_id, 0)
+            if max_seq > current:
+                _run_sequences[run_id] = max_seq
+                logger.debug(
+                    "Recovered sequence counter for run '%s': max_seq=%d",
+                    run_id, max_seq
+                )
 
 
 def _get_run_lock(run_id: RunId) -> threading.Lock:
@@ -265,6 +334,9 @@ def create_run_dir(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Path:
     Creates the run directory if it doesn't exist. Does not create
     flow subdirectories (those are created by agents as needed).
 
+    Also initializes the sequence counter from existing events.jsonl if
+    present, enabling recovery after restarts.
+
     Args:
         run_id: The unique run identifier.
         runs_dir: Base directory for runs. Defaults to RUNS_DIR.
@@ -279,6 +351,10 @@ def create_run_dir(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Path:
     """
     run_path = get_run_path(run_id, runs_dir)
     run_path.mkdir(parents=True, exist_ok=True)
+
+    # Initialize sequence counter from disk for recovery scenarios
+    _init_seq_from_disk(run_id, run_path)
+
     return run_path
 
 
@@ -444,6 +520,10 @@ def append_event(run_id: RunId, event: RunEvent, runs_dir: Path = RUNS_DIR) -> N
     This function is thread-safe via per-run locking to ensure atomic appends
     when multiple threads emit events for the same run.
 
+    The storage layer assigns a monotonically increasing sequence number to
+    each event before writing. This ensures reliable ordering even when
+    timestamps have limited precision.
+
     Args:
         run_id: The unique run identifier.
         event: The RunEvent to append.
@@ -455,6 +535,9 @@ def append_event(run_id: RunId, event: RunEvent, runs_dir: Path = RUNS_DIR) -> N
         events_path = run_path / EVENTS_FILE
 
         try:
+            # Assign monotonic sequence number before serialization
+            event.seq = _next_seq(run_id)
+
             data = run_event_to_dict(event)
             line = json.dumps(data, ensure_ascii=False)
 
@@ -703,6 +786,11 @@ def write_run_state(run_id: RunId, state: RunState, runs_dir: Path = RUNS_DIR) -
 def read_run_state(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Optional[RunState]:
     """Read RunState from run_state.json with graceful error handling.
 
+    Includes crash recovery logic: if handoff_envelopes is empty but envelope
+    files exist on disk, reconstructs the envelope map from the files. This
+    handles the case where the process crashed after writing envelope files
+    but before updating run_state.json.
+
     Args:
         run_id: The unique run identifier.
         runs_dir: Base directory for runs. Defaults to RUNS_DIR.
@@ -718,7 +806,19 @@ def read_run_state(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Optional[RunStat
         return None
 
     try:
-        return run_state_from_dict(data)
+        state = run_state_from_dict(data)
+
+        # Crash recovery: reconstruct handoff_envelopes from disk if empty
+        if not state.handoff_envelopes and state.flow_key:
+            disk_envelopes = list_envelopes(run_id, state.flow_key, runs_dir)
+            if disk_envelopes:
+                logger.info(
+                    "Recovered %d envelope(s) from disk for run '%s' flow '%s'",
+                    len(disk_envelopes), run_id, state.flow_key
+                )
+                state.handoff_envelopes.update(disk_envelopes)
+
+        return state
     except (KeyError, TypeError) as e:
         logger.warning("Invalid run_state data for run '%s' at %s: %s", run_id, state_path, e)
         return None
@@ -874,3 +974,87 @@ def list_envelopes(
             envelopes[step_id] = envelope
 
     return envelopes
+
+
+# -----------------------------------------------------------------------------
+# Atomic Step Completion Protocol
+# -----------------------------------------------------------------------------
+
+
+def commit_step_completion(
+    run_id: RunId,
+    flow_key: str,
+    envelope: HandoffEnvelope,
+    run_state_updates: Dict[str, Any],
+    runs_dir: Path = RUNS_DIR,
+) -> None:
+    """Atomic commit of step completion: envelope + run_state update.
+
+    This function ensures durability of step completion by following a
+    specific order of operations:
+
+    1. Write envelope to <flow>/handoff/<step_id>.json (immutable once written)
+    2. Update run_state.json with envelope reference + step_index bump
+
+    This ordering ensures that if the process crashes between steps, we can
+    recover by reading envelopes from disk and reconstructing the
+    run_state.handoff_envelopes map. The envelope files serve as the
+    durable source of truth.
+
+    Thread-safe via per-run locking.
+
+    Args:
+        run_id: The unique run identifier.
+        flow_key: The flow key (e.g., "signal", "build").
+        envelope: The HandoffEnvelope to persist.
+        run_state_updates: Dictionary of fields to update in run_state.json.
+            Typically includes "step_index", "current_step_id", "status", etc.
+            The envelope reference is automatically added to handoff_envelopes.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Raises:
+        FileNotFoundError: If the run's run_state.json doesn't exist.
+
+    Example:
+        >>> commit_step_completion(
+        ...     run_id="run-20251208-143022-abc123",
+        ...     flow_key="build",
+        ...     envelope=my_envelope,
+        ...     run_state_updates={
+        ...         "step_index": 3,
+        ...         "current_step_id": "4",
+        ...         "status": "running",
+        ...     },
+        ... )
+    """
+    lock = _get_run_lock(run_id)
+    with lock:
+        # Step 1: Write envelope to disk (immutable artifact)
+        step_id = envelope.step_id
+        write_envelope(run_id, flow_key, step_id, envelope, runs_dir)
+
+        # Step 2: Read current run_state
+        state = read_run_state(run_id, runs_dir)
+        if state is None:
+            raise FileNotFoundError(f"Run state not found: {run_id}")
+
+        # Step 3: Build updated state with envelope reference
+        data = run_state_to_dict(state)
+
+        # Add envelope to handoff_envelopes map
+        if "handoff_envelopes" not in data:
+            data["handoff_envelopes"] = {}
+        data["handoff_envelopes"][step_id] = handoff_envelope_to_dict(envelope)
+
+        # Apply caller-provided updates
+        for key, value in run_state_updates.items():
+            if key in data:
+                data[key] = value
+
+        # Update timestamp (using datetime from .types module via run_state_from_dict)
+        from datetime import datetime as dt, timezone as tz
+        data["timestamp"] = dt.now(tz.utc).isoformat() + "Z"
+
+        # Step 4: Write updated run_state atomically
+        updated_state = run_state_from_dict(data)
+        write_run_state(run_id, updated_state, runs_dir)

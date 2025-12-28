@@ -41,17 +41,17 @@ class TestFlowRegistryBasics:
 
         assert isinstance(keys, list)
         # All flows (SDLC + demo) should be returned
-        assert len(keys) >= 6  # At least 6 SDLC flows
+        assert len(keys) >= 7  # At least 7 SDLC flows
         # SDLC flows should be first and in order
-        assert keys[:6] == ["signal", "plan", "build", "gate", "deploy", "wisdom"]
+        assert keys[:7] == ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
 
     def test_get_sdlc_flow_keys_returns_only_sdlc(self):
-        """SDLC flow keys should return only the 6 core SDLC flows."""
+        """SDLC flow keys should return only the 7 core SDLC flows."""
         keys = get_sdlc_flow_keys()
 
         assert isinstance(keys, list)
-        assert len(keys) == 6
-        assert keys == ["signal", "plan", "build", "gate", "deploy", "wisdom"]
+        assert len(keys) == 7
+        assert keys == ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
 
     def test_get_flow_order_is_alias(self):
         """get_flow_order should return same result as get_flow_keys."""
@@ -62,9 +62,10 @@ class TestFlowRegistryBasics:
         assert get_flow_index("signal") == 1
         assert get_flow_index("plan") == 2
         assert get_flow_index("build") == 3
-        assert get_flow_index("gate") == 4
-        assert get_flow_index("deploy") == 5
-        assert get_flow_index("wisdom") == 6
+        assert get_flow_index("review") == 4
+        assert get_flow_index("gate") == 5
+        assert get_flow_index("deploy") == 6
+        assert get_flow_index("wisdom") == 7
 
     def test_get_flow_index_unknown_flow(self):
         """Unknown flow should return 99 (sentinel value)."""
@@ -74,12 +75,12 @@ class TestFlowRegistryBasics:
     def test_get_total_flows(self):
         """Total flows should match registry (SDLC + demo flows)."""
         total = get_total_flows()
-        assert total >= 6  # At least 6 SDLC flows
+        assert total >= 7  # At least 7 SDLC flows
         assert total == len(get_flow_keys())
 
     def test_get_total_sdlc_flows(self):
-        """Total SDLC flows should be exactly 6."""
-        assert get_total_sdlc_flows() == 6
+        """Total SDLC flows should be exactly 7."""
+        assert get_total_sdlc_flows() == 7
 
 
 class TestFlowTitlesAndDescriptions:

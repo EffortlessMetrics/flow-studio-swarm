@@ -34,13 +34,17 @@
       },
       "description": "Map of artifact names to their file paths (relative to RUN_BASE)."
     },
+    "file_changes": {
+      "type": "object",
+      "description": "Forensic file mutation scan results (authoritative, not agent-reported)."
+    },
     "status": {
       "type": "string",
       "enum": ["succeeded", "failed", "skipped"],
       "description": "Execution status of the step."
     },
     "error": {
-      "type": "string",
+      "type": ["string", "null"],
       "description": "Error message if the step failed."
     },
     "duration_ms": {
