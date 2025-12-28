@@ -129,6 +129,7 @@ steps:
       constraints:
         - "never fix, only critique"
         - "provide clear Status and can_further_iteration_help"
+        - "emit RoutingSignal in receipt.routing_signal for normalized routing decisions"
 
   - id: implement
     agents:
@@ -192,6 +193,7 @@ steps:
       constraints:
         - "never fix, only critique"
         - "provide clear Status and can_further_iteration_help"
+        - "emit RoutingSignal in receipt.routing_signal for normalized routing decisions"
 
   - id: mutate
     agents:
