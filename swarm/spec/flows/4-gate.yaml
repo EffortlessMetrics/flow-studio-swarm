@@ -1,0 +1,151 @@
+# Flow: 4-gate
+# Purpose: Draft -> Verify: Pre-merge gate to audit receipts, check contracts/policy, recommend merge/bounce
+
+id: 4-gate
+version: 1
+title: "Flow 4 - Gate"
+description: |
+  Audit receipts, verify contracts, enforce policies. Second-layer gravity
+  that protects maintainer attention. Gate is a verifier, not a builder.
+  Exit with MERGE, BOUNCE, or ESCALATE decision.
+
+defaults:
+  context_pack:
+    include_upstream_artifacts: true
+    include_previous_envelopes: true
+    max_envelopes: 6
+    include_scent_trail: true
+  sdk_overrides: {}
+
+steps:
+  # Step 1: Verify Build receipts
+  - id: check_receipts
+    station: receipt-checker
+    objective: |
+      Verify build_receipt.json exists and is complete.
+      Check structural sanity of all Build artifacts.
+      Validate FR status dictionary for readiness.
+    inputs:
+      - build/build_receipt.json
+      - build/test_changes_summary.md
+      - build/impl_changes_summary.md
+    outputs:
+      - gate/receipt_audit.md
+    routing:
+      kind: linear
+      next: enforce_contracts
+    teaching:
+      highlight: true
+      note: "Receipt audit: verify Build produced all expected outputs"
+
+  # Step 2: Check API contracts
+  - id: enforce_contracts
+    station: contract-enforcer
+    objective: |
+      Check API changes vs contracts defined in api_contracts.yaml.
+      Verify no breaking changes without version bump.
+      Document any contract violations or additions.
+    inputs:
+      - gate/receipt_audit.md
+      - plan/api_contracts.yaml
+      - plan/interface_spec.md
+      - build/impl_changes_summary.md
+    outputs:
+      - gate/contract_compliance.md
+    routing:
+      kind: linear
+      next: scan_security
+    teaching:
+      note: "Contract check: are API changes backward compatible"
+
+  # Step 3: Security scan
+  - id: scan_security
+    station: security-scanner
+    objective: |
+      Run SAST and secret scans on changed files.
+      Check for high severity vulnerabilities.
+      Document any security concerns.
+    inputs:
+      - gate/receipt_audit.md
+      - build/impl_changes_summary.md
+    outputs:
+      - gate/security_scan.md
+    routing:
+      kind: linear
+      next: enforce_coverage
+    teaching:
+      highlight: true
+      note: "Security scan: SAST and secret detection"
+
+  # Step 4: Coverage enforcement
+  - id: enforce_coverage
+    station: coverage-enforcer
+    objective: |
+      Verify test coverage meets expectations from test_plan.md.
+      Check that new code paths are covered.
+      Document any coverage gaps.
+    inputs:
+      - gate/receipt_audit.md
+      - plan/test_plan.md
+      - build/test_changes_summary.md
+    outputs:
+      - gate/coverage_audit.md
+    routing:
+      kind: linear
+      next: fix_gate_issues
+    teaching:
+      note: "Coverage check: are new paths tested"
+
+  # Step 5: Mechanical fixes (optional)
+  - id: fix_gate_issues
+    station: gate-fixer
+    objective: |
+      Apply mechanical fixes only: lint, format, docstrings, typos.
+      DO NOT fix logic, tests, API contracts, or design issues.
+      Document what was fixed and what was explicitly not attempted.
+    inputs:
+      - gate/receipt_audit.md
+      - gate/contract_compliance.md
+      - gate/security_scan.md
+      - gate/coverage_audit.md
+    outputs:
+      - gate/gate_fix_summary.md
+    routing:
+      kind: conditional
+      condition_field: needs_fixes
+      branches:
+        - match: true
+          next: decide_merge
+        - match: false
+          next: decide_merge
+      default: decide_merge
+    teaching:
+      note: "Mechanical fixes only: lint/format/docs. Logic issues BOUNCE."
+
+  # Step 6: Merge decision
+  - id: decide_merge
+    station: merge-decider
+    objective: |
+      Synthesize all verification results into final decision.
+      Check FR readiness: all MUST-HAVE must be FULLY_VERIFIED or MVP_VERIFIED.
+      Output: MERGE (proceed to deploy), BOUNCE (back to build/plan), or ESCALATE (human needed).
+    inputs:
+      - gate/receipt_audit.md
+      - gate/contract_compliance.md
+      - gate/security_scan.md
+      - gate/coverage_audit.md
+      - gate/gate_fix_summary.md
+      - build/build_receipt.json
+      - signal/requirements.md
+    outputs:
+      - gate/merge_decision.md
+      - gate/gate_receipt.json
+    routing:
+      kind: terminal
+    teaching:
+      highlight: true
+      note: "Final verdict: MERGE, BOUNCE, or ESCALATE with rationale"
+
+cross_cutting_stations:
+  - risk-analyst
+  - policy-analyst

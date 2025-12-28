@@ -12,11 +12,11 @@
       "description": "The routing decision made: advance to next step, loop back, terminate flow, or branch."
     },
     "next_step_id": {
-      "type": "string",
+      "type": ["string", "null"],
       "description": "The ID of the next step to execute (for advance/branch decisions)."
     },
     "route": {
-      "type": "string",
+      "type": ["string", "null"],
       "description": "Named route identifier (for branch routing)."
     },
     "reason": {

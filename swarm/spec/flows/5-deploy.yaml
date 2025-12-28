@@ -1,0 +1,94 @@
+# Flow: 5-deploy
+# Purpose: Artifact -> Prod: Execute deployment, verify health, create audit trail
+
+id: 5-deploy
+version: 1
+title: "Flow 5 - Deploy"
+description: |
+  Move approved artifact from ready-to-merge to deployed.
+  Execute merge, monitor CI, verify health, create audit trail.
+  Always runs after Gate - even if Gate said BOUNCE, Deploy records
+  WHY deployment did not happen for complete audit trail.
+
+defaults:
+  context_pack:
+    include_upstream_artifacts: true
+    include_previous_envelopes: true
+    max_envelopes: 6
+    include_scent_trail: true
+  sdk_overrides: {}
+
+steps:
+  # Step 1: Monitor CI/deployment events
+  - id: monitor_deploy
+    station: deploy-monitor
+    objective: |
+      Watch CI and deployment events after merge.
+      Track GitHub Actions status on main branch.
+      Record CI status and deployment events.
+    inputs:
+      - gate/merge_decision.md
+      - gate/gate_receipt.json
+    outputs:
+      - deploy/verification_report.md
+    routing:
+      kind: linear
+      next: verify_smoke
+    teaching:
+      highlight: true
+      note: "Passive monitoring of CI events after merge"
+
+  # Step 2: Run smoke tests and health checks
+  - id: verify_smoke
+    station: smoke-verifier
+    objective: |
+      Run health checks if endpoints available.
+      Verify artifact/release existence.
+      Append results to verification report.
+    inputs:
+      - deploy/verification_report.md
+    outputs:
+      - deploy/verification_report.md
+    routing:
+      kind: conditional
+      conditions:
+        - field: smoke_passed
+          values:
+            - true
+            - "true"
+          next: decide_deploy
+        - field: smoke_passed
+          values:
+            - false
+            - "false"
+          next: verify_smoke
+      fallback: decide_deploy
+      max_retries: 2
+    teaching:
+      highlight: true
+      note: "Smoke tests verify deployed artifact works - may retry on transient failures"
+
+  # Step 3: Make deployment decision
+  - id: decide_deploy
+    station: deploy-decider
+    objective: |
+      Synthesize CI + smoke results into deployment decision.
+      Produce verdict: STABLE, NOT_DEPLOYED, or BLOCKED_BY_GATE.
+      STABLE means merge succeeded, CI passing, smoke checks green.
+      NOT_DEPLOYED means merge failed, CI failing, or verification issues.
+      BLOCKED_BY_GATE means Gate verdict was not MERGE.
+    inputs:
+      - deploy/verification_report.md
+      - gate/merge_decision.md
+    outputs:
+      - deploy/deployment_decision.md
+      - deploy/deploy_receipt.json
+    routing:
+      kind: terminal
+    teaching:
+      highlight: true
+      note: "Final deployment verdict feeds into Flow 6 (Wisdom) analysis"
+
+cross_cutting_stations:
+  - repo-operator
+  - gh-reporter
