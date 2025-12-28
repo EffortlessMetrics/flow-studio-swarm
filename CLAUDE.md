@@ -471,3 +471,4 @@ Read `swarm/positioning.md` for the full philosophy. Browse `swarm/examples/heal
 | 20-minute tour | [docs/TOUR_20_MIN.md](./docs/TOUR_20_MIN.md) |
 | Release notes v2.3.0 | [docs/RELEASE_NOTES_2_3_0.md](./docs/RELEASE_NOTES_2_3_0.md) |
 | Stepwise contract | [docs/STEPWISE_CONTRACT.md](./docs/STEPWISE_CONTRACT.md) |
+| Stepwise vNext plan | [docs/PLAN_STEPWISE_VNEXT.md](./docs/PLAN_STEPWISE_VNEXT.md) |

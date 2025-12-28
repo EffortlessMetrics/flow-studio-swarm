@@ -63,6 +63,7 @@ Quick reference for day-to-day operations:
 3. [AGENT_SDK_INTEGRATION.md](./AGENT_SDK_INTEGRATION.md) - Agent SDK integration guide
 4. [TRANSCRIPT_SCHEMA.md](./TRANSCRIPT_SCHEMA.md) - Artifact format specification
 5. [LONG_RUNNING_HARNESSES.md](./LONG_RUNNING_HARNESSES.md) - Pattern mapping (Anthropic harness patterns)
+6. [PLAN_STEPWISE_VNEXT.md](./PLAN_STEPWISE_VNEXT.md) - **Roadmap**: Executable Graph IR plan (P0-P4)
 
 ### Wisdom & Analytics
 
