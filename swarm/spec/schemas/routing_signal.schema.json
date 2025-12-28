@@ -104,6 +104,16 @@
         }
       },
       "additionalProperties": false
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Numeric confidence (0-1), preferred over string confidence for precision"
+    },
+    "explanation": {
+      "$ref": "routing_explanation.schema.json",
+      "description": "Structured routing explanation with LLM reasoning (optional, for audit/debug)"
     }
   },
   "allOf": [

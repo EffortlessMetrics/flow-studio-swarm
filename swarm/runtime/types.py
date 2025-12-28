@@ -11,13 +11,17 @@ and enable static type checking across the runtime layer.
 Usage:
     from swarm.runtime.types import (
         RunId, BackendId, RunStatus, SDLCStatus,
-        RoutingDecision, RoutingSignal, HandoffEnvelope, RunState,
+        RoutingDecision, DecisionType, RoutingSignal, RoutingExplanation,
+        RoutingFactor, EdgeOption, Elimination, LLMReasoning,
+        CELEvaluation, MicroloopContext, DecisionMetrics,
+        HandoffEnvelope, RunState,
         RunSpec, RunSummary, RunEvent, BackendCapabilities,
         generate_run_id,
         run_spec_to_dict, run_spec_from_dict,
         run_summary_to_dict, run_summary_from_dict,
         run_event_to_dict, run_event_from_dict,
         routing_signal_to_dict, routing_signal_from_dict,
+        routing_explanation_to_dict, routing_explanation_from_dict,
         handoff_envelope_to_dict, handoff_envelope_from_dict,
         run_state_to_dict, run_state_from_dict,
     )
@@ -88,6 +92,115 @@ class RoutingDecision(str, Enum):
     BRANCH = "branch"
 
 
+class DecisionType(str, Enum):
+    """How the routing decision was made - for auditability."""
+
+    EXPLICIT = "explicit"  # Step output specified next_step_id directly
+    EXIT_CONDITION = "exit_condition"  # Microloop termination (VERIFIED, max_iterations)
+    DETERMINISTIC = "deterministic"  # Single outgoing edge or edge with condition=true
+    CEL = "cel"  # Edge conditions evaluated against step context
+    LLM_TIEBREAKER = "llm_tiebreaker"  # LLM chose among valid edges
+    LLM_ANALYSIS = "llm_analysis"  # LLM performed deeper analysis
+    ERROR = "error"  # Routing failed
+
+
+@dataclass
+class RoutingFactor:
+    """A factor considered during LLM routing analysis."""
+
+    name: str
+    impact: str  # "strongly_favors", "favors", "neutral", "against", "strongly_against"
+    evidence: Optional[str] = None
+    weight: float = 0.5
+
+
+@dataclass
+class EdgeOption:
+    """An edge option considered during routing."""
+
+    edge_id: str
+    target_node: str
+    edge_type: str = "sequence"
+    priority: int = 50
+    evaluated_result: Optional[bool] = None
+    score: Optional[float] = None  # LLM-assigned feasibility score
+
+
+@dataclass
+class Elimination:
+    """Record of why an edge was eliminated."""
+
+    edge_id: str
+    reason_code: str  # condition_false, priority_lower, exit_condition_met, etc.
+    detail: str = ""
+
+
+@dataclass
+class LLMReasoning:
+    """Structured output from LLM routing analysis."""
+
+    model_used: str = ""
+    prompt_hash: str = ""
+    response_time_ms: int = 0
+    factors_considered: List[RoutingFactor] = field(default_factory=list)
+    option_scores: Dict[str, float] = field(default_factory=dict)  # edge_id -> score
+    primary_justification: str = ""
+    risks_identified: List[Dict[str, str]] = field(default_factory=list)
+    assumptions_made: List[str] = field(default_factory=list)
+
+
+@dataclass
+class CELEvaluation:
+    """CEL expression evaluation results."""
+
+    expressions_evaluated: List[Dict[str, Any]] = field(default_factory=list)
+    context_variables: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class MicroloopContext:
+    """Context for microloop routing decisions."""
+
+    iteration: int = 1
+    max_iterations: int = 3
+    loop_target: str = ""
+    exit_status: str = ""
+    can_further_iteration_help: bool = True
+    status_history: List[str] = field(default_factory=list)
+
+
+@dataclass
+class DecisionMetrics:
+    """Metrics about the routing decision process."""
+
+    total_time_ms: int = 0
+    edges_total: int = 0
+    edges_eliminated: int = 0
+    llm_calls: int = 0
+    cel_evaluations: int = 0
+
+
+@dataclass
+class RoutingExplanation:
+    """Structured explanation of routing decisions for auditability.
+
+    Context-efficient JSON format capturing how and why routing decisions
+    were made, including LLM reasoning when applicable.
+    """
+
+    decision_type: DecisionType
+    selected_target: str
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    confidence: float = 1.0
+    reasoning_summary: str = ""
+    available_edges: List[EdgeOption] = field(default_factory=list)
+    elimination_log: List[Elimination] = field(default_factory=list)
+    llm_reasoning: Optional[LLMReasoning] = None
+    cel_evaluation: Optional[CELEvaluation] = None
+    microloop_context: Optional[MicroloopContext] = None
+    metrics: Optional[DecisionMetrics] = None
+
+
 @dataclass
 class RoutingSignal:
     """Normalized routing decision signal for stepwise flow execution.
@@ -118,6 +231,8 @@ class RoutingSignal:
     next_flow: Optional[str] = None
     loop_count: int = 0
     exit_condition_met: bool = False
+    # Structured routing explanation (optional, for audit/debug)
+    explanation: Optional[RoutingExplanation] = None
 
 
 @dataclass
@@ -164,6 +279,8 @@ class HandoffEnvelope:
     prompt_hash: Optional[str] = None
     verification_passed: bool = True
     verification_details: Dict[str, Any] = field(default_factory=dict)
+    # Routing audit trail (optional, populated when routing includes explanation)
+    routing_audit: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -489,6 +606,185 @@ def run_event_from_dict(data: Dict[str, Any]) -> RunEvent:
 # -----------------------------------------------------------------------------
 
 
+def routing_explanation_to_dict(explanation: RoutingExplanation) -> Dict[str, Any]:
+    """Convert RoutingExplanation to a dictionary for serialization.
+
+    Args:
+        explanation: The RoutingExplanation to convert.
+
+    Returns:
+        Dictionary representation suitable for JSON serialization.
+    """
+    result: Dict[str, Any] = {
+        "decision_type": explanation.decision_type.value,
+        "selected_target": explanation.selected_target,
+        "timestamp": _datetime_to_iso(explanation.timestamp),
+        "confidence": explanation.confidence,
+        "reasoning_summary": explanation.reasoning_summary,
+    }
+
+    if explanation.available_edges:
+        result["available_edges"] = [
+            {
+                "edge_id": e.edge_id,
+                "target_node": e.target_node,
+                "edge_type": e.edge_type,
+                "priority": e.priority,
+                "evaluated_result": e.evaluated_result,
+                "score": e.score,
+            }
+            for e in explanation.available_edges
+        ]
+
+    if explanation.elimination_log:
+        result["elimination_log"] = [
+            {"edge_id": e.edge_id, "reason_code": e.reason_code, "detail": e.detail}
+            for e in explanation.elimination_log
+        ]
+
+    if explanation.llm_reasoning:
+        llm = explanation.llm_reasoning
+        result["llm_reasoning"] = {
+            "model_used": llm.model_used,
+            "prompt_hash": llm.prompt_hash,
+            "response_time_ms": llm.response_time_ms,
+            "factors_considered": [
+                {"name": f.name, "impact": f.impact, "evidence": f.evidence, "weight": f.weight}
+                for f in llm.factors_considered
+            ],
+            "option_scores": dict(llm.option_scores),
+            "primary_justification": llm.primary_justification,
+            "risks_identified": llm.risks_identified,
+            "assumptions_made": llm.assumptions_made,
+        }
+
+    if explanation.cel_evaluation:
+        result["cel_evaluation"] = {
+            "expressions_evaluated": explanation.cel_evaluation.expressions_evaluated,
+            "context_variables": explanation.cel_evaluation.context_variables,
+        }
+
+    if explanation.microloop_context:
+        mc = explanation.microloop_context
+        result["microloop_context"] = {
+            "iteration": mc.iteration,
+            "max_iterations": mc.max_iterations,
+            "loop_target": mc.loop_target,
+            "exit_status": mc.exit_status,
+            "can_further_iteration_help": mc.can_further_iteration_help,
+            "status_history": mc.status_history,
+        }
+
+    if explanation.metrics:
+        result["metrics"] = {
+            "total_time_ms": explanation.metrics.total_time_ms,
+            "edges_total": explanation.metrics.edges_total,
+            "edges_eliminated": explanation.metrics.edges_eliminated,
+            "llm_calls": explanation.metrics.llm_calls,
+            "cel_evaluations": explanation.metrics.cel_evaluations,
+        }
+
+    return result
+
+
+def routing_explanation_from_dict(data: Dict[str, Any]) -> RoutingExplanation:
+    """Parse RoutingExplanation from a dictionary.
+
+    Args:
+        data: Dictionary with RoutingExplanation fields.
+
+    Returns:
+        Parsed RoutingExplanation instance.
+    """
+    available_edges = [
+        EdgeOption(
+            edge_id=e.get("edge_id", ""),
+            target_node=e.get("target_node", ""),
+            edge_type=e.get("edge_type", "sequence"),
+            priority=e.get("priority", 50),
+            evaluated_result=e.get("evaluated_result"),
+            score=e.get("score"),
+        )
+        for e in data.get("available_edges", [])
+    ]
+
+    elimination_log = [
+        Elimination(
+            edge_id=e.get("edge_id", ""),
+            reason_code=e.get("reason_code", ""),
+            detail=e.get("detail", ""),
+        )
+        for e in data.get("elimination_log", [])
+    ]
+
+    llm_reasoning = None
+    if "llm_reasoning" in data:
+        llm_data = data["llm_reasoning"]
+        llm_reasoning = LLMReasoning(
+            model_used=llm_data.get("model_used", ""),
+            prompt_hash=llm_data.get("prompt_hash", ""),
+            response_time_ms=llm_data.get("response_time_ms", 0),
+            factors_considered=[
+                RoutingFactor(
+                    name=f.get("name", ""),
+                    impact=f.get("impact", "neutral"),
+                    evidence=f.get("evidence"),
+                    weight=f.get("weight", 0.5),
+                )
+                for f in llm_data.get("factors_considered", [])
+            ],
+            option_scores=dict(llm_data.get("option_scores", {})),
+            primary_justification=llm_data.get("primary_justification", ""),
+            risks_identified=llm_data.get("risks_identified", []),
+            assumptions_made=llm_data.get("assumptions_made", []),
+        )
+
+    cel_evaluation = None
+    if "cel_evaluation" in data:
+        cel_data = data["cel_evaluation"]
+        cel_evaluation = CELEvaluation(
+            expressions_evaluated=cel_data.get("expressions_evaluated", []),
+            context_variables=cel_data.get("context_variables", {}),
+        )
+
+    microloop_context = None
+    if "microloop_context" in data:
+        mc_data = data["microloop_context"]
+        microloop_context = MicroloopContext(
+            iteration=mc_data.get("iteration", 1),
+            max_iterations=mc_data.get("max_iterations", 3),
+            loop_target=mc_data.get("loop_target", ""),
+            exit_status=mc_data.get("exit_status", ""),
+            can_further_iteration_help=mc_data.get("can_further_iteration_help", True),
+            status_history=mc_data.get("status_history", []),
+        )
+
+    metrics = None
+    if "metrics" in data:
+        m_data = data["metrics"]
+        metrics = DecisionMetrics(
+            total_time_ms=m_data.get("total_time_ms", 0),
+            edges_total=m_data.get("edges_total", 0),
+            edges_eliminated=m_data.get("edges_eliminated", 0),
+            llm_calls=m_data.get("llm_calls", 0),
+            cel_evaluations=m_data.get("cel_evaluations", 0),
+        )
+
+    return RoutingExplanation(
+        decision_type=DecisionType(data.get("decision_type", "deterministic")),
+        selected_target=data.get("selected_target", ""),
+        timestamp=_iso_to_datetime(data.get("timestamp")) or datetime.now(timezone.utc),
+        confidence=data.get("confidence", 1.0),
+        reasoning_summary=data.get("reasoning_summary", ""),
+        available_edges=available_edges,
+        elimination_log=elimination_log,
+        llm_reasoning=llm_reasoning,
+        cel_evaluation=cel_evaluation,
+        microloop_context=microloop_context,
+        metrics=metrics,
+    )
+
+
 def routing_signal_to_dict(signal: RoutingSignal) -> Dict[str, Any]:
     """Convert RoutingSignal to a dictionary for serialization.
 
@@ -498,7 +794,7 @@ def routing_signal_to_dict(signal: RoutingSignal) -> Dict[str, Any]:
     Returns:
         Dictionary representation suitable for JSON/YAML serialization.
     """
-    return {
+    result = {
         "decision": signal.decision.value if isinstance(signal.decision, RoutingDecision) else signal.decision,
         "next_step_id": signal.next_step_id,
         "route": signal.route,
@@ -509,6 +805,11 @@ def routing_signal_to_dict(signal: RoutingSignal) -> Dict[str, Any]:
         "loop_count": signal.loop_count,
         "exit_condition_met": signal.exit_condition_met,
     }
+
+    if signal.explanation:
+        result["explanation"] = routing_explanation_to_dict(signal.explanation)
+
+    return result
 
 
 def routing_signal_from_dict(data: Dict[str, Any]) -> RoutingSignal:
@@ -522,10 +823,14 @@ def routing_signal_from_dict(data: Dict[str, Any]) -> RoutingSignal:
 
     Note:
         Provides backwards compatibility for signals missing the new
-        next_flow, loop_count, or exit_condition_met fields.
+        next_flow, loop_count, exit_condition_met, or explanation fields.
     """
     decision_value = data.get("decision", "advance")
     decision = RoutingDecision(decision_value) if isinstance(decision_value, str) else decision_value
+
+    explanation = None
+    if "explanation" in data:
+        explanation = routing_explanation_from_dict(data["explanation"])
 
     return RoutingSignal(
         decision=decision,
@@ -537,6 +842,7 @@ def routing_signal_from_dict(data: Dict[str, Any]) -> RoutingSignal:
         next_flow=data.get("next_flow"),
         loop_count=data.get("loop_count", 0),
         exit_condition_met=data.get("exit_condition_met", False),
+        explanation=explanation,
     )
 
 
@@ -554,7 +860,7 @@ def handoff_envelope_to_dict(envelope: HandoffEnvelope) -> Dict[str, Any]:
     Returns:
         Dictionary representation suitable for JSON/YAML serialization.
     """
-    return {
+    result = {
         "step_id": envelope.step_id,
         "flow_key": envelope.flow_key,
         "run_id": envelope.run_id,
@@ -574,6 +880,14 @@ def handoff_envelope_to_dict(envelope: HandoffEnvelope) -> Dict[str, Any]:
         "verification_details": dict(envelope.verification_details),
     }
 
+    # Include routing audit trail if the routing signal has an explanation
+    if envelope.routing_signal.explanation:
+        result["routing_audit"] = routing_explanation_to_dict(envelope.routing_signal.explanation)
+    elif envelope.routing_audit:
+        result["routing_audit"] = envelope.routing_audit
+
+    return result
+
 
 def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
     """Parse HandoffEnvelope from a dictionary.
@@ -587,10 +901,13 @@ def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
     Note:
         Provides backwards compatibility for envelopes missing the new
         spec traceability fields (station_id, station_version, prompt_hash,
-        verification_passed, verification_details).
+        verification_passed, verification_details, routing_audit).
     """
     routing_signal_data = data.get("routing_signal", {})
     routing_signal = routing_signal_from_dict(routing_signal_data)
+
+    # Parse routing_audit if present (store as raw dict for flexibility)
+    routing_audit = data.get("routing_audit")
 
     return HandoffEnvelope(
         step_id=data.get("step_id", ""),
@@ -610,6 +927,7 @@ def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
         prompt_hash=data.get("prompt_hash"),
         verification_passed=data.get("verification_passed", True),
         verification_details=dict(data.get("verification_details", {})),
+        routing_audit=routing_audit,
     )
 
 

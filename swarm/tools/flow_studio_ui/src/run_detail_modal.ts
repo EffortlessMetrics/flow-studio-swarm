@@ -33,7 +33,7 @@ interface ExtendedRunSummary extends RunSummary {
   created_at?: string;
   started_at?: string;
   completed_at?: string;
-  status?: "pending" | "running" | "completed" | "failed" | "cancelled";
+  status?: "pending" | "running" | "completed" | "failed" | "canceled";
   error_message?: string;
   tags?: string[];
   is_exemplar?: boolean;
@@ -409,7 +409,7 @@ function getStatusClass(status: string | undefined): string {
       return "fs-status-badge info";
     case "failed":
       return "fs-status-badge error";
-    case "cancelled":
+    case "canceled":
       return "fs-status-badge warning";
     case "pending":
     default:
@@ -428,8 +428,8 @@ function getStatusLabel(status: string | undefined): string {
       return "\u25CF RUNNING";
     case "failed":
       return "\u2717 FAILED";
-    case "cancelled":
-      return "\u2014 CANCELLED";
+    case "canceled":
+      return "\u2014 CANCELED";
     case "pending":
       return "\u2026 PENDING";
     default:

@@ -6,16 +6,31 @@ This package provides the specification layer for the industrialized SDLC:
 - FlowSpec: Orchestrator spine with routing configuration
 - Fragments: Reusable prompt components
 - Compiler: Assembles specs + context into SDK inputs
+- Manager: Central authority for spec file operations (ADR-001)
 
 Usage:
     from swarm.spec import (
+        # Types
         StationSpec,
         FlowSpec,
         PromptPlan,
+        FlowGraph,
+        StepTemplate,
+        # Loader
         load_station,
         load_flow,
+        # Compiler
         compile_prompt,
+        # Manager (central authority for spec writes)
+        SpecManager,
+        get_manager,
     )
+
+    # Use SpecManager for all spec file operations
+    manager = get_manager()
+    graph = manager.get_flow_graph("build-flow")
+    errors = manager.validate_spec("flow_graph", graph_data)
+    new_etag = manager.save_flow_graph("build-flow", data, etag=old_etag)
 """
 
 from .types import (
@@ -46,8 +61,26 @@ from .compiler import (
     SpecCompiler,
 )
 
+from .manager import (
+    # Main class
+    SpecManager,
+    # Data types
+    FlowGraph,
+    StepTemplate,
+    ValidationError,
+    ValidationResult,
+    # Errors
+    SpecError,
+    SpecNotFoundError,
+    SpecValidationError,
+    ConcurrencyError,
+    # Convenience functions
+    get_manager,
+    reset_manager,
+)
+
 __all__ = [
-    # Types
+    # Types (dataclasses)
     "StationSpec",
     "StationSDK",
     "StationIdentity",
@@ -69,4 +102,16 @@ __all__ = [
     # Compiler
     "compile_prompt",
     "SpecCompiler",
+    # Manager (ADR-001: central authority for spec writes)
+    "SpecManager",
+    "FlowGraph",
+    "StepTemplate",
+    "ValidationError",
+    "ValidationResult",
+    "SpecError",
+    "SpecNotFoundError",
+    "SpecValidationError",
+    "ConcurrencyError",
+    "get_manager",
+    "reset_manager",
 ]

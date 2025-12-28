@@ -32,21 +32,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from swarm.config.flow_registry import StepDefinition, get_flow_steps
+from swarm.config.flow_registry import StepDefinition, get_flow_index, get_flow_steps
 
 # Module logger
 logger = logging.getLogger(__name__)
-
-# Flow key to number mapping for orchestrator flow file naming
-FLOW_KEY_TO_NUMBER: Dict[str, int] = {
-    "signal": 1,
-    "plan": 2,
-    "build": 3,
-    "review": 4,
-    "gate": 5,
-    "deploy": 6,
-    "wisdom": 7,
-}
 
 
 @dataclass
@@ -99,8 +88,8 @@ def load_orchestrator_flow_prompt(flow_key: str, repo_root: Path) -> Optional[st
     Returns:
         The prompt file content (with frontmatter stripped), or None if not found.
     """
-    flow_number = FLOW_KEY_TO_NUMBER.get(flow_key)
-    if flow_number is None:
+    flow_number = get_flow_index(flow_key)
+    if flow_number == 99:  # Unknown flow key (get_flow_index returns 99 for unknown keys)
         logger.warning("Unknown flow key '%s' - cannot map to flow number", flow_key)
         return None
 

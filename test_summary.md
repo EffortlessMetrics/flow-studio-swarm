@@ -1,50 +1,47 @@
 # Test Summary
 
-## Overall Status: PASS (for new station YAMLs)
+## Overall Status: PASS
 
-## Test Run
-- **Date**: 2025-12-28
-- **Command**: `uv run pytest tests/test_spec_loader.py tests/test_spec_validation.py tests/test_spec_compiler.py tests/test_spec_integration.py -v`
-- **Results**: 157 passed, 7 failed, 1 skipped (165 total)
+**Test File:** `tests/test_spec_system.py`
+**Duration:** 0.29s
+**Results:** 57 passed, 0 failed
 
-## New Station Files Created (12 total)
+## Test Categories
 
-All new station YAML files load and validate correctly:
+| Category | Tests | Status |
+|----------|-------|--------|
+| SpecManager - Load Station | 3 | PASS |
+| SpecManager - Load Flow | 2 | PASS |
+| SpecManager - Validation | 2 | PASS |
+| SpecManager - ETag | 1 | PASS |
+| SpecManager - Listing | 3 | PASS |
+| SpecCompiler - Simple Flow | 2 | PASS |
+| SpecCompiler - Template Resolution | 3 | PASS |
+| SpecCompiler - Fragment Loading | 3 | PASS |
+| SpecCompiler - Prompt Hash | 2 | PASS |
+| SpecCompiler - Microloop | 1 | PASS |
+| SpecCompiler - Verification | 1 | PASS |
+| SpecCompiler - Handoff Contract | 1 | PASS |
+| Extract Flow Key | 2 | PASS |
+| SmartRouter - Explicit Next | 1 | PASS |
+| SmartRouter - Exit on Verified | 2 | PASS |
+| SmartRouter - Max Iterations | 1 | PASS |
+| SmartRouter - Single Edge | 1 | PASS |
+| SmartRouter - Branching | 3 | PASS |
+| SmartRouter - Terminal | 1 | PASS |
+| SmartRouter - Invalid Edge | 1 | PASS |
+| Microloop Termination | 4 | PASS |
+| Route Step Stub | 2 | PASS |
+| End-to-End Compile and Route | 3 | PASS |
+| Type Conversions | 2 | PASS |
+| System Append Building | 3 | PASS |
+| User Prompt Building | 2 | PASS |
+| Edge Cases | 6 | PASS |
 
-| Station | Flow | Category | Status |
-|---------|------|----------|--------|
-| signal-cleanup | 1 | infra | PASS |
-| plan-cleanup | 2 | infra | PASS |
-| context-loader | 3 | implementation | PASS |
-| fixer | 3 | implementation | PASS |
-| doc-writer | 3 | implementation | PASS |
-| self-reviewer | 3 | verification | PASS |
-| review-worklist-writer | 4 | router | PASS |
-| pr-feedback-harvester | 4 | analytics | PASS |
-| review-cleanup | 4 | infra | PASS |
-| gate-cleanup | 5 | infra | PASS |
-| deploy-cleanup | 6 | infra | PASS |
-| wisdom-cleanup | 7 | infra | PASS |
+## Failing Tests
 
-## Pre-existing Failures (Not Related to This Change)
+None.
 
-The 7 failing tests are caused by pre-existing issues in the repository:
+## Error Snippets
 
-### Missing Fragment References
-- `common/lane_hygiene.md` missing (referenced by clarifier, gh-reporter, policy-analyst, repo-operator, risk-analyst)
-
-### Unknown Station References in Flows
-- Flow 1-signal: bdd-critic
-- Flow 2-plan: option-critic, contract-critic, observability-critic
-- Flow 3-build: test-executor, mutation-auditor
-- Flow 4-review: pr-creator, pr-status-manager, secrets-sanitizer
-- Flow 5-gate: fix-forward-runner, traceability-auditor
-- Flow 7-wisdom: maintainability-analyst, process-analyst, signal-quality-analyst, traceability-auditor
-
-### Schema Validation Issues (Pre-existing Stations)
-- Multiple stations have `path_template` fields not allowed in current schema
-- Some stations have additional routing fields not in schema
-
-## Conclusion
-
-The 12 new station specifications have been created successfully and pass all validation. The test failures are pre-existing issues in the repository that need to be addressed separately.
+None.

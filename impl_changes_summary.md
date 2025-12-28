@@ -1,149 +1,130 @@
 # Implementation Changes Summary
 
-## Task
-Integrate spec-first routing into the orchestrator at `swarm/runtime/orchestrator.py`.
+## Component: SpecCompiler Enhancement
 
-## Files Changed
+**File Changed:** `swarm/spec/compiler.py`
 
-### 1. `swarm/runtime/orchestrator.py`
+## Summary
 
-Major enhancements for spec-first routing:
+Enhanced the SpecCompiler class to support FlowGraph-based compilation with StepPlan output, fragment includes, and deterministic prompt hashing. The implementation follows ADR-001 spec-first architecture and aligns with `prompt_plan.schema.json`.
 
-#### New Imports
-- Added `re`, `subprocess` for verification command execution
-- Added conditional import for `swarm.spec.loader` (load_flow, load_station)
-- Added `SPEC_AVAILABLE` flag for graceful degradation
+## Changes Made
 
-#### New Class Attributes
-- `_flow_spec_cache: Dict[str, Any]` - Cache for loaded FlowSpecs
-- `_station_spec_cache: Dict[str, Any]` - Cache for loaded StationSpecs
+### 1. New Data Classes
 
-#### New Methods: Spec-First Routing Support
+Added comprehensive data classes for FlowGraph compilation:
 
-1. **`_load_flow_spec(flow_key)`**: Load FlowSpec with caching
-   - Maps flow keys to spec IDs (e.g., "build" -> "3-build")
-   - Caches results to avoid repeated file I/O
-   - Returns None if spec not available (graceful degradation)
+- **StepPlan** - Per-step compilation result with:
+  - step_id, station_id, system_prompt, user_prompt
+  - allowed_tools, permission_mode, max_turns
+  - output_schema (JSON schema for structured output)
+  - prompt_hash (16-char SHA-256 for reproducibility)
+  - verification requirements, fragment references
+  - Full `to_dict()` method for serialization
 
-2. **`_load_station_spec(station_id)`**: Load StationSpec with caching
-   - Loads station specs for verification
-   - Caches results for performance
-   - Returns None if spec not available
+- **FlowNode** - FlowGraph node representation with:
+  - node_id, template_id
+  - params (parameter substitution)
+  - overrides (SDK/station overrides)
+  - ui (UI positioning)
 
-3. **`_get_macro_routing(flow_key, success)`**: Get macro-routing from FlowSpec
-   - Checks `on_complete.next_flow` when flow succeeds
-   - Checks `on_failure.next_flow` when flow fails
-   - Returns (next_flow_key, reason) tuple
+- **StepTemplate** - Reusable step template with:
+  - id, version, title, station_id
+  - objective (ParameterizedObjective)
+  - io_overrides, routing_defaults
+  - constraints, parameters, tags
 
-4. **`_get_spec_step_routing(flow_key, step_id)`**: Get step routing from FlowSpec
-   - Returns routing configuration dict from FlowSpec step
-   - Includes: kind, next, loop_target, exit_on conditions, max_iterations, branches
+- **CompileContext** - Compilation context with:
+  - run_id, run_base, repo_root
+  - iteration (microloop count)
+  - context_pack, scent_trail
 
-#### New Methods: Verification Execution
+- **MultiStepPromptPlan** - Full flow compilation output with:
+  - flow_id, steps (List[StepPlan])
+  - spec_hash (combined hash)
+  - compiled_at timestamp
 
-5. **`_run_verification(run_id, flow_key, step_id, station_id, envelope)`**: Run verification checks
-   - Emits `verification_started` event
-   - Checks `required_artifacts` from station verify block
-   - Runs `verification_commands` (shell commands with success patterns)
-   - Skips skill-based commands (test-runner, auto-linter, policy-runner)
-   - Emits `verification_passed` or `verification_failed` event
-   - Returns verification results with gate_status_on_fail
+### 2. New SpecCompiler Methods
 
-#### New Methods: Spec-First Routing Signal
+**Core Methods:**
+- `compile_step(node, template, context)` - Compile FlowNode to StepPlan
+- `resolve_template(node, registry)` - Resolve StepTemplate from node
+- `build_system_prompt(station, scent_trail)` - Build complete system prompt
+- `build_user_prompt(objective, context_pack, io_contract, variables)` - Build user prompt
+- `compute_prompt_hash(system, user)` - Compute deterministic 16-char hash
 
-6. **`_create_routing_signal_from_spec(step, result, loop_state, spec_routing)`**: Create routing signal from FlowSpec
-   - Supports routing kinds: linear, microloop, branch, terminal
-   - Handles exit_on conditions for microloops:
-     - Status values (e.g., ["VERIFIED", "verified"])
-     - can_further_iteration_help: false
-   - Tracks loop_count and exit_condition_met
-   - Returns RoutingSignal with spec-sourced decision
+**Multi-Step:**
+- `compile_flow(flow_id, context)` - Compile full flow to MultiStepPromptPlan
 
-7. **`_get_spec_exit_on(flow_key, step_id)`**: Get exit_on conditions from FlowSpec
-   - Reads raw YAML to get exit_on block from step routing
-   - Returns dict with status values and can_further_iteration_help
+**Private Helpers:**
+- `_resolve_station_id()` - Station ID from node/template
+- `_resolve_objective()` - Objective from template + params
+- `_build_variables()` - Template substitution variables
+- `_build_io_contract()` - Merged IO from station/template/node
+- `_build_output_schema()` - JSON schema for handoff
+- `_build_verification_from_node()` - Verification requirements
+- `_merge_sdk_options()` - SDK options with overrides
+- `_process_fragment_includes()` - Process `{{fragment:path}}` syntax
+- `_collect_fragment_references()` - Audit trail for fragments
+- `_load_template()` - Load StepTemplate from disk (cached)
+- `_compile_flow_step()` - Internal FlowStep to StepPlan
 
-#### Updated Methods
+### 3. Fragment Include Syntax
 
-8. **`_create_routing_signal()`**: Now uses spec-first routing
-   - Tries `_get_spec_step_routing()` first
-   - If spec found, delegates to `_create_routing_signal_from_spec()`
-   - Falls back to config-based routing if no spec
+Added support for inline fragment includes:
+```
+{{fragment:common/status_model}}
+{{fragment:microloop/critic_never_fixes.md}}
+```
 
-9. **`_execute_stepwise()`**: Added verification and macro-routing
-   - After step execution, gets station_id from FlowSpec
-   - Calls `_run_verification()` for station verification
-   - Updates handoff envelope with verification results:
-     - `verification_passed: bool`
-     - `verification_details: Dict` (artifact_checks, command_checks)
-     - `station_id: str`
-   - After flow completes, calls `_get_macro_routing()`
-   - Emits `macro_route` event if next flow is defined
-   - Updates `run_state.flow_transition_history`
-   - Includes macro-routing info in `run_completed` event
+The `.md` extension is added automatically if missing. Missing fragments produce a `[Fragment not found: path]` placeholder with a warning log.
 
-## New Event Types Emitted
+### 4. Constants and Presets
 
-1. **`verification_started`**: When step verification begins
-   - Payload: station_id
-
-2. **`verification_passed`**: When verification succeeds
-   - Payload: station_id, artifact_checks, command_checks, reason
-
-3. **`verification_failed`**: When verification fails
-   - Payload: station_id, gate_status_on_fail, artifact_checks, command_checks
-
-4. **`macro_route`**: When flow completes with defined next_flow
-   - Payload: from_flow, to_flow, reason, flow_succeeded, loop_count
-
-## Flow Context Tracking
-
-In `run_completed` event:
-- `next_flow`: Next flow from macro-routing (or None)
-- `macro_route_reason`: Reason for flow transition
-- `flow_transition_history`: List of all flow transitions in run
-
-In `RunState`:
-- `current_flow_index`: 1-based index of current flow
-- `flow_transition_history`: Ordered list of flow transitions with metadata
+- `COMPILER_VERSION = "1.0.0"` - For traceability
+- `SYSTEM_PRESETS` - Claude preset content dictionary
+- `TOOL_PROFILES` - Quick tool configuration profiles
 
 ## Tests Addressed
 
-### Verified Working
-- Spec loader tests: 46/48 passing
-- FlowSpec loading: Works correctly (tested manually)
-- RoutingKind.TERMINAL: Recognized from spec
+All 38 existing tests pass:
+- TestExtractFlowKey (4 tests)
+- TestRenderTemplate (6 tests)
+- TestBuildSystemAppend (4 tests)
+- TestBuildSystemAppendV2 (2 tests)
+- TestBuildUserPrompt (4 tests)
+- TestMergeVerificationRequirements (3 tests)
+- TestResolveHandoffContract (2 tests)
+- TestSpecCompiler (10 tests)
+- TestCompilePromptFunction (1 test)
+- TestPromptHashComputation (2 tests)
 
-### Known Issue (Pre-existing)
-- Circular import in swarm.runtime module prevents direct import of orchestrator
-- This is a pre-existing issue in the codebase (not introduced by this change)
-- The circular import is: context_pack.py -> engines -> claude/engine.py -> context_pack.py
+1 test skipped (missing station file - pre-existing issue).
 
 ## Trade-offs and Decisions
 
-1. **Graceful Degradation**: SPEC_AVAILABLE flag allows orchestrator to work without spec module. Falls back to config-based routing.
+1. **StepPlan vs PromptPlan**: Added StepPlan as a more complete per-step structure while preserving existing PromptPlan for backward compatibility.
 
-2. **YAML Parsing for exit_on**: FlowSpec dataclass doesn't include exit_on, so we read raw YAML. This is temporary until spec types are extended.
+2. **Fragment caching**: Using `@lru_cache` for template loading to avoid repeated disk I/O.
 
-3. **Skill Commands Skipped**: Verification commands like "test-runner" are skipped since they require skill runner integration.
+3. **Hash truncation**: 16-character SHA-256 prefix balances uniqueness vs readability.
 
-4. **Station ID from FlowSpec**: We get station_id from FlowSpec step, not from agent/config, for traceability.
+4. **Context pack format**: `build_user_prompt` accepts dict instead of typed object for flexibility with both existing ContextPack and raw dicts.
 
-5. **Flow ID Mapping**: Hardcoded map from flow_key to flow_id (e.g., "build" -> "3-build"). Could be derived from flow_registry.
+5. **Preset handling**: System presets are hardcoded but support custom via `preset_content` attribute.
 
-## Critique Issues Resolved
+## Completion State
 
-N/A - No code_critique.md was present.
+**VERIFIED** - Code written, all tests pass.
 
-## Verification Status
+## Files Changed
 
-**UNVERIFIED** - Code written, but tests cannot run due to pre-existing circular import issue in swarm.runtime module. The spec loader tests pass (46/48), and manual testing confirms FlowSpec loading works correctly.
+| File | Change Type |
+|------|-------------|
+| `swarm/spec/compiler.py` | Enhanced with new methods and data classes |
 
-### Blocking Issue
+## Next Steps
 
-The orchestrator cannot be imported due to a circular import:
-```
-orchestrator.py -> context_pack.py -> engines -> claude/engine.py -> context_pack.py
-```
-
-This is a pre-existing architectural issue that needs to be resolved separately. The new code follows the existing patterns and does not introduce new circular dependencies.
+1. Add tests for new `compile_step` and `compile_flow` methods
+2. Create sample StepTemplate files in `swarm/spec/templates/`
+3. Update downstream consumers to use StepPlan where appropriate

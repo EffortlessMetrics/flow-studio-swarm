@@ -15,7 +15,11 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from swarm.runtime.types import RoutingDecision, RoutingSignal
+from swarm.runtime.types import (
+    RoutingDecision, RoutingSignal, RoutingExplanation,
+    DecisionType, EdgeOption, Elimination, LLMReasoning,
+    MicroloopContext, DecisionMetrics, RoutingFactor,
+)
 from swarm.spec.types import RoutingConfig, RoutingKind
 
 from ..models import RoutingContext, StepContext
@@ -23,9 +27,9 @@ from ..models import RoutingContext, StepContext
 logger = logging.getLogger(__name__)
 
 
-# Router prompt template for agentic routing decisions
+# Router prompt template for agentic routing decisions with structured JSON output
 ROUTER_PROMPT_TEMPLATE = """
-You are a routing resolver. Your job is to convert natural language handoff text plus step routing configuration into a deterministic RoutingSignal JSON.
+You are a routing resolver. Your job is to analyze handoff data and routing configuration to produce a structured routing decision with full reasoning.
 
 ## Handoff from Previous Step
 
@@ -49,48 +53,96 @@ routing:
 current_iteration: {current_iteration}
 ```
 
+## Available Edges
+{available_edges_json}
+
 ## Decision Logic
 
 ### Linear Flow
-- If `loop_target` is reached and `success_values` contains the target value -> **"proceed"**
-- If `loop_target` is not reached but `max_iterations` is exhausted -> **"rerun"**
-- If `loop_target` is not reached and `can_further_iteration_help` is false -> **"blocked"**
+- If `loop_target` is reached and `success_values` contains the target value -> **"advance"**
+- If `loop_target` is not reached but `max_iterations` is exhausted -> **"loop"**
+- If `loop_target` is not reached and `can_further_iteration_help` is false -> **"terminate"**
 
 ### Microloop Flow
-- If `success_values` contains the current status value -> **"proceed"** (exit loop)
-- If `max_iterations` is exhausted -> **"proceed"** (exit with documented concerns)
-- If `can_further_iteration_help` is false -> **"proceed"** (exit loop, no viable fix path)
+- If `success_values` contains the current status value -> **"advance"** (exit loop)
+- If `max_iterations` is exhausted -> **"advance"** (exit with documented concerns)
+- If `can_further_iteration_help` is false -> **"advance"** (exit loop, no viable fix path)
 - Otherwise if UNVERIFIED and iterations < max -> **"loop"** back to loop_target
 
 ### Branching Flow
-- If explicit user routing hint exists in handoff text -> **"route"** with the specified step_id
+- If explicit user routing hint exists in handoff text -> **"branch"** with the specified step_id
 
 ### Default
-- If no conditions met -> **"proceed"** with `next_step_id: null`
-
-## Confidence Scoring
-- **1.0**: Clear, confident routing decision
-- **0.7**: Some ambiguity but reasonable inference
-- **0.5**: Ambiguous routing, may need human review
-- **0.0**: Clear, unambiguous routing decision (legacy: inverted scale)
+- If no conditions met -> **"advance"** with `next_step_id: null`
 
 ## Output Format
 
 Output ONLY a valid JSON object with this structure (no markdown, no explanation):
+
 ```json
 {{
-  "decision": "proceed" | "rerun" | "blocked" | "loop" | "route",
+  "decision": "advance" | "loop" | "terminate" | "branch",
   "next_step_id": "<step_id or null>",
   "route": null,
-  "reason": "<explanation for this routing decision>",
+  "reason": "<one-sentence explanation for this routing decision>",
+  "confidence": <0.0 to 1.0>,
+  "needs_human": <true | false>,
+  "reasoning": {{
+    "factors_considered": [
+      {{
+        "name": "<factor name, max 50 chars>",
+        "impact": "strongly_favors" | "favors" | "neutral" | "against" | "strongly_against",
+        "evidence": "<pointer to supporting data, max 100 chars>",
+        "weight": <0.0 to 1.0>
+      }}
+    ],
+    "option_scores": {{
+      "<edge_id>": <0.0 to 1.0 score>
+    }},
+    "primary_justification": "<main reason for selected option, max 300 chars>",
+    "risks_identified": [
+      {{
+        "risk": "<risk description, max 100 chars>",
+        "severity": "low" | "medium" | "high",
+        "mitigation": "<how to mitigate, max 100 chars>"
+      }}
+    ],
+    "assumptions_made": ["<assumption 1>", "<assumption 2>"]
+  }}
+}}
+```
+
+Analyze the handoff and emit your routing decision with full reasoning now.
+"""
+
+
+# Simple router prompt for backward compatibility
+ROUTER_PROMPT_SIMPLE = """
+You are a routing resolver. Analyze the handoff and routing config below to decide the next step.
+
+## Handoff
+```json
+{handoff_json}
+```
+
+## Routing Config
+- kind: {routing_kind}
+- next: {routing_next}
+- loop_target: {loop_target}
+- success_values: {loop_success_values}
+- max_iterations: {max_iterations}
+- current_iteration: {current_iteration}
+
+Output ONLY a JSON object:
+```json
+{{
+  "decision": "advance" | "loop" | "terminate" | "branch",
+  "next_step_id": "<step_id or null>",
+  "reason": "<why>",
   "confidence": <0.0 to 1.0>,
   "needs_human": <true | false>
 }}
 ```
-
-Note: For backward compatibility, "proceed" maps to "advance", and "rerun" maps to "loop".
-
-Analyze the handoff and emit your routing decision now.
 """
 
 
@@ -368,6 +420,42 @@ current_iteration: {template_vars['current_iteration']}
         }
         decision = decision_map.get(decision_str, RoutingDecision.ADVANCE)
 
+        # Build LLMReasoning from structured response if present
+        llm_reasoning = None
+        reasoning_data = routing_data.get("reasoning", {})
+        if reasoning_data:
+            factors = [
+                RoutingFactor(
+                    name=f.get("name", ""),
+                    impact=f.get("impact", "neutral"),
+                    evidence=f.get("evidence"),
+                    weight=float(f.get("weight", 0.5)),
+                )
+                for f in reasoning_data.get("factors_considered", [])
+            ]
+            llm_reasoning = LLMReasoning(
+                model_used="claude",  # SDK doesn't expose model easily
+                prompt_hash=routing_data.get("prompt_hash", ""),
+                response_time_ms=0,  # Would need timing wrapper
+                factors_considered=factors,
+                option_scores=reasoning_data.get("option_scores", {}),
+                primary_justification=reasoning_data.get("primary_justification", ""),
+                risks_identified=reasoning_data.get("risks_identified", []),
+                assumptions_made=reasoning_data.get("assumptions_made", []),
+            )
+
+        # Build explanation
+        from datetime import datetime, timezone
+        explanation = RoutingExplanation(
+            decision_type=DecisionType.LLM_TIEBREAKER,
+            selected_target=routing_data.get("next_step_id") or "",
+            timestamp=datetime.now(timezone.utc),
+            confidence=float(routing_data.get("confidence", 0.7)),
+            reasoning_summary=routing_data.get("reason", "")[:200],
+            llm_reasoning=llm_reasoning,
+            metrics=DecisionMetrics(llm_calls=1),
+        )
+
         return RoutingSignal(
             decision=decision,
             next_step_id=routing_data.get("next_step_id"),
@@ -375,6 +463,7 @@ current_iteration: {template_vars['current_iteration']}
             reason=routing_data.get("reason", ""),
             confidence=float(routing_data.get("confidence", 0.7)),
             needs_human=bool(routing_data.get("needs_human", False)),
+            explanation=explanation,
         )
 
     except json.JSONDecodeError as e:
@@ -586,3 +675,385 @@ def route_from_routing_config(
 
     # Routing cannot be determined deterministically - requires LLM decision
     return None
+
+
+def smart_route(
+    routing_config: RoutingConfig,
+    handoff_data: Dict[str, Any],
+    iteration_count: int = 0,
+    available_edges: Optional[list] = None,
+) -> RoutingSignal:
+    """Smart routing with structured JSON explanation.
+
+    Implements priority-based routing with full audit trail:
+    1. Exit conditions (VERIFIED status, max iterations)
+    2. Deterministic spec routing
+    3. Branch matching
+    4. LLM tie-breaker (if multiple valid options)
+
+    Args:
+        routing_config: The RoutingConfig from the step's FlowStep.routing.
+        handoff_data: The handoff data including status and other fields.
+        iteration_count: Current iteration count for microloop tracking.
+        available_edges: Optional list of available edges for audit trail.
+
+    Returns:
+        RoutingSignal with populated explanation field.
+    """
+    import time
+    from datetime import datetime, timezone
+
+    start_time = time.time()
+    handoff_status = handoff_data.get("status", "")
+    normalized_status = handoff_status.upper() if handoff_status else ""
+    elimination_log = []
+    edges_considered = []
+
+    # Build edge options from routing config
+    if available_edges:
+        edges_considered = [
+            EdgeOption(
+                edge_id=e.get("edge_id", f"edge_{i}"),
+                target_node=e.get("to", ""),
+                edge_type=e.get("type", "sequence"),
+                priority=e.get("priority", 50),
+            )
+            for i, e in enumerate(available_edges)
+        ]
+    elif routing_config.next:
+        edges_considered = [
+            EdgeOption(
+                edge_id="primary",
+                target_node=routing_config.next,
+                edge_type="sequence",
+                priority=0,
+            )
+        ]
+        if routing_config.loop_target:
+            edges_considered.append(
+                EdgeOption(
+                    edge_id="loop",
+                    target_node=routing_config.loop_target,
+                    edge_type="loop",
+                    priority=10,
+                )
+            )
+
+    # Build microloop context if applicable
+    microloop_ctx = None
+    if routing_config.kind == RoutingKind.MICROLOOP:
+        microloop_ctx = MicroloopContext(
+            iteration=iteration_count + 1,
+            max_iterations=routing_config.max_iterations,
+            loop_target=routing_config.loop_target or "",
+            exit_status=normalized_status,
+            can_further_iteration_help=handoff_data.get("can_further_iteration_help", True),
+        )
+
+    # Priority 1: Check for exit conditions (deterministic)
+    if routing_config.kind == RoutingKind.TERMINAL:
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        return RoutingSignal(
+            decision=RoutingDecision.TERMINATE,
+            reason="spec_terminal",
+            confidence=1.0,
+            needs_human=False,
+            explanation=RoutingExplanation(
+                decision_type=DecisionType.EXIT_CONDITION,
+                selected_target="",
+                timestamp=datetime.now(timezone.utc),
+                confidence=1.0,
+                reasoning_summary="Terminal step, flow complete",
+                available_edges=edges_considered,
+                elimination_log=elimination_log,
+                microloop_context=microloop_ctx,
+                metrics=DecisionMetrics(
+                    total_time_ms=elapsed_ms,
+                    edges_total=len(edges_considered),
+                    edges_eliminated=len(elimination_log),
+                ),
+            ),
+        )
+
+    # Priority 2: Check microloop success condition
+    if routing_config.kind == RoutingKind.MICROLOOP:
+        success_values_upper = tuple(v.upper() for v in routing_config.loop_success_values)
+
+        if normalized_status in success_values_upper:
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            # Mark loop edge as eliminated
+            for e in edges_considered:
+                if e.edge_type == "loop":
+                    elimination_log.append(Elimination(
+                        edge_id=e.edge_id,
+                        reason_code="exit_condition_met",
+                        detail=f"Status {normalized_status} matches success values",
+                    ))
+                else:
+                    e.evaluated_result = True
+                    e.score = 1.0
+
+            return RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                next_step_id=routing_config.next,
+                reason="spec_microloop_verified",
+                confidence=1.0,
+                needs_human=False,
+                explanation=RoutingExplanation(
+                    decision_type=DecisionType.EXIT_CONDITION,
+                    selected_target=routing_config.next or "",
+                    timestamp=datetime.now(timezone.utc),
+                    confidence=1.0,
+                    reasoning_summary=f"Microloop exit: status {normalized_status} matches success condition",
+                    available_edges=edges_considered,
+                    elimination_log=elimination_log,
+                    microloop_context=microloop_ctx,
+                    metrics=DecisionMetrics(
+                        total_time_ms=elapsed_ms,
+                        edges_total=len(edges_considered),
+                        edges_eliminated=len(elimination_log),
+                    ),
+                ),
+            )
+
+        # Check max iterations
+        if iteration_count >= routing_config.max_iterations:
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            for e in edges_considered:
+                if e.edge_type == "loop":
+                    elimination_log.append(Elimination(
+                        edge_id=e.edge_id,
+                        reason_code="max_iterations",
+                        detail=f"Iteration {iteration_count + 1} >= max {routing_config.max_iterations}",
+                    ))
+
+            return RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                next_step_id=routing_config.next,
+                reason="spec_microloop_max_iterations",
+                confidence=0.7,
+                needs_human=True,
+                explanation=RoutingExplanation(
+                    decision_type=DecisionType.EXIT_CONDITION,
+                    selected_target=routing_config.next or "",
+                    timestamp=datetime.now(timezone.utc),
+                    confidence=0.7,
+                    reasoning_summary=f"Max iterations reached ({iteration_count + 1}/{routing_config.max_iterations})",
+                    available_edges=edges_considered,
+                    elimination_log=elimination_log,
+                    microloop_context=microloop_ctx,
+                    metrics=DecisionMetrics(
+                        total_time_ms=elapsed_ms,
+                        edges_total=len(edges_considered),
+                        edges_eliminated=len(elimination_log),
+                    ),
+                ),
+            )
+
+        # Check can_further_iteration_help
+        can_help = handoff_data.get("can_further_iteration_help", True)
+        if isinstance(can_help, str):
+            can_help = can_help.lower() in ("yes", "true", "1")
+        if not can_help:
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            for e in edges_considered:
+                if e.edge_type == "loop":
+                    elimination_log.append(Elimination(
+                        edge_id=e.edge_id,
+                        reason_code="status_mismatch",
+                        detail="Critic indicated no further iteration can help",
+                    ))
+
+            return RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                next_step_id=routing_config.next,
+                reason="spec_microloop_no_further_help",
+                confidence=0.8,
+                needs_human=True,
+                explanation=RoutingExplanation(
+                    decision_type=DecisionType.EXIT_CONDITION,
+                    selected_target=routing_config.next or "",
+                    timestamp=datetime.now(timezone.utc),
+                    confidence=0.8,
+                    reasoning_summary="Critic judged no further iteration can help",
+                    available_edges=edges_considered,
+                    elimination_log=elimination_log,
+                    microloop_context=microloop_ctx,
+                    metrics=DecisionMetrics(
+                        total_time_ms=elapsed_ms,
+                        edges_total=len(edges_considered),
+                        edges_eliminated=len(elimination_log),
+                    ),
+                ),
+            )
+
+        # Continue looping
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        for e in edges_considered:
+            if e.edge_type != "loop":
+                elimination_log.append(Elimination(
+                    edge_id=e.edge_id,
+                    reason_code="condition_false",
+                    detail=f"Status {normalized_status} not in success values, loop continues",
+                ))
+
+        return RoutingSignal(
+            decision=RoutingDecision.LOOP,
+            next_step_id=routing_config.loop_target,
+            reason="spec_microloop_continue",
+            confidence=1.0,
+            needs_human=False,
+            loop_count=iteration_count + 1,
+            explanation=RoutingExplanation(
+                decision_type=DecisionType.DETERMINISTIC,
+                selected_target=routing_config.loop_target or "",
+                timestamp=datetime.now(timezone.utc),
+                confidence=1.0,
+                reasoning_summary=f"Continuing microloop: iteration {iteration_count + 1}, status {normalized_status}",
+                available_edges=edges_considered,
+                elimination_log=elimination_log,
+                microloop_context=microloop_ctx,
+                metrics=DecisionMetrics(
+                    total_time_ms=elapsed_ms,
+                    edges_total=len(edges_considered),
+                    edges_eliminated=len(elimination_log),
+                ),
+            ),
+        )
+
+    # Priority 3: Linear routing
+    if routing_config.kind == RoutingKind.LINEAR:
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        if routing_config.next:
+            return RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                next_step_id=routing_config.next,
+                reason="spec_linear",
+                confidence=1.0,
+                needs_human=False,
+                explanation=RoutingExplanation(
+                    decision_type=DecisionType.DETERMINISTIC,
+                    selected_target=routing_config.next,
+                    timestamp=datetime.now(timezone.utc),
+                    confidence=1.0,
+                    reasoning_summary="Linear flow: advancing to next step",
+                    available_edges=edges_considered,
+                    elimination_log=elimination_log,
+                    metrics=DecisionMetrics(
+                        total_time_ms=elapsed_ms,
+                        edges_total=len(edges_considered),
+                        edges_eliminated=len(elimination_log),
+                    ),
+                ),
+            )
+        return RoutingSignal(
+            decision=RoutingDecision.TERMINATE,
+            reason="spec_linear_no_next",
+            confidence=1.0,
+            needs_human=False,
+            explanation=RoutingExplanation(
+                decision_type=DecisionType.DETERMINISTIC,
+                selected_target="",
+                timestamp=datetime.now(timezone.utc),
+                confidence=1.0,
+                reasoning_summary="Linear flow complete: no next step defined",
+                available_edges=edges_considered,
+                elimination_log=elimination_log,
+                metrics=DecisionMetrics(
+                    total_time_ms=elapsed_ms,
+                    edges_total=len(edges_considered),
+                    edges_eliminated=len(elimination_log),
+                ),
+            ),
+        )
+
+    # Priority 4: Branch routing
+    if routing_config.kind == RoutingKind.BRANCH and routing_config.branches:
+        elapsed_ms = int((time.time() - start_time) * 1000)
+
+        # Try exact match first, then case-insensitive
+        matched_target = None
+        matched_key = None
+        for branch_key, branch_target in routing_config.branches.items():
+            if branch_key == handoff_status or branch_key.upper() == normalized_status:
+                matched_target = branch_target
+                matched_key = branch_key
+                break
+            else:
+                elimination_log.append(Elimination(
+                    edge_id=f"branch_{branch_key}",
+                    reason_code="condition_false",
+                    detail=f"Status '{handoff_status}' != branch key '{branch_key}'",
+                ))
+
+        if matched_target:
+            return RoutingSignal(
+                decision=RoutingDecision.BRANCH,
+                next_step_id=matched_target,
+                route=matched_key,
+                reason="spec_branch",
+                confidence=1.0,
+                needs_human=False,
+                explanation=RoutingExplanation(
+                    decision_type=DecisionType.DETERMINISTIC,
+                    selected_target=matched_target,
+                    timestamp=datetime.now(timezone.utc),
+                    confidence=1.0,
+                    reasoning_summary=f"Branch matched: status '{handoff_status}' -> '{matched_target}'",
+                    available_edges=edges_considered,
+                    elimination_log=elimination_log,
+                    metrics=DecisionMetrics(
+                        total_time_ms=elapsed_ms,
+                        edges_total=len(edges_considered),
+                        edges_eliminated=len(elimination_log),
+                    ),
+                ),
+            )
+
+        # Fallback to next
+        if routing_config.next:
+            return RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                next_step_id=routing_config.next,
+                reason="spec_branch_default",
+                confidence=0.8,
+                needs_human=False,
+                explanation=RoutingExplanation(
+                    decision_type=DecisionType.DETERMINISTIC,
+                    selected_target=routing_config.next,
+                    timestamp=datetime.now(timezone.utc),
+                    confidence=0.8,
+                    reasoning_summary=f"No branch matched status '{handoff_status}', using default",
+                    available_edges=edges_considered,
+                    elimination_log=elimination_log,
+                    metrics=DecisionMetrics(
+                        total_time_ms=elapsed_ms,
+                        edges_total=len(edges_considered),
+                        edges_eliminated=len(elimination_log),
+                    ),
+                ),
+            )
+
+    # Fallback: routing could not be determined
+    elapsed_ms = int((time.time() - start_time) * 1000)
+    return RoutingSignal(
+        decision=RoutingDecision.TERMINATE,
+        reason="routing_undetermined",
+        confidence=0.5,
+        needs_human=True,
+        explanation=RoutingExplanation(
+            decision_type=DecisionType.ERROR,
+            selected_target="",
+            timestamp=datetime.now(timezone.utc),
+            confidence=0.5,
+            reasoning_summary="Could not determine routing from spec",
+            available_edges=edges_considered,
+            elimination_log=elimination_log,
+            microloop_context=microloop_ctx,
+            metrics=DecisionMetrics(
+                total_time_ms=elapsed_ms,
+                edges_total=len(edges_considered),
+                edges_eliminated=len(elimination_log),
+            ),
+        ),
+    )

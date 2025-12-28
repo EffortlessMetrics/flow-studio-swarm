@@ -40,6 +40,7 @@ from swarm.config.flow_registry import (
     FlowRegistry,
     StepDefinition,
     StepRouting,
+    get_flow_spec_id,
 )
 
 from . import storage as storage_module
@@ -203,16 +204,7 @@ class GeminiStepOrchestrator:
             return self._flow_spec_cache[flow_key]
 
         # Map flow_key to spec flow_id (e.g., "build" -> "3-build")
-        flow_id_map = {
-            "signal": "1-signal",
-            "plan": "2-plan",
-            "build": "3-build",
-            "review": "4-review",
-            "gate": "5-gate",
-            "deploy": "6-deploy",
-            "wisdom": "7-wisdom",
-        }
-        flow_id = flow_id_map.get(flow_key, flow_key)
+        flow_id = get_flow_spec_id(flow_key)
 
         try:
             flow_spec = load_flow(flow_id, self._repo_root)
@@ -284,12 +276,7 @@ class GeminiStepOrchestrator:
             # Try to read the raw YAML to get on_complete/on_failure
             import yaml
             spec_root = self._repo_root / "swarm" / "spec"
-            flow_id_map = {
-                "signal": "1-signal", "plan": "2-plan", "build": "3-build",
-                "review": "4-review", "gate": "5-gate", "deploy": "6-deploy",
-                "wisdom": "7-wisdom",
-            }
-            flow_id = flow_id_map.get(flow_key, flow_key)
+            flow_id = get_flow_spec_id(flow_key)
             flow_path = spec_root / "flows" / f"{flow_id}.yaml"
 
             if flow_path.exists():
@@ -1432,12 +1419,7 @@ class GeminiStepOrchestrator:
         try:
             import yaml
             spec_root = self._repo_root / "swarm" / "spec"
-            flow_id_map = {
-                "signal": "1-signal", "plan": "2-plan", "build": "3-build",
-                "review": "4-review", "gate": "5-gate", "deploy": "6-deploy",
-                "wisdom": "7-wisdom",
-            }
-            flow_id = flow_id_map.get(flow_key, flow_key)
+            flow_id = get_flow_spec_id(flow_key)
             flow_path = spec_root / "flows" / f"{flow_id}.yaml"
 
             if not flow_path.exists():
@@ -2274,7 +2256,7 @@ class GeminiStepOrchestrator:
                         current_step.id,
                     )
                     cancelled = True
-                    final_status = RunStatus.CANCELLED
+                    final_status = RunStatus.CANCELED
                     sdlc_status = SDLCStatus.PARTIAL
                     error_msg = f"Cancelled during step {current_step.id}"
 
@@ -2422,7 +2404,7 @@ class GeminiStepOrchestrator:
         except asyncio.CancelledError:
             logger.warning("Run %s cancelled at step boundary", run_id)
             cancelled = True
-            final_status = RunStatus.CANCELLED
+            final_status = RunStatus.CANCELED
             sdlc_status = SDLCStatus.PARTIAL
             error_msg = "Run cancelled"
 
