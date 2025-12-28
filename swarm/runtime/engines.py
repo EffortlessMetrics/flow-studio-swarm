@@ -69,8 +69,69 @@ from .types import (
     handoff_envelope_to_dict,
 )
 
+# Import Claude SDK adapter for unified SDK access
+from .claude_sdk import (
+    SDK_AVAILABLE as CLAUDE_SDK_AVAILABLE,
+    check_sdk_available as check_claude_sdk_available,
+    create_high_trust_options,
+    extract_usage_from_event,
+    extract_model_from_event,
+)
+
+# Import resolvers for prompt building
+from .resolvers import (
+    EnvelopeWriterResolver,
+    build_finalization_prompt,
+    build_routing_prompt,
+    parse_envelope_response,
+    parse_routing_response,
+    load_envelope_writer_prompt,
+)
+
 # Module logger
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Async Utilities
+# =============================================================================
+
+
+def _run_async_safely(coro):
+    """Run an async coroutine safely, handling event loop context.
+
+    This function provides a clean sync-to-async bridge that:
+    - Creates a new event loop if none exists
+    - Properly handles cleanup
+    - Avoids the ThreadPoolExecutor+asyncio.run pattern
+
+    Note: This should only be called from synchronous code. If called
+    from within an async context, the behavior is undefined.
+
+    Args:
+        coro: The coroutine to run.
+
+    Returns:
+        The result of the coroutine.
+    """
+    import asyncio
+
+    try:
+        # Check if there's already a running loop
+        loop = asyncio.get_running_loop()
+        # We're in an async context - this shouldn't happen in normal usage
+        # Log a warning and create a new loop in a thread
+        logger.warning(
+            "_run_async_safely called from async context. "
+            "Consider using await directly."
+        )
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(asyncio.run, coro)
+            return future.result()
+    except RuntimeError:
+        # No running loop - create one and run
+        return asyncio.run(coro)
 
 
 @dataclass
@@ -1221,18 +1282,16 @@ Analyze the handoff and emit your routing decision now.
     def _check_sdk_available(self) -> bool:
         """Check if the Claude Code SDK is available.
 
+        Uses the unified claude_sdk adapter for consistent SDK access.
         Caches the result after first check.
 
         Returns:
             True if claude_code_sdk can be imported, False otherwise.
         """
         if self._sdk_available is None:
-            try:
-                import claude_code_sdk  # noqa: F401
-                self._sdk_available = True
-            except ImportError:
-                self._sdk_available = False
-                logger.debug("claude_code_sdk not available")
+            self._sdk_available = check_claude_sdk_available()
+            if not self._sdk_available:
+                logger.debug("claude_code_sdk not available (via adapter)")
         return self._sdk_available
 
     def _get_resolved_budgets(
@@ -1480,6 +1539,8 @@ Analyze the handoff and emit your routing decision now.
         and produces a routing decision. Uses resolver template if available,
         otherwise falls back to ROUTER_PROMPT_TEMPLATE.
 
+        Uses the unified claude_sdk adapter for SDK access.
+
         Args:
             handoff_data: The handoff JSON from JIT finalization.
             ctx: Step execution context with routing configuration.
@@ -1488,8 +1549,11 @@ Analyze the handoff and emit your routing decision now.
         Returns:
             RoutingSignal if routing was determined, None if routing failed.
         """
-        from claude_code_sdk import ClaudeCodeOptions, query
+        from .claude_sdk import get_sdk_module
         from .types import RoutingDecision, RoutingSignal
+
+        sdk = get_sdk_module()
+        query = sdk.query
 
         # Extract routing config from context
         routing = ctx.routing or RoutingContext()
@@ -1565,8 +1629,9 @@ current_iteration: {template_vars['current_iteration']}
             router_prompt = self.ROUTER_PROMPT_TEMPLATE.format(**template_vars)
             logger.debug("Using fallback ROUTER_PROMPT_TEMPLATE for routing")
 
-        # Router uses minimal options - just needs to analyze and respond
-        options = ClaudeCodeOptions(
+        # Router uses minimal options via adapter - just needs to analyze and respond
+        options = create_high_trust_options(
+            cwd=cwd,
             permission_mode="bypassPermissions",
         )
 
@@ -1578,7 +1643,6 @@ current_iteration: {template_vars['current_iteration']}
 
             async for event in query(
                 prompt=router_prompt,
-                cwd=cwd,
                 options=options,
             ):
                 # Extract text content from messages
@@ -1923,21 +1987,10 @@ Error: {step_result.error or "None"}
             logger.warning("SDK not available for run_worker, falling back to stub")
             return self._run_worker_stub(ctx)
 
-        import asyncio
-
-        # Determine if we need to create a new event loop
-        try:
-            loop = asyncio.get_running_loop()
-            # We're already in an async context - need to run in thread
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(
-                    asyncio.run, self._run_worker_async(ctx)
-                )
-                return future.result()
-        except RuntimeError:
-            # No running loop - we can create one
-            return asyncio.run(self._run_worker_async(ctx))
+        # Run the async worker in a clean event loop
+        # Note: This is a sync-to-async bridge. The caller is responsible
+        # for ensuring this is not called from within an async context.
+        return _run_async_safely(self._run_worker_async(ctx))
 
     def _run_worker_stub(
         self, ctx: StepContext
@@ -2017,13 +2070,18 @@ Error: {step_result.error or "None"}
         Executes only the work phase - builds prompt, runs LLM query,
         collects output. Does NOT run JIT finalization or routing.
 
+        Uses the unified claude_sdk adapter for SDK access.
+
         Args:
             ctx: Step execution context.
 
         Returns:
             Tuple of (StepResult, events, work_summary).
         """
-        from claude_code_sdk import ClaudeCodeOptions, query
+        from .claude_sdk import get_sdk_module
+
+        sdk = get_sdk_module()
+        query = sdk.query
 
         start_time = datetime.now(timezone.utc)
         agent_key = ctx.step_agents[0] if ctx.step_agents else "unknown"
@@ -2039,8 +2097,9 @@ Error: {step_result.error or "None"}
         # Set up working directory
         cwd = str(ctx.repo_root) if ctx.repo_root else str(Path.cwd())
 
-        # High-trust options
-        options = ClaudeCodeOptions(
+        # High-trust options via adapter
+        options = create_high_trust_options(
+            cwd=cwd,
             permission_mode="bypassPermissions",
         )
 
@@ -2067,7 +2126,6 @@ Error: {step_result.error or "None"}
         try:
             async for event in query(
                 prompt=prompt,
-                cwd=cwd,
                 options=options,
             ):
                 now = datetime.now(timezone.utc)
@@ -2300,18 +2358,10 @@ Error: {step_result.error or "None"}
             logger.warning("SDK not available for finalize_step, falling back to stub")
             return self._finalize_step_stub(ctx, step_result, work_summary)
 
-        import asyncio
-
-        try:
-            loop = asyncio.get_running_loop()
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(
-                    asyncio.run, self._finalize_step_async(ctx, step_result, work_summary)
-                )
-                return future.result()
-        except RuntimeError:
-            return asyncio.run(self._finalize_step_async(ctx, step_result, work_summary))
+        # Run async finalization in a clean event loop
+        return _run_async_safely(
+            self._finalize_step_async(ctx, step_result, work_summary)
+        )
 
     def _finalize_step_stub(
         self,
@@ -2380,6 +2430,74 @@ Error: {step_result.error or "None"}
             events=[],
         )
 
+    def _build_finalization_prompt(
+        self,
+        ctx: StepContext,
+        handoff_path: Path,
+        work_summary: str,
+        step_result: StepResult,
+    ) -> str:
+        """Build the finalization prompt using resolvers module.
+
+        Attempts to use the EnvelopeWriterResolver from the resolvers module
+        for prompt construction. Falls back to the inline JIT_FINALIZATION_PROMPT
+        if the template cannot be loaded.
+
+        Args:
+            ctx: Step execution context.
+            handoff_path: Path where the handoff draft should be written.
+            work_summary: Raw assistant output from work phase.
+            step_result: Result from work phase.
+
+        Returns:
+            Formatted finalization prompt string.
+        """
+        # Try to use the resolvers module template
+        try:
+            template = load_envelope_writer_prompt(ctx.repo_root)
+            if template:
+                # Use build_finalization_prompt from resolvers
+                prompt = build_finalization_prompt(
+                    step_id=ctx.step_id,
+                    step_output=work_summary,
+                    artifacts_changed=[],  # Will be populated by the agent
+                    flow_key=ctx.flow_key,
+                    run_id=ctx.run_id,
+                    status=step_result.status,
+                    error=step_result.error,
+                    duration_ms=step_result.duration_ms,
+                    template=template,
+                )
+                # Add handoff path instruction
+                handoff_instruction = f"""
+---
+After analyzing the above, use the `Write` tool to create a file at:
+{handoff_path}
+
+The file must be valid JSON matching the HandoffEnvelope schema.
+---
+"""
+                return prompt + handoff_instruction
+        except Exception as e:
+            logger.debug("Failed to load resolver template, using fallback: %s", e)
+
+        # Fallback to inline template
+        finalization_prompt = self.JIT_FINALIZATION_PROMPT.format(
+            handoff_path=str(handoff_path),
+            step_id=ctx.step_id,
+            flow_key=ctx.flow_key,
+            run_id=ctx.run_id,
+        )
+
+        # Add work summary context
+        truncated_summary = work_summary[:4000] if len(work_summary) > 4000 else work_summary
+        return f"""
+## Work Session Summary
+{truncated_summary}
+
+{finalization_prompt}
+"""
+
     async def _finalize_step_async(
         self,
         ctx: StepContext,
@@ -2387,6 +2505,9 @@ Error: {step_result.error or "None"}
         work_summary: str,
     ) -> FinalizationResult:
         """Async implementation of finalize_step.
+
+        Uses the unified claude_sdk adapter and resolvers module for
+        prompt construction.
 
         Args:
             ctx: Step execution context.
@@ -2396,7 +2517,10 @@ Error: {step_result.error or "None"}
         Returns:
             FinalizationResult with handoff data and envelope.
         """
-        from claude_code_sdk import ClaudeCodeOptions, query
+        from .claude_sdk import get_sdk_module
+
+        sdk = get_sdk_module()
+        query = sdk.query
 
         events: List[RunEvent] = []
         raw_events: List[Dict[str, Any]] = []
@@ -2408,31 +2532,27 @@ Error: {step_result.error or "None"}
         handoff_dir.mkdir(parents=True, exist_ok=True)
 
         cwd = str(ctx.repo_root) if ctx.repo_root else str(Path.cwd())
-        options = ClaudeCodeOptions(permission_mode="bypassPermissions")
 
-        # Build finalization prompt
-        finalization_prompt = self.JIT_FINALIZATION_PROMPT.format(
-            handoff_path=str(handoff_path),
-            step_id=ctx.step_id,
-            flow_key=ctx.flow_key,
-            run_id=ctx.run_id,
+        # Use adapter for high-trust options
+        options = create_high_trust_options(
+            cwd=cwd,
+            permission_mode="bypassPermissions",
         )
 
-        # Add work summary context
-        truncated_summary = work_summary[:4000] if len(work_summary) > 4000 else work_summary
-        finalization_with_context = f"""
-## Work Session Summary
-{truncated_summary}
-
-{finalization_prompt}
-"""
+        # Build finalization prompt using resolvers module
+        # First try to use the EnvelopeWriterResolver, fallback to inline template
+        finalization_prompt = self._build_finalization_prompt(
+            ctx=ctx,
+            handoff_path=handoff_path,
+            work_summary=work_summary,
+            step_result=step_result,
+        )
 
         try:
             logger.debug("Starting JIT finalization for step %s", ctx.step_id)
 
             async for event in query(
-                prompt=finalization_with_context,
-                cwd=cwd,
+                prompt=finalization_prompt,
                 options=options,
             ):
                 now = datetime.now(timezone.utc)
@@ -2546,18 +2666,8 @@ Error: {step_result.error or "None"}
             logger.warning("SDK not available for route_step, falling back to stub")
             return self._route_step_stub(ctx, handoff_data)
 
-        import asyncio
-
-        try:
-            loop = asyncio.get_running_loop()
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(
-                    asyncio.run, self._route_step_async(ctx, handoff_data)
-                )
-                return future.result()
-        except RuntimeError:
-            return asyncio.run(self._route_step_async(ctx, handoff_data))
+        # Run async routing in a clean event loop
+        return _run_async_safely(self._route_step_async(ctx, handoff_data))
 
     def _route_step_stub(
         self,
