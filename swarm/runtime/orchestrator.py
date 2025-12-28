@@ -345,20 +345,52 @@ class GeminiStepOrchestrator:
                 # Add to history for next step's context
                 step_history.append(step_result)
 
-                # Create handoff envelope for this step with routing signal
-                handoff_envelope = HandoffEnvelope(
-                    step_id=current_step.id,
-                    flow_key=flow_key,
-                    run_id=run_id,
-                    routing_signal=self._create_routing_signal(
-                        current_step, step_result, loop_state
-                    ),
-                    summary=step_result.get("output", "")[:2000],  # Limit to 2k chars
-                    status=step_result.get("status", "succeeded"),
-                    error=step_result.get("error"),
-                    duration_ms=step_result.get("duration_ms", 0),
-                    timestamp=datetime.now(timezone.utc),
-                )
+                # =======================================================
+                # ROUTING LIFT: Prefer engine's handoff/routing when available
+                # =======================================================
+                # Priority order for handoff envelope:
+                # 1. Engine's handoff_envelope (from lifecycle-capable engines)
+                # 2. Create new envelope with orchestrator-generated routing
+                #
+                # Priority order for routing signal:
+                # 1. Engine's routing_signal (from lifecycle-capable engines)
+                # 2. Orchestrator's _create_routing_signal() (deterministic fallback)
+                # =======================================================
+
+                # Check if lifecycle-capable engine already provided envelope
+                if "handoff_envelope" in step_result and step_result["handoff_envelope"]:
+                    handoff_envelope = step_result["handoff_envelope"]
+                    logger.debug(
+                        "Using engine-provided handoff envelope for step %s",
+                        current_step.id,
+                    )
+                    # Engine's envelope may not have routing_signal yet - add it
+                    if handoff_envelope.routing_signal is None:
+                        if "routing_signal" in step_result and step_result["routing_signal"]:
+                            handoff_envelope.routing_signal = step_result["routing_signal"]
+                        else:
+                            handoff_envelope.routing_signal = self._create_routing_signal(
+                                current_step, step_result, loop_state
+                            )
+                else:
+                    # Create new envelope - prefer engine's routing signal
+                    routing_signal = step_result.get("routing_signal")
+                    if routing_signal is None:
+                        routing_signal = self._create_routing_signal(
+                            current_step, step_result, loop_state
+                        )
+
+                    handoff_envelope = HandoffEnvelope(
+                        step_id=current_step.id,
+                        flow_key=flow_key,
+                        run_id=run_id,
+                        routing_signal=routing_signal,
+                        summary=step_result.get("output", "")[:2000],  # Limit to 2k chars
+                        status=step_result.get("status", "succeeded"),
+                        error=step_result.get("error"),
+                        duration_ms=step_result.get("duration_ms", 0),
+                        timestamp=datetime.now(timezone.utc),
+                    )
 
                 # Store handoff envelope in run state (in-memory for next step's context)
                 run_state.handoff_envelopes[current_step.id] = handoff_envelope
@@ -1513,20 +1545,45 @@ class GeminiStepOrchestrator:
                 # Add to history
                 step_history.append(step_result)
 
-                # Create handoff envelope
-                handoff_envelope = HandoffEnvelope(
-                    step_id=current_step.id,
-                    flow_key=flow_key,
-                    run_id=run_id,
-                    routing_signal=self._create_routing_signal(
-                        current_step, step_result, loop_state
-                    ),
-                    summary=step_result.get("output", "")[:2000],
-                    status=step_result.get("status", "succeeded"),
-                    error=step_result.get("error"),
-                    duration_ms=step_result.get("duration_ms", 0),
-                    timestamp=datetime.now(timezone.utc),
-                )
+                # =======================================================
+                # ROUTING LIFT: Prefer engine's handoff/routing when available
+                # =======================================================
+                # (Same logic as sync version - see sync _execute_stepwise)
+
+                # Check if lifecycle-capable engine already provided envelope
+                if "handoff_envelope" in step_result and step_result["handoff_envelope"]:
+                    handoff_envelope = step_result["handoff_envelope"]
+                    logger.debug(
+                        "Using engine-provided handoff envelope for step %s (async)",
+                        current_step.id,
+                    )
+                    # Engine's envelope may not have routing_signal yet - add it
+                    if handoff_envelope.routing_signal is None:
+                        if "routing_signal" in step_result and step_result["routing_signal"]:
+                            handoff_envelope.routing_signal = step_result["routing_signal"]
+                        else:
+                            handoff_envelope.routing_signal = self._create_routing_signal(
+                                current_step, step_result, loop_state
+                            )
+                else:
+                    # Create new envelope - prefer engine's routing signal
+                    routing_signal = step_result.get("routing_signal")
+                    if routing_signal is None:
+                        routing_signal = self._create_routing_signal(
+                            current_step, step_result, loop_state
+                        )
+
+                    handoff_envelope = HandoffEnvelope(
+                        step_id=current_step.id,
+                        flow_key=flow_key,
+                        run_id=run_id,
+                        routing_signal=routing_signal,
+                        summary=step_result.get("output", "")[:2000],
+                        status=step_result.get("status", "succeeded"),
+                        error=step_result.get("error"),
+                        duration_ms=step_result.get("duration_ms", 0),
+                        timestamp=datetime.now(timezone.utc),
+                    )
 
                 run_state.handoff_envelopes[current_step.id] = handoff_envelope
 

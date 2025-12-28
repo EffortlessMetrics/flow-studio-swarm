@@ -540,6 +540,41 @@ class StatsDB:
                     error_message=payload.get("error"),
                 )
 
+            elif kind == "file_changes":
+                # File changes from DiffScanner (forensic truth)
+                files = payload.get("files", [])
+                for fc in files:
+                    self.record_file_change(
+                        run_id=run_id,
+                        step_id=step_id,
+                        file_path=fc.get("path", ""),
+                        change_type=fc.get("status", "modified"),
+                        lines_added=fc.get("insertions", 0),
+                        lines_removed=fc.get("deletions", 0),
+                    )
+
+            elif kind == "run_start":
+                # Run initialization
+                flow_keys = payload.get("flow_keys", [])
+                self.record_run_start(
+                    run_id=run_id,
+                    flow_keys=flow_keys,
+                    profile_id=payload.get("profile_id"),
+                    engine_id=payload.get("engine"),
+                    metadata=payload.get("metadata"),
+                )
+
+            elif kind == "run_completed":
+                # Run completion
+                self.record_run_end(
+                    run_id=run_id,
+                    status=payload.get("status", "completed"),
+                    total_steps=payload.get("total_steps", 0),
+                    completed_steps=payload.get("steps_completed", 0),
+                    total_tokens=payload.get("total_tokens", 0),
+                    total_duration_ms=payload.get("duration_ms", 0),
+                )
+
     # =========================================================================
     # Query Operations (for TypeScript UI)
     # =========================================================================
@@ -773,3 +808,266 @@ def close_stats_db():
         if _global_db is not None:
             _global_db.close()
             _global_db = None
+
+
+# =============================================================================
+# Disk-as-Truth Recovery: Rebuild DuckDB from events.jsonl
+# =============================================================================
+
+
+def rebuild_stats_db(
+    runs_dir: Optional[Path] = None,
+    db_path: Optional[Path] = None,
+    run_ids: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Rebuild the DuckDB stats database from disk artifacts.
+
+    This function implements the "disk-as-truth" principle:
+    - events.jsonl is the append-only journal (durable, crash-safe)
+    - DuckDB is a projection that can be rebuilt at any time
+
+    The rebuild process:
+    1. Scan runs_dir for run directories (or use provided run_ids)
+    2. For each run, read events.jsonl
+    3. Parse events and call ingest_events to populate DuckDB
+    4. Read handoff envelopes for additional routing/status data
+
+    Args:
+        runs_dir: Path to the runs directory. Defaults to swarm/runs/.
+        db_path: Path to the DuckDB file. If None, uses default.
+        run_ids: Optional list of specific run IDs to rebuild.
+                 If None, rebuilds all runs found in runs_dir.
+
+    Returns:
+        Dict with rebuild statistics:
+        - runs_processed: Number of runs processed
+        - events_ingested: Total events ingested
+        - errors: List of any errors encountered
+    """
+    from . import storage as storage_module
+
+    if runs_dir is None:
+        runs_dir = storage_module.RUNS_DIR
+
+    if db_path is None:
+        db_path = runs_dir / ".stats.duckdb"
+
+    # Create fresh database (drop existing)
+    if db_path.exists():
+        logger.info("Removing existing stats database: %s", db_path)
+        db_path.unlink()
+
+    db = StatsDB(db_path)
+
+    stats = {
+        "runs_processed": 0,
+        "events_ingested": 0,
+        "envelopes_processed": 0,
+        "errors": [],
+    }
+
+    # Get list of run IDs to process
+    if run_ids is None:
+        # Scan runs directory
+        if not runs_dir.exists():
+            logger.warning("Runs directory does not exist: %s", runs_dir)
+            return stats
+
+        run_ids = [
+            d.name for d in runs_dir.iterdir()
+            if d.is_dir() and not d.name.startswith(".")
+        ]
+
+    logger.info("Rebuilding stats DB from %d runs", len(run_ids))
+
+    for run_id in run_ids:
+        try:
+            run_path = runs_dir / run_id
+            events_file = run_path / storage_module.EVENTS_FILE
+
+            if not events_file.exists():
+                logger.debug("No events.jsonl for run %s, skipping", run_id)
+                continue
+
+            # Read and parse events
+            events: List[Dict[str, Any]] = []
+            with events_file.open("r", encoding="utf-8") as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                        events.append(event)
+                    except json.JSONDecodeError as e:
+                        stats["errors"].append({
+                            "run_id": run_id,
+                            "file": "events.jsonl",
+                            "line": line_num,
+                            "error": str(e),
+                        })
+
+            if events:
+                # Ingest events into DuckDB
+                db.ingest_events(events, run_id)
+                stats["events_ingested"] += len(events)
+
+            # Also process handoff envelopes for routing info
+            for flow_dir in run_path.iterdir():
+                if not flow_dir.is_dir() or flow_dir.name.startswith("."):
+                    continue
+
+                handoff_dir = flow_dir / "handoff"
+                if not handoff_dir.exists():
+                    continue
+
+                for envelope_file in handoff_dir.glob("*.json"):
+                    try:
+                        with envelope_file.open("r", encoding="utf-8") as f:
+                            envelope_data = json.load(f)
+
+                        # Record file changes from envelope if present
+                        file_changes = envelope_data.get("file_changes", {})
+                        if file_changes and "files" in file_changes:
+                            step_id = envelope_data.get("step_id", envelope_file.stem)
+                            for fc in file_changes.get("files", []):
+                                db.record_file_change(
+                                    run_id=run_id,
+                                    step_id=step_id,
+                                    file_path=fc.get("path", ""),
+                                    change_type=fc.get("status", "modified"),
+                                    lines_added=fc.get("insertions", 0),
+                                    lines_removed=fc.get("deletions", 0),
+                                )
+
+                        stats["envelopes_processed"] += 1
+
+                    except (json.JSONDecodeError, IOError) as e:
+                        stats["errors"].append({
+                            "run_id": run_id,
+                            "file": str(envelope_file),
+                            "error": str(e),
+                        })
+
+            stats["runs_processed"] += 1
+
+        except Exception as e:
+            logger.warning("Error processing run %s: %s", run_id, e)
+            stats["errors"].append({
+                "run_id": run_id,
+                "error": str(e),
+            })
+
+    db.close()
+
+    logger.info(
+        "Rebuild complete: %d runs, %d events, %d envelopes, %d errors",
+        stats["runs_processed"],
+        stats["events_ingested"],
+        stats["envelopes_processed"],
+        len(stats["errors"]),
+    )
+
+    return stats
+
+
+# =============================================================================
+# CLI Entry Point
+# =============================================================================
+
+
+def main():
+    """CLI entry point for stats database operations.
+
+    Usage:
+        python -m swarm.runtime.db rebuild [--runs-dir PATH] [--db-path PATH]
+        python -m swarm.runtime.db stats <run_id>
+    """
+    import argparse
+    import sys
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
+    parser = argparse.ArgumentParser(
+        description="Flow Studio Stats Database CLI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Rebuild command
+    rebuild_parser = subparsers.add_parser(
+        "rebuild",
+        help="Rebuild DuckDB from events.jsonl (disk-as-truth)",
+    )
+    rebuild_parser.add_argument(
+        "--runs-dir",
+        type=Path,
+        default=None,
+        help="Path to runs directory (default: swarm/runs/)",
+    )
+    rebuild_parser.add_argument(
+        "--db-path",
+        type=Path,
+        default=None,
+        help="Path to DuckDB file (default: <runs-dir>/.stats.duckdb)",
+    )
+    rebuild_parser.add_argument(
+        "--run-id",
+        action="append",
+        dest="run_ids",
+        help="Specific run ID to rebuild (can be repeated)",
+    )
+
+    # Stats command
+    stats_parser = subparsers.add_parser(
+        "stats",
+        help="Show statistics for a run",
+    )
+    stats_parser.add_argument("run_id", help="Run ID to query")
+
+    args = parser.parse_args()
+
+    if args.command == "rebuild":
+        print("Rebuilding stats database...")
+        result = rebuild_stats_db(
+            runs_dir=args.runs_dir,
+            db_path=args.db_path,
+            run_ids=args.run_ids,
+        )
+        print(f"\nRebuild complete:")
+        print(f"  Runs processed: {result['runs_processed']}")
+        print(f"  Events ingested: {result['events_ingested']}")
+        print(f"  Envelopes processed: {result['envelopes_processed']}")
+        if result["errors"]:
+            print(f"  Errors: {len(result['errors'])}")
+            for err in result["errors"][:5]:
+                print(f"    - {err}")
+        sys.exit(0)
+
+    elif args.command == "stats":
+        db = get_stats_db()
+        run_stats = db.get_run_stats(args.run_id)
+        if run_stats is None:
+            print(f"Run not found: {args.run_id}")
+            sys.exit(1)
+
+        print(f"Run: {run_stats.run_id}")
+        print(f"  Status: {run_stats.status}")
+        print(f"  Flows: {', '.join(run_stats.flow_keys)}")
+        print(f"  Steps: {run_stats.completed_steps}/{run_stats.total_steps}")
+        print(f"  Tokens: {run_stats.total_tokens}")
+        print(f"  Duration: {run_stats.total_duration_ms}ms")
+        print(f"  Tool calls: {run_stats.tool_call_count}")
+        print(f"  File changes: {run_stats.file_change_count}")
+        sys.exit(0)
+
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
