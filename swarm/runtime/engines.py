@@ -48,8 +48,10 @@ from swarm.runtime.history_priority import (
     prioritize_history,
 )
 from swarm.runtime.path_helpers import (
+    ensure_handoff_dir,
     ensure_llm_dir,
     ensure_receipts_dir,
+    handoff_envelope_path as make_handoff_envelope_path,
 )
 from swarm.runtime.path_helpers import (
     receipt_path as make_receipt_path,
@@ -58,7 +60,14 @@ from swarm.runtime.path_helpers import (
     transcript_path as make_transcript_path,
 )
 
-from .types import RunEvent, RunSpec
+from .types import (
+    HandoffEnvelope,
+    RoutingDecision,
+    RoutingSignal,
+    RunEvent,
+    RunSpec,
+    handoff_envelope_to_dict,
+)
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -976,8 +985,9 @@ Write the file now.
 """
 
     # Router prompt template for agentic routing decisions
+    # This is the fallback template if swarm/prompts/resolvers/routing_signal.md doesn't exist
     ROUTER_PROMPT_TEMPLATE = """
-You are a routing resolver. Your job is to analyze a step's handoff and decide the next move in the flow.
+You are a routing resolver. Your job is to convert natural language handoff text plus step routing configuration into a deterministic RoutingSignal JSON.
 
 ## Handoff from Previous Step
 
@@ -997,26 +1007,41 @@ routing:
   loop_condition_field: {loop_condition_field}
   loop_success_values: {loop_success_values}
   max_iterations: {max_iterations}
+  can_further_iteration_help: {can_further_iteration_help}
 current_iteration: {current_iteration}
 ```
 
 ## Decision Logic
 
-Based on the handoff status and routing configuration:
+### Linear Flow
+- If `loop_target` is reached and `success_values` contains the target value -> **"proceed"**
+- If `loop_target` is not reached but `max_iterations` is exhausted -> **"rerun"**
+- If `loop_target` is not reached and `can_further_iteration_help` is false -> **"blocked"**
 
-1. If status is VERIFIED and routing kind is "linear" → decision: "advance" to next step
-2. If status is VERIFIED and routing kind is "microloop" → decision: "advance" (exit loop)
-3. If status is UNVERIFIED and routing kind is "microloop" and iterations < max → decision: "loop" back to loop_target
-4. If status is UNVERIFIED and iterations >= max → decision: "advance" (exit loop with documented concerns)
-5. If status is BLOCKED → decision: "terminate" (cannot proceed)
-6. If status is PARTIAL → decision: "advance" but flag needs_human: true
+### Microloop Flow
+- If `success_values` contains the current status value -> **"proceed"** (exit loop)
+- If `max_iterations` is exhausted -> **"proceed"** (exit with documented concerns)
+- If `can_further_iteration_help` is false -> **"proceed"** (exit loop, no viable fix path)
+- Otherwise if UNVERIFIED and iterations < max -> **"loop"** back to loop_target
+
+### Branching Flow
+- If explicit user routing hint exists in handoff text -> **"route"** with the specified step_id
+
+### Default
+- If no conditions met -> **"proceed"** with `next_step_id: null`
+
+## Confidence Scoring
+- **1.0**: Clear, confident routing decision
+- **0.7**: Some ambiguity but reasonable inference
+- **0.5**: Ambiguous routing, may need human review
+- **0.0**: Clear, unambiguous routing decision (legacy: inverted scale)
 
 ## Output Format
 
-Output ONLY a valid JSON object with this structure:
+Output ONLY a valid JSON object with this structure (no markdown, no explanation):
 ```json
 {{
-  "decision": "advance" | "loop" | "terminate" | "branch",
+  "decision": "proceed" | "rerun" | "blocked" | "loop" | "route",
   "next_step_id": "<step_id or null>",
   "route": null,
   "reason": "<explanation for this routing decision>",
@@ -1024,6 +1049,8 @@ Output ONLY a valid JSON object with this structure:
   "needs_human": <true | false>
 }}
 ```
+
+Note: For backward compatibility, "proceed" maps to "advance", and "rerun" maps to "loop".
 
 Analyze the handoff and emit your routing decision now.
 """
@@ -1210,6 +1237,117 @@ Analyze the handoff and emit your routing decision now.
             logger.warning("Failed to load agent persona %s: %s", agent_key, e)
             return None
 
+    def _load_resolver_template(self, resolver_name: str) -> Optional[str]:
+        """Load resolver template from swarm/prompts/resolvers/*.md.
+
+        Resolver templates provide customizable prompts for specific routing/decision
+        tasks. If a template exists, it is used instead of the hardcoded prompt.
+
+        Args:
+            resolver_name: The resolver name (e.g., "routing_signal").
+
+        Returns:
+            The resolver template content, or None if not found.
+        """
+        if not self.repo_root:
+            return None
+
+        resolver_path = (
+            Path(self.repo_root) / "swarm" / "prompts" / "resolvers" / f"{resolver_name}.md"
+        )
+        if not resolver_path.exists():
+            logger.debug("Resolver template not found: %s", resolver_path)
+            return None
+
+        try:
+            content = resolver_path.read_text(encoding="utf-8")
+
+            # Strip YAML frontmatter (between --- markers) if present
+            if content.startswith("---"):
+                end_marker = content.find("---", 3)
+                if end_marker != -1:
+                    body_start = end_marker + 3
+                    if body_start < len(content) and content[body_start] == "\n":
+                        body_start += 1
+                    content = content[body_start:]
+
+            logger.debug("Loaded resolver template: %s", resolver_path)
+            return content.strip()
+
+        except (OSError, IOError) as e:
+            logger.warning("Failed to load resolver template %s: %s", resolver_name, e)
+            return None
+
+    def _check_microloop_termination(
+        self,
+        handoff_data: Dict[str, Any],
+        routing_config: Dict[str, Any],
+        current_iteration: int,
+    ) -> Optional["RoutingSignal"]:
+        """Check if microloop should terminate based on resolver spec logic.
+
+        This implements the microloop termination logic from routing_signal.md:
+        1. Check if loop_target reached with success_values
+        2. Check if max_iterations exhausted
+        3. Check if can_further_iteration_help is false in handoff
+
+        Args:
+            handoff_data: The handoff JSON from JIT finalization.
+            routing_config: The step's routing configuration from extra.routing.
+            current_iteration: Current loop iteration count.
+
+        Returns:
+            RoutingSignal if termination condition met, None to continue looping.
+        """
+        from .types import RoutingDecision, RoutingSignal
+
+        # Extract routing configuration
+        loop_target = routing_config.get("loop_target")
+        success_values = routing_config.get("loop_success_values", ["VERIFIED"])
+        max_iterations = routing_config.get("max_iterations", 3)
+        loop_condition_field = routing_config.get("loop_condition_field", "status")
+
+        # Get the current status from handoff
+        current_status = handoff_data.get(loop_condition_field, "").upper()
+
+        # Check can_further_iteration_help from handoff (explicit signal from critic)
+        can_further_help = handoff_data.get("can_further_iteration_help", True)
+        if isinstance(can_further_help, str):
+            can_further_help = can_further_help.lower() in ("yes", "true", "1")
+
+        # Condition 1: Success status reached - exit loop with ADVANCE
+        if current_status in [s.upper() for s in success_values]:
+            return RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                next_step_id=None,  # Orchestrator determines next step
+                reason=f"Loop target reached: {loop_condition_field}={current_status}",
+                confidence=1.0,
+                needs_human=False,
+            )
+
+        # Condition 2: Max iterations exhausted - exit loop with ADVANCE
+        if current_iteration >= max_iterations:
+            return RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                next_step_id=None,
+                reason=f"Max iterations reached ({current_iteration}/{max_iterations}), exiting with documented concerns",
+                confidence=0.7,
+                needs_human=True,  # Human should review incomplete work
+            )
+
+        # Condition 3: can_further_iteration_help is false - exit loop
+        if not can_further_help:
+            return RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                next_step_id=None,
+                reason="Critic indicated no further iteration can help, exiting loop",
+                confidence=0.8,
+                needs_human=True,  # Human should review why iteration was not helpful
+            )
+
+        # No termination condition met - return None to continue looping
+        return None
+
     async def _run_router_session(
         self,
         handoff_data: Dict[str, Any],
@@ -1219,7 +1357,8 @@ Analyze the handoff and emit your routing decision now.
         """Run a lightweight router session to decide the next step.
 
         This is a fresh, short-lived session that analyzes the handoff
-        and produces a routing decision. Uses the ROUTER_PROMPT_TEMPLATE.
+        and produces a routing decision. Uses resolver template if available,
+        otherwise falls back to ROUTER_PROMPT_TEMPLATE.
 
         Args:
             handoff_data: The handoff JSON from JIT finalization.
@@ -1235,20 +1374,76 @@ Analyze the handoff and emit your routing decision now.
         # Extract routing config from context
         routing = ctx.routing or RoutingContext()
         routing_config = ctx.extra.get("routing", {})
+        current_iteration = routing.loop_iteration
+        routing_kind = routing_config.get("kind", "linear")
 
-        # Build router prompt
-        router_prompt = self.ROUTER_PROMPT_TEMPLATE.format(
-            handoff_json=json.dumps(handoff_data, indent=2),
-            step_id=ctx.step_id,
-            flow_key=ctx.flow_key,
-            routing_kind=routing_config.get("kind", "linear"),
-            routing_next=routing_config.get("next", "null"),
-            loop_target=routing_config.get("loop_target", "null"),
-            loop_condition_field=routing_config.get("loop_condition_field", "status"),
-            loop_success_values=routing_config.get("loop_success_values", ["VERIFIED"]),
-            max_iterations=routing_config.get("max_iterations", 3),
-            current_iteration=routing.loop_iteration,
-        )
+        # For microloops, check termination conditions before LLM call
+        # This saves LLM calls when we can determine routing deterministically
+        if routing_kind == "microloop":
+            termination_signal = self._check_microloop_termination(
+                handoff_data=handoff_data,
+                routing_config=routing_config,
+                current_iteration=current_iteration,
+            )
+            if termination_signal:
+                logger.debug(
+                    "Microloop termination detected for step %s: %s",
+                    ctx.step_id,
+                    termination_signal.reason,
+                )
+                return termination_signal
+
+        # Try to load resolver template, fall back to hardcoded template
+        resolver_template = self._load_resolver_template("routing_signal")
+
+        # Prepare template variables
+        template_vars = {
+            "handoff_json": json.dumps(handoff_data, indent=2),
+            "step_id": ctx.step_id,
+            "flow_key": ctx.flow_key,
+            "routing_kind": routing_kind,
+            "routing_next": routing_config.get("next", "null"),
+            "loop_target": routing_config.get("loop_target", "null"),
+            "loop_condition_field": routing_config.get("loop_condition_field", "status"),
+            "loop_success_values": routing_config.get("loop_success_values", ["VERIFIED"]),
+            "max_iterations": routing_config.get("max_iterations", 3),
+            "can_further_iteration_help": handoff_data.get("can_further_iteration_help", True),
+            "current_iteration": current_iteration,
+        }
+
+        # Build router prompt from resolver template or fallback
+        if resolver_template:
+            # Resolver template: prepend context, then append template instructions
+            router_prompt = f"""
+## Handoff from Previous Step
+
+```json
+{template_vars['handoff_json']}
+```
+
+## Step Routing Configuration
+
+```yaml
+step_id: {template_vars['step_id']}
+flow_key: {template_vars['flow_key']}
+routing:
+  kind: {template_vars['routing_kind']}
+  next: {template_vars['routing_next']}
+  loop_target: {template_vars['loop_target']}
+  loop_condition_field: {template_vars['loop_condition_field']}
+  loop_success_values: {template_vars['loop_success_values']}
+  max_iterations: {template_vars['max_iterations']}
+  can_further_iteration_help: {template_vars['can_further_iteration_help']}
+current_iteration: {template_vars['current_iteration']}
+```
+
+{resolver_template}
+"""
+            logger.debug("Using resolver template for routing")
+        else:
+            # Use hardcoded template with format substitution
+            router_prompt = self.ROUTER_PROMPT_TEMPLATE.format(**template_vars)
+            logger.debug("Using fallback ROUTER_PROMPT_TEMPLATE for routing")
 
         # Router uses minimal options - just needs to analyze and respond
         options = ClaudeCodeOptions(
@@ -1304,13 +1499,19 @@ Analyze the handoff and emit your routing decision now.
 
             routing_data = json.loads(json_match)
 
-            # Map decision string to enum
+            # Map decision string to enum (supports both old and new terminology)
             decision_str = routing_data.get("decision", "advance").lower()
             decision_map = {
+                # Original terminology
                 "advance": RoutingDecision.ADVANCE,
                 "loop": RoutingDecision.LOOP,
                 "terminate": RoutingDecision.TERMINATE,
                 "branch": RoutingDecision.BRANCH,
+                # New resolver terminology (routing_signal.md)
+                "proceed": RoutingDecision.ADVANCE,  # proceed -> advance
+                "rerun": RoutingDecision.LOOP,  # rerun -> loop
+                "blocked": RoutingDecision.TERMINATE,  # blocked -> terminate
+                "route": RoutingDecision.BRANCH,  # route -> branch
             }
             decision = decision_map.get(decision_str, RoutingDecision.ADVANCE)
 
@@ -1329,6 +1530,248 @@ Analyze the handoff and emit your routing decision now.
             return None
         except Exception as e:
             logger.warning("Router session failed: %s", e)
+            return None
+
+    async def _write_handoff_envelope(
+        self,
+        ctx: StepContext,
+        step_result: StepResult,
+        routing_signal: Optional[RoutingSignal],
+        work_summary: str,
+    ) -> Optional[HandoffEnvelope]:
+        """Write structured HandoffEnvelope using envelope_writer resolver.
+
+        Called after JIT finalization to create the durable handoff artifact.
+        Uses the envelope_writer.md template to generate a structured envelope
+        with routing signal, summary, and artifact pointers.
+
+        Args:
+            ctx: Step execution context with flow/step metadata.
+            step_result: Result from step execution.
+            routing_signal: Routing decision from router session (may be None).
+            work_summary: Summary text from the step's work session.
+
+        Returns:
+            HandoffEnvelope if successfully created, None otherwise.
+        """
+        from claude_code_sdk import ClaudeCodeOptions, query
+
+        # Load envelope_writer.md template
+        template_path = (
+            Path(self.repo_root) / "swarm" / "prompts" / "resolvers" / "envelope_writer.md"
+            if self.repo_root
+            else Path("swarm/prompts/resolvers/envelope_writer.md")
+        )
+
+        if not template_path.exists():
+            logger.warning("envelope_writer.md template not found at %s", template_path)
+            # Create a default envelope without LLM assistance
+            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary)
+
+        try:
+            template_content = template_path.read_text(encoding="utf-8")
+        except (OSError, IOError) as e:
+            logger.warning("Failed to load envelope_writer.md: %s", e)
+            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary)
+
+        # Build input data for the envelope writer
+        routing_data = {
+            "decision": routing_signal.decision.value if routing_signal else "advance",
+            "next_step_id": routing_signal.next_step_id if routing_signal else None,
+            "route": routing_signal.route if routing_signal else None,
+            "reason": routing_signal.reason if routing_signal else "default_advance",
+            "confidence": routing_signal.confidence if routing_signal else 0.7,
+            "needs_human": routing_signal.needs_human if routing_signal else False,
+        }
+
+        # Collect artifact information
+        artifacts_created = step_result.artifacts or {}
+
+        # Build the prompt for envelope writer
+        envelope_input = f"""
+## Step Execution Results
+
+Step ID: {ctx.step_id}
+Flow key: {ctx.flow_key}
+Run ID: {ctx.run_id}
+Status: {step_result.status}
+Duration: {step_result.duration_ms} ms
+Error: {step_result.error or "None"}
+
+## Work Summary
+{work_summary[:4000] if work_summary else "No summary available."}
+
+## Artifacts Created/Modified
+{json.dumps(artifacts_created, indent=2)}
+
+## Routing Signal
+{json.dumps(routing_data, indent=2)}
+
+---
+{template_content}
+"""
+
+        # Set up working directory
+        cwd = str(ctx.repo_root) if ctx.repo_root else str(Path.cwd())
+
+        # Envelope writer uses minimal options
+        options = ClaudeCodeOptions(
+            permission_mode="bypassPermissions",
+        )
+
+        # Collect envelope writer response
+        envelope_response = ""
+
+        try:
+            logger.debug("Starting envelope writer session for step %s", ctx.step_id)
+
+            async for event in query(
+                prompt=envelope_input,
+                cwd=cwd,
+                options=options,
+            ):
+                if hasattr(event, "message"):
+                    message = getattr(event, "message", event)
+                    content = getattr(message, "content", "")
+                    if isinstance(content, list):
+                        text_parts = [
+                            getattr(b, "text", str(getattr(b, "content", "")))
+                            for b in content
+                        ]
+                        content = "\n".join(text_parts)
+                    if content:
+                        envelope_response += content
+
+            logger.debug("Envelope writer session complete for step %s", ctx.step_id)
+
+            # Parse JSON from response
+            json_match = None
+            if "```json" in envelope_response:
+                start = envelope_response.find("```json") + 7
+                end = envelope_response.find("```", start)
+                if end > start:
+                    json_match = envelope_response[start:end].strip()
+            elif "```" in envelope_response:
+                start = envelope_response.find("```") + 3
+                end = envelope_response.find("```", start)
+                if end > start:
+                    json_match = envelope_response[start:end].strip()
+            else:
+                # Try to parse entire response as JSON
+                json_match = envelope_response.strip()
+
+            if not json_match:
+                logger.warning("Envelope writer response contained no parseable JSON")
+                return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary)
+
+            envelope_data = json.loads(json_match)
+
+            # Create HandoffEnvelope from parsed data
+            envelope = HandoffEnvelope(
+                step_id=envelope_data.get("step_id", ctx.step_id),
+                flow_key=envelope_data.get("flow_key", ctx.flow_key),
+                run_id=envelope_data.get("run_id", ctx.run_id),
+                routing_signal=routing_signal or RoutingSignal(
+                    decision=RoutingDecision.ADVANCE,
+                    reason="default_advance",
+                    confidence=0.7,
+                ),
+                summary=envelope_data.get("summary", work_summary[:2000] if work_summary else ""),
+                artifacts=envelope_data.get("artifacts", {}),
+                status=envelope_data.get("status", step_result.status),
+                error=envelope_data.get("error"),
+                duration_ms=envelope_data.get("duration_ms", step_result.duration_ms),
+            )
+
+            # Write envelope to disk
+            envelope_path = self._write_envelope_to_disk(ctx, envelope)
+            if envelope_path:
+                logger.debug("Wrote handoff envelope to %s", envelope_path)
+
+            return envelope
+
+        except json.JSONDecodeError as e:
+            logger.warning("Failed to parse envelope writer response as JSON: %s", e)
+            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary)
+        except Exception as e:
+            logger.warning("Envelope writer session failed for step %s: %s", ctx.step_id, e)
+            return self._create_fallback_envelope(ctx, step_result, routing_signal, work_summary)
+
+    def _create_fallback_envelope(
+        self,
+        ctx: StepContext,
+        step_result: StepResult,
+        routing_signal: Optional[RoutingSignal],
+        work_summary: str,
+    ) -> HandoffEnvelope:
+        """Create a fallback HandoffEnvelope without LLM assistance.
+
+        Used when envelope_writer.md template is not available or parsing fails.
+
+        Args:
+            ctx: Step execution context.
+            step_result: Result from step execution.
+            routing_signal: Routing decision from router session (may be None).
+            work_summary: Summary text from the step's work session.
+
+        Returns:
+            HandoffEnvelope with basic step information.
+        """
+        envelope = HandoffEnvelope(
+            step_id=ctx.step_id,
+            flow_key=ctx.flow_key,
+            run_id=ctx.run_id,
+            routing_signal=routing_signal or RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                reason="default_advance",
+                confidence=0.7,
+            ),
+            summary=work_summary[:2000] if work_summary else f"Step {ctx.step_id} completed with status {step_result.status}",
+            artifacts=step_result.artifacts or {},
+            status=step_result.status,
+            error=step_result.error,
+            duration_ms=step_result.duration_ms,
+        )
+
+        # Write envelope to disk
+        envelope_path = self._write_envelope_to_disk(ctx, envelope)
+        if envelope_path:
+            logger.debug("Wrote fallback handoff envelope to %s", envelope_path)
+
+        return envelope
+
+    def _write_envelope_to_disk(
+        self,
+        ctx: StepContext,
+        envelope: HandoffEnvelope,
+    ) -> Optional[Path]:
+        """Write HandoffEnvelope to disk at RUN_BASE/<flow_key>/handoff/<step_id>.json.
+
+        Args:
+            ctx: Step execution context.
+            envelope: The HandoffEnvelope to write.
+
+        Returns:
+            Path to the written file, or None if writing failed.
+        """
+        try:
+            # Ensure handoff directory exists
+            ensure_handoff_dir(ctx.run_base)
+
+            # Generate envelope file path
+            envelope_path = make_handoff_envelope_path(ctx.run_base, ctx.step_id)
+
+            # Convert envelope to dict for JSON serialization
+            envelope_dict = handoff_envelope_to_dict(envelope)
+
+            # Write to disk
+            with envelope_path.open("w", encoding="utf-8") as f:
+                json.dump(envelope_dict, f, indent=2)
+
+            return envelope_path
+
+        except (OSError, IOError) as e:
+            logger.warning("Failed to write handoff envelope for step %s: %s", ctx.step_id, e)
             return None
 
     def _build_prompt(
@@ -2030,6 +2473,10 @@ Analyze the handoff and emit your routing decision now.
         token_counts: Dict[str, int] = {"prompt": 0, "completion": 0, "total": 0}
         model_name = "claude-sonnet-4-20250514"  # Default model
 
+        # Track pending tool use inputs for file change recording
+        # Maps tool_use_id to (tool_name, tool_input) for correlation with results
+        pending_tool_inputs: Dict[str, Tuple[str, Dict[str, Any]]] = {}
+
         try:
             # Execute the query
             async for event in query(
@@ -2083,10 +2530,15 @@ Analyze the handoff and emit your routing decision now.
                     # Tool use event
                     tool_name = getattr(event, "tool_name", getattr(event, "name", "unknown"))
                     tool_input = getattr(event, "input", getattr(event, "args", {}))
+                    tool_use_id = getattr(event, "id", getattr(event, "tool_use_id", None))
 
                     event_dict["type"] = "tool_use"
                     event_dict["tool"] = tool_name
                     event_dict["input"] = tool_input
+
+                    # Store tool input for file change tracking when we get the result
+                    if tool_use_id and isinstance(tool_input, dict):
+                        pending_tool_inputs[tool_use_id] = (tool_name, tool_input)
 
                     events.append(
                         RunEvent(
@@ -2105,6 +2557,16 @@ Analyze the handoff and emit your routing decision now.
                     result = getattr(event, "tool_result", getattr(event, "result", ""))
                     success = getattr(event, "success", True)
                     tool_name = getattr(event, "tool_name", "unknown")
+                    tool_use_id = getattr(event, "tool_use_id", getattr(event, "id", None))
+
+                    # Retrieve stored tool input for this tool use
+                    stored_tool_name = tool_name
+                    tool_input: Dict[str, Any] = {}
+                    if tool_use_id and tool_use_id in pending_tool_inputs:
+                        stored_tool_name, tool_input = pending_tool_inputs.pop(tool_use_id)
+                        # Use stored tool name if current is unknown
+                        if tool_name == "unknown":
+                            tool_name = stored_tool_name
 
                     event_dict["type"] = "tool_result"
                     event_dict["tool"] = tool_name
@@ -2127,13 +2589,13 @@ Analyze the handoff and emit your routing decision now.
                         )
                     )
 
-                    # Record tool call in stats DB
+                    # Record tool call and file changes in stats DB
                     if self._stats_db:
                         try:
-                            # Extract file path for file operations
+                            # Extract file path from tool input for file operations
                             target_path = None
                             if tool_name in ("Edit", "Write", "Read"):
-                                target_path = str(getattr(event, "file_path", ""))[:500]
+                                target_path = str(tool_input.get("file_path", ""))[:500]
 
                             self._stats_db.record_tool_call(
                                 run_id=ctx.run_id,
@@ -2145,6 +2607,21 @@ Analyze the handoff and emit your routing decision now.
                             )
                         except Exception as db_err:
                             logger.debug("Failed to record tool call: %s", db_err)
+
+                        # Record file changes for Write and Edit operations
+                        if tool_name in ("Write", "Edit") and success:
+                            try:
+                                target_path = str(tool_input.get("file_path", ""))
+                                if target_path:
+                                    change_type = "created" if tool_name == "Write" else "modified"
+                                    self._stats_db.record_file_change(
+                                        run_id=ctx.run_id,
+                                        step_id=ctx.step_id,
+                                        file_path=target_path,
+                                        change_type=change_type,
+                                    )
+                            except Exception as db_err:
+                                logger.debug("Failed to record file change: %s", db_err)
 
                 elif event_type == "ResultEvent" or hasattr(event, "result"):
                     # Final result event
@@ -2304,6 +2781,52 @@ Analyze the handoff and emit your routing decision now.
                         "error": str(route_error),
                     })
 
+            # ===== HANDOFF ENVELOPE WRITING =====
+            # Create structured HandoffEnvelope for cross-step communication
+            work_summary = "".join(full_assistant_text)
+            try:
+                # Build a preliminary step result for envelope writing
+                preliminary_result = StepResult(
+                    step_id=ctx.step_id,
+                    status="succeeded",
+                    output=work_summary[:2000] if work_summary else "",
+                    duration_ms=int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000),
+                    artifacts=handoff_data.get("artifacts", {}) if handoff_data else {},
+                )
+
+                # Write the handoff envelope
+                handoff_envelope = await self._write_handoff_envelope(
+                    ctx=ctx,
+                    step_result=preliminary_result,
+                    routing_signal=routing_signal,
+                    work_summary=work_summary,
+                )
+
+                if handoff_envelope:
+                    logger.debug(
+                        "Handoff envelope created for step %s: status=%s",
+                        ctx.step_id,
+                        handoff_envelope.status,
+                    )
+                    # Record envelope event
+                    raw_events.append({
+                        "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                        "phase": "envelope",
+                        "type": "handoff_envelope_written",
+                        "envelope_path": str(make_handoff_envelope_path(ctx.run_base, ctx.step_id)),
+                        "status": handoff_envelope.status,
+                    })
+
+            except Exception as envelope_error:
+                logger.warning("Failed to write handoff envelope for step %s: %s", ctx.step_id, envelope_error)
+                raw_events.append({
+                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                    "phase": "envelope",
+                    "type": "error",
+                    "error": str(envelope_error),
+                })
+                handoff_envelope = None
+
             status = "succeeded"
             error = None
 
@@ -2313,6 +2836,7 @@ Analyze the handoff and emit your routing decision now.
             error = str(e)
             handoff_data = None  # Ensure defined for receipt/result building
             routing_signal = None  # Ensure defined for receipt/result building
+            handoff_envelope = None  # Ensure defined for receipt/result building
             raw_events.append(
                 {
                     "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
@@ -2409,6 +2933,10 @@ Analyze the handoff and emit your routing decision now.
                 "confidence": routing_signal.confidence,
                 "needs_human": routing_signal.needs_human,
             }
+        # Add handoff envelope path if envelope was written
+        envelope_path = make_handoff_envelope_path(ctx.run_base, ctx.step_id)
+        if envelope_path.exists():
+            artifacts["handoff_envelope_path"] = str(envelope_path)
 
         # Record step end in stats DB
         if self._stats_db:

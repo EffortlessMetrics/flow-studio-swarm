@@ -23,6 +23,7 @@ Usage:
         append_event, read_events,
         write_run_state, read_run_state, update_run_state,
         write_envelope, read_envelope, list_envelopes,
+        commit_step_completion,
         list_runs, discover_legacy_runs,
     )
 """
@@ -703,6 +704,11 @@ def write_run_state(run_id: RunId, state: RunState, runs_dir: Path = RUNS_DIR) -
 def read_run_state(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Optional[RunState]:
     """Read RunState from run_state.json with graceful error handling.
 
+    Includes crash recovery logic: if handoff_envelopes is empty but envelope
+    files exist on disk, reconstructs the envelope map from the files. This
+    handles the case where the process crashed after writing envelope files
+    but before updating run_state.json.
+
     Args:
         run_id: The unique run identifier.
         runs_dir: Base directory for runs. Defaults to RUNS_DIR.
@@ -718,7 +724,19 @@ def read_run_state(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Optional[RunStat
         return None
 
     try:
-        return run_state_from_dict(data)
+        state = run_state_from_dict(data)
+
+        # Crash recovery: reconstruct handoff_envelopes from disk if empty
+        if not state.handoff_envelopes and state.flow_key:
+            disk_envelopes = list_envelopes(run_id, state.flow_key, runs_dir)
+            if disk_envelopes:
+                logger.info(
+                    "Recovered %d envelope(s) from disk for run '%s' flow '%s'",
+                    len(disk_envelopes), run_id, state.flow_key
+                )
+                state.handoff_envelopes.update(disk_envelopes)
+
+        return state
     except (KeyError, TypeError) as e:
         logger.warning("Invalid run_state data for run '%s' at %s: %s", run_id, state_path, e)
         return None
@@ -874,3 +892,87 @@ def list_envelopes(
             envelopes[step_id] = envelope
 
     return envelopes
+
+
+# -----------------------------------------------------------------------------
+# Atomic Step Completion Protocol
+# -----------------------------------------------------------------------------
+
+
+def commit_step_completion(
+    run_id: RunId,
+    flow_key: str,
+    envelope: HandoffEnvelope,
+    run_state_updates: Dict[str, Any],
+    runs_dir: Path = RUNS_DIR,
+) -> None:
+    """Atomic commit of step completion: envelope + run_state update.
+
+    This function ensures durability of step completion by following a
+    specific order of operations:
+
+    1. Write envelope to <flow>/handoff/<step_id>.json (immutable once written)
+    2. Update run_state.json with envelope reference + step_index bump
+
+    This ordering ensures that if the process crashes between steps, we can
+    recover by reading envelopes from disk and reconstructing the
+    run_state.handoff_envelopes map. The envelope files serve as the
+    durable source of truth.
+
+    Thread-safe via per-run locking.
+
+    Args:
+        run_id: The unique run identifier.
+        flow_key: The flow key (e.g., "signal", "build").
+        envelope: The HandoffEnvelope to persist.
+        run_state_updates: Dictionary of fields to update in run_state.json.
+            Typically includes "step_index", "current_step_id", "status", etc.
+            The envelope reference is automatically added to handoff_envelopes.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Raises:
+        FileNotFoundError: If the run's run_state.json doesn't exist.
+
+    Example:
+        >>> commit_step_completion(
+        ...     run_id="run-20251208-143022-abc123",
+        ...     flow_key="build",
+        ...     envelope=my_envelope,
+        ...     run_state_updates={
+        ...         "step_index": 3,
+        ...         "current_step_id": "4",
+        ...         "status": "running",
+        ...     },
+        ... )
+    """
+    lock = _get_run_lock(run_id)
+    with lock:
+        # Step 1: Write envelope to disk (immutable artifact)
+        step_id = envelope.step_id
+        write_envelope(run_id, flow_key, step_id, envelope, runs_dir)
+
+        # Step 2: Read current run_state
+        state = read_run_state(run_id, runs_dir)
+        if state is None:
+            raise FileNotFoundError(f"Run state not found: {run_id}")
+
+        # Step 3: Build updated state with envelope reference
+        data = run_state_to_dict(state)
+
+        # Add envelope to handoff_envelopes map
+        if "handoff_envelopes" not in data:
+            data["handoff_envelopes"] = {}
+        data["handoff_envelopes"][step_id] = handoff_envelope_to_dict(envelope)
+
+        # Apply caller-provided updates
+        for key, value in run_state_updates.items():
+            if key in data:
+                data[key] = value
+
+        # Update timestamp (using datetime from .types module via run_state_from_dict)
+        from datetime import datetime as dt, timezone as tz
+        data["timestamp"] = dt.now(tz.utc).isoformat() + "Z"
+
+        # Step 4: Write updated run_state atomically
+        updated_state = run_state_from_dict(data)
+        write_run_state(run_id, updated_state, runs_dir)
