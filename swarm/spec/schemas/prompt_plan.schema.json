@@ -1,0 +1,258 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowstudio.dev/schemas/prompt_plan.schema.json",
+  "title": "PromptPlan",
+  "description": "Output of the prompt compiler: fully resolved prompts and SDK options ready for execution.",
+  "type": "object",
+  "required": ["system_prompt", "user_prompt", "options", "metadata"],
+  "properties": {
+    "system_prompt": {
+      "type": "string",
+      "description": "Fully compiled system prompt including station identity and invariants"
+    },
+    "user_prompt": {
+      "type": "string",
+      "description": "Fully compiled user prompt including context, objectives, and instructions"
+    },
+    "options": {
+      "$ref": "#/definitions/ClaudeCodeOptions",
+      "description": "Claude Code SDK options for execution"
+    },
+    "metadata": {
+      "$ref": "#/definitions/PromptMetadata",
+      "description": "Traceability metadata for the compiled prompt"
+    },
+    "context_pack": {
+      "$ref": "#/definitions/ContextPack",
+      "description": "Context artifacts included in the prompt"
+    },
+    "fragments_used": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "hash"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the fragment file"
+          },
+          "hash": {
+            "type": "string",
+            "description": "Content hash of the fragment"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "List of prompt fragments used in compilation"
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "valid": {
+          "type": "boolean",
+          "description": "Whether the prompt plan passed validation"
+        },
+        "errors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Validation errors if any"
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Validation warnings if any"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "ClaudeCodeOptions": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": ["claude-3-5-haiku-latest", "claude-sonnet-4-20250514", "claude-opus-4-20250514"],
+          "description": "Model to use for execution"
+        },
+        "maxTurns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 12,
+          "description": "Maximum conversation turns"
+        },
+        "maxThinkingTokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum tokens for extended thinking (0 to disable)"
+        },
+        "permissionMode": {
+          "type": "string",
+          "enum": ["default", "bypassPermissions", "planMode"],
+          "default": "bypassPermissions",
+          "description": "Permission handling mode"
+        },
+        "allowedTools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tools allowed for this execution"
+        },
+        "disallowedTools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tools explicitly disallowed"
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Working directory for execution"
+        },
+        "systemPrompt": {
+          "type": "string",
+          "description": "System prompt (copied from parent for convenience)"
+        },
+        "abortSignal": {
+          "type": "object",
+          "description": "Abort signal configuration"
+        }
+      },
+      "additionalProperties": true
+    },
+    "PromptMetadata": {
+      "type": "object",
+      "required": ["station_id", "station_version", "flow_id", "flow_version", "prompt_hash"],
+      "properties": {
+        "station_id": {
+          "type": "string",
+          "description": "Station spec ID"
+        },
+        "station_version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Station spec version"
+        },
+        "flow_id": {
+          "type": "string",
+          "description": "Flow spec ID"
+        },
+        "flow_version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Flow spec version"
+        },
+        "step_id": {
+          "type": "string",
+          "description": "Step ID within the flow"
+        },
+        "prompt_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hash of the compiled prompt for traceability"
+        },
+        "compiled_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the prompt was compiled"
+        },
+        "compiler_version": {
+          "type": "string",
+          "description": "Version of the prompt compiler"
+        },
+        "run_id": {
+          "type": "string",
+          "description": "Run identifier for correlation"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ContextPack": {
+      "type": "object",
+      "properties": {
+        "upstream_artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "content_preview"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "Path to the artifact"
+              },
+              "content_preview": {
+                "type": "string",
+                "maxLength": 500,
+                "description": "Preview of artifact content"
+              },
+              "included_fully": {
+                "type": "boolean",
+                "description": "Whether the full content was included"
+              },
+              "truncated_at_chars": {
+                "type": "integer",
+                "description": "Character count if truncated"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Upstream artifacts included in context"
+        },
+        "previous_envelopes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["step_id", "status", "summary"],
+            "properties": {
+              "step_id": {
+                "type": "string",
+                "description": "Step that produced the envelope"
+              },
+              "status": {
+                "type": "string",
+                "description": "Status from the envelope"
+              },
+              "summary": {
+                "type": "string",
+                "description": "Summary from the envelope"
+              },
+              "iteration": {
+                "type": "integer",
+                "description": "Iteration number if in a microloop"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Previous handoff envelopes for context"
+        },
+        "scent_trail": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["step_id", "key_insight"],
+            "properties": {
+              "step_id": {
+                "type": "string",
+                "description": "Step that produced this insight"
+              },
+              "key_insight": {
+                "type": "string",
+                "description": "Key insight to carry forward"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Scent trail of key insights from previous steps"
+        },
+        "total_chars": {
+          "type": "integer",
+          "description": "Total character count of context pack"
+        },
+        "budget_remaining": {
+          "type": "integer",
+          "description": "Characters remaining in budget after context pack"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

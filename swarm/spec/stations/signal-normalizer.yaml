@@ -1,8 +1,9 @@
 # Station: signal-normalizer
+# Source: swarm/prompts/agentic_steps/signal-normalizer.md
 # Role: Normalize raw signal into machine-friendly facts and repo context
 
 id: signal-normalizer
-version: 1
+version: 2
 title: Normalize Signal
 category: shaping
 
@@ -34,7 +35,15 @@ identity:
 
     All paths are repo-root-relative. Write only to .runs/<run-id>/signal/.
     Keep quotes bounded; prefer references over dumps.
+  longform_ref: prompts/agentic_steps/signal-normalizer.md
   tone: neutral
+
+policy:
+  invariants_ref:
+    - fragments/common/invariants.md
+    - fragments/common/evidence.md
+  handoff_ref:
+    - fragments/common/handoff.md
 
 io:
   required_inputs: []
@@ -46,10 +55,25 @@ io:
     - signal/context_brief.md
   optional_outputs: []
 
+handoff:
+  draft_path_template: "{{run.base}}/handoff/signal-normalizer.draft.json"
+  schema_ref: schemas/handoff.schema.json
+  required_fields:
+    - status
+    - summary
+    - artifacts
+
+verify:
+  required_artifacts:
+    - signal/issue_normalized.md
+    - signal/context_brief.md
+  gate_status_on_fail: UNVERIFIED
+
 runtime_prompt:
   fragments:
     - common/invariants.md
     - common/evidence.md
+    - common/handoff.md
   template: |
     ## Signal Normalization Approach
 
@@ -65,13 +89,6 @@ runtime_prompt:
     3. Scan repo for prior art and likely touch-points
     4. Apply quoting/redaction rules (max 30 lines, redact secrets)
     5. Write issue_normalized.md and context_brief.md
-
-handoff:
-  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
-  required_fields:
-    - status
-    - summary
-    - artifacts
 
 invariants:
   - "All paths are repo-root-relative"

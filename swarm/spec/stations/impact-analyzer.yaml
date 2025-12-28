@@ -1,8 +1,9 @@
 # Station: impact-analyzer
+# Source: swarm/prompts/agentic_steps/impact-analyzer.md
 # Role: Map blast radius of change with evidence-backed analysis
 
 id: impact-analyzer
-version: 1
+version: 2
 title: Impact Analyzer
 category: design
 
@@ -36,7 +37,15 @@ identity:
     - Inferred items must include confidence level (LOW/MEDIUM) and notes
     - Do not present inferred items as certain
     - Use stable identifiers (function names, class names) not line numbers
+  longform_ref: prompts/agentic_steps/impact-analyzer.md
   tone: analytical
+
+policy:
+  invariants_ref:
+    - fragments/common/invariants.md
+    - fragments/common/evidence.md
+  handoff_ref:
+    - fragments/common/handoff.md
 
 io:
   required_inputs:
@@ -49,10 +58,24 @@ io:
     - plan/impact_map.json
   optional_outputs: []
 
+handoff:
+  draft_path_template: "{{run.base}}/handoff/impact-analyzer.draft.json"
+  schema_ref: schemas/handoff.schema.json
+  required_fields:
+    - status
+    - summary
+    - artifacts
+
+verify:
+  required_artifacts:
+    - plan/impact_map.json
+  gate_status_on_fail: UNVERIFIED
+
 runtime_prompt:
   fragments:
     - common/invariants.md
     - common/evidence.md
+    - common/handoff.md
   template: |
     ## Impact Analysis Approach
 
@@ -70,13 +93,6 @@ runtime_prompt:
     - affected: array of impact items with evidence
     - interfaces_impacted: API endpoints, data entities, events
     - configuration_impact and test_impact arrays
-
-handoff:
-  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
-  required_fields:
-    - status
-    - summary
-    - artifacts
 
 invariants:
   - "Every observed item must have at least one evidence entry"

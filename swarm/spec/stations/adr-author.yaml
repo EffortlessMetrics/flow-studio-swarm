@@ -1,8 +1,9 @@
 # Station: adr-author
+# Source: swarm/prompts/agentic_steps/adr-author.md
 # Role: Write run-local ADR binding design options to REQ/NFRs
 
 id: adr-author
-version: 1
+version: 2
 title: ADR Author
 category: design
 
@@ -38,7 +39,14 @@ identity:
     - Document trade-offs and consequences explicitly
     - Use stable markers (DR-###, RSK-###, ASM-###)
     - Write only to .runs/<run-id>/plan/adr.md
+  longform_ref: prompts/agentic_steps/adr-author.md
   tone: neutral
+
+policy:
+  invariants_ref:
+    - fragments/common/invariants.md
+  handoff_ref:
+    - fragments/common/handoff.md
 
 io:
   required_inputs:
@@ -53,9 +61,23 @@ io:
     - plan/adr.md
   optional_outputs: []
 
+handoff:
+  draft_path_template: "{{run.base}}/handoff/adr-author.draft.json"
+  schema_ref: schemas/handoff.schema.json
+  required_fields:
+    - status
+    - summary
+    - artifacts
+
+verify:
+  required_artifacts:
+    - plan/adr.md
+  gate_status_on_fail: UNVERIFIED
+
 runtime_prompt:
   fragments:
     - common/invariants.md
+    - common/handoff.md
   template: |
     ## ADR Writing Approach
 
@@ -78,13 +100,6 @@ runtime_prompt:
     - Risks and Mitigations: RISK: RSK-###
     - Assumptions: ASM: ASM-###
     - Inventory section with machine-countable markers
-
-handoff:
-  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
-  required_fields:
-    - status
-    - summary
-    - artifacts
 
 invariants:
   - "Decision Drivers must cite REQ/NFR IDs when available"

@@ -4,13 +4,14 @@
 id: learning-synthesizer
 version: 1
 title: Learning Synthesis
-category: analysis
+category: analytics
 
 sdk:
-  model: sonnet
+  model: opus
   permission_mode: bypassPermissions
   allowed_tools:
     - Read
+    - Write
     - Grep
     - Glob
     - Bash
@@ -42,32 +43,32 @@ identity:
 
 io:
   required_inputs:
-    - wisdom/artifact_audit.md
-    - wisdom/regression_report.md
-    - wisdom/flow_history.json
+    - "{{run.base}}/wisdom/artifact_audit.md"
+    - "{{run.base}}/wisdom/regression_report.md"
+    - "{{run.base}}/wisdom/flow_history.json"
   optional_inputs:
-    - signal/open_questions.md
-    - plan/adr.md
-    - build/test_critique.md
-    - build/code_critique.md
-    - build/mutation_report.md
-    - build/flakiness_report.md
-    - build/fuzz_report.md
-    - build/doc_critique.md
-    - gate/merge_decision.md
-    - deploy/deployment_decision.md
-    - signal/github_report.md
-    - plan/github_report.md
-    - build/github_report.md
-    - gate/github_report.md
-    - deploy/github_report.md
-    - signal/signal_receipt.json
-    - plan/plan_receipt.json
-    - build/build_receipt.json
-    - gate/gate_receipt.json
-    - deploy/deploy_receipt.json
+    - "{{run.base}}/signal/open_questions.md"
+    - "{{run.base}}/plan/adr.md"
+    - "{{run.base}}/build/test_critique.md"
+    - "{{run.base}}/build/code_critique.md"
+    - "{{run.base}}/build/mutation_report.md"
+    - "{{run.base}}/build/flakiness_report.md"
+    - "{{run.base}}/build/fuzz_report.md"
+    - "{{run.base}}/build/doc_critique.md"
+    - "{{run.base}}/gate/merge_decision.md"
+    - "{{run.base}}/deploy/deployment_decision.md"
+    - "{{run.base}}/signal/github_report.md"
+    - "{{run.base}}/plan/github_report.md"
+    - "{{run.base}}/build/github_report.md"
+    - "{{run.base}}/gate/github_report.md"
+    - "{{run.base}}/deploy/github_report.md"
+    - "{{run.base}}/signal/signal_receipt.json"
+    - "{{run.base}}/plan/plan_receipt.json"
+    - "{{run.base}}/build/build_receipt.json"
+    - "{{run.base}}/gate/gate_receipt.json"
+    - "{{run.base}}/deploy/deploy_receipt.json"
   required_outputs:
-    - wisdom/learnings.md
+    - "{{run.base}}/wisdom/learnings.md"
   optional_outputs: []
 
 runtime_prompt:

@@ -197,6 +197,38 @@ def load_fragment(fragment_path: str, repo_root: Optional[Path] = None) -> str:
     return full_path.read_text(encoding="utf-8")
 
 
+def load_fragments(
+    fragment_paths: List[str],
+    repo_root: Optional[Path] = None,
+    separator: str = "\n\n---\n\n",
+) -> str:
+    """Load and concatenate multiple fragments.
+
+    Args:
+        fragment_paths: List of relative paths within fragments/.
+        repo_root: Optional repository root path.
+        separator: String to insert between fragments.
+
+    Returns:
+        Concatenated content of all fragments.
+
+    Note:
+        Missing fragments are logged as warnings but do not raise errors.
+        This allows graceful degradation when optional fragments are absent.
+    """
+    contents: List[str] = []
+
+    for frag_path in fragment_paths:
+        try:
+            content = load_fragment(frag_path, repo_root)
+            if content.strip():
+                contents.append(content.strip())
+        except FileNotFoundError:
+            logger.warning("Fragment not found (skipping): %s", frag_path)
+
+    return separator.join(contents)
+
+
 @lru_cache(maxsize=64)
 def load_fragment_cached(fragment_path: str, repo_root_str: str) -> str:
     """Cached version of load_fragment for repeated access."""

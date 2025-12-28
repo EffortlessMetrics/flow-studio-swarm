@@ -4,16 +4,17 @@
 id: artifact-auditor
 version: 1
 title: Artifact Audit
-category: analysis
+category: analytics
 
 sdk:
   model: haiku
   permission_mode: bypassPermissions
   allowed_tools:
     - Read
+    - Write
     - Grep
     - Glob
-  # Read-only audit - no Write/Edit
+  # Produces audit report but does not modify source artifacts
   sandbox:
     enabled: true
     auto_allow_bash: false
@@ -38,14 +39,14 @@ identity:
 
 io:
   required_inputs:
-    - signal/
-    - plan/
-    - build/
+    - "{{run.base}}/signal/"
+    - "{{run.base}}/plan/"
+    - "{{run.base}}/build/"
   optional_inputs:
-    - gate/
-    - deploy/
+    - "{{run.base}}/gate/"
+    - "{{run.base}}/deploy/"
   required_outputs:
-    - wisdom/artifact_audit.md
+    - "{{run.base}}/wisdom/artifact_audit.md"
   optional_outputs: []
 
 runtime_prompt:

@@ -1,8 +1,9 @@
 # Station: bdd-author
+# Source: swarm/prompts/agentic_steps/bdd-author.md
 # Role: Convert requirements into executable BDD scenarios with strict traceability
 
 id: bdd-author
-version: 1
+version: 2
 title: Author BDD Scenarios
 category: spec
 
@@ -34,7 +35,15 @@ identity:
 
     Default to domain-level steps unless requirements explicitly specify an interface.
     Write scenarios that survive refactors without becoming vague.
+  longform_ref: prompts/agentic_steps/bdd-author.md
   tone: neutral
+
+policy:
+  invariants_ref:
+    - fragments/common/invariants.md
+    - fragments/common/evidence.md
+  handoff_ref:
+    - fragments/common/handoff.md
 
 io:
   required_inputs:
@@ -51,10 +60,26 @@ io:
   optional_outputs:
     - signal/open_questions.md
 
+handoff:
+  draft_path_template: "{{run.base}}/handoff/bdd-author.draft.json"
+  schema_ref: schemas/handoff.schema.json
+  required_fields:
+    - status
+    - summary
+    - artifacts
+    - can_further_iteration_help
+
+verify:
+  required_artifacts:
+    - signal/example_matrix.md
+    - signal/verification_notes.md
+  gate_status_on_fail: UNVERIFIED
+
 runtime_prompt:
   fragments:
     - common/invariants.md
     - common/evidence.md
+    - common/handoff.md
   template: |
     ## BDD Writing Approach
 
@@ -84,14 +109,6 @@ runtime_prompt:
     Bad (interface-coupled without requirement basis):
       Given a POST request to /api/v1/auth/login
       Then the response status is 200
-
-handoff:
-  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
-  required_fields:
-    - status
-    - summary
-    - artifacts
-    - can_further_iteration_help
 
 invariants:
   - "Each scenario has exactly one primary @REQ-### tag"

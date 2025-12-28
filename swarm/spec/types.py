@@ -227,11 +227,39 @@ class FlowSpec:
 
 
 @dataclass(frozen=True)
+class VerificationRequirements:
+    """Verification requirements for a step.
+
+    Defines what artifacts must exist and what commands must pass
+    for the step to be considered verified.
+    """
+    required_artifacts: Tuple[str, ...] = ()
+    verification_commands: Tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class HandoffContract:
+    """Handoff contract for a step.
+
+    Defines where the handoff file goes and what fields it must contain.
+    """
+    path: str  # Resolved path (no templates)
+    required_fields: Tuple[str, ...] = (
+        "status", "summary", "artifacts", "can_further_iteration_help"
+    )
+
+
+@dataclass(frozen=True)
 class PromptPlan:
     """Compiled prompt plan ready for SDK execution.
 
     This is the output of the spec compiler - everything needed
     to make a Claude SDK call without any additional computation.
+
+    V2 additions:
+    - verification: Required artifacts and verification commands
+    - handoff: Resolved handoff path and required fields
+    - flow_key: Separate from flow_id for routing
     """
     # Traceability
     station_id: str
@@ -256,6 +284,19 @@ class PromptPlan:
     # Metadata for events
     compiled_at: str  # ISO timestamp
     context_pack_size: int  # Number of envelopes included
+
+    # V2: Verification requirements (merged from station + step)
+    verification: VerificationRequirements = field(
+        default_factory=lambda: VerificationRequirements()
+    )
+
+    # V2: Handoff contract (resolved path, required fields)
+    handoff: HandoffContract = field(
+        default_factory=lambda: HandoffContract(path="")
+    )
+
+    # V2: Flow key for routing (e.g., "build" from "3-build")
+    flow_key: str = ""
 
 
 # =============================================================================

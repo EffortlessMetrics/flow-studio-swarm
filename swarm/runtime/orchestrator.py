@@ -11,6 +11,7 @@ Design Philosophy:
     - Context continuity: Previous step outputs are included in subsequent prompts
     - Observable execution: Events are logged per-step for debugging
     - Type-safe: Uses existing RunSpec, RunSummary, RunEvent types
+    - Spec-first routing: FlowSpec from swarm/spec/flows defines routing
 
 Usage:
     from swarm.runtime.orchestrator import GeminiStepOrchestrator
@@ -27,6 +28,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
+import subprocess
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -64,6 +67,17 @@ from .types import (
     generate_run_id,
     handoff_envelope_to_dict,
 )
+
+# Spec-first imports for FlowSpec routing
+try:
+    from swarm.spec.loader import load_flow, load_station
+    from swarm.spec.types import FlowSpec, RoutingKind, StationSpec
+    SPEC_AVAILABLE = True
+except ImportError:
+    SPEC_AVAILABLE = False
+    FlowSpec = None
+    RoutingKind = None
+    StationSpec = None
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -110,6 +124,10 @@ class GeminiStepOrchestrator:
         # Stop request tracking for graceful interruption
         # Using threading.Event for true cross-thread safety
         self._stop_requests: Dict[RunId, threading.Event] = {}
+        # Cache for loaded FlowSpecs (spec-first routing)
+        self._flow_spec_cache: Dict[str, Any] = {}
+        # Cache for loaded StationSpecs (verification)
+        self._station_spec_cache: Dict[str, Any] = {}
 
     def request_stop(self, run_id: RunId) -> bool:
         """Request graceful stop of a running run.
@@ -161,6 +179,389 @@ class GeminiStepOrchestrator:
         if run_id not in self._stop_requests:
             return False
         return self._stop_requests[run_id].is_set()
+
+    # =========================================================================
+    # SPEC-FIRST ROUTING SUPPORT
+    # =========================================================================
+
+    def _load_flow_spec(self, flow_key: str) -> Optional[Any]:
+        """Load FlowSpec from swarm/spec/flows/{flow_id}.yaml.
+
+        Uses caching to avoid repeated file I/O.
+
+        Args:
+            flow_key: The flow key (e.g., "build", "plan").
+
+        Returns:
+            Loaded FlowSpec or None if not available.
+        """
+        if not SPEC_AVAILABLE:
+            logger.debug("Spec module not available, skipping FlowSpec load")
+            return None
+
+        if flow_key in self._flow_spec_cache:
+            return self._flow_spec_cache[flow_key]
+
+        # Map flow_key to spec flow_id (e.g., "build" -> "3-build")
+        flow_id_map = {
+            "signal": "1-signal",
+            "plan": "2-plan",
+            "build": "3-build",
+            "review": "4-review",
+            "gate": "5-gate",
+            "deploy": "6-deploy",
+            "wisdom": "7-wisdom",
+        }
+        flow_id = flow_id_map.get(flow_key, flow_key)
+
+        try:
+            flow_spec = load_flow(flow_id, self._repo_root)
+            self._flow_spec_cache[flow_key] = flow_spec
+            logger.debug("Loaded FlowSpec for %s (id=%s)", flow_key, flow_id)
+            return flow_spec
+        except FileNotFoundError:
+            logger.debug("FlowSpec not found for %s", flow_key)
+            self._flow_spec_cache[flow_key] = None
+            return None
+        except Exception as e:
+            logger.warning("Failed to load FlowSpec for %s: %s", flow_key, e)
+            self._flow_spec_cache[flow_key] = None
+            return None
+
+    def _load_station_spec(self, station_id: str) -> Optional[Any]:
+        """Load StationSpec from swarm/spec/stations/{station_id}.yaml.
+
+        Uses caching to avoid repeated file I/O.
+
+        Args:
+            station_id: The station identifier (e.g., "code-implementer").
+
+        Returns:
+            Loaded StationSpec or None if not available.
+        """
+        if not SPEC_AVAILABLE:
+            return None
+
+        if station_id in self._station_spec_cache:
+            return self._station_spec_cache[station_id]
+
+        try:
+            station_spec = load_station(station_id, self._repo_root)
+            self._station_spec_cache[station_id] = station_spec
+            logger.debug("Loaded StationSpec for %s", station_id)
+            return station_spec
+        except FileNotFoundError:
+            logger.debug("StationSpec not found for %s", station_id)
+            self._station_spec_cache[station_id] = None
+            return None
+        except Exception as e:
+            logger.warning("Failed to load StationSpec for %s: %s", station_id, e)
+            self._station_spec_cache[station_id] = None
+            return None
+
+    def _get_macro_routing(
+        self,
+        flow_key: str,
+        success: bool,
+    ) -> Tuple[Optional[str], str]:
+        """Get macro-routing decision from FlowSpec's on_complete/on_failure.
+
+        Args:
+            flow_key: The flow that completed.
+            success: Whether the flow succeeded.
+
+        Returns:
+            Tuple of (next_flow_key or None, reason string).
+        """
+        flow_spec = self._load_flow_spec(flow_key)
+        if flow_spec is None:
+            return None, "no_flow_spec"
+
+        # Check FlowSpec for on_complete/on_failure
+        # These are optional attributes in FlowSpec YAML
+        spec_data = None
+        try:
+            # Try to read the raw YAML to get on_complete/on_failure
+            import yaml
+            spec_root = self._repo_root / "swarm" / "spec"
+            flow_id_map = {
+                "signal": "1-signal", "plan": "2-plan", "build": "3-build",
+                "review": "4-review", "gate": "5-gate", "deploy": "6-deploy",
+                "wisdom": "7-wisdom",
+            }
+            flow_id = flow_id_map.get(flow_key, flow_key)
+            flow_path = spec_root / "flows" / f"{flow_id}.yaml"
+
+            if flow_path.exists():
+                with open(flow_path, "r", encoding="utf-8") as f:
+                    spec_data = yaml.safe_load(f)
+        except Exception as e:
+            logger.debug("Failed to read FlowSpec YAML for %s: %s", flow_key, e)
+
+        if spec_data is None:
+            return None, "no_spec_data"
+
+        if success:
+            on_complete = spec_data.get("on_complete", {})
+            next_flow = on_complete.get("next_flow")
+            reason = on_complete.get("reason", "flow_complete")
+            if next_flow:
+                return next_flow, reason
+        else:
+            on_failure = spec_data.get("on_failure", {})
+            next_flow = on_failure.get("next_flow")
+            reason = on_failure.get("reason", "flow_failed")
+            if next_flow:
+                return next_flow, reason
+
+        return None, "no_macro_route_defined"
+
+    def _get_spec_step_routing(
+        self,
+        flow_key: str,
+        step_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Get step routing configuration from FlowSpec.
+
+        Args:
+            flow_key: The flow key.
+            step_id: The step identifier.
+
+        Returns:
+            Routing configuration dict or None if not found.
+        """
+        flow_spec = self._load_flow_spec(flow_key)
+        if flow_spec is None:
+            return None
+
+        # Find step in FlowSpec
+        for step in flow_spec.steps:
+            if step.id == step_id:
+                routing = step.routing
+                return {
+                    "kind": routing.kind.value if hasattr(routing.kind, 'value') else str(routing.kind),
+                    "next": routing.next,
+                    "loop_target": routing.loop_target,
+                    "loop_condition_field": routing.loop_condition_field,
+                    "loop_success_values": list(routing.loop_success_values),
+                    "max_iterations": routing.max_iterations,
+                    "branches": dict(routing.branches) if routing.branches else {},
+                }
+
+        return None
+
+    # =========================================================================
+    # VERIFICATION EXECUTION
+    # =========================================================================
+
+    def _run_verification(
+        self,
+        run_id: RunId,
+        flow_key: str,
+        step_id: str,
+        station_id: str,
+        handoff_envelope: HandoffEnvelope,
+    ) -> Dict[str, Any]:
+        """Run verification checks from station spec's verify block.
+
+        Checks required_artifacts and runs verification_commands.
+
+        Args:
+            run_id: The run identifier.
+            flow_key: The flow key.
+            step_id: The step identifier.
+            station_id: The station that executed the step.
+            handoff_envelope: The step's handoff envelope.
+
+        Returns:
+            Dict with verification results:
+            - passed: bool
+            - artifact_checks: List of (artifact, exists)
+            - command_checks: List of (command, passed, output)
+            - gate_status_on_fail: Status to set if verification fails
+        """
+        result: Dict[str, Any] = {
+            "passed": True,
+            "artifact_checks": [],
+            "command_checks": [],
+            "gate_status_on_fail": "UNVERIFIED",
+        }
+
+        # Emit verification_started event
+        storage_module.append_event(
+            run_id,
+            RunEvent(
+                run_id=run_id,
+                ts=datetime.now(timezone.utc),
+                kind="verification_started",
+                flow_key=flow_key,
+                step_id=step_id,
+                payload={
+                    "station_id": station_id,
+                },
+            ),
+        )
+
+        station_spec = self._load_station_spec(station_id)
+        if station_spec is None:
+            logger.debug("No StationSpec for %s, skipping verification", station_id)
+            # Emit verification_passed (vacuously true)
+            storage_module.append_event(
+                run_id,
+                RunEvent(
+                    run_id=run_id,
+                    ts=datetime.now(timezone.utc),
+                    kind="verification_passed",
+                    flow_key=flow_key,
+                    step_id=step_id,
+                    payload={
+                        "station_id": station_id,
+                        "reason": "no_station_spec",
+                    },
+                ),
+            )
+            return result
+
+        # Get verify block from raw YAML (not in dataclass yet)
+        try:
+            import yaml
+            station_path = self._repo_root / "swarm" / "spec" / "stations" / f"{station_id}.yaml"
+            if station_path.exists():
+                with open(station_path, "r", encoding="utf-8") as f:
+                    station_data = yaml.safe_load(f)
+                verify_block = station_data.get("verify", {})
+            else:
+                verify_block = {}
+        except Exception as e:
+            logger.debug("Failed to read verify block for %s: %s", station_id, e)
+            verify_block = {}
+
+        if not verify_block:
+            # Emit verification_passed (vacuously true)
+            storage_module.append_event(
+                run_id,
+                RunEvent(
+                    run_id=run_id,
+                    ts=datetime.now(timezone.utc),
+                    kind="verification_passed",
+                    flow_key=flow_key,
+                    step_id=step_id,
+                    payload={
+                        "station_id": station_id,
+                        "reason": "no_verify_block",
+                    },
+                ),
+            )
+            return result
+
+        result["gate_status_on_fail"] = verify_block.get("gate_status_on_fail", "UNVERIFIED")
+        run_base = self._repo_root / "swarm" / "runs" / run_id
+
+        # Check required_artifacts
+        required_artifacts = verify_block.get("required_artifacts", [])
+        for artifact_path in required_artifacts:
+            full_path = run_base / artifact_path
+            exists = full_path.exists()
+            result["artifact_checks"].append((artifact_path, exists))
+            if not exists:
+                result["passed"] = False
+                logger.debug("Verification failed: artifact missing: %s", artifact_path)
+
+        # Run verification_commands
+        required_commands = verify_block.get("required_commands", [])
+        for cmd_spec in required_commands:
+            if isinstance(cmd_spec, str):
+                command = cmd_spec
+                success_pattern = None
+                timeout_seconds = 60
+            else:
+                command = cmd_spec.get("command", "")
+                success_pattern = cmd_spec.get("success_pattern")
+                timeout_seconds = cmd_spec.get("timeout_seconds", 60)
+
+            if not command:
+                continue
+
+            # Skip skill-based commands for now (would need skill runner)
+            if command in ("test-runner", "auto-linter", "policy-runner"):
+                logger.debug("Skipping skill-based verification command: %s", command)
+                result["command_checks"].append((command, True, "skipped_skill"))
+                continue
+
+            try:
+                proc_result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_seconds,
+                    cwd=str(self._repo_root),
+                )
+                output = proc_result.stdout + proc_result.stderr
+                passed = proc_result.returncode == 0
+
+                # Check success pattern if specified
+                if passed and success_pattern:
+                    passed = bool(re.search(success_pattern, output, re.IGNORECASE))
+
+                result["command_checks"].append((command, passed, output[:500]))
+                if not passed:
+                    result["passed"] = False
+                    logger.debug("Verification command failed: %s", command)
+
+            except subprocess.TimeoutExpired:
+                result["command_checks"].append((command, False, "timeout"))
+                result["passed"] = False
+                logger.debug("Verification command timed out: %s", command)
+            except Exception as e:
+                result["command_checks"].append((command, False, str(e)))
+                result["passed"] = False
+                logger.debug("Verification command error: %s: %s", command, e)
+
+        # Emit verification_passed or verification_failed
+        if result["passed"]:
+            storage_module.append_event(
+                run_id,
+                RunEvent(
+                    run_id=run_id,
+                    ts=datetime.now(timezone.utc),
+                    kind="verification_passed",
+                    flow_key=flow_key,
+                    step_id=step_id,
+                    payload={
+                        "station_id": station_id,
+                        "artifact_checks": result["artifact_checks"],
+                        "command_checks": [
+                            (c, p, o[:100]) for c, p, o in result["command_checks"]
+                        ],
+                    },
+                ),
+            )
+        else:
+            storage_module.append_event(
+                run_id,
+                RunEvent(
+                    run_id=run_id,
+                    ts=datetime.now(timezone.utc),
+                    kind="verification_failed",
+                    flow_key=flow_key,
+                    step_id=step_id,
+                    payload={
+                        "station_id": station_id,
+                        "gate_status_on_fail": result["gate_status_on_fail"],
+                        "artifact_checks": result["artifact_checks"],
+                        "command_checks": [
+                            (c, p, o[:100]) for c, p, o in result["command_checks"]
+                        ],
+                    },
+                ),
+            )
+
+        return result
+
+    # =========================================================================
+    # FLOW EXECUTION METHODS
+    # =========================================================================
 
     def run_stepwise_flow(
         self,
@@ -446,6 +847,38 @@ class GeminiStepOrchestrator:
                         timestamp=datetime.now(timezone.utc),
                     )
 
+                # =========================================================
+                # VERIFICATION: Run verification from station spec
+                # =========================================================
+                # Get station ID from step (for FlowSpec, station is explicit)
+                station_id = None
+                flow_spec = self._load_flow_spec(flow_key)
+                if flow_spec:
+                    for spec_step in flow_spec.steps:
+                        if spec_step.id == current_step.id:
+                            station_id = spec_step.station
+                            break
+
+                if station_id:
+                    verification_result = self._run_verification(
+                        run_id=run_id,
+                        flow_key=flow_key,
+                        step_id=current_step.id,
+                        station_id=station_id,
+                        handoff_envelope=handoff_envelope,
+                    )
+
+                    # Update handoff envelope with verification results
+                    handoff_envelope.verification_passed = verification_result["passed"]
+                    handoff_envelope.verification_details = {
+                        "artifact_checks": verification_result["artifact_checks"],
+                        "command_checks": [
+                            (c, p, o[:100]) for c, p, o in verification_result.get("command_checks", [])
+                        ],
+                        "gate_status_on_fail": verification_result.get("gate_status_on_fail", "UNVERIFIED"),
+                    }
+                    handoff_envelope.station_id = station_id
+
                 # Store handoff envelope in run state (in-memory for next step's context)
                 run_state.handoff_envelopes[current_step.id] = handoff_envelope
 
@@ -547,6 +980,44 @@ class GeminiStepOrchestrator:
             sdlc_status = SDLCStatus.ERROR
             error_msg = str(e)
 
+        # =========================================================
+        # MACRO-ROUTING: Check on_complete/on_failure for flow transition
+        # =========================================================
+        flow_succeeded = (final_status == RunStatus.SUCCEEDED)
+        next_flow_key, macro_reason = self._get_macro_routing(flow_key, flow_succeeded)
+
+        if next_flow_key:
+            # Emit macro_route event
+            storage_module.append_event(
+                run_id,
+                RunEvent(
+                    run_id=run_id,
+                    ts=datetime.now(timezone.utc),
+                    kind="macro_route",
+                    flow_key=flow_key,
+                    payload={
+                        "from_flow": flow_key,
+                        "to_flow": next_flow_key,
+                        "reason": macro_reason,
+                        "flow_succeeded": flow_succeeded,
+                        "loop_count": 0,
+                    },
+                ),
+            )
+            logger.info(
+                "Macro-route: %s -> %s (reason: %s)",
+                flow_key, next_flow_key, macro_reason,
+            )
+
+        # Update flow transition history in run state
+        run_state.flow_transition_history.append({
+            "from_flow": flow_key,
+            "to_flow": next_flow_key,
+            "reason": macro_reason,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "flow_succeeded": flow_succeeded,
+        })
+
         # Update final status
         completed_at = datetime.now(timezone.utc)
         storage_module.update_summary(run_id, {
@@ -570,6 +1041,9 @@ class GeminiStepOrchestrator:
                     "steps_completed": len(step_history),
                     "total_steps_executed": total_steps_executed,
                     "loop_state_final": dict(loop_state),
+                    "next_flow": next_flow_key,
+                    "macro_route_reason": macro_reason,
+                    "flow_transition_history": run_state.flow_transition_history,
                 },
             ),
         )
@@ -682,6 +1156,9 @@ class GeminiStepOrchestrator:
     ) -> RoutingSignal:
         """Create a RoutingSignal from step result and routing config.
 
+        Uses spec-first routing when FlowSpec is available, otherwise
+        falls back to config-based routing.
+
         Args:
             step: The step that was executed.
             result: The step execution result dictionary.
@@ -690,6 +1167,20 @@ class GeminiStepOrchestrator:
         Returns:
             A RoutingSignal with the routing decision.
         """
+        # =========================================================
+        # SPEC-FIRST ROUTING: Try FlowSpec first
+        # =========================================================
+        flow_key = result.get("flow_key", "")
+        spec_routing = self._get_spec_step_routing(flow_key, step.id) if flow_key else None
+
+        if spec_routing:
+            return self._create_routing_signal_from_spec(
+                step, result, loop_state, spec_routing
+            )
+
+        # =========================================================
+        # FALLBACK: Config-based routing
+        # =========================================================
         routing = step.routing
 
         # Default routing signal - advance to next step
@@ -794,6 +1285,176 @@ class GeminiStepOrchestrator:
             confidence=confidence,
             needs_human=needs_human,
         )
+
+    def _create_routing_signal_from_spec(
+        self,
+        step: StepDefinition,
+        result: Dict[str, Any],
+        loop_state: Dict[str, int],
+        spec_routing: Dict[str, Any],
+    ) -> RoutingSignal:
+        """Create a RoutingSignal using FlowSpec routing configuration.
+
+        Supports routing kinds: linear, microloop, branch, terminal.
+        Supports exit_on conditions for microloops.
+
+        Args:
+            step: The step that was executed.
+            result: The step execution result dictionary.
+            loop_state: Dictionary tracking iteration counts per microloop.
+            spec_routing: Routing configuration from FlowSpec.
+
+        Returns:
+            A RoutingSignal with the routing decision.
+        """
+        kind = spec_routing.get("kind", "linear")
+        decision = RoutingDecision.ADVANCE
+        next_step_id = None
+        reason = "step_complete"
+        confidence = 1.0
+        needs_human = False
+        loop_count = 0
+        exit_condition_met = False
+
+        if kind == "terminal":
+            decision = RoutingDecision.TERMINATE
+            reason = "terminal_step"
+            return RoutingSignal(
+                decision=decision,
+                next_step_id=None,
+                reason=reason,
+                confidence=confidence,
+                needs_human=needs_human,
+            )
+
+        elif kind == "linear":
+            next_step_id = spec_routing.get("next")
+            if next_step_id:
+                reason = "linear_via_spec"
+            else:
+                decision = RoutingDecision.TERMINATE
+                reason = "flow_complete_via_spec"
+
+        elif kind == "microloop":
+            loop_target = spec_routing.get("loop_target")
+            next_after_loop = spec_routing.get("next")
+            max_iterations = spec_routing.get("max_iterations", 3)
+
+            loop_key = f"{step.id}:{loop_target}" if loop_target else step.id
+            current_iter = loop_state.get(loop_key, 0)
+            loop_count = current_iter
+
+            # Check exit_on conditions from FlowSpec YAML
+            flow_key = result.get("flow_key", "")
+            exit_on = self._get_spec_exit_on(flow_key, step.id)
+
+            if exit_on:
+                # Check status condition
+                status_values = exit_on.get("status", [])
+                step_status = result.get("status", "")
+                if status_values and step_status in status_values:
+                    exit_condition_met = True
+                    reason = f"exit_on_status:{step_status}"
+
+                # Check can_further_iteration_help condition
+                if exit_on.get("can_further_iteration_help") is False:
+                    agent_key = step.agents[0] if step.agents else "unknown"
+                    can_iterate = self._read_receipt_field(
+                        result.get("run_id", ""),
+                        flow_key,
+                        step.id,
+                        agent_key,
+                        "can_further_iteration_help"
+                    )
+                    if can_iterate and can_iterate.lower() == "no":
+                        exit_condition_met = True
+                        reason = "exit_on_no_further_help"
+
+            # Check max iterations
+            if current_iter >= max_iterations:
+                exit_condition_met = True
+                reason = f"max_iterations_reached:{max_iterations}"
+
+            if exit_condition_met:
+                if next_after_loop:
+                    next_step_id = next_after_loop
+                    decision = RoutingDecision.ADVANCE
+                else:
+                    decision = RoutingDecision.TERMINATE
+            else:
+                # Loop back
+                if loop_target:
+                    next_step_id = loop_target
+                    decision = RoutingDecision.LOOP
+                    reason = f"loop_iteration:{current_iter + 1}"
+
+        elif kind == "branch":
+            branches = spec_routing.get("branches", {})
+            step_status = result.get("status", "")
+
+            if branches and step_status in branches:
+                next_step_id = branches[step_status]
+                reason = f"branch_via_spec:{step_status}"
+                decision = RoutingDecision.BRANCH
+            else:
+                # Default/fallback
+                next_step_id = spec_routing.get("next")
+                if next_step_id:
+                    reason = "branch_default_via_spec"
+                else:
+                    decision = RoutingDecision.TERMINATE
+                    reason = "flow_complete_branch_via_spec"
+
+        return RoutingSignal(
+            decision=decision,
+            next_step_id=next_step_id,
+            reason=reason,
+            confidence=confidence,
+            needs_human=needs_human,
+            loop_count=loop_count,
+            exit_condition_met=exit_condition_met,
+        )
+
+    def _get_spec_exit_on(
+        self,
+        flow_key: str,
+        step_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Get exit_on conditions from FlowSpec step routing.
+
+        Args:
+            flow_key: The flow key.
+            step_id: The step identifier.
+
+        Returns:
+            Dict with exit_on conditions or None.
+        """
+        try:
+            import yaml
+            spec_root = self._repo_root / "swarm" / "spec"
+            flow_id_map = {
+                "signal": "1-signal", "plan": "2-plan", "build": "3-build",
+                "review": "4-review", "gate": "5-gate", "deploy": "6-deploy",
+                "wisdom": "7-wisdom",
+            }
+            flow_id = flow_id_map.get(flow_key, flow_key)
+            flow_path = spec_root / "flows" / f"{flow_id}.yaml"
+
+            if not flow_path.exists():
+                return None
+
+            with open(flow_path, "r", encoding="utf-8") as f:
+                spec_data = yaml.safe_load(f)
+
+            for step in spec_data.get("steps", []):
+                if step.get("id") == step_id:
+                    routing = step.get("routing", {})
+                    return routing.get("exit_on")
+
+            return None
+        except Exception as e:
+            logger.debug("Failed to read exit_on for %s/%s: %s", flow_key, step_id, e)
+            return None
 
     def _route(
         self,

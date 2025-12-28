@@ -4,7 +4,7 @@
 id: smoke-verifier
 version: 1
 title: Verify Smoke Tests
-category: deploy
+category: verification
 
 sdk:
   model: haiku
@@ -44,12 +44,12 @@ identity:
 
 io:
   required_inputs:
-    - deploy/verification_report.md
+    - "{{run.base}}/deploy/verification_report.md"
   optional_inputs:
-    - deploy/deployment_log.md
-    - run_meta.json
+    - "{{run.base}}/deploy/deployment_log.md"
+    - "{{run.base}}/run_meta.json"
   required_outputs:
-    - deploy/verification_report.md
+    - "{{run.base}}/deploy/verification_report.md"
   optional_outputs: []
 
 runtime_prompt:

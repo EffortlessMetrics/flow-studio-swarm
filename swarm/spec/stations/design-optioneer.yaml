@@ -1,8 +1,9 @@
 # Station: design-optioneer
+# Source: swarm/prompts/agentic_steps/design-optioneer.md
 # Role: Propose 2-3 distinct architecture options with structured trade-offs
 
 id: design-optioneer
-version: 1
+version: 2
 title: Design Optioneer
 category: design
 
@@ -38,7 +39,14 @@ identity:
     - Include minimal/do-nothing option when plausible
     - Do NOT make the final decision - only suggest default
     - Check wisdom trail before proposing options
+  longform_ref: prompts/agentic_steps/design-optioneer.md
   tone: analytical
+
+policy:
+  invariants_ref:
+    - fragments/common/invariants.md
+  handoff_ref:
+    - fragments/common/handoff.md
 
 io:
   required_inputs:
@@ -53,9 +61,23 @@ io:
     - plan/design_options.md
   optional_outputs: []
 
+handoff:
+  draft_path_template: "{{run.base}}/handoff/design-optioneer.draft.json"
+  schema_ref: schemas/handoff.schema.json
+  required_fields:
+    - status
+    - summary
+    - artifacts
+
+verify:
+  required_artifacts:
+    - plan/design_options.md
+  gate_status_on_fail: UNVERIFIED
+
 runtime_prompt:
   fragments:
     - common/invariants.md
+    - common/handoff.md
   template: |
     ## Design Options Approach
 
@@ -76,13 +98,6 @@ runtime_prompt:
     - Risks with likelihood and mitigation
     - Assumptions with impact if wrong
     - When to choose this option
-
-handoff:
-  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
-  required_fields:
-    - status
-    - summary
-    - artifacts
 
 invariants:
   - "Use stable option IDs (OPT-001, OPT-002, OPT-003)"

@@ -24,13 +24,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from .loader import load_flow, load_fragment, load_station
+from .loader import load_flow, load_fragment, load_fragments, load_station
 from .types import (
     FlowSpec,
     FlowStep,
+    HandoffContract,
     PromptPlan,
     RoutingKind,
     StationSpec,
+    VerificationRequirements,
 )
 
 if TYPE_CHECKING:
@@ -38,6 +40,39 @@ if TYPE_CHECKING:
     from swarm.runtime.engines.models import StepContext
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Flow Key Extraction
+# =============================================================================
+
+
+def extract_flow_key(flow_id: str) -> str:
+    """Extract the flow key from a flow ID.
+
+    Flow IDs are typically formatted as "<number>-<key>" (e.g., "3-build").
+    This function extracts the key portion for routing purposes.
+
+    Args:
+        flow_id: The full flow identifier (e.g., "3-build").
+
+    Returns:
+        The flow key (e.g., "build").
+
+    Examples:
+        >>> extract_flow_key("3-build")
+        'build'
+        >>> extract_flow_key("1-signal")
+        'signal'
+        >>> extract_flow_key("build")  # Already just the key
+        'build'
+    """
+    if "-" in flow_id:
+        # Split on first hyphen and take everything after
+        parts = flow_id.split("-", 1)
+        if len(parts) == 2 and parts[0].isdigit():
+            return parts[1]
+    return flow_id
 
 
 # =============================================================================
@@ -115,6 +150,62 @@ def build_system_append(
     # Scent trail (truncated to avoid bloat)
     if scent_trail:
         trail = scent_trail[:1500]  # Cap at 1500 chars
+        if len(scent_trail) > 1500:
+            trail += "\n... (truncated)"
+        parts.append("\n## Lessons from Previous Runs")
+        parts.append(trail)
+
+    return "\n".join(parts)
+
+
+def build_system_append_v2(
+    station: StationSpec,
+    scent_trail: Optional[str] = None,
+    repo_root: Optional[Path] = None,
+    policy_invariants_ref: Optional[List[str]] = None,
+) -> str:
+    """Build the v2 system prompt append with policy fragment loading.
+
+    V2 enhancements over build_system_append:
+    - Loads policy invariants from referenced fragment files
+    - Includes station-specific invariants after global ones
+    - Better structured output with clear sections
+
+    Args:
+        station: The station specification.
+        scent_trail: Optional cross-run wisdom content.
+        repo_root: Repository root for fragment loading.
+        policy_invariants_ref: List of fragment paths for policy invariants.
+
+    Returns:
+        Combined system prompt append text.
+    """
+    parts: List[str] = []
+
+    # 1. Station identity (who you are)
+    if station.identity.system_append:
+        parts.append(station.identity.system_append.strip())
+
+    # 2. Load policy invariants from referenced fragments
+    if policy_invariants_ref:
+        fragment_content = load_fragments(
+            policy_invariants_ref,
+            repo_root,
+            separator="\n\n",
+        )
+        if fragment_content:
+            parts.append("\n## Policy Invariants (From Fragments)")
+            parts.append(fragment_content)
+
+    # 3. Station-specific invariants (always apply)
+    if station.invariants:
+        parts.append("\n## Station Invariants (Non-Negotiable)")
+        for inv in station.invariants:
+            parts.append(f"- {inv}")
+
+    # 4. Scent trail (wisdom from previous runs, truncated)
+    if scent_trail:
+        trail = scent_trail[:1500]
         if len(scent_trail) > 1500:
             trail += "\n... (truncated)"
         parts.append("\n## Lessons from Previous Runs")
@@ -265,6 +356,72 @@ def build_user_prompt(
 # =============================================================================
 
 
+def merge_verification_requirements(
+    station: StationSpec,
+    step: FlowStep,
+    run_base: Path,
+    variables: Dict[str, Any],
+) -> VerificationRequirements:
+    """Merge station and step verification requirements.
+
+    Station provides defaults; step can override or extend.
+
+    Args:
+        station: Station specification with default verification.
+        step: Step specification with potential overrides.
+        run_base: Run base path for template resolution.
+        variables: Template variables for path resolution.
+
+    Returns:
+        Merged VerificationRequirements with resolved paths.
+    """
+    # Collect required artifacts from station IO and step outputs
+    artifacts: List[str] = []
+
+    # Station required outputs become verification requirements
+    for output_path in station.io.required_outputs:
+        resolved = render_template(output_path, variables)
+        artifacts.append(resolved)
+
+    # Step outputs also become verification requirements
+    for output_path in step.outputs:
+        resolved = render_template(output_path, variables)
+        if resolved not in artifacts:
+            artifacts.append(resolved)
+
+    # Verification commands from step sdk_overrides (if specified)
+    commands: List[str] = []
+    if step.sdk_overrides.get("verification_commands"):
+        for cmd in step.sdk_overrides["verification_commands"]:
+            commands.append(render_template(cmd, variables))
+
+    return VerificationRequirements(
+        required_artifacts=tuple(artifacts),
+        verification_commands=tuple(commands),
+    )
+
+
+def resolve_handoff_contract(
+    station: StationSpec,
+    variables: Dict[str, Any],
+) -> HandoffContract:
+    """Resolve the handoff contract with template substitution.
+
+    Args:
+        station: Station specification with handoff template.
+        variables: Template variables for path resolution.
+
+    Returns:
+        HandoffContract with resolved path.
+    """
+    resolved_path = render_template(station.handoff.path_template, variables)
+
+    return HandoffContract(
+        path=resolved_path,
+        required_fields=station.handoff.required_fields,
+    )
+
+
 @dataclass
 class CompileContext:
     """Context for prompt compilation."""
@@ -331,8 +488,17 @@ class SpecCompiler:
         context_pack: Optional["ContextPack"],
         run_base: Path,
         cwd: Optional[str] = None,
+        policy_invariants_ref: Optional[List[str]] = None,
+        use_v2: bool = True,
     ) -> PromptPlan:
         """Compile a PromptPlan for a flow step.
+
+        V2 enhancements:
+        - Includes verification requirements (merged from station + step)
+        - Includes resolved handoff contract
+        - Includes flow_key for routing
+        - Supports policy invariants from fragment references
+        - Full template resolution for paths
 
         Args:
             flow_id: Flow specification ID (e.g., "3-build").
@@ -340,6 +506,8 @@ class SpecCompiler:
             context_pack: Hydrated context with artifacts and envelopes.
             run_base: Run base directory for outputs.
             cwd: Working directory for SDK. Defaults to repo_root.
+            policy_invariants_ref: Fragment paths for policy invariants.
+            use_v2: Use v2 system_append with policy loading (default True).
 
         Returns:
             Compiled PromptPlan ready for SDK execution.
@@ -350,6 +518,9 @@ class SpecCompiler:
         """
         # Load flow spec
         flow = load_flow(flow_id, self.repo_root)
+
+        # Extract flow key for routing
+        flow_key = extract_flow_key(flow_id)
 
         # Find step in flow
         step = None
@@ -367,8 +538,42 @@ class SpecCompiler:
         # Load scent trail
         scent_trail = self._load_scent_trail()
 
-        # Build system append
-        system_append = build_system_append(station, scent_trail)
+        # Build template variables for path resolution
+        variables = {
+            "run": {
+                "base": str(run_base),
+            },
+            "step": {
+                "id": step.id,
+                "objective": step.objective,
+                "scope": step.scope or "",
+            },
+            "flow": {
+                "id": flow.id,
+                "key": flow_key,
+                "version": str(flow.version),
+            },
+            "station": {
+                "id": station.id,
+                "title": station.title,
+                "version": str(station.version),
+            },
+        }
+
+        # Build system append (v1 or v2)
+        if use_v2:
+            # Default policy invariants if not specified
+            if policy_invariants_ref is None:
+                policy_invariants_ref = list(station.runtime_prompt.fragments)
+
+            system_append = build_system_append_v2(
+                station=station,
+                scent_trail=scent_trail,
+                repo_root=self.repo_root,
+                policy_invariants_ref=policy_invariants_ref,
+            )
+        else:
+            system_append = build_system_append(station, scent_trail)
 
         # Build user prompt
         user_prompt = build_user_prompt(
@@ -379,7 +584,7 @@ class SpecCompiler:
             repo_root=self.repo_root,
         )
 
-        # Compute prompt hash for traceability
+        # Compute prompt hash for traceability (SHA256 of combined prompts)
         prompt_hash = hashlib.sha256(
             (system_append + user_prompt).encode("utf-8")
         ).hexdigest()[:16]
@@ -393,6 +598,20 @@ class SpecCompiler:
 
         # Determine cwd
         effective_cwd = cwd or (str(self.repo_root) if self.repo_root else str(Path.cwd()))
+
+        # V2: Merge verification requirements from station and step
+        verification = merge_verification_requirements(
+            station=station,
+            step=step,
+            run_base=run_base,
+            variables=variables,
+        )
+
+        # V2: Resolve handoff contract with template substitution
+        handoff = resolve_handoff_contract(
+            station=station,
+            variables=variables,
+        )
 
         return PromptPlan(
             # Traceability
@@ -415,6 +634,10 @@ class SpecCompiler:
             # Metadata
             compiled_at=datetime.now(timezone.utc).isoformat(),
             context_pack_size=len(context_pack.previous_envelopes) if context_pack else 0,
+            # V2 additions
+            verification=verification,
+            handoff=handoff,
+            flow_key=flow_key,
         )
 
     def compile_from_context(
@@ -455,8 +678,16 @@ def compile_prompt(
     run_base: Path,
     repo_root: Optional[Path] = None,
     cwd: Optional[str] = None,
+    policy_invariants_ref: Optional[List[str]] = None,
+    use_v2: bool = True,
 ) -> PromptPlan:
     """Compile a PromptPlan for a flow step (convenience function).
+
+    V2 enhancements:
+    - Includes verification requirements (merged from station + step)
+    - Includes resolved handoff contract
+    - Includes flow_key for routing
+    - Supports policy invariants from fragment references
 
     Args:
         flow_id: Flow specification ID (e.g., "3-build").
@@ -465,9 +696,19 @@ def compile_prompt(
         run_base: Run base directory for outputs.
         repo_root: Repository root for loading specs.
         cwd: Working directory for SDK.
+        policy_invariants_ref: Fragment paths for policy invariants.
+        use_v2: Use v2 system_append with policy loading (default True).
 
     Returns:
         Compiled PromptPlan ready for SDK execution.
     """
     compiler = SpecCompiler(repo_root)
-    return compiler.compile(flow_id, step_id, context_pack, run_base, cwd)
+    return compiler.compile(
+        flow_id=flow_id,
+        step_id=step_id,
+        context_pack=context_pack,
+        run_base=run_base,
+        cwd=cwd,
+        policy_invariants_ref=policy_invariants_ref,
+        use_v2=use_v2,
+    )

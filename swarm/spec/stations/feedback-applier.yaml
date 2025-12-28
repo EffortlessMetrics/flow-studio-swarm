@@ -4,7 +4,7 @@
 id: feedback-applier
 version: 1
 title: Feedback Application
-category: synthesis
+category: analytics
 
 sdk:
   model: sonnet
@@ -45,20 +45,20 @@ identity:
 
 io:
   required_inputs:
-    - wisdom/learnings.md
+    - "{{run.base}}/wisdom/learnings.md"
   optional_inputs:
-    - wisdom/regression_report.md
-    - wisdom/artifact_audit.md
-    - build/mutation_report.md
-    - build/fuzz_report.md
-    - build/flakiness_report.md
-    - build/doc_critique.md
+    - "{{run.base}}/wisdom/regression_report.md"
+    - "{{run.base}}/wisdom/artifact_audit.md"
+    - "{{run.base}}/build/mutation_report.md"
+    - "{{run.base}}/build/fuzz_report.md"
+    - "{{run.base}}/build/flakiness_report.md"
+    - "{{run.base}}/build/doc_critique.md"
   required_outputs:
-    - wisdom/feedback_actions.md
+    - "{{run.base}}/wisdom/feedback_actions.md"
   optional_outputs:
-    - wisdom/pack_improvements.md
-    - wisdom/codebase_wisdom.md
-    - _wisdom/latest.md
+    - "{{run.base}}/wisdom/pack_improvements.md"
+    - "{{run.base}}/wisdom/codebase_wisdom.md"
+    - "{{run.base}}/../_wisdom/latest.md"
 
 runtime_prompt:
   fragments:

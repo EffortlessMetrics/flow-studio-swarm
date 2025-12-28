@@ -18,6 +18,15 @@ defaults:
     include_scent_trail: true
   sdk_overrides: {}
 
+# Macro-level flow routing
+on_complete:
+  next_flow: 2-plan
+  reason: "Signal artifacts complete; proceed to design planning"
+
+on_failure:
+  next_flow: null
+  reason: "Flow 1 has no failure fallback; rerun with better input"
+
 steps:
   # Step 1: Normalize raw signal
   - id: normalize
@@ -89,11 +98,12 @@ steps:
     routing:
       kind: microloop
       loop_target: author_reqs
-      loop_condition_field: status
-      loop_success_values:
-        - VERIFIED
-        - verified
       next: author_bdd
+      exit_on:
+        status:
+          - VERIFIED
+          - verified
+        can_further_iteration_help: false
       max_iterations: 3
     teaching:
       highlight: true
@@ -137,11 +147,12 @@ steps:
     routing:
       kind: microloop
       loop_target: author_bdd
-      loop_condition_field: status
-      loop_success_values:
-        - VERIFIED
-        - verified
       next: assess_scope
+      exit_on:
+        status:
+          - VERIFIED
+          - verified
+        can_further_iteration_help: false
       max_iterations: 3
     teaching:
       highlight: true

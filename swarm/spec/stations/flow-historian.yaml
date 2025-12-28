@@ -4,13 +4,14 @@
 id: flow-historian
 version: 1
 title: Flow Timeline Compilation
-category: analysis
+category: analytics
 
 sdk:
   model: haiku
   permission_mode: bypassPermissions
   allowed_tools:
     - Read
+    - Write
     - Grep
     - Glob
     - Bash
@@ -44,20 +45,25 @@ identity:
 
 io:
   required_inputs:
-    - run_meta.json
+    - "{{run.base}}/run_meta.json"
   optional_inputs:
-    - runs/index.json
-    - signal/signal_receipt.json
-    - plan/plan_receipt.json
-    - build/build_receipt.json
-    - gate/gate_receipt.json
-    - deploy/deploy_receipt.json
-    - wisdom/wisdom_receipt.json
-    - plan/adr.md
-    - gate/merge_decision.md
-    - deploy/deployment_decision.md
+    - "{{run.base}}/../index.json"
+    - "{{run.base}}/signal/signal_receipt.json"
+    - "{{run.base}}/plan/plan_receipt.json"
+    - "{{run.base}}/build/build_receipt.json"
+    - "{{run.base}}/gate/gate_receipt.json"
+    - "{{run.base}}/deploy/deploy_receipt.json"
+    - "{{run.base}}/wisdom/wisdom_receipt.json"
+    - "{{run.base}}/plan/adr.md"
+    - "{{run.base}}/gate/merge_decision.md"
+    - "{{run.base}}/deploy/deployment_decision.md"
+    - "{{run.base}}/signal/"
+    - "{{run.base}}/plan/"
+    - "{{run.base}}/build/"
+    - "{{run.base}}/gate/"
+    - "{{run.base}}/deploy/"
   required_outputs:
-    - wisdom/flow_history.json
+    - "{{run.base}}/wisdom/flow_history.json"
   optional_outputs: []
 
 runtime_prompt:

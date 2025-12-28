@@ -1,8 +1,9 @@
 # Station: problem-framer
+# Source: swarm/prompts/agentic_steps/problem-framer.md
 # Role: Synthesize normalized signal into a crisp, testable problem statement
 
 id: problem-framer
-version: 1
+version: 2
 title: Frame Problem
 category: shaping
 
@@ -34,7 +35,15 @@ identity:
 
     You do not block the flow for ambiguity. You document assumptions and questions
     (with defaults) and keep moving. Distill, don't solve.
+  longform_ref: prompts/agentic_steps/problem-framer.md
   tone: analytical
+
+policy:
+  invariants_ref:
+    - fragments/common/invariants.md
+    - fragments/common/evidence.md
+  handoff_ref:
+    - fragments/common/handoff.md
 
 io:
   required_inputs:
@@ -46,10 +55,25 @@ io:
     - signal/problem_statement.md
   optional_outputs: []
 
+handoff:
+  draft_path_template: "{{run.base}}/handoff/problem-framer.draft.json"
+  schema_ref: schemas/handoff.schema.json
+  required_fields:
+    - status
+    - summary
+    - artifacts
+    - can_further_iteration_help
+
+verify:
+  required_artifacts:
+    - signal/problem_statement.md
+  gate_status_on_fail: UNVERIFIED
+
 runtime_prompt:
   fragments:
     - common/invariants.md
     - common/evidence.md
+    - common/handoff.md
   template: |
     ## Problem Framing Approach
 
@@ -68,14 +92,6 @@ runtime_prompt:
     Ask: "Does this request imply a change to how data is stored or structured?"
     - Adding a field, changing config format, renaming DB column = YES
     - Document: what changes, rollout pattern, backwards compatibility
-
-handoff:
-  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
-  required_fields:
-    - status
-    - summary
-    - artifacts
-    - can_further_iteration_help
 
 invariants:
   - "No git ops - no commit/push/checkout"

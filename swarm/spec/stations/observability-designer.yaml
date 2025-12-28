@@ -1,8 +1,9 @@
 # Station: observability-designer
+# Source: swarm/prompts/agentic_steps/observability-designer.md
 # Role: Define metrics, logs, traces, SLOs, and alerts for planned change
 
 id: observability-designer
-version: 1
+version: 2
 title: Observability Designer
 category: design
 
@@ -38,7 +39,14 @@ identity:
     - Set SLOs with SLIs, targets, and error budget policy
     - Define actionable alerts with runbook pointers
     - Include machine-countable inventory markers
+  longform_ref: prompts/agentic_steps/observability-designer.md
   tone: neutral
+
+policy:
+  invariants_ref:
+    - fragments/common/invariants.md
+  handoff_ref:
+    - fragments/common/handoff.md
 
 io:
   required_inputs:
@@ -52,9 +60,23 @@ io:
     - plan/observability_spec.md
   optional_outputs: []
 
+handoff:
+  draft_path_template: "{{run.base}}/handoff/observability-designer.draft.json"
+  schema_ref: schemas/handoff.schema.json
+  required_fields:
+    - status
+    - summary
+    - artifacts
+
+verify:
+  required_artifacts:
+    - plan/observability_spec.md
+  gate_status_on_fail: UNVERIFIED
+
 runtime_prompt:
   fragments:
     - common/invariants.md
+    - common/handoff.md
   template: |
     ## Observability Design Approach
 
@@ -84,13 +106,6 @@ runtime_prompt:
     - TRACE_SPAN: <name> parent=<...> attrs=[...]
     - SLO: <name> target=<...> window=<...>
     - ALERT: <name> severity=<...> runbook=<path-or-TBD>
-
-handoff:
-  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
-  required_fields:
-    - status
-    - summary
-    - artifacts
 
 invariants:
   - "Include machine-countable inventory markers"

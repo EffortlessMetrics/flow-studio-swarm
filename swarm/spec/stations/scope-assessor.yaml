@@ -1,8 +1,9 @@
 # Station: scope-assessor
+# Source: swarm/prompts/agentic_steps/scope-assessor.md
 # Role: Produce stakeholders, early risks, and T-shirt scope estimate
 
 id: scope-assessor
-version: 1
+version: 2
 title: Assess Scope
 category: shaping
 
@@ -34,7 +35,15 @@ identity:
 
     Early scope is not precision; it is preventing surprise. Be specific,
     reference artifacts, and keep the structure countable.
+  longform_ref: prompts/agentic_steps/scope-assessor.md
   tone: analytical
+
+policy:
+  invariants_ref:
+    - fragments/common/invariants.md
+    - fragments/common/evidence.md
+  handoff_ref:
+    - fragments/common/handoff.md
 
 io:
   required_inputs:
@@ -53,10 +62,27 @@ io:
     - signal/scope_estimate.md
   optional_outputs: []
 
+handoff:
+  draft_path_template: "{{run.base}}/handoff/scope-assessor.draft.json"
+  schema_ref: schemas/handoff.schema.json
+  required_fields:
+    - status
+    - summary
+    - artifacts
+    - can_further_iteration_help
+
+verify:
+  required_artifacts:
+    - signal/stakeholders.md
+    - signal/early_risks.md
+    - signal/scope_estimate.md
+  gate_status_on_fail: UNVERIFIED
+
 runtime_prompt:
   fragments:
     - common/invariants.md
     - common/evidence.md
+    - common/handoff.md
   template: |
     ## Scope Assessment Approach
 
@@ -87,14 +113,6 @@ runtime_prompt:
     Each risk uses: RSK-### [SEVERITY] [CATEGORY]
     - Severity: CRITICAL | HIGH | MEDIUM | LOW
     - Category: SECURITY | COMPLIANCE | DATA | PERFORMANCE | OPS
-
-handoff:
-  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
-  required_fields:
-    - status
-    - summary
-    - artifacts
-    - can_further_iteration_help
 
 invariants:
   - "No git ops - no commit/push/checkout"

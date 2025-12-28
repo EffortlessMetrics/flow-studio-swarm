@@ -4,7 +4,7 @@
 id: deploy-decider
 version: 1
 title: Decide Deployment
-category: deploy
+category: verification
 
 sdk:
   model: sonnet
@@ -43,13 +43,13 @@ identity:
 
 io:
   required_inputs:
-    - gate/merge_decision.md
+    - "{{run.base}}/gate/merge_decision.md"
   optional_inputs:
-    - deploy/verification_report.md
-    - deploy/branch_protection.md
-    - run_meta.json
+    - "{{run.base}}/deploy/verification_report.md"
+    - "{{run.base}}/deploy/branch_protection.md"
+    - "{{run.base}}/run_meta.json"
   required_outputs:
-    - deploy/deployment_decision.md
+    - "{{run.base}}/deploy/deployment_decision.md"
   optional_outputs: []
 
 runtime_prompt:

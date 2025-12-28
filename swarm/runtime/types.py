@@ -103,6 +103,9 @@ class RoutingSignal:
         reason: Human-readable explanation for the routing decision.
         confidence: Confidence score for this decision (0.0 to 1.0).
         needs_human: Whether human intervention is required before proceeding.
+        next_flow: Flow key for macro-routing (flow transitions).
+        loop_count: Current iteration count for microloop tracking.
+        exit_condition_met: Whether the termination condition has been met.
     """
 
     decision: RoutingDecision
@@ -111,6 +114,10 @@ class RoutingSignal:
     reason: str = ""
     confidence: float = 1.0
     needs_human: bool = False
+    # Macro-routing and microloop tracking fields
+    next_flow: Optional[str] = None
+    loop_count: int = 0
+    exit_condition_met: bool = False
 
 
 @dataclass
@@ -133,6 +140,11 @@ class HandoffEnvelope:
         error: Error message if the step failed.
         duration_ms: Execution duration in milliseconds.
         timestamp: ISO 8601 timestamp when this envelope was created.
+        station_id: Station identifier for spec traceability.
+        station_version: Version of the station spec used.
+        prompt_hash: Hash of the prompt template for reproducibility.
+        verification_passed: Whether spec verification passed for this step.
+        verification_details: Detailed verification results and diagnostics.
     """
 
     step_id: str
@@ -146,6 +158,12 @@ class HandoffEnvelope:
     error: Optional[str] = None
     duration_ms: int = 0
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # Spec traceability fields
+    station_id: Optional[str] = None
+    station_version: Optional[int] = None
+    prompt_hash: Optional[str] = None
+    verification_passed: bool = True
+    verification_details: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -220,14 +238,23 @@ class RunEvent:
     Attributes:
         run_id: The run this event belongs to.
         ts: Timestamp of the event.
-        kind: Event type (e.g., "tool_start", "tool_end", "step_start",
-              "step_end", "log", "error").
+        kind: Event type. Standard types include:
+              - "tool_start", "tool_end": Tool invocation lifecycle
+              - "step_start", "step_end": Step execution lifecycle
+              - "log", "error": General logging and error reporting
+              - "verification_started": Spec verification check initiated
+              - "verification_passed": Spec verification succeeded
+              - "verification_failed": Spec verification failed
+              - "macro_route": Flow transition event (macro-routing)
         flow_key: The flow this event occurred in.
         event_id: Globally unique identifier for this event (ULID or UUID4).
         seq: Monotonic sequence number within the run (assigned by storage layer).
         step_id: Optional step identifier within the flow.
         agent_key: Optional agent that produced this event.
-        payload: Arbitrary event-specific data.
+        payload: Arbitrary event-specific data. For verification events,
+                 may include "station_id", "checks", "passed", "failed".
+                 For macro_route events, may include "from_flow", "to_flow",
+                 "reason", "loop_count".
     """
 
     # Required fields (no defaults)
@@ -478,6 +505,9 @@ def routing_signal_to_dict(signal: RoutingSignal) -> Dict[str, Any]:
         "reason": signal.reason,
         "confidence": signal.confidence,
         "needs_human": signal.needs_human,
+        "next_flow": signal.next_flow,
+        "loop_count": signal.loop_count,
+        "exit_condition_met": signal.exit_condition_met,
     }
 
 
@@ -489,6 +519,10 @@ def routing_signal_from_dict(data: Dict[str, Any]) -> RoutingSignal:
 
     Returns:
         Parsed RoutingSignal instance.
+
+    Note:
+        Provides backwards compatibility for signals missing the new
+        next_flow, loop_count, or exit_condition_met fields.
     """
     decision_value = data.get("decision", "advance")
     decision = RoutingDecision(decision_value) if isinstance(decision_value, str) else decision_value
@@ -500,6 +534,9 @@ def routing_signal_from_dict(data: Dict[str, Any]) -> RoutingSignal:
         reason=data.get("reason", ""),
         confidence=data.get("confidence", 1.0),
         needs_human=data.get("needs_human", False),
+        next_flow=data.get("next_flow"),
+        loop_count=data.get("loop_count", 0),
+        exit_condition_met=data.get("exit_condition_met", False),
     )
 
 
@@ -529,6 +566,12 @@ def handoff_envelope_to_dict(envelope: HandoffEnvelope) -> Dict[str, Any]:
         "error": envelope.error,
         "duration_ms": envelope.duration_ms,
         "timestamp": _datetime_to_iso(envelope.timestamp),
+        # Spec traceability fields
+        "station_id": envelope.station_id,
+        "station_version": envelope.station_version,
+        "prompt_hash": envelope.prompt_hash,
+        "verification_passed": envelope.verification_passed,
+        "verification_details": dict(envelope.verification_details),
     }
 
 
@@ -540,6 +583,11 @@ def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
 
     Returns:
         Parsed HandoffEnvelope instance.
+
+    Note:
+        Provides backwards compatibility for envelopes missing the new
+        spec traceability fields (station_id, station_version, prompt_hash,
+        verification_passed, verification_details).
     """
     routing_signal_data = data.get("routing_signal", {})
     routing_signal = routing_signal_from_dict(routing_signal_data)
@@ -556,6 +604,12 @@ def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
         error=data.get("error"),
         duration_ms=data.get("duration_ms", 0),
         timestamp=_iso_to_datetime(data.get("timestamp")) or datetime.now(timezone.utc),
+        # Spec traceability fields (backward compatible defaults)
+        station_id=data.get("station_id"),
+        station_version=data.get("station_version"),
+        prompt_hash=data.get("prompt_hash"),
+        verification_passed=data.get("verification_passed", True),
+        verification_details=dict(data.get("verification_details", {})),
     )
 
 
@@ -580,6 +634,8 @@ class RunState:
         handoff_envelopes: Map of step_id to HandoffEnvelope for completed steps.
         status: Current run status (pending, running, succeeded, failed, canceled).
         timestamp: ISO 8601 timestamp when this state was last updated.
+        current_flow_index: 1-based index of the current flow (1=signal, 6=wisdom).
+        flow_transition_history: Ordered list of flow transitions with metadata.
     """
 
     run_id: str
@@ -590,6 +646,9 @@ class RunState:
     handoff_envelopes: Dict[str, HandoffEnvelope] = field(default_factory=dict)
     status: str = "pending"
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # Flow tracking fields for macro-routing
+    current_flow_index: int = 1
+    flow_transition_history: List[Dict[str, Any]] = field(default_factory=list)
 
 
 def run_state_to_dict(state: RunState) -> Dict[str, Any]:
@@ -613,6 +672,9 @@ def run_state_to_dict(state: RunState) -> Dict[str, Any]:
         },
         "status": state.status,
         "timestamp": _datetime_to_iso(state.timestamp),
+        # Flow tracking fields
+        "current_flow_index": state.current_flow_index,
+        "flow_transition_history": list(state.flow_transition_history),
     }
 
 
@@ -624,6 +686,10 @@ def run_state_from_dict(data: Dict[str, Any]) -> RunState:
 
     Returns:
         Parsed RunState instance.
+
+    Note:
+        Provides backwards compatibility for states missing the new
+        current_flow_index and flow_transition_history fields.
     """
     envelopes_data = data.get("handoff_envelopes", {})
     handoff_envelopes = {
@@ -640,4 +706,7 @@ def run_state_from_dict(data: Dict[str, Any]) -> RunState:
         handoff_envelopes=handoff_envelopes,
         status=data.get("status", "pending"),
         timestamp=_iso_to_datetime(data.get("timestamp")) or datetime.now(timezone.utc),
+        # Flow tracking fields (backward compatible defaults)
+        current_flow_index=data.get("current_flow_index", 1),
+        flow_transition_history=list(data.get("flow_transition_history", [])),
     )

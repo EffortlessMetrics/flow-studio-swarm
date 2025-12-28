@@ -1,8 +1,9 @@
 # Station: test-strategist
+# Source: swarm/prompts/agentic_steps/test-strategist.md
 # Role: Map BDD scenarios and risks to test types and coverage thresholds
 
 id: test-strategist
-version: 1
+version: 2
 title: Test Strategist
 category: design
 
@@ -38,7 +39,14 @@ identity:
     - Create AC matrix as build contract for Flow 3
     - Assess mutation testing requirements
     - Check test fixture impact for schema changes
+  longform_ref: prompts/agentic_steps/test-strategist.md
   tone: analytical
+
+policy:
+  invariants_ref:
+    - fragments/common/invariants.md
+  handoff_ref:
+    - fragments/common/handoff.md
 
 io:
   required_inputs:
@@ -57,9 +65,25 @@ io:
     - plan/ac_matrix.md
   optional_outputs: []
 
+handoff:
+  draft_path_template: "{{run.base}}/handoff/test-strategist.draft.json"
+  schema_ref: schemas/handoff.schema.json
+  required_fields:
+    - status
+    - summary
+    - artifacts
+    - can_further_iteration_help
+
+verify:
+  required_artifacts:
+    - plan/test_plan.md
+    - plan/ac_matrix.md
+  gate_status_on_fail: UNVERIFIED
+
 runtime_prompt:
   fragments:
     - common/invariants.md
+    - common/handoff.md
   template: |
     ## Test Strategy Approach
 
@@ -92,14 +116,6 @@ runtime_prompt:
     - Test Types: From test plan mapping
     - Impl Hints: Affected module/component
     - Verification: How to confirm AC satisfied
-
-handoff:
-  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
-  required_fields:
-    - status
-    - summary
-    - artifacts
-    - can_further_iteration_help
 
 invariants:
   - "Use scenario-level @REQ-### tags for traceability"

@@ -1,8 +1,9 @@
 # Station: work-planner
+# Source: swarm/prompts/agentic_steps/work-planner.md
 # Role: Break design into subtasks with sequencing and rollout/rollback plans
 
 id: work-planner
-version: 1
+version: 2
 title: Work Planner
 category: design
 
@@ -39,7 +40,14 @@ identity:
     - Include acceptance criteria tied to REQ/NFR IDs
     - Design rollout with feature flags and observability gates
     - Design realistic rollback plans
+  longform_ref: prompts/agentic_steps/work-planner.md
   tone: neutral
+
+policy:
+  invariants_ref:
+    - fragments/common/invariants.md
+  handoff_ref:
+    - fragments/common/handoff.md
 
 io:
   required_inputs:
@@ -59,9 +67,24 @@ io:
     - plan/work_plan.md
   optional_outputs: []
 
+handoff:
+  draft_path_template: "{{run.base}}/handoff/work-planner.draft.json"
+  schema_ref: schemas/handoff.schema.json
+  required_fields:
+    - status
+    - summary
+    - artifacts
+
+verify:
+  required_artifacts:
+    - plan/subtasks.yaml
+    - plan/work_plan.md
+  gate_status_on_fail: UNVERIFIED
+
 runtime_prompt:
   fragments:
     - common/invariants.md
+    - common/handoff.md
   template: |
     ## Work Planning Approach
 
@@ -98,13 +121,6 @@ runtime_prompt:
           test_roots: ["tests/auth/"]
         touches: ["<path/pattern>"]
         estimate: S
-
-handoff:
-  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
-  required_fields:
-    - status
-    - summary
-    - artifacts
 
 invariants:
   - "Use stable IDs (ST-###) for subtasks"

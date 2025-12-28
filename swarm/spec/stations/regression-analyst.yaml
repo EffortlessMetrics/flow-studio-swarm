@@ -4,13 +4,14 @@
 id: regression-analyst
 version: 1
 title: Regression Analysis
-category: analysis
+category: analytics
 
 sdk:
   model: sonnet
   permission_mode: bypassPermissions
   allowed_tools:
     - Read
+    - Write
     - Grep
     - Glob
     - Bash
@@ -45,17 +46,17 @@ identity:
 
 io:
   required_inputs:
-    - wisdom/artifact_audit.md
-    - build/test_critique.md
+    - "{{run.base}}/wisdom/artifact_audit.md"
+    - "{{run.base}}/build/test_critique.md"
   optional_inputs:
-    - build/build_receipt.json
-    - build/code_critique.md
-    - gate/coverage_audit.md
-    - gate/merge_decision.md
-    - deploy/deploy_receipt.json
-    - run_meta.json
+    - "{{run.base}}/build/build_receipt.json"
+    - "{{run.base}}/build/code_critique.md"
+    - "{{run.base}}/gate/coverage_audit.md"
+    - "{{run.base}}/gate/merge_decision.md"
+    - "{{run.base}}/deploy/deploy_receipt.json"
+    - "{{run.base}}/run_meta.json"
   required_outputs:
-    - wisdom/regression_report.md
+    - "{{run.base}}/wisdom/regression_report.md"
   optional_outputs: []
 
 runtime_prompt:
