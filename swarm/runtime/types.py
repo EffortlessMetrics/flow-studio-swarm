@@ -32,6 +32,20 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
+# Event ID generation: prefer ulid for time-ordered IDs, fall back to uuid4
+try:
+    import ulid
+
+    def _generate_event_id() -> str:
+        """Generate a globally unique event ID using ULID."""
+        return str(ulid.new())
+except ImportError:
+    import uuid
+
+    def _generate_event_id() -> str:
+        """Generate a globally unique event ID using UUID4."""
+        return str(uuid.uuid4())
+
 # Type aliases
 RunId = str
 BackendId = Literal[
@@ -207,15 +221,22 @@ class RunEvent:
         kind: Event type (e.g., "tool_start", "tool_end", "step_start",
               "step_end", "log", "error").
         flow_key: The flow this event occurred in.
+        event_id: Globally unique identifier for this event (ULID or UUID4).
+        seq: Monotonic sequence number within the run (assigned by storage layer).
         step_id: Optional step identifier within the flow.
         agent_key: Optional agent that produced this event.
         payload: Arbitrary event-specific data.
     """
 
+    # Required fields (no defaults)
     run_id: RunId
     ts: datetime
     kind: str
     flow_key: str
+    # V1 event contract: unique ID and sequence (defaults for backwards compat)
+    event_id: str = field(default_factory=_generate_event_id)
+    seq: int = 0  # Assigned by storage layer before write
+    # Optional fields
     step_id: Optional[str] = None
     agent_key: Optional[str] = None
     payload: Dict[str, Any] = field(default_factory=dict)
@@ -396,6 +417,8 @@ def run_event_to_dict(event: RunEvent) -> Dict[str, Any]:
         Dictionary representation suitable for JSON/YAML serialization.
     """
     return {
+        "event_id": event.event_id,
+        "seq": event.seq,
         "run_id": event.run_id,
         "ts": _datetime_to_iso(event.ts),
         "kind": event.kind,
@@ -414,12 +437,18 @@ def run_event_from_dict(data: Dict[str, Any]) -> RunEvent:
 
     Returns:
         Parsed RunEvent instance.
+
+    Note:
+        Provides backwards compatibility for events missing event_id or seq
+        fields by generating a new event_id or defaulting seq to 0.
     """
     return RunEvent(
         run_id=data.get("run_id", ""),
         ts=_iso_to_datetime(data.get("ts")) or datetime.now(timezone.utc),
         kind=data.get("kind", "unknown"),
         flow_key=data.get("flow_key", ""),
+        event_id=data.get("event_id", _generate_event_id()),
+        seq=data.get("seq", 0),
         step_id=data.get("step_id"),
         agent_key=data.get("agent_key"),
         payload=dict(data.get("payload", {})),

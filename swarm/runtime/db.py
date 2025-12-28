@@ -35,7 +35,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +148,31 @@ CREATE INDEX IF NOT EXISTS idx_steps_flow_step ON steps(flow_key, step_id);
 CREATE INDEX IF NOT EXISTS idx_tool_calls_run_id ON tool_calls(run_id);
 CREATE INDEX IF NOT EXISTS idx_tool_calls_step_id ON tool_calls(step_id);
 CREATE INDEX IF NOT EXISTS idx_file_changes_run_id ON file_changes(run_id);
+
+-- Events table: raw event storage for idempotent ingestion
+CREATE TABLE IF NOT EXISTS events (
+    event_id VARCHAR PRIMARY KEY,
+    seq INTEGER NOT NULL,
+    run_id VARCHAR NOT NULL,
+    ts TIMESTAMP NOT NULL,
+    kind VARCHAR NOT NULL,
+    flow_key VARCHAR NOT NULL,
+    step_id VARCHAR,
+    agent_key VARCHAR,
+    payload JSON,
+    ingested_at TIMESTAMP DEFAULT (now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_run_seq ON events(run_id, seq);
+CREATE INDEX IF NOT EXISTS idx_events_run_kind ON events(run_id, kind);
+
+-- Ingestion state table: offset tracking for incremental ingestion
+CREATE TABLE IF NOT EXISTS ingestion_state (
+    run_id VARCHAR PRIMARY KEY,
+    last_offset INTEGER NOT NULL DEFAULT 0,
+    last_seq INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT (now())
+);
 """
 
 
@@ -290,6 +315,62 @@ class StatsDB:
             with self._lock:
                 self._connection.close()
                 self._connection = None
+
+    # =========================================================================
+    # Raw Event Storage (Idempotent)
+    # =========================================================================
+
+    def _insert_raw_event(self, event: Dict[str, Any]) -> bool:
+        """Insert raw event if not already present. Returns True if inserted."""
+        try:
+            # Use RETURNING to detect if insert happened (empty result = conflict/no insert)
+            result = self.connection.execute("""
+                INSERT INTO events (event_id, seq, run_id, ts, kind, flow_key, step_id, agent_key, payload)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (event_id) DO NOTHING
+                RETURNING event_id
+            """, [
+                event.get("event_id"),
+                event.get("seq", 0),
+                event["run_id"],
+                event["ts"],
+                event["kind"],
+                event["flow_key"],
+                event.get("step_id"),
+                event.get("agent_key"),
+                json.dumps(event.get("payload", {}))
+            ])
+            return len(result.fetchall()) > 0
+        except Exception as e:
+            logger.warning(f"Failed to insert event {event.get('event_id')}: {e}")
+            return False
+
+    def get_ingestion_offset(self, run_id: str) -> Tuple[int, int]:
+        """Get (byte_offset, last_seq) for incremental ingestion."""
+        if self.connection is None:
+            return (0, 0)
+
+        with self._lock:
+            result = self.connection.execute(
+                "SELECT last_offset, last_seq FROM ingestion_state WHERE run_id = ?",
+                [run_id]
+            ).fetchone()
+            return (result[0], result[1]) if result else (0, 0)
+
+    def set_ingestion_offset(self, run_id: str, offset: int, seq: int) -> None:
+        """Update ingestion offset after successful tail."""
+        if self.connection is None:
+            return
+
+        with self._lock:
+            self.connection.execute("""
+                INSERT INTO ingestion_state (run_id, last_offset, last_seq, updated_at)
+                VALUES (?, ?, ?, now())
+                ON CONFLICT (run_id) DO UPDATE SET
+                    last_offset = excluded.last_offset,
+                    last_seq = excluded.last_seq,
+                    updated_at = excluded.updated_at
+            """, [run_id, offset, seq])
 
     # =========================================================================
     # Write Operations
@@ -477,20 +558,37 @@ class StatsDB:
     # Batch Operations
     # =========================================================================
 
-    def ingest_events(self, events: List[Dict[str, Any]], run_id: str):
-        """Batch ingest events from events.jsonl format.
+    def ingest_events(self, events: List[Dict[str, Any]], run_id: str) -> int:
+        """Batch ingest events from events.jsonl format (idempotent).
 
         This is the primary interface for the event sink pattern.
-        Parses RunEvent-style dicts and routes to appropriate record_* methods.
+        First inserts raw events into the events table (dedup by event_id),
+        then updates projections (runs, steps, tool_calls, file_changes).
 
         Args:
             events: List of event dicts (from events.jsonl).
             run_id: The run ID these events belong to.
+
+        Returns:
+            Number of newly ingested events (events that were not already present).
         """
         if self.connection is None:
-            return
+            return 0
+
+        newly_ingested = 0
 
         for event in events:
+            # Ensure run_id is set on the event for raw storage
+            event_with_run = {**event, "run_id": run_id}
+
+            # Insert raw event first (idempotent - skips if event_id exists)
+            if not self._insert_raw_event(event_with_run):
+                # Event already exists, skip projection updates
+                continue
+
+            newly_ingested += 1
+
+            # Update projections for new events
             kind = event.get("kind", "")
             payload = event.get("payload", {})
             step_id = event.get("step_id", "")
@@ -574,6 +672,8 @@ class StatsDB:
                     total_tokens=payload.get("total_tokens", 0),
                     total_duration_ms=payload.get("duration_ms", 0),
                 )
+
+        return newly_ingested
 
     # =========================================================================
     # Query Operations (for TypeScript UI)

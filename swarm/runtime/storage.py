@@ -82,6 +82,74 @@ LEGACY_META_FILE = "run.json"  # Old-style optional metadata
 _RUN_LOCKS: Dict[RunId, threading.Lock] = {}
 _RUN_LOCKS_LOCK = threading.Lock()
 
+# -----------------------------------------------------------------------------
+# Per-run sequence tracking for monotonic event ordering
+# -----------------------------------------------------------------------------
+# Each run has a monotonically increasing sequence counter that is assigned
+# to events before writing. This enables reliable ordering even when timestamps
+# have limited precision or clock skew occurs.
+
+_run_sequences: Dict[str, int] = {}
+_seq_lock = threading.Lock()
+
+
+def _next_seq(run_id: str) -> int:
+    """Get the next monotonic sequence number for a run.
+
+    Thread-safe counter that increments on each call for a given run_id.
+    Sequence numbers start at 1 and increase monotonically.
+
+    Args:
+        run_id: The unique run identifier.
+
+    Returns:
+        The next sequence number for this run.
+    """
+    with _seq_lock:
+        seq = _run_sequences.get(run_id, 0) + 1
+        _run_sequences[run_id] = seq
+        return seq
+
+
+def _init_seq_from_disk(run_id: str, run_dir: Path) -> None:
+    """Initialize sequence counter from existing events.jsonl.
+
+    This function handles recovery scenarios where a run is being resumed
+    after a restart. It scans existing events to find the highest sequence
+    number and initializes the counter to continue from there.
+
+    Args:
+        run_id: The unique run identifier.
+        run_dir: Path to the run directory.
+    """
+    events_file = run_dir / EVENTS_FILE
+    if not events_file.exists():
+        return
+
+    max_seq = 0
+    try:
+        with open(events_file, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        event = json.loads(line)
+                        max_seq = max(max_seq, event.get("seq", 0))
+                    except json.JSONDecodeError:
+                        continue
+    except (OSError, IOError):
+        pass
+
+    if max_seq > 0:
+        with _seq_lock:
+            # Only update if disk has higher seq than in-memory
+            current = _run_sequences.get(run_id, 0)
+            if max_seq > current:
+                _run_sequences[run_id] = max_seq
+                logger.debug(
+                    "Recovered sequence counter for run '%s': max_seq=%d",
+                    run_id, max_seq
+                )
+
 
 def _get_run_lock(run_id: RunId) -> threading.Lock:
     """Get or create a lock for a specific run ID.
@@ -266,6 +334,9 @@ def create_run_dir(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Path:
     Creates the run directory if it doesn't exist. Does not create
     flow subdirectories (those are created by agents as needed).
 
+    Also initializes the sequence counter from existing events.jsonl if
+    present, enabling recovery after restarts.
+
     Args:
         run_id: The unique run identifier.
         runs_dir: Base directory for runs. Defaults to RUNS_DIR.
@@ -280,6 +351,10 @@ def create_run_dir(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Path:
     """
     run_path = get_run_path(run_id, runs_dir)
     run_path.mkdir(parents=True, exist_ok=True)
+
+    # Initialize sequence counter from disk for recovery scenarios
+    _init_seq_from_disk(run_id, run_path)
+
     return run_path
 
 
@@ -445,6 +520,10 @@ def append_event(run_id: RunId, event: RunEvent, runs_dir: Path = RUNS_DIR) -> N
     This function is thread-safe via per-run locking to ensure atomic appends
     when multiple threads emit events for the same run.
 
+    The storage layer assigns a monotonically increasing sequence number to
+    each event before writing. This ensures reliable ordering even when
+    timestamps have limited precision.
+
     Args:
         run_id: The unique run identifier.
         event: The RunEvent to append.
@@ -456,6 +535,9 @@ def append_event(run_id: RunId, event: RunEvent, runs_dir: Path = RUNS_DIR) -> N
         events_path = run_path / EVENTS_FILE
 
         try:
+            # Assign monotonic sequence number before serialization
+            event.seq = _next_seq(run_id)
+
             data = run_event_to_dict(event)
             line = json.dumps(data, ensure_ascii=False)
 
