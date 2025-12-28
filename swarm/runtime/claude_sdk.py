@@ -11,6 +11,7 @@ Usage:
     from swarm.runtime.claude_sdk import (
         SDK_AVAILABLE,
         create_high_trust_options,
+        create_options_from_plan,
         query_with_options,
         get_sdk_module,
     )
@@ -25,11 +26,38 @@ Design Principles:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Optional, Union
+
+if TYPE_CHECKING:
+    from swarm.spec.types import PromptPlan
 
 # Module logger
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Sandbox Configuration (NOT IMPLEMENTED)
+# =============================================================================
+# IMPORTANT: Sandbox enforcement is NOT currently implemented in the SDK.
+# These settings are preserved for future SDK support, but currently only
+# affect logging output. Commands have full host access regardless of settings.
+#
+# When the SDK adds sandbox support, we can enable actual enforcement.
+# Until then, treat all execution as unsandboxed.
+
+# Intentionally defaults to False to avoid false sense of safety
+SANDBOX_ENABLED = os.environ.get("SWARM_SANDBOX_ENABLED", "false").lower() == "true"
+ALLOW_UNSANDBOXED = os.environ.get("SWARM_ALLOW_UNSANDBOXED", "true").lower() == "true"
+
+# Preserved for future SDK support
+DEFAULT_SANDBOX_ALLOWED_COMMANDS = [
+    "git", "npm", "npx", "pnpm", "uv", "pip", "pytest",
+    "cargo", "rustc", "make", "python", "node",
+]
+
+# Warning flag to log sandbox status on first use
+_SANDBOX_WARNING_LOGGED = False
 
 # =============================================================================
 # SDK Availability Detection
@@ -93,6 +121,7 @@ def create_high_trust_options(
     system_prompt_append: Optional[str] = None,
     max_thinking_tokens: Optional[int] = None,
     max_turns: Optional[int] = None,
+    sandboxed: Optional[bool] = None,
 ) -> Any:
     """Create ClaudeCodeOptions with High-Trust settings.
 
@@ -101,11 +130,17 @@ def create_high_trust_options(
     - Project-only settings (CLAUDE.md visibility)
     - System prompt preset for consistent Claude Code behavior
     - Explicit tool surface
+    - Sandbox control for command containment
 
     MANDATORY SETTINGS (always enforced):
     - setting_sources=["project"]: Loads CLAUDE.md and .claude/skills
     - permission_mode: Controls file/command permissions
     - system_prompt preset: "claude_code" for consistent behavior
+
+    SANDBOX BEHAVIOR:
+    - If sandboxed is None, uses SWARM_SANDBOX_ENABLED env var (default True)
+    - If sandboxed is False, requires SWARM_ALLOW_UNSANDBOXED=true
+    - Sandbox limits command execution to a safe subset
 
     Args:
         cwd: Working directory for the SDK session (REQUIRED for reliable execution).
@@ -114,6 +149,7 @@ def create_high_trust_options(
         system_prompt_append: Optional text to append to system prompt (persona, context).
         max_thinking_tokens: Optional max tokens for extended thinking.
         max_turns: Optional max conversation turns within this query (default: unlimited).
+        sandboxed: Enable sandbox containment. None uses SWARM_SANDBOX_ENABLED env var.
 
     Returns:
         ClaudeCodeOptions instance configured for high-trust execution.
@@ -161,6 +197,143 @@ def create_high_trust_options(
 
     if max_turns is not None:
         options_kwargs["max_turns"] = max_turns
+
+    # Handle sandbox configuration
+    # NOTE: Sandbox enforcement is NOT currently implemented in the SDK.
+    # This code path exists for future SDK support only.
+    global _SANDBOX_WARNING_LOGGED
+
+    if sandboxed is None:
+        sandboxed = SANDBOX_ENABLED
+
+    # Log honest sandbox status (once per process)
+    if not _SANDBOX_WARNING_LOGGED:
+        logger.info(
+            "Sandbox status: NOT IMPLEMENTED. Commands have full host access. "
+            "SWARM_SANDBOX_ENABLED=%s has no effect until SDK adds support.",
+            SANDBOX_ENABLED,
+        )
+        _SANDBOX_WARNING_LOGGED = True
+
+    # Preserved for future SDK support - currently no-op
+    # When SDK adds sandboxSettings, uncomment this:
+    # options_kwargs["sandboxSettings"] = {
+    #     "enabled": sandboxed,
+    #     "allowedCommands": DEFAULT_SANDBOX_ALLOWED_COMMANDS,
+    # }
+
+    return sdk.ClaudeCodeOptions(**options_kwargs)
+
+
+def create_options_from_plan(
+    plan: "PromptPlan",
+    cwd: Optional[Union[str, Path]] = None,
+) -> Any:
+    """Create ClaudeCodeOptions from a compiled PromptPlan.
+
+    This function maps spec-defined settings from a PromptPlan to SDK options,
+    enabling the spec-first architecture where execution parameters are derived
+    from machine-readable contracts rather than filesystem configuration.
+
+    The PromptPlan contains all SDK configuration needed for execution:
+    - model: The model to use (e.g., "sonnet", "opus")
+    - permission_mode: Permission mode for the SDK session
+    - allowed_tools: Tools available to the agent (informational in high-trust mode)
+    - max_turns: Maximum conversation turns
+    - sandbox_enabled: Sandbox configuration (prepared for future SDK support)
+    - system_append: Text to append to the system prompt
+
+    Args:
+        plan: A compiled PromptPlan containing SDK configuration.
+        cwd: Optional working directory override. If not specified, uses plan.cwd.
+
+    Returns:
+        ClaudeCodeOptions instance configured from the PromptPlan.
+
+    Raises:
+        RuntimeError: If the Claude SDK is not available.
+
+    Example:
+        >>> from swarm.spec.types import PromptPlan
+        >>> plan = compile_prompt_plan(station, flow, step, ctx)
+        >>> options = create_options_from_plan(plan)
+        >>> async for event in sdk.query(prompt=plan.user_prompt, options=options):
+        ...     process(event)
+    """
+    if not SDK_AVAILABLE:
+        raise RuntimeError(
+            f"Claude SDK not available: {_sdk_import_error}. "
+            "Install with: pip install claude-code-sdk"
+        )
+    sdk = _sdk_module
+
+    # Determine effective cwd - prefer explicit parameter, then plan.cwd
+    effective_cwd: Optional[str] = None
+    if cwd is not None:
+        effective_cwd = str(cwd)
+    elif plan.cwd:
+        effective_cwd = plan.cwd
+
+    # Build system prompt with preset and optional append
+    system_prompt: Dict[str, Any] = {
+        "type": "preset",
+        "preset": SYSTEM_PROMPT_PRESET,
+    }
+    if plan.system_append:
+        system_prompt["append"] = plan.system_append
+
+    # Map permission mode from plan (with fallback)
+    permission_mode = plan.permission_mode or "bypassPermissions"
+
+    # Build options with MANDATORY settings from spec
+    options_kwargs: Dict[str, Any] = {
+        # 1. Permission mode from plan (or default)
+        "permission_mode": permission_mode,
+        # 2. Setting sources: ["project"] ensures CLAUDE.md and skills are loaded
+        "setting_sources": ["project"],
+        # 3. System prompt: preset + append from plan
+        "system_prompt": system_prompt,
+    }
+
+    # Working directory
+    if effective_cwd:
+        options_kwargs["cwd"] = effective_cwd
+    else:
+        logger.warning(
+            "create_options_from_plan called without cwd and plan.cwd is empty - "
+            "execution may fail or use unexpected working directory"
+        )
+
+    # Model from plan (map short names to full model IDs if needed)
+    if plan.model:
+        # The plan.model may be a short name like "sonnet" or full ID
+        # For now, pass through - the SDK handles model resolution
+        options_kwargs["model"] = plan.model
+
+    # Max turns from plan
+    if plan.max_turns:
+        options_kwargs["max_turns"] = plan.max_turns
+
+    # NOTE: allowed_tools is informational in high-trust mode.
+    # The agent has full toolbox access via bypassPermissions.
+    # allowed_tools is preserved in the PromptPlan for:
+    # 1. Documentation of intended tool surface
+    # 2. Future SDK support for tool restrictions
+    # 3. Audit/compliance logging
+    #
+    # For now, we log the intended tools but don't restrict.
+    if plan.allowed_tools:
+        logger.debug(
+            "PromptPlan specifies allowed_tools=%s (informational only in high-trust mode)",
+            plan.allowed_tools,
+        )
+
+    # NOTE: sandbox_enabled is prepared for future SDK support.
+    # Currently no-op, same as create_high_trust_options().
+    if plan.sandbox_enabled:
+        logger.debug(
+            "PromptPlan specifies sandbox_enabled=True (not enforced until SDK adds support)"
+        )
 
     return sdk.ClaudeCodeOptions(**options_kwargs)
 

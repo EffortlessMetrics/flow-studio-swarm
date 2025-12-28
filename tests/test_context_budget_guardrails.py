@@ -318,7 +318,7 @@ class TestPriorityAwarePromptBuilding:
             extra={},
         )
 
-        prompt, truncation_info = engine._build_prompt(ctx)
+        prompt, truncation_info, _ = engine._build_prompt(ctx)
 
         # CRITICAL items (code-implementer, merge-decider) should be in prompt
         assert "s2" in prompt  # code-implementer
@@ -366,7 +366,7 @@ class TestPriorityAwarePromptBuilding:
             extra={},
         )
 
-        prompt, _ = engine._build_prompt(ctx)
+        prompt, _, _ = engine._build_prompt(ctx)
 
         # Find positions in prompt - chronological order should be maintained
         pos_1 = prompt.find("step_1")

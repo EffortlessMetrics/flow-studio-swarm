@@ -3,40 +3,42 @@
 ## Overall Status: PASS
 
 ## Test Run Details
-- **Date**: 2025-12-28
-- **Tests Selected**: 63
-- **Tests Passed**: 62
-- **Tests Skipped**: 1 (Datadog backend - requires external dependencies)
-- **Tests Failed**: 0
-- **Duration**: 6.62s
+- **File**: `tests/test_route_from_routing_config.py`
+- **Total Tests**: 16
+- **Passed**: 16
+- **Failed**: 0
+- **Duration**: 0.13s
 
-## Tests Executed
+## Test Coverage by Category
 
-### Storage Tests (7 passed)
-- `test_create_and_read_spec`
-- `test_create_and_read_summary`
-- `test_update_summary`
-- `test_append_and_read_events`
-- `test_list_runs`
-- `test_discover_legacy_runs`
-- `test_run_exists`
+### Terminal Routing (1 test)
+- `TestTerminalRouting::test_terminal_routing` - PASSED
 
-### Runtime/Event Tests (55+ passed)
-- Event mapping tests for Gemini backend
-- Claude stepwise backend capability tests
-- Run service event roundtrip tests
-- Flow Studio API event endpoint tests
-- Run inspector timeline tests
-- Step event emission tests
+### Linear Routing (2 tests)
+- `TestLinearRouting::test_linear_routing_with_next` - PASSED
+- `TestLinearRouting::test_linear_routing_without_next` - PASSED
 
-## Changes Verified
+### Microloop Routing (4 tests)
+- `TestMicroloopRouting::test_microloop_verified_exits` - PASSED
+- `TestMicroloopRouting::test_microloop_unverified_loops` - PASSED
+- `TestMicroloopRouting::test_microloop_max_iterations_exits` - PASSED
+- `TestMicroloopRouting::test_microloop_case_insensitive` - PASSED
 
-The sequence tracking implementation in `storage.py` was verified to work correctly:
+### Branch Routing (4 tests)
+- `TestBranchRouting::test_branch_exact_match` - PASSED
+- `TestBranchRouting::test_branch_case_insensitive` - PASSED
+- `TestBranchRouting::test_branch_default_fallback` - PASSED
+- `TestBranchRouting::test_branch_no_match_no_next` - PASSED
 
-1. **Sequence counter initialization** - `_run_sequences` and `_seq_lock` module-level state
-2. **`_next_seq()` helper** - Returns monotonically increasing sequence numbers
-3. **`_init_seq_from_disk()` recovery** - Initializes counter from existing events.jsonl
-4. **`append_event()` integration** - Assigns sequence numbers before writing events
-5. **`create_run_dir()` recovery hook** - Calls `_init_seq_from_disk()` on run initialization
+### Edge Cases (5 tests)
+- `TestEdgeCases::test_empty_status_handling` - PASSED
+- `TestEdgeCases::test_none_status_handling` - PASSED
+- `TestEdgeCases::test_microloop_iteration_boundary` - PASSED
+- `TestEdgeCases::test_microloop_iteration_below_max` - PASSED
+- `TestEdgeCases::test_branch_empty_branches_dict` - PASSED
 
-All existing tests continue to pass, confirming backwards compatibility.
+## Failing Tests
+None
+
+## Notes
+All tests for the `route_from_routing_config` function pass successfully. The implementation correctly handles all routing kinds (TERMINAL, LINEAR, MICROLOOP, BRANCH) and edge cases.

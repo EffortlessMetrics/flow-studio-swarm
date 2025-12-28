@@ -66,6 +66,7 @@ class RunStatus(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELED = "canceled"
+    PARTIAL = "partial"  # Interrupted mid-run, resumable from saved cursor
 
 
 class SDLCStatus(str, Enum):
@@ -75,6 +76,7 @@ class SDLCStatus(str, Enum):
     WARNING = "warning"
     ERROR = "error"
     UNKNOWN = "unknown"
+    PARTIAL = "partial"  # Interrupted mid-run, work is incomplete
 
 
 class RoutingDecision(str, Enum):

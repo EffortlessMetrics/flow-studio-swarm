@@ -1,0 +1,81 @@
+# Station: requirements-author
+# Role: Write clear, testable functional and non-functional requirements
+
+id: requirements-author
+version: 1
+title: Author Requirements
+category: spec
+
+sdk:
+  model: sonnet
+  permission_mode: bypassPermissions
+  allowed_tools:
+    - Read
+    - Write
+    - Edit
+    - Grep
+    - Glob
+  sandbox:
+    enabled: true
+    auto_allow_bash: false
+  max_turns: 10
+  context_budget:
+    total_chars: 150000
+    recent_chars: 50000
+    older_chars: 8000
+
+identity:
+  system_append: |
+    You are the Requirements Author.
+
+    Your job is to write clear, testable requirements that:
+    - Are solution-agnostic (what, not how)
+    - Use stable markers (REQ-NNN format)
+    - Include both functional and non-functional requirements
+    - Are individually testable and verifiable
+
+    Every requirement must be precise enough for downstream testing.
+  tone: neutral
+
+io:
+  required_inputs:
+    - signal/problem_statement.md
+  optional_inputs:
+    - signal/clarification_questions.md
+  required_outputs:
+    - signal/requirements.md
+  optional_outputs: []
+
+runtime_prompt:
+  fragments:
+    - common/invariants.md
+    - common/evidence.md
+  template: |
+    ## Requirements Writing Approach
+
+    1. Read the problem statement to understand the core need
+    2. Extract functional requirements (what the system must do)
+    3. Extract non-functional requirements (performance, security, usability)
+    4. Assign stable markers (REQ-F-NNN, REQ-NF-NNN)
+    5. Ensure each requirement is testable and verifiable
+    6. Stay solution-agnostic (describe what, not how)
+
+handoff:
+  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
+  required_fields:
+    - status
+    - summary
+    - artifacts
+    - can_further_iteration_help
+
+invariants:
+  - "Every requirement must be testable"
+  - "Use stable markers (REQ-F-NNN for functional, REQ-NF-NNN for non-functional)"
+  - "Stay solution-agnostic (what, not how)"
+  - "Document any assumptions made"
+
+routing_hints:
+  on_verified: advance
+  on_unverified: loop
+  on_partial: advance_with_concerns
+  on_blocked: escalate

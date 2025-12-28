@@ -1,0 +1,124 @@
+# Flow: 3-build
+# Purpose: Design → Code: Implement via adversarial microloops
+
+id: 3-build
+version: 1
+title: "Flow 3 - Build"
+description: |
+  Transform design artifacts (ADR, contracts) into working code.
+  Uses adversarial microloops between authors and critics.
+  Exit when VERIFIED or no further iteration can help.
+
+defaults:
+  context_pack:
+    include_upstream_artifacts: true
+    include_previous_envelopes: true
+    max_envelopes: 8
+    include_scent_trail: true
+  sdk_overrides: {}
+
+steps:
+  # Step 1: Write tests first
+  - id: author_tests
+    station: test-author
+    objective: |
+      Write or update tests based on BDD scenarios and test plan.
+      Tests should initially fail (proving they test real behavior).
+    inputs:
+      - plan/test_plan.md
+      - signal/bdd_scenarios.md
+    outputs:
+      - build/test_changes_summary.md
+    routing:
+      kind: linear
+      next: critique_tests
+    teaching:
+      highlight: true
+      note: "Test-first: tests should fail before implementation"
+
+  # Step 2: Review tests
+  - id: critique_tests
+    station: test-critic
+    objective: |
+      Harsh review of test quality, coverage, and alignment with BDD.
+      Check edge cases, error paths, and assertion quality.
+    inputs:
+      - build/test_changes_summary.md
+      - signal/bdd_scenarios.md
+    outputs:
+      - build/test_critique.md
+    routing:
+      kind: microloop
+      loop_target: author_tests
+      loop_condition_field: status
+      loop_success_values:
+        - VERIFIED
+        - verified
+      next: implement
+      max_iterations: 3
+    teaching:
+      highlight: true
+      note: "MICROLOOP: test-author ⇄ test-critic until VERIFIED"
+
+  # Step 3: Implement code
+  - id: implement
+    station: code-implementer
+    objective: |
+      Implement code to pass tests and satisfy requirements.
+      Follow ADR decisions and honor API contracts.
+    inputs:
+      - plan/adr.md
+      - plan/api_contracts.yaml
+      - build/test_changes_summary.md
+    outputs:
+      - build/impl_changes_summary.md
+    routing:
+      kind: linear
+      next: critique_code
+    teaching:
+      highlight: true
+      note: "Implementation: make tests pass"
+
+  # Step 4: Review implementation
+  - id: critique_code
+    station: code-critic
+    objective: |
+      Harsh review of implementation against ADR and contracts.
+      Check correctness, edge cases, error handling, security.
+    inputs:
+      - build/impl_changes_summary.md
+      - plan/adr.md
+    outputs:
+      - build/code_critique.md
+    routing:
+      kind: microloop
+      loop_target: implement
+      loop_condition_field: status
+      loop_success_values:
+        - VERIFIED
+        - verified
+      next: finalize
+      max_iterations: 4
+    teaching:
+      highlight: true
+      note: "MICROLOOP: implementer ⇄ critic until VERIFIED"
+
+  # Step 5: Finalize and commit
+  - id: finalize
+    station: build-cleanup
+    objective: |
+      Write build_receipt.json, update ac_status.json, verify all artifacts.
+      Commit changes to feature branch.
+    inputs:
+      - build/impl_changes_summary.md
+      - build/test_changes_summary.md
+    outputs:
+      - build/build_receipt.json
+    routing:
+      kind: terminal
+    teaching:
+      note: "Cleanup: seal the build receipt"
+
+cross_cutting_stations:
+  - clarifier
+  - risk-analyst

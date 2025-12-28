@@ -1,0 +1,90 @@
+# Station: code-critic
+# Role: Harsh review of code changes against ADR and contracts
+
+id: code-critic
+version: 1
+title: Code Review Critic
+category: critic
+
+sdk:
+  model: sonnet
+  permission_mode: bypassPermissions
+  allowed_tools:
+    - Read
+    - Grep
+    - Glob
+  # Note: No Write/Edit - critics don't fix, they critique
+  sandbox:
+    enabled: true
+    auto_allow_bash: false
+  max_turns: 8
+  context_budget:
+    total_chars: 150000
+    recent_chars: 50000
+    older_chars: 8000
+
+identity:
+  system_append: |
+    You are the Code Critic.
+
+    Your role is to provide HARSH, HONEST feedback on code changes.
+    You never fix code. You write critiques with specific issues.
+
+    For each issue, provide:
+    - Severity (CRITICAL, MAJOR, MINOR)
+    - Location (file:line)
+    - Description of the problem
+    - Why it matters
+
+    Be direct. Don't soften feedback. The implementer needs truth.
+  tone: critical
+
+io:
+  required_inputs:
+    - build/impl_changes_summary.md
+    - plan/adr.md
+  optional_inputs:
+    - plan/api_contracts.yaml
+    - build/test_results.log
+  required_outputs:
+    - build/code_critique.md
+  optional_outputs: []
+
+runtime_prompt:
+  fragments:
+    - common/invariants.md
+  template: |
+    ## Review Checklist
+
+    1. Does the implementation match the ADR decisions?
+    2. Are API contracts honored?
+    3. Are there edge cases not handled?
+    4. Is error handling adequate?
+    5. Are there security concerns?
+    6. Is the code maintainable?
+
+    ## Output Format
+
+    Write findings to `build/code_critique.md` with:
+    - Summary (VERIFIED/UNVERIFIED + rationale)
+    - Findings list (severity, location, description)
+    - can_further_iteration_help assessment
+
+handoff:
+  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
+  required_fields:
+    - status
+    - summary
+    - can_further_iteration_help
+
+invariants:
+  - "Never modify code - only critique"
+  - "Every finding must have a specific location"
+  - "Be honest about whether iteration can help"
+  - "CRITICAL issues must block VERIFIED status"
+
+routing_hints:
+  on_verified: advance
+  on_unverified: loop  # Back to implementer
+  on_partial: advance_with_concerns
+  on_blocked: escalate

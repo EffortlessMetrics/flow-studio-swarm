@@ -107,6 +107,60 @@ class GeminiStepOrchestrator:
         self._repo_root = repo_root or Path(__file__).resolve().parents[2]
         self._flow_registry = FlowRegistry.get_instance()
         self._lock = threading.Lock()
+        # Stop request tracking for graceful interruption
+        # Using threading.Event for true cross-thread safety
+        self._stop_requests: Dict[RunId, threading.Event] = {}
+
+    def request_stop(self, run_id: RunId) -> bool:
+        """Request graceful stop of a running run.
+
+        The run will:
+        1. Complete or abort the current step
+        2. Write PARTIAL status to run_state
+        3. Emit run_stop_requested event
+        4. Save cursor for later resumption
+
+        This is safe to call from any thread (uses threading.Event,
+        which is thread-safe unlike asyncio.Event).
+
+        Args:
+            run_id: The run to stop.
+
+        Returns:
+            True if stop was signaled, False if run not found/not async.
+        """
+        with self._lock:
+            if run_id not in self._stop_requests:
+                # Create event for future runs or runs not yet tracked
+                self._stop_requests[run_id] = threading.Event()
+
+        self._stop_requests[run_id].set()
+        logger.info("Stop requested for run %s", run_id)
+        return True
+
+    def clear_stop_request(self, run_id: RunId) -> None:
+        """Clear any pending stop request for a run.
+
+        Call this when resuming a run to clear stale stop requests.
+
+        Args:
+            run_id: The run to clear stop for.
+        """
+        if run_id in self._stop_requests:
+            self._stop_requests[run_id].clear()
+
+    def _is_stop_requested(self, run_id: RunId) -> bool:
+        """Check if stop has been requested for a run.
+
+        Args:
+            run_id: The run to check.
+
+        Returns:
+            True if stop was requested, False otherwise.
+        """
+        if run_id not in self._stop_requests:
+            return False
+        return self._stop_requests[run_id].is_set()
 
     def run_stepwise_flow(
         self,
@@ -1496,6 +1550,35 @@ class GeminiStepOrchestrator:
 
         try:
             while current_step is not None:
+                # Check for stop request at step boundary (before starting step)
+                if self._is_stop_requested(run_id):
+                    logger.info(
+                        "Stop requested for %s at step boundary (before %s)",
+                        run_id, current_step.id,
+                    )
+                    # Emit stop event
+                    storage_module.append_event(
+                        run_id,
+                        RunEvent(
+                            run_id=run_id,
+                            ts=datetime.now(timezone.utc),
+                            kind="run_stop_requested",
+                            flow_key=flow_key,
+                            step_id=current_step.id,
+                            payload={"reason": "operator_stop"},
+                        ),
+                    )
+                    # Save PARTIAL state with cursor for resumption
+                    storage_module.update_run_state(run_id, {
+                        "status": "partial",
+                        "current_step_id": current_step.id,
+                        "loop_state": dict(loop_state),
+                    })
+                    final_status = RunStatus.PARTIAL
+                    sdlc_status = SDLCStatus.PARTIAL
+                    error_msg = f"Stopped at step boundary before {current_step.id}"
+                    break
+
                 # Safety limit check
                 total_steps_executed += 1
                 if total_steps_executed > max_total_steps:

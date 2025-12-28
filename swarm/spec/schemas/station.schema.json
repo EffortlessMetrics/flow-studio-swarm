@@ -1,0 +1,181 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowstudio.dev/schemas/station.schema.json",
+  "title": "StationSpec",
+  "description": "A station specification defines the contract and runtime profile for a stepwise execution role.",
+  "type": "object",
+  "required": ["id", "version", "title", "sdk", "identity", "io", "handoff"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Unique station identifier (kebab-case)"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Station spec version for traceability"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "Human-readable station title"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["shaping", "spec", "design", "implementation", "critic", "verification", "analytics", "reporter", "infra", "router"],
+      "description": "Role family for grouping and color assignment"
+    },
+    "sdk": {
+      "type": "object",
+      "description": "Claude SDK runtime configuration",
+      "required": ["model"],
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": ["haiku", "sonnet", "opus", "inherit"],
+          "description": "Model tier to use"
+        },
+        "permission_mode": {
+          "type": "string",
+          "enum": ["default", "bypassPermissions", "planMode"],
+          "default": "bypassPermissions",
+          "description": "Permission handling mode"
+        },
+        "allowed_tools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Task", "TodoWrite", "AskUserQuestion"]
+          },
+          "description": "Tools this station may use"
+        },
+        "denied_tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tools explicitly denied"
+        },
+        "sandbox": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "auto_allow_bash": { "type": "boolean", "default": true },
+            "excluded_commands": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Bash commands to deny even in sandbox"
+            }
+          }
+        },
+        "max_turns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 12,
+          "description": "Maximum conversation turns before forcing exit"
+        },
+        "context_budget": {
+          "type": "object",
+          "properties": {
+            "total_chars": { "type": "integer", "default": 200000 },
+            "recent_chars": { "type": "integer", "default": 60000 },
+            "older_chars": { "type": "integer", "default": 10000 }
+          }
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "description": "Station identity for system prompt",
+      "required": ["system_append"],
+      "properties": {
+        "system_append": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Short identity text appended to system prompt (max 2000 chars)"
+        },
+        "tone": {
+          "type": "string",
+          "enum": ["neutral", "analytical", "critical", "supportive"],
+          "default": "neutral"
+        }
+      }
+    },
+    "io": {
+      "type": "object",
+      "description": "Input/Output contract",
+      "properties": {
+        "required_inputs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Artifacts that MUST exist before step runs (relative to run_base)"
+        },
+        "optional_inputs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Artifacts to read if available"
+        },
+        "required_outputs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Artifacts that MUST be produced"
+        },
+        "optional_outputs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Artifacts that MAY be produced"
+        }
+      }
+    },
+    "runtime_prompt": {
+      "type": "object",
+      "description": "Template for user prompt construction",
+      "properties": {
+        "fragments": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Fragment paths to include (relative to swarm/spec/fragments/)"
+        },
+        "template": {
+          "type": "string",
+          "description": "Mustache-style template with {{variable}} placeholders"
+        }
+      }
+    },
+    "handoff": {
+      "type": "object",
+      "description": "Handoff contract",
+      "required": ["required_fields"],
+      "properties": {
+        "path_template": {
+          "type": "string",
+          "default": "{{run.base}}/handoff/{{step.id}}.draft.json",
+          "description": "Where to write handoff draft"
+        },
+        "required_fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["status", "summary", "artifacts", "can_further_iteration_help", "proposed_next_step", "confidence", "blockers"]
+          },
+          "description": "Fields that MUST be in handoff"
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Hard rules this station must follow (injected as constraints)"
+    },
+    "routing_hints": {
+      "type": "object",
+      "description": "Default routing behavior (can be overridden by flow step)",
+      "properties": {
+        "on_verified": { "type": "string", "enum": ["advance", "complete"] },
+        "on_unverified": { "type": "string", "enum": ["loop", "advance_with_concerns", "block"] },
+        "on_partial": { "type": "string", "enum": ["loop", "advance_with_concerns"] },
+        "on_blocked": { "type": "string", "enum": ["escalate", "terminate"] }
+      }
+    }
+  }
+}

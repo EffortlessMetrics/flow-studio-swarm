@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowstudio.dev/schemas/flow.schema.json",
+  "title": "FlowSpec",
+  "description": "A flow specification defines the orchestrator spine: step sequence, routing, and per-step overrides.",
+  "type": "object",
+  "required": ["id", "version", "title", "steps"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9]+-[a-z]+$",
+      "description": "Flow identifier (e.g., '3-build')"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Flow spec version for traceability"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "Human-readable flow title"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Flow purpose and scope"
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Default settings for all steps in this flow",
+      "properties": {
+        "context_pack": {
+          "type": "object",
+          "properties": {
+            "include_upstream_artifacts": { "type": "boolean", "default": true },
+            "include_previous_envelopes": { "type": "boolean", "default": true },
+            "max_envelopes": { "type": "integer", "default": 12 },
+            "include_scent_trail": { "type": "boolean", "default": true }
+          }
+        },
+        "sdk_overrides": {
+          "type": "object",
+          "description": "SDK settings to apply to all steps"
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/FlowStep"
+      }
+    },
+    "cross_cutting_stations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Stations available to all steps in this flow"
+    }
+  },
+  "definitions": {
+    "FlowStep": {
+      "type": "object",
+      "required": ["id", "station", "objective"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "Step identifier (unique within flow)"
+        },
+        "station": {
+          "type": "string",
+          "description": "Station spec to use for this step"
+        },
+        "objective": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "What this step must accomplish"
+        },
+        "scope": {
+          "type": "string",
+          "description": "Scope constraint (e.g., 'AC-001..AC-003')"
+        },
+        "inputs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Additional inputs beyond station defaults"
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Outputs specific to this step"
+        },
+        "routing": {
+          "$ref": "#/definitions/RoutingConfig"
+        },
+        "sdk_overrides": {
+          "type": "object",
+          "description": "Per-step SDK setting overrides"
+        },
+        "teaching": {
+          "type": "object",
+          "properties": {
+            "highlight": { "type": "boolean", "default": false },
+            "note": { "type": "string" }
+          }
+        }
+      }
+    },
+    "RoutingConfig": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["linear", "microloop", "branch", "terminal"],
+          "description": "Routing strategy"
+        },
+        "next": {
+          "type": "string",
+          "description": "Next step ID (for linear/microloop exit)"
+        },
+        "loop_target": {
+          "type": "string",
+          "description": "Step to loop back to (for microloop)"
+        },
+        "loop_condition_field": {
+          "type": "string",
+          "default": "status",
+          "description": "Handoff field to check for loop exit"
+        },
+        "loop_success_values": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["VERIFIED", "verified"],
+          "description": "Values that trigger loop exit"
+        },
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "default": 3
+        },
+        "branches": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Condition value -> step_id mapping"
+        }
+      }
+    }
+  }
+}

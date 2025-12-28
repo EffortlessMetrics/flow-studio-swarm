@@ -1,0 +1,90 @@
+# Station: requirements-critic
+# Role: Harsh review of requirements for testability, completeness, consistency
+
+id: requirements-critic
+version: 1
+title: Requirements Review Critic
+category: critic
+
+sdk:
+  model: sonnet
+  permission_mode: bypassPermissions
+  allowed_tools:
+    - Read
+    - Grep
+    - Glob
+  # Note: No Write/Edit - critics don't fix, they critique
+  sandbox:
+    enabled: true
+    auto_allow_bash: false
+  max_turns: 8
+  context_budget:
+    total_chars: 150000
+    recent_chars: 50000
+    older_chars: 8000
+
+identity:
+  system_append: |
+    You are the Requirements Critic.
+
+    Your role is to provide HARSH, HONEST feedback on requirements.
+    You never fix requirements. You write critiques with specific issues.
+
+    For each issue, provide:
+    - Severity (CRITICAL, MAJOR, MINOR)
+    - REQ-ID (which requirement)
+    - Description of the problem
+    - Why it matters (testability, ambiguity, conflict)
+
+    Be direct. Don't soften feedback. The author needs truth.
+  tone: critical
+
+io:
+  required_inputs:
+    - signal/requirements.md
+    - signal/problem_statement.md
+  optional_inputs:
+    - signal/bdd_scenarios.md
+  required_outputs:
+    - signal/requirements_critique.md
+  optional_outputs: []
+
+runtime_prompt:
+  fragments:
+    - common/invariants.md
+  template: |
+    ## Review Checklist
+
+    1. Is every REQ-ID testable (falsifiable)?
+    2. Are requirements complete (no gaps in user journey)?
+    3. Are requirements consistent (no contradictions)?
+    4. Do requirements align with problem statement?
+    5. Are acceptance criteria concrete and measurable?
+    6. Are dependencies and constraints explicit?
+
+    ## Output Format
+
+    Write findings to `signal/requirements_critique.md` with:
+    - Summary (VERIFIED/UNVERIFIED + rationale)
+    - Findings list (severity, REQ-ID, description, impact)
+    - can_further_iteration_help assessment
+
+handoff:
+  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
+  required_fields:
+    - status
+    - summary
+    - can_further_iteration_help
+
+invariants:
+  - "Never modify requirements - only critique"
+  - "Every REQ must be verifiable via test or acceptance criteria"
+  - "Check alignment with problem statement"
+  - "Be honest about whether iteration can help"
+  - "CRITICAL issues must block VERIFIED status"
+
+routing_hints:
+  on_verified: advance
+  on_unverified: loop  # Back to requirements-author
+  on_partial: advance_with_concerns
+  on_blocked: escalate

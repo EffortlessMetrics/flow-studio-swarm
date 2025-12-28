@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -38,6 +39,82 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Projection-Only Mode
+# =============================================================================
+# When enabled, direct record_* calls are no-ops. Only ingest_events() should
+# mutate projection tables. This ensures DuckDB is a pure projection of
+# events.jsonl, fully rebuildable from disk.
+#
+# Configuration is evaluated at StatsDB construction time, not import time,
+# allowing tests to set env vars after import and before creating the instance.
+
+# Thread-local flag to indicate we're inside ingest_events()
+# When True, record_* calls are allowed even in projection-only mode
+_ingestion_context = threading.local()
+
+
+def _is_in_ingestion_context() -> bool:
+    """Check if we're currently inside ingest_events()."""
+    return getattr(_ingestion_context, 'active', False)
+
+
+# =============================================================================
+# Event Kind Canonicalization
+# =============================================================================
+# Canonical event kinds and aliases for backwards compatibility.
+# The alias map rewrites legacy names to canonical during ingestion.
+#
+# Canonical names follow the pattern: {entity}_{action}
+#   - run_created, run_started, run_completed
+#   - step_start, step_end
+#   - tool_start, tool_end
+#   - file_changes, route_decision
+
+# Canonical event kinds (the "truth" names)
+CANONICAL_EVENT_KINDS = frozenset({
+    # Run lifecycle
+    "run_created",
+    "run_started",
+    "run_completed",
+    "run_stop_requested",
+    # Step lifecycle
+    "step_start",
+    "step_end",
+    # Tool lifecycle
+    "tool_start",
+    "tool_end",
+    # Data events
+    "file_changes",
+    "route_decision",
+})
+
+# Alias map: legacy_name -> canonical_name
+# Entries map to canonical names; missing keys mean name is already canonical
+EVENT_KIND_ALIASES: Dict[str, str] = {
+    # Run aliases
+    "run_start": "run_started",
+    "run_end": "run_completed",
+    "run_cancelled": "run_completed",  # Status indicates actual outcome
+    "run_failed": "run_completed",     # Status indicates actual outcome
+    # Step aliases
+    "step_complete": "step_end",
+    "step_error": "step_end",          # Status indicates actual outcome
+}
+
+
+def normalize_event_kind(kind: str) -> str:
+    """Normalize an event kind to its canonical form.
+
+    Args:
+        kind: The event kind string (may be legacy alias).
+
+    Returns:
+        The canonical event kind.
+    """
+    return EVENT_KIND_ALIASES.get(kind, kind)
+
 
 # Lazy import to avoid hard dependency at module load time
 _duckdb = None
@@ -238,16 +315,73 @@ class StatsDB:
         connection: Active DuckDB connection (lazy initialized).
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(
+        self,
+        db_path: Optional[Path] = None,
+        projection_only: Optional[bool] = None,
+        projection_strict: Optional[bool] = None,
+    ):
         """Initialize the stats database.
 
         Args:
             db_path: Path to the DuckDB file. If None, uses in-memory database.
+            projection_only: If True, direct record_* calls are no-ops.
+                Defaults to SWARM_DB_PROJECTION_ONLY env var (default: true).
+            projection_strict: If True, direct record_* calls raise RuntimeError.
+                Defaults to SWARM_DB_PROJECTION_STRICT env var (default: false).
         """
         self.db_path = db_path
         self._connection = None
         self._lock = threading.RLock()
         self._initialized = False
+
+        # Capture projection config at construction time (not import time)
+        # This allows tests to set env vars after import but before construction
+        if projection_only is None:
+            projection_only = os.environ.get(
+                "SWARM_DB_PROJECTION_ONLY", "true"
+            ).lower() == "true"
+        if projection_strict is None:
+            projection_strict = os.environ.get(
+                "SWARM_DB_PROJECTION_STRICT", "false"
+            ).lower() == "true"
+
+        self._projection_only = projection_only
+        self._projection_strict = projection_strict
+
+    def _projection_guard(self, method_name: str) -> bool:
+        """Check if direct projection writes are allowed.
+
+        In projection-only mode, direct record_* calls are skipped (or raise in
+        strict mode). This ensures all DB state comes from event ingestion.
+
+        Calls from within ingest_events() are always allowed.
+
+        Args:
+            method_name: Name of the calling method for logging.
+
+        Returns:
+            True if write should proceed, False if should be skipped.
+
+        Raises:
+            RuntimeError: In strict mode when direct writes are attempted.
+        """
+        # Always allow calls from ingestion context
+        if _is_in_ingestion_context():
+            return True
+
+        if not self._projection_only:
+            return True  # Legacy mode, allow direct writes
+
+        if self._projection_strict:
+            raise RuntimeError(
+                f"Direct DB write via {method_name}() blocked in projection-only mode. "
+                "Use event emission + ingest_events() instead. "
+                "Set SWARM_DB_PROJECTION_ONLY=false to disable this check."
+            )
+
+        logger.debug("Projection-only mode: skipping direct %s() call", method_name)
+        return False
 
     @property
     def connection(self):
@@ -383,11 +517,23 @@ class StatsDB:
         profile_id: Optional[str] = None,
         engine_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        ts: Optional[datetime] = None,
     ):
-        """Record the start of a new run."""
+        """Record the start of a new run.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+                For replay/rebuild, always pass the event timestamp.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_run_start"):
+            return
 
+        started_at = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
@@ -399,7 +545,7 @@ class StatsDB:
                     status = 'running'
                 """,
                 [run_id, flow_keys, profile_id, engine_id,
-                 datetime.now(timezone.utc), json.dumps(metadata or {})]
+                 started_at, json.dumps(metadata or {})]
             )
 
     def record_run_end(
@@ -410,11 +556,22 @@ class StatsDB:
         completed_steps: int,
         total_tokens: int,
         total_duration_ms: int,
+        ts: Optional[datetime] = None,
     ):
-        """Record the completion of a run."""
+        """Record the completion of a run.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_run_end"):
+            return
 
+        completed_at = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
@@ -427,7 +584,7 @@ class StatsDB:
                     total_duration_ms = ?
                 WHERE run_id = ?
                 """,
-                [datetime.now(timezone.utc), status, total_steps, completed_steps,
+                [completed_at, status, total_steps, completed_steps,
                  total_tokens, total_duration_ms, run_id]
             )
 
@@ -438,18 +595,29 @@ class StatsDB:
         step_id: str,
         step_index: int,
         agent_key: Optional[str] = None,
+        ts: Optional[datetime] = None,
     ):
-        """Record the start of a step execution."""
+        """Record the start of a step execution.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_step_start"):
+            return
 
+        started_at = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
                 INSERT INTO steps (run_id, flow_key, step_id, step_index, agent_key, started_at, status)
                 VALUES (?, ?, ?, ?, ?, ?, 'running')
                 """,
-                [run_id, flow_key, step_id, step_index, agent_key, datetime.now(timezone.utc)]
+                [run_id, flow_key, step_id, step_index, agent_key, started_at]
             )
 
     def record_step_end(
@@ -466,11 +634,22 @@ class StatsDB:
         routing_next_step: Optional[str] = None,
         routing_confidence: Optional[float] = None,
         error_message: Optional[str] = None,
+        ts: Optional[datetime] = None,
     ):
-        """Record the completion of a step execution."""
+        """Record the completion of a step execution.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_step_end"):
+            return
 
+        completed_at = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
@@ -488,7 +667,7 @@ class StatsDB:
                     error_message = ?
                 WHERE run_id = ? AND flow_key = ? AND step_id = ? AND status = 'running'
                 """,
-                [datetime.now(timezone.utc), status, duration_ms,
+                [completed_at, status, duration_ms,
                  prompt_tokens, completion_tokens, prompt_tokens + completion_tokens,
                  handoff_status, routing_decision, routing_next_step, routing_confidence,
                  error_message, run_id, flow_key, step_id]
@@ -507,12 +686,22 @@ class StatsDB:
         diff_lines_removed: Optional[int] = None,
         exit_code: Optional[int] = None,
         error_message: Optional[str] = None,
+        ts: Optional[datetime] = None,
     ):
-        """Record a tool call."""
+        """Record a tool call.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_tool_call"):
+            return
 
-        now = datetime.now(timezone.utc)
+        tool_ts = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
@@ -522,7 +711,7 @@ class StatsDB:
                     exit_code, error_message
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                [run_id, step_id, tool_name, phase, now, now,
+                [run_id, step_id, tool_name, phase, tool_ts, tool_ts,
                  duration_ms, success, target_path, diff_lines_added, diff_lines_removed,
                  exit_code, error_message]
             )
@@ -535,11 +724,22 @@ class StatsDB:
         change_type: str,
         lines_added: int = 0,
         lines_removed: int = 0,
+        ts: Optional[datetime] = None,
     ):
-        """Record a file change."""
+        """Record a file change.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            ts: Optional timestamp from event. If None, uses current time.
+        """
         if self.connection is None:
             return
+        if not self._projection_guard("record_file_change"):
+            return
 
+        change_ts = ts if ts is not None else datetime.now(timezone.utc)
         with self._transaction() as conn:
             conn.execute(
                 """
@@ -551,7 +751,7 @@ class StatsDB:
                     lines_removed = file_changes.lines_removed + EXCLUDED.lines_removed
                 """,
                 [run_id, step_id, file_path, change_type, lines_added, lines_removed,
-                 datetime.now(timezone.utc)]
+                 change_ts]
             )
 
     # =========================================================================
@@ -565,6 +765,9 @@ class StatsDB:
         First inserts raw events into the events table (dedup by event_id),
         then updates projections (runs, steps, tool_calls, file_changes).
 
+        This method sets the ingestion context flag, allowing internal
+        record_* calls to proceed even in projection-only mode.
+
         Args:
             events: List of event dicts (from events.jsonl).
             run_id: The run ID these events belong to.
@@ -575,6 +778,43 @@ class StatsDB:
         if self.connection is None:
             return 0
 
+        # Set ingestion context to allow record_* calls
+        _ingestion_context.active = True
+        try:
+            return self._ingest_events_internal(events, run_id)
+        finally:
+            _ingestion_context.active = False
+
+    def _parse_event_ts(self, ts_str: Any) -> Optional[datetime]:
+        """Parse event timestamp string to datetime.
+
+        Args:
+            ts_str: ISO format timestamp string, datetime, or None.
+
+        Returns:
+            Parsed datetime in UTC, or None if parsing fails.
+        """
+        if ts_str is None:
+            return None
+        if isinstance(ts_str, datetime):
+            return ts_str
+        if not isinstance(ts_str, str):
+            return None
+
+        try:
+            # Handle ISO format with or without timezone
+            if ts_str.endswith("Z"):
+                ts_str = ts_str[:-1] + "+00:00"
+            dt = datetime.fromisoformat(ts_str)
+            # Ensure UTC timezone
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except (ValueError, TypeError):
+            return None
+
+    def _ingest_events_internal(self, events: List[Dict[str, Any]], run_id: str) -> int:
+        """Internal implementation of ingest_events."""
         newly_ingested = 0
 
         for event in events:
@@ -588,8 +828,13 @@ class StatsDB:
 
             newly_ingested += 1
 
-            # Update projections for new events
-            kind = event.get("kind", "")
+            # Parse event timestamp - CRITICAL: use event's ts, not "now"
+            # This ensures replays and rebuilds produce identical projections
+            event_ts = self._parse_event_ts(event.get("ts"))
+
+            # Normalize event kind to canonical form (handles legacy aliases)
+            raw_kind = event.get("kind", "")
+            kind = normalize_event_kind(raw_kind)
             payload = event.get("payload", {})
             step_id = event.get("step_id", "")
             flow_key = event.get("flow_key", "")
@@ -601,9 +846,10 @@ class StatsDB:
                     step_id=step_id,
                     step_index=payload.get("step_index", 0),
                     agent_key=payload.get("agent_key"),
+                    ts=event_ts,
                 )
 
-            elif kind == "step_complete":
+            elif kind == "step_end":  # Canonical: step_complete/step_error -> step_end
                 self.record_step_end(
                     run_id=run_id,
                     flow_key=flow_key,
@@ -617,6 +863,7 @@ class StatsDB:
                     routing_next_step=payload.get("routing_next_step"),
                     routing_confidence=payload.get("routing_confidence"),
                     error_message=payload.get("error"),
+                    ts=event_ts,
                 )
 
             elif kind == "tool_start":
@@ -636,6 +883,7 @@ class StatsDB:
                     diff_lines_removed=payload.get("diff_lines_removed"),
                     exit_code=payload.get("exit_code"),
                     error_message=payload.get("error"),
+                    ts=event_ts,
                 )
 
             elif kind == "file_changes":
@@ -649,9 +897,10 @@ class StatsDB:
                         change_type=fc.get("status", "modified"),
                         lines_added=fc.get("insertions", 0),
                         lines_removed=fc.get("deletions", 0),
+                        ts=event_ts,
                     )
 
-            elif kind == "run_start":
+            elif kind == "run_started":  # Canonical: run_start -> run_started
                 # Run initialization
                 flow_keys = payload.get("flow_keys", [])
                 self.record_run_start(
@@ -660,6 +909,7 @@ class StatsDB:
                     profile_id=payload.get("profile_id"),
                     engine_id=payload.get("engine"),
                     metadata=payload.get("metadata"),
+                    ts=event_ts,
                 )
 
             elif kind == "run_completed":
@@ -671,6 +921,7 @@ class StatsDB:
                     completed_steps=payload.get("steps_completed", 0),
                     total_tokens=payload.get("total_tokens", 0),
                     total_duration_ms=payload.get("duration_ms", 0),
+                    ts=event_ts,
                 )
 
         return newly_ingested
@@ -1013,41 +1264,46 @@ def rebuild_stats_db(
                 stats["events_ingested"] += len(events)
 
             # Also process handoff envelopes for routing info
-            for flow_dir in run_path.iterdir():
-                if not flow_dir.is_dir() or flow_dir.name.startswith("."):
-                    continue
+            # Set ingestion context to allow record_* calls (projection-only mode)
+            _ingestion_context.active = True
+            try:
+                for flow_dir in run_path.iterdir():
+                    if not flow_dir.is_dir() or flow_dir.name.startswith("."):
+                        continue
 
-                handoff_dir = flow_dir / "handoff"
-                if not handoff_dir.exists():
-                    continue
+                    handoff_dir = flow_dir / "handoff"
+                    if not handoff_dir.exists():
+                        continue
 
-                for envelope_file in handoff_dir.glob("*.json"):
-                    try:
-                        with envelope_file.open("r", encoding="utf-8") as f:
-                            envelope_data = json.load(f)
+                    for envelope_file in handoff_dir.glob("*.json"):
+                        try:
+                            with envelope_file.open("r", encoding="utf-8") as f:
+                                envelope_data = json.load(f)
 
-                        # Record file changes from envelope if present
-                        file_changes = envelope_data.get("file_changes", {})
-                        if file_changes and "files" in file_changes:
-                            step_id = envelope_data.get("step_id", envelope_file.stem)
-                            for fc in file_changes.get("files", []):
-                                db.record_file_change(
-                                    run_id=run_id,
-                                    step_id=step_id,
-                                    file_path=fc.get("path", ""),
-                                    change_type=fc.get("status", "modified"),
-                                    lines_added=fc.get("insertions", 0),
-                                    lines_removed=fc.get("deletions", 0),
-                                )
+                            # Record file changes from envelope if present
+                            file_changes = envelope_data.get("file_changes", {})
+                            if file_changes and "files" in file_changes:
+                                step_id = envelope_data.get("step_id", envelope_file.stem)
+                                for fc in file_changes.get("files", []):
+                                    db.record_file_change(
+                                        run_id=run_id,
+                                        step_id=step_id,
+                                        file_path=fc.get("path", ""),
+                                        change_type=fc.get("status", "modified"),
+                                        lines_added=fc.get("insertions", 0),
+                                        lines_removed=fc.get("deletions", 0),
+                                    )
 
-                        stats["envelopes_processed"] += 1
+                            stats["envelopes_processed"] += 1
 
-                    except (json.JSONDecodeError, IOError) as e:
-                        stats["errors"].append({
-                            "run_id": run_id,
-                            "file": str(envelope_file),
-                            "error": str(e),
-                        })
+                        except (json.JSONDecodeError, IOError) as e:
+                            stats["errors"].append({
+                                "run_id": run_id,
+                                "file": str(envelope_file),
+                                "error": str(e),
+                            })
+            finally:
+                _ingestion_context.active = False
 
             stats["runs_processed"] += 1
 
@@ -1082,6 +1338,7 @@ def main():
     Usage:
         python -m swarm.runtime.db rebuild [--runs-dir PATH] [--db-path PATH]
         python -m swarm.runtime.db stats <run_id>
+        python -m swarm.runtime.db doctor <run_id> [--strict] [--from-disk]
     """
     import argparse
     import sys
@@ -1128,6 +1385,29 @@ def main():
     )
     stats_parser.add_argument("run_id", help="Run ID to query")
 
+    # Doctor command (event contract validation)
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Validate event stream contract for a run",
+    )
+    doctor_parser.add_argument("run_id", help="Run ID to validate")
+    doctor_parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat warnings as errors",
+    )
+    doctor_parser.add_argument(
+        "--from-disk",
+        action="store_true",
+        help="Read events from disk (events.jsonl) instead of DB",
+    )
+    doctor_parser.add_argument(
+        "--runs-dir",
+        type=Path,
+        default=None,
+        help="Path to runs directory (for --from-disk mode)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "rebuild":
@@ -1163,6 +1443,37 @@ def main():
         print(f"  Tool calls: {run_stats.tool_call_count}")
         print(f"  File changes: {run_stats.file_change_count}")
         sys.exit(0)
+
+    elif args.command == "doctor":
+        from .event_validator import (
+            validate_run_from_db,
+            validate_run_from_disk,
+            format_violations,
+        )
+        from .storage import RUNS_DIR
+
+        runs_dir = args.runs_dir or RUNS_DIR
+
+        if args.from_disk:
+            violations = validate_run_from_disk(
+                args.run_id, runs_dir, strict=args.strict
+            )
+        else:
+            db = get_stats_db()
+            violations = validate_run_from_db(args.run_id, db, strict=args.strict)
+
+        errors = [v for v in violations if v.severity == "error"]
+        warnings = [v for v in violations if v.severity == "warning"]
+
+        if not violations:
+            print(f"✓ Run {args.run_id}: event stream valid")
+            sys.exit(0)
+
+        print(f"Run {args.run_id}: {len(errors)} error(s), {len(warnings)} warning(s)")
+        print(format_violations(violations))
+
+        # Exit with error code if there are errors
+        sys.exit(1 if errors else 0)
 
     else:
         parser.print_help()

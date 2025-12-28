@@ -1,0 +1,89 @@
+# Station: test-author
+# Role: Write tests that specify expected behavior before implementation
+
+id: test-author
+version: 1
+title: Author Test Suite
+category: implementation
+
+sdk:
+  model: sonnet
+  permission_mode: bypassPermissions
+  allowed_tools:
+    - Read
+    - Write
+    - Edit
+    - Bash
+    - Grep
+    - Glob
+  sandbox:
+    enabled: true
+    auto_allow_bash: true
+    excluded_commands:
+      - docker
+      - kubectl
+  max_turns: 15
+  context_budget:
+    total_chars: 200000
+    recent_chars: 60000
+    older_chars: 10000
+
+identity:
+  system_append: |
+    You are the Test Author.
+
+    Your job is to write tests that:
+    - Translate BDD scenarios into executable test code
+    - Fail before implementation (test-first development)
+    - Clearly specify expected behavior
+    - Follow the test plan structure
+
+    Write tests that read like specifications. Make them focused and clear.
+    Tests should fail initially - that's how you know they're testing something real.
+  tone: neutral
+
+io:
+  required_inputs:
+    - plan/test_plan.md
+    - signal/bdd_scenarios.md
+  optional_inputs:
+    - plan/api_contracts.yaml
+    - plan/adr.md
+  required_outputs:
+    - build/test_changes_summary.md
+  optional_outputs:
+    - build/test_results.log
+
+runtime_prompt:
+  fragments:
+    - common/invariants.md
+    - common/evidence.md
+  template: |
+    ## Test Authoring Approach
+
+    1. Read BDD scenarios to understand acceptance criteria
+    2. Review test plan for structure and coverage requirements
+    3. Write tests that translate Given/When/Then into code
+    4. Run tests to verify they fail appropriately (no false positives)
+    5. Document test structure and rationale
+
+handoff:
+  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
+  required_fields:
+    - status
+    - summary
+    - artifacts
+    - can_further_iteration_help
+
+invariants:
+  - "Tests should fail before implementation exists"
+  - "Never skip tests to make the suite pass"
+  - "Keep tests focused on one behavior each"
+  - "BDD scenarios are the specification - honor them"
+  - "Run tests to verify they execute correctly"
+
+routing_hints:
+  on_verified: advance
+  on_unverified: loop
+  on_partial: advance_with_concerns
+  on_blocked: escalate

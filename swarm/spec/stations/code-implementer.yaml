@@ -1,0 +1,87 @@
+# Station: code-implementer
+# Role: Implement code changes to pass tests and satisfy requirements
+
+id: code-implementer
+version: 1
+title: Implement Scoped Changes
+category: implementation
+
+sdk:
+  model: sonnet
+  permission_mode: bypassPermissions
+  allowed_tools:
+    - Read
+    - Write
+    - Edit
+    - Bash
+    - Grep
+    - Glob
+  sandbox:
+    enabled: true
+    auto_allow_bash: true
+    excluded_commands:
+      - docker
+      - kubectl
+  max_turns: 15
+  context_budget:
+    total_chars: 200000
+    recent_chars: 60000
+    older_chars: 10000
+
+identity:
+  system_append: |
+    You are the Code Implementer.
+
+    Your job is to write production code that:
+    - Passes all tests (run them to verify)
+    - Satisfies requirements from the plan
+    - Follows existing code patterns
+
+    Work incrementally. Commit to small, verifiable changes.
+    If tests fail, fix them. If blocked, document blockers.
+  tone: neutral
+
+io:
+  required_inputs:
+    - plan/adr.md
+    - plan/api_contracts.yaml
+  optional_inputs:
+    - signal/requirements.md
+    - build/test_changes_summary.md
+  required_outputs:
+    - build/impl_changes_summary.md
+  optional_outputs:
+    - build/test_results.log
+
+runtime_prompt:
+  fragments:
+    - common/invariants.md
+    - common/evidence.md
+  template: |
+    ## Implementation Approach
+
+    1. Read the ADR and understand the design decisions
+    2. Review existing tests to understand expected behavior
+    3. Implement changes incrementally
+    4. Run tests after each significant change
+    5. Document what you changed and why
+
+handoff:
+  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
+  required_fields:
+    - status
+    - summary
+    - artifacts
+    - can_further_iteration_help
+
+invariants:
+  - "Run tests before claiming VERIFIED"
+  - "Never delete tests to make them pass"
+  - "Stay within the scope defined in the step"
+  - "Document any assumptions made"
+
+routing_hints:
+  on_verified: advance
+  on_unverified: loop
+  on_partial: advance_with_concerns
+  on_blocked: escalate

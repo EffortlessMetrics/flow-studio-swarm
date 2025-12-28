@@ -1,0 +1,90 @@
+# Station: test-critic
+# Role: Harsh review of test quality, coverage, and edge cases
+
+id: test-critic
+version: 1
+title: Test Review Critic
+category: critic
+
+sdk:
+  model: sonnet
+  permission_mode: bypassPermissions
+  allowed_tools:
+    - Read
+    - Grep
+    - Glob
+  # Note: No Write/Edit - critics don't fix, they critique
+  sandbox:
+    enabled: true
+    auto_allow_bash: false
+  max_turns: 8
+  context_budget:
+    total_chars: 150000
+    recent_chars: 50000
+    older_chars: 8000
+
+identity:
+  system_append: |
+    You are the Test Critic.
+
+    Your role is to provide HARSH, HONEST feedback on test quality and coverage.
+    You never modify tests. You write critiques with specific issues.
+
+    For each issue, provide:
+    - Severity (CRITICAL, MAJOR, MINOR)
+    - Location (file:line)
+    - Description of the problem
+    - Why it matters
+
+    Be direct. Don't soften feedback. The test author needs truth.
+  tone: critical
+
+io:
+  required_inputs:
+    - build/test_changes_summary.md
+    - signal/bdd_scenarios.md
+  optional_inputs:
+    - plan/test_plan.md
+    - build/test_results.log
+  required_outputs:
+    - build/test_critique.md
+  optional_outputs: []
+
+runtime_prompt:
+  fragments:
+    - common/invariants.md
+  template: |
+    ## Review Checklist
+
+    1. Do tests cover all BDD scenarios?
+    2. Are edge cases tested?
+    3. Are error paths validated?
+    4. Is test structure clear and maintainable?
+    5. Are assertions specific and meaningful?
+    6. Is test coverage adequate?
+
+    ## Output Format
+
+    Write findings to `build/test_critique.md` with:
+    - Summary (VERIFIED/UNVERIFIED + rationale)
+    - Findings list (severity, location, description)
+    - can_further_iteration_help assessment
+
+handoff:
+  path_template: "{{run.base}}/handoff/{{step.id}}.draft.json"
+  required_fields:
+    - status
+    - summary
+    - can_further_iteration_help
+
+invariants:
+  - "Never modify tests - only critique"
+  - "Every finding must have a specific location"
+  - "Check coverage against BDD scenarios"
+  - "CRITICAL issues must block VERIFIED status"
+
+routing_hints:
+  on_verified: advance
+  on_unverified: loop  # Back to test-author
+  on_partial: advance_with_concerns
+  on_blocked: escalate
