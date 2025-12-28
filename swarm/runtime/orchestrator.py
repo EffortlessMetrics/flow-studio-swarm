@@ -39,7 +39,9 @@ from swarm.config.flow_registry import (
 )
 
 from . import storage as storage_module
+from .context_pack import ContextPack, build_context_pack
 from .engines import GeminiStepEngine, RoutingContext, StepContext, StepEngine
+from .flow_loader import EnrichedStepDefinition, enrich_step_definition_with_flow
 from .types import (
     RunEvent,
     RunId,
@@ -320,7 +322,7 @@ class GeminiStepOrchestrator:
                 # Build routing context for microloop metadata
                 routing_ctx = self._build_routing_context(current_step, loop_state)
 
-                # Execute the current step
+                # Execute the current step (pass run_state for context pack)
                 step_result = self._execute_single_step(
                     run_id=run_id,
                     flow_key=flow_key,
@@ -329,12 +331,13 @@ class GeminiStepOrchestrator:
                     spec=spec,
                     history=step_history,
                     routing_ctx=routing_ctx,
+                    run_state=run_state,
                 )
 
                 # Add to history for next step's context
                 step_history.append(step_result)
 
-                # Create handoff envelope for this step
+                # Create handoff envelope for this step with routing signal
                 handoff_envelope = HandoffEnvelope(
                     step_id=current_step.id,
                     flow_key=flow_key,
@@ -349,23 +352,26 @@ class GeminiStepOrchestrator:
                     timestamp=datetime.now(timezone.utc),
                 )
 
-                # Write envelope to durable storage
-                storage_module.write_envelope(run_id, flow_key, current_step.id, handoff_envelope)
-
-                # Store handoff envelope in run state
+                # Store handoff envelope in run state (in-memory for next step's context)
                 run_state.handoff_envelopes[current_step.id] = handoff_envelope
 
-                # Update run state after step completion
-                storage_module.update_run_state(run_id, {
-                    "current_step_id": current_step.id,
-                    "step_index": current_step.index,
-                    "loop_state": dict(loop_state),
-                    "handoff_envelopes": {
-                        step_id: handoff_envelope_to_dict(env)
-                        for step_id, env in run_state.handoff_envelopes.items()
+                # =========================================================
+                # ATOMIC COMMIT: Use commit_step_completion for crash safety
+                # =========================================================
+                # This ensures envelope is written to disk before run_state is
+                # updated. On crash recovery, we can reconstruct run_state from
+                # envelope files on disk.
+                storage_module.commit_step_completion(
+                    run_id=run_id,
+                    flow_key=flow_key,
+                    envelope=handoff_envelope,
+                    run_state_updates={
+                        "current_step_id": current_step.id,
+                        "step_index": current_step.index,
+                        "loop_state": dict(loop_state),
+                        "status": "running",
                     },
-                    "timestamp": handoff_envelope.timestamp.isoformat() + "Z",
-                })
+                )
 
                 # Check for step failure
                 if step_result.get("status") == "failed":
@@ -379,7 +385,7 @@ class GeminiStepOrchestrator:
                     logger.info("Reached end_step %s, stopping execution", end_step)
                     break
 
-                # Route to next step using RoutingSignal
+                # Route to next step using RoutingSignal from handoff envelope
                 next_step_id, route_reason = self._route(
                     flow_def=flow_def,
                     current_step=current_step,
@@ -387,6 +393,7 @@ class GeminiStepOrchestrator:
                     loop_state=loop_state,
                     run_id=run_id,
                     flow_key=flow_key,
+                    handoff_envelope=handoff_envelope,
                 )
 
                 # Update routing context with decision and update receipt
@@ -532,6 +539,47 @@ class GeminiStepOrchestrator:
                 return step
         return None
 
+    def _read_receipt_field(
+        self,
+        run_id: str,
+        flow_key: str,
+        step_id: str,
+        agent_key: str,
+        field_name: str,
+    ) -> Optional[str]:
+        """Read a field from a step's receipt file.
+
+        This method provides backward compatibility with receipt-based routing
+        while we transition to RoutingSignal-based routing via handoff envelopes.
+
+        Args:
+            run_id: The run identifier.
+            flow_key: The flow key (e.g., "build").
+            step_id: The step identifier.
+            agent_key: The agent key.
+            field_name: The field to read from the receipt.
+
+        Returns:
+            The field value as a string, or None if not found.
+        """
+        run_base = self._repo_root / "swarm" / "runs" / run_id / flow_key
+        receipt_path = run_base / "receipts" / f"{step_id}-{agent_key}.json"
+
+        if not receipt_path.exists():
+            logger.debug("Receipt not found: %s", receipt_path)
+            return None
+
+        try:
+            with open(receipt_path) as f:
+                receipt = json.load(f)
+            value = receipt.get(field_name)
+            if value is not None:
+                return str(value)
+            return None
+        except Exception as e:
+            logger.debug("Failed to read receipt field %s: %s", field_name, e)
+            return None
+
     def _create_routing_signal(
         self,
         step: StepDefinition,
@@ -661,6 +709,7 @@ class GeminiStepOrchestrator:
         loop_state: Dict[str, int],
         run_id: RunId,
         flow_key: str,
+        handoff_envelope: Optional[HandoffEnvelope] = None,
     ) -> Tuple[Optional[str], str]:
         """Determine the next step based on routing config and result.
 
@@ -669,6 +718,10 @@ class GeminiStepOrchestrator:
         - microloop: Loops back to a target step until a condition is met
         - branch: Chooses next step based on result values
 
+        When a HandoffEnvelope is provided, uses its RoutingSignal for routing
+        decisions. Otherwise, falls back to receipt-based routing for backward
+        compatibility.
+
         Args:
             flow_def: The flow definition with all steps.
             current_step: The step that just completed.
@@ -676,11 +729,49 @@ class GeminiStepOrchestrator:
             loop_state: Dictionary tracking iteration counts per step.
             run_id: The run identifier (for reading receipts).
             flow_key: The flow key (for reading receipts).
+            handoff_envelope: Optional HandoffEnvelope with routing signal.
+                If provided, uses its RoutingSignal for routing decisions.
 
         Returns:
             Tuple of (next_step_id or None if flow is complete, reason string).
         """
         routing = current_step.routing
+
+        # =========================================================
+        # ROUTING SIGNAL PATH: Use handoff envelope if available
+        # =========================================================
+        # This is the preferred path - uses the RoutingSignal from the
+        # handoff envelope instead of parsing receipts.
+        if handoff_envelope is not None:
+            signal = handoff_envelope.routing_signal
+            if signal.decision == RoutingDecision.TERMINATE:
+                return None, signal.reason or "flow_complete_via_signal"
+            elif signal.decision == RoutingDecision.ADVANCE:
+                next_step_id = signal.next_step_id
+                if next_step_id is None and routing and routing.next:
+                    next_step_id = routing.next
+                return next_step_id, signal.reason or "advance_via_signal"
+            elif signal.decision == RoutingDecision.LOOP:
+                if routing and routing.loop_target:
+                    loop_key = f"{current_step.id}:{routing.loop_target}"
+                    current_iter = loop_state.get(loop_key, 0)
+                    loop_state[loop_key] = current_iter + 1
+                    return routing.loop_target, signal.reason or f"loop_iteration:{current_iter + 1}"
+            elif signal.decision == RoutingDecision.BRANCH:
+                next_step_id = signal.next_step_id
+                if next_step_id:
+                    return next_step_id, signal.reason or "branch_via_signal"
+
+            # If signal didn't provide a clear path, log and fall through
+            logger.debug(
+                "RoutingSignal did not resolve routing for step %s (decision=%s), falling back",
+                current_step.id,
+                signal.decision,
+            )
+
+        # =========================================================
+        # FALLBACK PATH: Receipt-based routing (backward compatibility)
+        # =========================================================
 
         # No routing config: fall back to linear progression
         if routing is None:
@@ -837,6 +928,33 @@ class GeminiStepOrchestrator:
         except Exception:
             pass  # Graceful failure
 
+    def _read_receipt_field(
+        self,
+        run_id: str,
+        flow_key: str,
+        step_id: str,
+        agent_key: str,
+        field_name: str,
+    ) -> Optional[str]:
+        """Read a specific field from a receipt file.
+
+        Used by the _route method to extract receipt fields for routing decisions.
+
+        Args:
+            run_id: The run identifier.
+            flow_key: The flow key (e.g., "build").
+            step_id: The step identifier.
+            agent_key: The agent key.
+            field_name: The field to extract from the receipt.
+
+        Returns:
+            The field value as a string if found, None otherwise.
+        """
+        from swarm.runtime.resolvers import read_receipt_field
+        return read_receipt_field(
+            self._repo_root, run_id, flow_key, step_id, agent_key, field_name
+        )
+
     def _execute_single_step(
         self,
         run_id: RunId,
@@ -846,12 +964,19 @@ class GeminiStepOrchestrator:
         spec: RunSpec,
         history: List[Dict[str, Any]],
         routing_ctx: Optional["RoutingContext"] = None,
+        run_state: Optional[RunState] = None,
     ) -> Dict[str, Any]:
         """Execute a single step via the configured StepEngine.
 
         Builds a StepContext including previous step outputs, delegates to the
         engine, persists emitted events, and returns a dict suitable for
         inclusion in subsequent step history.
+
+        This method implements a four-phase execution model:
+        1. Hydration: Build ContextPack with upstream artifacts and envelopes
+        2. Enrichment: Load prompts via EnrichedStepDefinition
+        3. Execution: Delegate to engine with enriched context
+        4. Finalization: Engine produces HandoffEnvelope (JIT finalization)
 
         Args:
             run_id: The run identifier.
@@ -861,6 +986,8 @@ class GeminiStepOrchestrator:
             spec: The run specification.
             history: List of previous step results for context.
             routing_ctx: Optional routing context for microloop metadata.
+            run_state: Optional RunState for building context pack with
+                in-memory handoff envelopes.
 
         Returns:
             Dictionary with step execution result:
@@ -868,6 +995,8 @@ class GeminiStepOrchestrator:
             - status: "succeeded" or "failed"
             - error: Error message if failed
             - output: Summary of step output
+            - run_id: The run identifier (for routing)
+            - flow_key: The flow key (for routing)
         """
         step_start = datetime.now(timezone.utc)
 
@@ -895,6 +1024,8 @@ class GeminiStepOrchestrator:
             "step_index": step.index,
             "agents": list(step.agents),
             "started_at": step_start.isoformat(),
+            "run_id": run_id,
+            "flow_key": flow_key,
         }
 
         status = "failed"
@@ -921,7 +1052,40 @@ class GeminiStepOrchestrator:
                 routing=routing_ctx,
             )
 
-            # Execute via engine
+            # =========================================================
+            # PHASE 1: Hydration - Build ContextPack
+            # =========================================================
+            # The ContextPack consolidates upstream artifacts and previous
+            # handoff envelopes for this step's context.
+            context_pack = build_context_pack(ctx, run_state, self._repo_root)
+
+            logger.debug(
+                "Built context pack for step %s: %d artifacts, %d prior envelopes",
+                step.id,
+                len(context_pack.upstream_artifacts),
+                len(context_pack.previous_envelopes),
+            )
+
+            # =========================================================
+            # PHASE 2: Enrichment - Load Prompts
+            # =========================================================
+            # EnrichedStepDefinition adds orchestrator and agent prompts
+            # from swarm/prompts/ and .claude/agents/ directories.
+            enriched_step = enrich_step_definition_with_flow(
+                step, flow_key, self._repo_root
+            )
+
+            # Store enriched prompts in extra for engine access
+            ctx.extra["orchestrator_prompt"] = enriched_step.orchestrator_prompt
+            ctx.extra["agent_prompts"] = enriched_step.agent_prompts
+            ctx.extra["context_pack"] = context_pack
+
+            # =========================================================
+            # PHASE 3: Execution - Delegate to Engine
+            # =========================================================
+            # The engine executes the step and produces a StepResult.
+            # JIT finalization happens inside the engine (ClaudeStepEngine
+            # prompts the LLM to write a HandoffEnvelope).
             step_result, engine_events = self._engine.run_step(ctx)
 
             # Persist engine-emitted events

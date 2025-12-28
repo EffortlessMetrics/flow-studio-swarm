@@ -31,6 +31,7 @@ from .types import (
     RunEvent,
     RunId,
     RunSpec,
+    RunState,
     RunStatus,
     RunSummary,
     SDLCStatus,
@@ -1037,6 +1038,15 @@ class GeminiStepwiseBackend(RunBackend):
         # Execute each flow in the spec
         for flow_key in spec.flow_keys:
             try:
+                # Create RunState for this flow execution
+                run_state = RunState(
+                    run_id=run_id,
+                    flow_key=flow_key,
+                    status="pending",
+                    timestamp=datetime.now(timezone.utc),
+                )
+                storage.write_run_state(run_id, run_state)
+
                 # The orchestrator handles its own run creation, but we want
                 # to use our run_id. We call run_stepwise_flow which creates
                 # its own run_id, so we need to manually drive the execution.
@@ -1046,6 +1056,7 @@ class GeminiStepwiseBackend(RunBackend):
                     flow_key=flow_key,
                     flow_def=orchestrator._flow_registry.get_flow(flow_key),
                     spec=spec,
+                    run_state=run_state,
                     start_step=None,
                     end_step=None,
                 )
@@ -1227,6 +1238,15 @@ class ClaudeStepwiseBackend(RunBackend):
         # Execute each flow in the spec
         for flow_key in spec.flow_keys:
             try:
+                # Create RunState for this flow execution
+                run_state = RunState(
+                    run_id=run_id,
+                    flow_key=flow_key,
+                    status="pending",
+                    timestamp=datetime.now(timezone.utc),
+                )
+                storage.write_run_state(run_id, run_state)
+
                 # The orchestrator handles its own run creation, but we want
                 # to use our run_id. We call run_stepwise_flow which creates
                 # its own run_id, so we need to manually drive the execution.
@@ -1236,6 +1256,7 @@ class ClaudeStepwiseBackend(RunBackend):
                     flow_key=flow_key,
                     flow_def=orchestrator._flow_registry.get_flow(flow_key),
                     spec=spec,
+                    run_state=run_state,
                     start_step=None,
                     end_step=None,
                 )

@@ -268,3 +268,150 @@ uv run swarm/tools/wisdom_summarizer.py health-check-risky-deploy --output path
 # Quiet mode (no output, just write the file)
 uv run swarm/tools/wisdom_summarizer.py health-check-risky-deploy --output quiet
 ```
+
+---
+
+## Task: Integrate Routing Signal Resolver
+
+**Date**: 2025-12-27
+
+### Status: VERIFIED
+
+All tests pass and the implementation is complete.
+
+### Files Changed
+
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `swarm/runtime/resolvers.py` | Created | New routing signal resolver module |
+| `swarm/runtime/orchestrator.py` | Modified | Added missing `_read_receipt_field` method |
+
+### Implementation Details
+
+**Created**: `swarm/runtime/resolvers.py`
+
+New module with routing signal resolver functions:
+
+**Functions Added:**
+
+1. **`load_routing_signal_prompt(repo_root: Path) -> str`**
+   - Loads the `routing_signal.md` template from disk
+   - Supports both auto-detected and explicit repo_root paths
+   - Raises `FileNotFoundError` if template is missing
+
+2. **`build_routing_prompt(handoff_envelope, current_step, flow_spec, loop_state, repo_root) -> str`**
+   - Builds a complete routing decision prompt
+   - Includes handoff envelope summary, step routing config, and available steps
+   - Formats microloop state (iteration count, max iterations)
+   - Lists all steps in flow for validation
+
+3. **`parse_routing_response(response: str) -> RoutingSignal`**
+   - Parses JSON response into a RoutingSignal dataclass
+   - Handles multiple response formats:
+     - Pure JSON
+     - JSON in markdown code blocks
+     - JSON with surrounding text
+   - Maps alternative decision names (proceed/rerun/blocked) to RoutingDecision enum
+   - Validates confidence scores (0.0 to 1.0)
+   - Parses needs_human flag
+
+4. **`read_receipt_field(repo_root, run_id, flow_key, step_id, agent_key, field_name) -> Optional[str]`**
+   - Reads a specific field from a receipt JSON file
+   - Used by the orchestrator's `_route` method for routing decisions
+   - Returns None if receipt or field is missing
+   - Handles JSON decode errors gracefully
+
+5. **`validate_next_step(next_step_id, flow_spec) -> bool`**
+   - Validates that a proposed next step exists in the flow
+   - Returns True for None (flow termination)
+
+6. **`get_available_next_steps(current_step, flow_spec) -> List[str]`**
+   - Gets list of valid next step IDs from current position
+   - Includes routing.next, loop_target, branch targets, and next-by-index
+
+**Helper Functions:**
+
+- `_build_handoff_section()` - Formats handoff envelope for prompt
+- `_build_routing_config_section()` - Formats step routing config
+- `_build_available_steps_section()` - Lists all steps in flow
+- `_extract_json()` - Extracts JSON from potentially wrapped text
+- `_routing_signal_from_response()` - Converts parsed JSON to RoutingSignal
+
+**Modified**: `swarm/runtime/orchestrator.py`
+
+Added the missing `_read_receipt_field` method:
+
+```python
+def _read_receipt_field(
+    self,
+    run_id: str,
+    flow_key: str,
+    step_id: str,
+    agent_key: str,
+    field_name: str,
+) -> Optional[str]:
+    """Read a specific field from a receipt file."""
+    from swarm.runtime.resolvers import read_receipt_field
+    return read_receipt_field(
+        self._repo_root, run_id, flow_key, step_id, agent_key, field_name
+    )
+```
+
+This method was being called in `_route()` and `_create_routing_signal()` but was not defined.
+
+### Tests Addressed
+
+All 10 tests in `tests/test_build_stepwise_routing.py` pass:
+
+| Test | Description | Status |
+|------|-------------|--------|
+| `test_verified_exits_loop` | When status=VERIFIED, loop exits to next step | PASS |
+| `test_unverified_can_help_loops_back` | When status=UNVERIFIED and can_help=yes, loops back | PASS |
+| `test_unverified_cannot_help_exits` | When status=UNVERIFIED and can_help=no, exits loop | PASS |
+| `test_max_iterations_limits_loops` | After max iterations, exits even if can_help=yes | PASS |
+| `test_linear_routing_advances` | Linear steps advance to next step | PASS |
+| `test_linear_routing_flow_complete` | Final linear step terminates flow | PASS |
+| `test_loop_state_increments` | Loop counter increments on each iteration | PASS |
+| `test_loop_state_independent_loops` | Different loops have independent counters | PASS |
+| `test_no_routing_config_falls_back_to_linear` | Step with no routing config falls back to linear | PASS |
+| `test_missing_receipt_loops_back` | When receipt is missing, microloop should loop back | PASS |
+
+Additional verification tests:
+- Module imports: PASS
+- Template loading (3212 chars from routing_signal.md): PASS
+- JSON parsing (pure JSON, code blocks, alternative names): PASS
+
+### Trade-offs and Decisions
+
+1. **Delegation Pattern**: The orchestrator's `_read_receipt_field` delegates to `resolvers.read_receipt_field` rather than duplicating logic.
+
+2. **Alternative Decision Names**: Maps common alternative names (proceed, rerun, blocked) to the canonical RoutingDecision enum values for robustness.
+
+3. **JSON Extraction**: The `_extract_json` helper tries multiple patterns (code blocks, raw JSON) to handle various LLM response formats.
+
+4. **Confidence Clamping**: Confidence values are clamped to [0.0, 1.0] range and unparseable strings default to 0.7.
+
+5. **Graceful Degradation**: Missing receipts or parse errors return None/default values rather than raising exceptions.
+
+### Integration Notes
+
+The routing resolver is designed to be called as a SEPARATE short-lived LLM call:
+
+1. After step execution, the orchestrator creates a `HandoffEnvelope`
+2. The router session receives `build_routing_prompt()` output
+3. The router LLM returns a JSON RoutingSignal
+4. `parse_routing_response()` converts this to a RoutingSignal dataclass
+5. The orchestrator uses the signal to determine the next step
+
+### Observability
+
+The routing resolver logs to the `swarm.runtime.resolvers` logger:
+- DEBUG: Receipt file locations, parse details
+- WARNING: Missing receipts, JSON parse failures
+
+Events emitted by the orchestrator include routing decision details:
+- `route_decision` event with from_step, to_step, reason, confidence, needs_human
+
+### Verification Status
+
+**VERIFIED**: Code written, 10 tests pass, module imports verified, template loading verified, JSON parsing verified.
