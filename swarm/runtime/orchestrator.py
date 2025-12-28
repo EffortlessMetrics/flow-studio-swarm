@@ -40,7 +40,14 @@ from swarm.config.flow_registry import (
 
 from . import storage as storage_module
 from .context_pack import ContextPack, build_context_pack
-from .engines import GeminiStepEngine, RoutingContext, StepContext, StepEngine
+from .engines import (
+    FinalizationResult,
+    GeminiStepEngine,
+    LifecycleCapableEngine,
+    RoutingContext,
+    StepContext,
+    StepEngine,
+)
 from .flow_loader import EnrichedStepDefinition, enrich_step_definition_with_flow
 from .types import (
     RunEvent,
@@ -1080,22 +1087,80 @@ class GeminiStepOrchestrator:
             ctx.extra["agent_prompts"] = enriched_step.agent_prompts
             ctx.extra["context_pack"] = context_pack
 
+            # Add routing config to extra for lifecycle-capable engines
+            if step.routing:
+                ctx.extra["routing"] = {
+                    "kind": step.routing.kind,
+                    "next": step.routing.next,
+                    "loop_target": step.routing.loop_target,
+                    "loop_condition_field": step.routing.loop_condition_field,
+                    "loop_success_values": list(step.routing.loop_success_values),
+                    "max_iterations": step.routing.max_iterations,
+                }
+
             # =========================================================
             # PHASE 3: Execution - Delegate to Engine
             # =========================================================
-            # The engine executes the step and produces a StepResult.
-            # JIT finalization happens inside the engine (ClaudeStepEngine
-            # prompts the LLM to write a HandoffEnvelope).
-            step_result, engine_events = self._engine.run_step(ctx)
+            # Check if engine supports explicit lifecycle control
+            if isinstance(self._engine, LifecycleCapableEngine):
+                # LIFECYCLE-CAPABLE ENGINE: Explicit phase control
+                # This path gives the orchestrator control over when
+                # finalization and routing happen.
+                logger.debug(
+                    "Using lifecycle-capable engine for step %s",
+                    step.id,
+                )
 
-            # Persist engine-emitted events
-            for event in engine_events:
-                storage_module.append_event(run_id, event)
+                # Phase 3a: Work - Execute the step's primary task
+                step_result, work_events, work_summary = self._engine.run_worker(ctx)
 
-            status = step_result.status
-            error = step_result.error
-            output = step_result.output
-            duration_ms = step_result.duration_ms
+                # Persist work phase events
+                for event in work_events:
+                    storage_module.append_event(run_id, event)
+
+                # Phase 3b: Finalization - Extract handoff state
+                finalization_result = self._engine.finalize_step(
+                    ctx, step_result, work_summary
+                )
+
+                # Persist finalization events
+                for event in finalization_result.events:
+                    storage_module.append_event(run_id, event)
+
+                # Phase 3c: Routing - Determine next step
+                routing_signal: Optional[RoutingSignal] = None
+                if finalization_result.handoff_data:
+                    routing_signal = self._engine.route_step(
+                        ctx, finalization_result.handoff_data
+                    )
+
+                    # Store routing signal in result for _execute_stepwise
+                    if routing_signal:
+                        result["routing_signal"] = routing_signal
+
+                # Store envelope in result for later use
+                if finalization_result.envelope:
+                    result["handoff_envelope"] = finalization_result.envelope
+
+                status = step_result.status
+                error = step_result.error
+                output = step_result.output
+                duration_ms = step_result.duration_ms
+
+            else:
+                # LEGACY ENGINE: Monolithic run_step() call
+                # The engine handles finalization and routing internally
+                # (or relies on orchestrator-generated routing).
+                step_result, engine_events = self._engine.run_step(ctx)
+
+                # Persist engine-emitted events
+                for event in engine_events:
+                    storage_module.append_event(run_id, event)
+
+                status = step_result.status
+                error = step_result.error
+                output = step_result.output
+                duration_ms = step_result.duration_ms
 
         except Exception as e:
             logger.warning("Step %s failed: %s", step.id, e)

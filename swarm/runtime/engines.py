@@ -251,6 +251,103 @@ class StepEngine(ABC):
         ...
 
 
+@dataclass
+class FinalizationResult:
+    """Result from the finalization phase.
+
+    Attributes:
+        handoff_data: Raw handoff JSON from the agent's draft file (if available).
+        envelope: Structured HandoffEnvelope (if successfully created).
+        work_summary: Summary of the step's work output.
+        events: Events emitted during finalization.
+    """
+
+    handoff_data: Optional[Dict[str, Any]] = None
+    envelope: Optional[HandoffEnvelope] = None
+    work_summary: str = ""
+    events: List[RunEvent] = field(default_factory=list)
+
+
+class LifecycleCapableEngine(StepEngine):
+    """Engine that supports explicit lifecycle phase control.
+
+    Extends StepEngine with methods for orchestrator-controlled lifecycle:
+    - run_worker(): Execute the work phase only
+    - finalize_step(): JIT finalization to extract handoff state
+    - route_step(): Determine next step via routing resolver
+
+    The orchestrator can call these methods individually for fine-grained control,
+    or use run_step() which calls all phases in sequence.
+    """
+
+    @abstractmethod
+    def run_worker(
+        self, ctx: StepContext
+    ) -> Tuple[StepResult, List[RunEvent], str]:
+        """Execute the work phase only (no finalization or routing).
+
+        The work phase:
+        1. Builds the prompt from context
+        2. Executes the LLM query
+        3. Collects assistant output and events
+
+        Args:
+            ctx: Step execution context.
+
+        Returns:
+            Tuple of (StepResult, events, work_summary).
+            work_summary is the raw assistant output for finalization.
+        """
+        ...
+
+    @abstractmethod
+    def finalize_step(
+        self,
+        ctx: StepContext,
+        step_result: StepResult,
+        work_summary: str,
+    ) -> FinalizationResult:
+        """Execute JIT finalization to extract handoff state.
+
+        The finalization phase:
+        1. Injects finalization prompt to the LLM session
+        2. Agent writes handoff draft file
+        3. Reads and parses the draft
+        4. Creates structured HandoffEnvelope
+
+        Args:
+            ctx: Step execution context.
+            step_result: Result from run_worker phase.
+            work_summary: Raw assistant output from work phase.
+
+        Returns:
+            FinalizationResult with handoff data and envelope.
+        """
+        ...
+
+    @abstractmethod
+    def route_step(
+        self,
+        ctx: StepContext,
+        handoff_data: Dict[str, Any],
+    ) -> Optional[RoutingSignal]:
+        """Determine next step via routing resolver.
+
+        The routing phase:
+        1. Checks deterministic termination conditions (microloop exit)
+        2. If needed, runs lightweight LLM router session
+        3. Parses routing decision into RoutingSignal
+
+        Args:
+            ctx: Step execution context with routing configuration.
+            handoff_data: Parsed handoff data from finalization.
+
+        Returns:
+            RoutingSignal if routing was determined, None if routing failed.
+        """
+        ...
+
+
 class GeminiStepEngine(StepEngine):
     """Step engine using Gemini CLI.
 
@@ -883,7 +980,7 @@ class GeminiStepEngine(StepEngine):
         )
 
 
-class ClaudeStepEngine(StepEngine):
+class ClaudeStepEngine(LifecycleCapableEngine):
     """Step engine using Claude Agent SDK or CLI.
 
     This engine supports three modes:
@@ -914,6 +1011,12 @@ class ClaudeStepEngine(StepEngine):
 
     Context budgets are read from runtime.yaml via runtime_config.py.
     See docs/CONTEXT_BUDGETS.md for the full philosophy.
+
+    Lifecycle Methods (for orchestrator control):
+    - run_worker(): Execute work phase only (prompt → LLM → output)
+    - finalize_step(): JIT finalization to extract handoff state
+    - route_step(): Determine next step via routing resolver
+    - run_step(): Convenience method that calls all phases in sequence
     """
 
     @property
@@ -1114,6 +1217,23 @@ Analyze the handoff and emit your routing decision now.
     @property
     def engine_id(self) -> str:
         return "claude-step"
+
+    def _check_sdk_available(self) -> bool:
+        """Check if the Claude Code SDK is available.
+
+        Caches the result after first check.
+
+        Returns:
+            True if claude_code_sdk can be imported, False otherwise.
+        """
+        if self._sdk_available is None:
+            try:
+                import claude_code_sdk  # noqa: F401
+                self._sdk_available = True
+            except ImportError:
+                self._sdk_available = False
+                logger.debug("claude_code_sdk not available")
+        return self._sdk_available
 
     def _get_resolved_budgets(
         self, flow_key: Optional[str] = None, step_id: Optional[str] = None
@@ -1773,6 +1893,778 @@ Error: {step_result.error or "None"}
         except (OSError, IOError) as e:
             logger.warning("Failed to write handoff envelope for step %s: %s", ctx.step_id, e)
             return None
+
+    # =========================================================================
+    # PUBLIC LIFECYCLE METHODS (for orchestrator-controlled execution)
+    # =========================================================================
+
+    def run_worker(
+        self, ctx: StepContext
+    ) -> Tuple[StepResult, List[RunEvent], str]:
+        """Execute the work phase only (no finalization or routing).
+
+        This method runs the primary work session where the agent executes
+        its assigned task. It does NOT inject finalization prompts or make
+        routing decisions - those are handled by finalize_step() and route_step().
+
+        Args:
+            ctx: Step execution context.
+
+        Returns:
+            Tuple of (StepResult, events, work_summary).
+            work_summary is the raw assistant output for subsequent finalization.
+        """
+        # Stub mode: return synthetic result without SDK
+        if self.stub_mode or self._mode == "stub":
+            return self._run_worker_stub(ctx)
+
+        # SDK mode requires the claude_code_sdk
+        if not self._check_sdk_available():
+            logger.warning("SDK not available for run_worker, falling back to stub")
+            return self._run_worker_stub(ctx)
+
+        import asyncio
+
+        # Determine if we need to create a new event loop
+        try:
+            loop = asyncio.get_running_loop()
+            # We're already in an async context - need to run in thread
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(
+                    asyncio.run, self._run_worker_async(ctx)
+                )
+                return future.result()
+        except RuntimeError:
+            # No running loop - we can create one
+            return asyncio.run(self._run_worker_async(ctx))
+
+    def _run_worker_stub(
+        self, ctx: StepContext
+    ) -> Tuple[StepResult, List[RunEvent], str]:
+        """Stub implementation of run_worker for testing.
+
+        Args:
+            ctx: Step execution context.
+
+        Returns:
+            Tuple of (StepResult, events, work_summary).
+        """
+        start_time = datetime.now(timezone.utc)
+        agent_key = ctx.step_agents[0] if ctx.step_agents else "unknown"
+
+        # Create directories
+        ensure_llm_dir(ctx.run_base)
+        ensure_receipts_dir(ctx.run_base)
+
+        # Generate stub transcript
+        t_path = make_transcript_path(ctx.run_base, ctx.step_id, agent_key, "claude")
+        transcript_messages = [
+            {
+                "timestamp": start_time.isoformat() + "Z",
+                "role": "system",
+                "content": f"[STUB WORKER] Executing step {ctx.step_id} with agent {agent_key}",
+            },
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                "role": "assistant",
+                "content": f"[STUB] Completed step {ctx.step_id}. Work phase done.",
+            },
+        ]
+        with t_path.open("w", encoding="utf-8") as f:
+            for msg in transcript_messages:
+                f.write(json.dumps(msg) + "\n")
+
+        end_time = datetime.now(timezone.utc)
+        duration_ms = int((end_time - start_time).total_seconds() * 1000)
+
+        work_summary = f"[STUB:{self.engine_id}] Step {ctx.step_id} work phase completed successfully"
+
+        result = StepResult(
+            step_id=ctx.step_id,
+            status="succeeded",
+            output=work_summary,
+            duration_ms=duration_ms,
+            artifacts={
+                "transcript_path": str(t_path),
+                "token_counts": {"prompt": 0, "completion": 0, "total": 0},
+                "model": "claude-stub",
+            },
+        )
+
+        events: List[RunEvent] = [
+            RunEvent(
+                run_id=ctx.run_id,
+                ts=start_time,
+                kind="log",
+                flow_key=ctx.flow_key,
+                step_id=ctx.step_id,
+                agent_key=agent_key,
+                payload={
+                    "message": f"[STUB WORKER] Step {ctx.step_id} executed",
+                    "mode": "stub",
+                },
+            )
+        ]
+
+        return result, events, work_summary
+
+    async def _run_worker_async(
+        self, ctx: StepContext
+    ) -> Tuple[StepResult, List[RunEvent], str]:
+        """Async implementation of run_worker.
+
+        Executes only the work phase - builds prompt, runs LLM query,
+        collects output. Does NOT run JIT finalization or routing.
+
+        Args:
+            ctx: Step execution context.
+
+        Returns:
+            Tuple of (StepResult, events, work_summary).
+        """
+        from claude_code_sdk import ClaudeCodeOptions, query
+
+        start_time = datetime.now(timezone.utc)
+        agent_key = ctx.step_agents[0] if ctx.step_agents else "unknown"
+        events: List[RunEvent] = []
+
+        # Create directories
+        ensure_llm_dir(ctx.run_base)
+        ensure_receipts_dir(ctx.run_base)
+
+        # Build prompt
+        prompt, truncation_info, agent_persona = self._build_prompt(ctx)
+
+        # Set up working directory
+        cwd = str(ctx.repo_root) if ctx.repo_root else str(Path.cwd())
+
+        # High-trust options
+        options = ClaudeCodeOptions(
+            permission_mode="bypassPermissions",
+        )
+
+        # Record step start in stats DB
+        if self._stats_db:
+            try:
+                self._stats_db.record_step_start(
+                    run_id=ctx.run_id,
+                    flow_key=ctx.flow_key,
+                    step_id=ctx.step_id,
+                    step_index=ctx.step_index,
+                    agent_key=agent_key,
+                )
+            except Exception as db_err:
+                logger.debug("Failed to record step start: %s", db_err)
+
+        # Collect output
+        raw_events: List[Dict[str, Any]] = []
+        full_assistant_text: List[str] = []
+        token_counts: Dict[str, int] = {"prompt": 0, "completion": 0, "total": 0}
+        model_name = "claude-sonnet-4-20250514"
+        pending_tool_inputs: Dict[str, Tuple[str, Dict[str, Any]]] = {}
+
+        try:
+            async for event in query(
+                prompt=prompt,
+                cwd=cwd,
+                options=options,
+            ):
+                now = datetime.now(timezone.utc)
+                event_dict: Dict[str, Any] = {"timestamp": now.isoformat() + "Z"}
+                event_type = getattr(event, "type", None) or type(event).__name__
+
+                if event_type == "AssistantMessageEvent" or hasattr(event, "message"):
+                    message = getattr(event, "message", event)
+                    role = getattr(message, "role", "assistant")
+                    content = getattr(message, "content", "")
+
+                    if isinstance(content, list):
+                        text_parts = []
+                        for block in content:
+                            if hasattr(block, "text"):
+                                text_parts.append(block.text)
+                            elif hasattr(block, "content"):
+                                text_parts.append(str(block.content))
+                        content = "\n".join(text_parts)
+
+                    event_dict["role"] = role
+                    event_dict["content"] = content
+                    event_dict["type"] = "message"
+
+                    if role == "assistant" and content:
+                        full_assistant_text.append(content)
+
+                    events.append(
+                        RunEvent(
+                            run_id=ctx.run_id,
+                            ts=now,
+                            kind="assistant_message" if role == "assistant" else "user_message",
+                            flow_key=ctx.flow_key,
+                            step_id=ctx.step_id,
+                            agent_key=agent_key,
+                            payload={"role": role, "content": content[:500]},
+                        )
+                    )
+
+                elif event_type == "ToolUseEvent" or hasattr(event, "tool_name"):
+                    tool_name = getattr(event, "tool_name", getattr(event, "name", "unknown"))
+                    tool_input = getattr(event, "input", getattr(event, "args", {}))
+                    tool_use_id = getattr(event, "id", getattr(event, "tool_use_id", None))
+
+                    event_dict["type"] = "tool_use"
+                    event_dict["tool"] = tool_name
+                    event_dict["input"] = tool_input
+
+                    if tool_use_id and isinstance(tool_input, dict):
+                        pending_tool_inputs[tool_use_id] = (tool_name, tool_input)
+
+                    events.append(
+                        RunEvent(
+                            run_id=ctx.run_id,
+                            ts=now,
+                            kind="tool_start",
+                            flow_key=ctx.flow_key,
+                            step_id=ctx.step_id,
+                            agent_key=agent_key,
+                            payload={"tool": tool_name, "input": str(tool_input)[:200]},
+                        )
+                    )
+
+                elif event_type == "ToolResultEvent" or hasattr(event, "tool_result"):
+                    result = getattr(event, "tool_result", getattr(event, "result", ""))
+                    success = getattr(event, "success", True)
+                    tool_name = getattr(event, "tool_name", "unknown")
+                    tool_use_id = getattr(event, "tool_use_id", getattr(event, "id", None))
+
+                    tool_input: Dict[str, Any] = {}
+                    if tool_use_id and tool_use_id in pending_tool_inputs:
+                        stored_name, tool_input = pending_tool_inputs.pop(tool_use_id)
+                        if tool_name == "unknown":
+                            tool_name = stored_name
+
+                    event_dict["type"] = "tool_result"
+                    event_dict["tool"] = tool_name
+                    event_dict["success"] = success
+                    event_dict["output"] = str(result)[:500]
+
+                    events.append(
+                        RunEvent(
+                            run_id=ctx.run_id,
+                            ts=now,
+                            kind="tool_end",
+                            flow_key=ctx.flow_key,
+                            step_id=ctx.step_id,
+                            agent_key=agent_key,
+                            payload={
+                                "tool": tool_name,
+                                "success": success,
+                                "output": str(result)[:200],
+                            },
+                        )
+                    )
+
+                    # Record to stats DB
+                    if self._stats_db:
+                        try:
+                            target_path = None
+                            if tool_name in ("Edit", "Write", "Read"):
+                                target_path = str(tool_input.get("file_path", ""))[:500]
+                            self._stats_db.record_tool_call(
+                                run_id=ctx.run_id,
+                                step_id=ctx.step_id,
+                                tool_name=tool_name,
+                                phase="work",
+                                success=success,
+                                target_path=target_path,
+                            )
+                        except Exception as db_err:
+                            logger.debug("Failed to record tool call: %s", db_err)
+
+                        if tool_name in ("Write", "Edit") and success:
+                            try:
+                                target_path = str(tool_input.get("file_path", ""))
+                                if target_path:
+                                    change_type = "created" if tool_name == "Write" else "modified"
+                                    self._stats_db.record_file_change(
+                                        run_id=ctx.run_id,
+                                        step_id=ctx.step_id,
+                                        file_path=target_path,
+                                        change_type=change_type,
+                                    )
+                            except Exception as db_err:
+                                logger.debug("Failed to record file change: %s", db_err)
+
+                elif event_type == "ResultEvent" or hasattr(event, "result"):
+                    result = getattr(event, "result", event)
+                    event_dict["type"] = "result"
+
+                    usage = getattr(result, "usage", None)
+                    if usage:
+                        token_counts["prompt"] = getattr(usage, "input_tokens", 0)
+                        token_counts["completion"] = getattr(usage, "output_tokens", 0)
+                        token_counts["total"] = token_counts["prompt"] + token_counts["completion"]
+                        event_dict["usage"] = token_counts
+
+                    result_model = getattr(result, "model", None)
+                    if result_model:
+                        model_name = result_model
+
+                else:
+                    event_dict["type"] = event_type
+                    if hasattr(event, "__dict__"):
+                        for k, v in event.__dict__.items():
+                            if not k.startswith("_"):
+                                try:
+                                    json.dumps(v)
+                                    event_dict[k] = v
+                                except (TypeError, ValueError):
+                                    event_dict[k] = str(v)
+
+                raw_events.append(event_dict)
+
+            status = "succeeded"
+            error = None
+
+        except Exception as e:
+            logger.warning("SDK worker query failed for step %s: %s", ctx.step_id, e)
+            status = "failed"
+            error = str(e)
+            raw_events.append({
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                "type": "error",
+                "error": str(e),
+            })
+
+        end_time = datetime.now(timezone.utc)
+        duration_ms = int((end_time - start_time).total_seconds() * 1000)
+
+        # Build work summary
+        work_summary = "".join(full_assistant_text)
+
+        # Build output text
+        if len(work_summary) > 2000:
+            output_text = work_summary[:2000] + "... (truncated)"
+        elif work_summary:
+            output_text = work_summary
+        else:
+            output_text = f"Step {ctx.step_id} work phase completed. Events: {len(raw_events)}"
+
+        # Write transcript (work phase only)
+        t_path = make_transcript_path(ctx.run_base, ctx.step_id, agent_key, "claude")
+        with t_path.open("w", encoding="utf-8") as f:
+            for event in raw_events:
+                f.write(json.dumps(event) + "\n")
+
+        result = StepResult(
+            step_id=ctx.step_id,
+            status=status,
+            output=output_text,
+            error=error,
+            duration_ms=duration_ms,
+            artifacts={
+                "transcript_path": str(t_path),
+                "token_counts": token_counts,
+                "model": model_name,
+            },
+        )
+
+        return result, events, work_summary
+
+    def finalize_step(
+        self,
+        ctx: StepContext,
+        step_result: StepResult,
+        work_summary: str,
+    ) -> FinalizationResult:
+        """Execute JIT finalization to extract handoff state.
+
+        This method injects a finalization prompt into a fresh LLM session
+        to have the agent write a structured handoff draft file. It then
+        reads the draft and creates a HandoffEnvelope.
+
+        Args:
+            ctx: Step execution context.
+            step_result: Result from run_worker phase.
+            work_summary: Raw assistant output from work phase.
+
+        Returns:
+            FinalizationResult with handoff data and envelope.
+        """
+        # Stub mode: return synthetic finalization result
+        if self.stub_mode or self._mode == "stub":
+            return self._finalize_step_stub(ctx, step_result, work_summary)
+
+        # SDK mode requires the claude_code_sdk
+        if not self._check_sdk_available():
+            logger.warning("SDK not available for finalize_step, falling back to stub")
+            return self._finalize_step_stub(ctx, step_result, work_summary)
+
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(
+                    asyncio.run, self._finalize_step_async(ctx, step_result, work_summary)
+                )
+                return future.result()
+        except RuntimeError:
+            return asyncio.run(self._finalize_step_async(ctx, step_result, work_summary))
+
+    def _finalize_step_stub(
+        self,
+        ctx: StepContext,
+        step_result: StepResult,
+        work_summary: str,
+    ) -> FinalizationResult:
+        """Stub implementation of finalize_step for testing.
+
+        Args:
+            ctx: Step execution context.
+            step_result: Result from work phase.
+            work_summary: Raw assistant output from work phase.
+
+        Returns:
+            FinalizationResult with stub handoff data and envelope.
+        """
+        # Create handoff directory
+        handoff_dir = ctx.run_base / "handoff"
+        handoff_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create stub handoff data
+        handoff_data: Dict[str, Any] = {
+            "step_id": ctx.step_id,
+            "flow_key": ctx.flow_key,
+            "run_id": ctx.run_id,
+            "status": "VERIFIED" if step_result.status == "succeeded" else "UNVERIFIED",
+            "summary": work_summary[:500] if work_summary else f"[STUB] Step {ctx.step_id} completed",
+            "can_further_iteration_help": "no",  # Allow loop exit in stub mode
+            "artifacts": [],
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+        }
+
+        # Write stub handoff draft
+        handoff_path = handoff_dir / f"{ctx.step_id}.draft.json"
+        with handoff_path.open("w", encoding="utf-8") as f:
+            json.dump(handoff_data, f, indent=2)
+
+        # Create stub envelope
+        envelope = HandoffEnvelope(
+            step_id=ctx.step_id,
+            flow_key=ctx.flow_key,
+            run_id=ctx.run_id,
+            routing_signal=RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                reason="stub_finalization",
+                confidence=1.0,
+                needs_human=False,
+            ),
+            summary=handoff_data["summary"],
+            status=handoff_data["status"],
+            duration_ms=step_result.duration_ms,
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        # Write envelope to disk
+        envelope_path = make_handoff_envelope_path(ctx.run_base, ctx.step_id)
+        envelope_path.parent.mkdir(parents=True, exist_ok=True)
+        with envelope_path.open("w", encoding="utf-8") as f:
+            json.dump(handoff_envelope_to_dict(envelope), f, indent=2)
+
+        return FinalizationResult(
+            handoff_data=handoff_data,
+            envelope=envelope,
+            work_summary=work_summary,
+            events=[],
+        )
+
+    async def _finalize_step_async(
+        self,
+        ctx: StepContext,
+        step_result: StepResult,
+        work_summary: str,
+    ) -> FinalizationResult:
+        """Async implementation of finalize_step.
+
+        Args:
+            ctx: Step execution context.
+            step_result: Result from work phase.
+            work_summary: Raw assistant output from work phase.
+
+        Returns:
+            FinalizationResult with handoff data and envelope.
+        """
+        from claude_code_sdk import ClaudeCodeOptions, query
+
+        events: List[RunEvent] = []
+        raw_events: List[Dict[str, Any]] = []
+        agent_key = ctx.step_agents[0] if ctx.step_agents else "unknown"
+
+        # Compute handoff path
+        handoff_dir = ctx.run_base / "handoff"
+        handoff_path = handoff_dir / f"{ctx.step_id}.draft.json"
+        handoff_dir.mkdir(parents=True, exist_ok=True)
+
+        cwd = str(ctx.repo_root) if ctx.repo_root else str(Path.cwd())
+        options = ClaudeCodeOptions(permission_mode="bypassPermissions")
+
+        # Build finalization prompt
+        finalization_prompt = self.JIT_FINALIZATION_PROMPT.format(
+            handoff_path=str(handoff_path),
+            step_id=ctx.step_id,
+            flow_key=ctx.flow_key,
+            run_id=ctx.run_id,
+        )
+
+        # Add work summary context
+        truncated_summary = work_summary[:4000] if len(work_summary) > 4000 else work_summary
+        finalization_with_context = f"""
+## Work Session Summary
+{truncated_summary}
+
+{finalization_prompt}
+"""
+
+        try:
+            logger.debug("Starting JIT finalization for step %s", ctx.step_id)
+
+            async for event in query(
+                prompt=finalization_with_context,
+                cwd=cwd,
+                options=options,
+            ):
+                now = datetime.now(timezone.utc)
+                event_dict = {"timestamp": now.isoformat() + "Z", "phase": "finalization"}
+
+                event_type = getattr(event, "type", None) or type(event).__name__
+
+                if event_type == "AssistantMessageEvent" or hasattr(event, "message"):
+                    message = getattr(event, "message", event)
+                    content = getattr(message, "content", "")
+                    if isinstance(content, list):
+                        text_parts = [getattr(b, "text", str(getattr(b, "content", ""))) for b in content]
+                        content = "\n".join(text_parts)
+                    event_dict["type"] = "message"
+                    event_dict["content"] = content[:500]
+
+                elif event_type == "ToolUseEvent" or hasattr(event, "tool_name"):
+                    tool_name = getattr(event, "tool_name", getattr(event, "name", "unknown"))
+                    event_dict["type"] = "tool_use"
+                    event_dict["tool"] = tool_name
+
+                elif event_type == "ToolResultEvent" or hasattr(event, "tool_result"):
+                    event_dict["type"] = "tool_result"
+                    event_dict["success"] = getattr(event, "success", True)
+
+                else:
+                    event_dict["type"] = event_type
+
+                raw_events.append(event_dict)
+
+            logger.debug("JIT finalization complete for step %s", ctx.step_id)
+
+        except Exception as fin_error:
+            logger.warning("JIT finalization failed for step %s: %s", ctx.step_id, fin_error)
+            raw_events.append({
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                "phase": "finalization",
+                "type": "error",
+                "error": str(fin_error),
+            })
+
+        # Read handoff draft
+        handoff_data: Optional[Dict[str, Any]] = None
+        if handoff_path.exists():
+            try:
+                handoff_data = json.loads(handoff_path.read_text(encoding="utf-8"))
+                logger.debug("Handoff extracted from %s: status=%s", handoff_path, handoff_data.get("status"))
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Failed to parse handoff file %s: %s", handoff_path, e)
+        else:
+            logger.warning("Handoff file not created by agent: %s", handoff_path)
+
+        # Create envelope (with None routing_signal for now - routing happens separately)
+        envelope: Optional[HandoffEnvelope] = None
+        try:
+            envelope = await self._write_handoff_envelope(
+                ctx=ctx,
+                step_result=step_result,
+                routing_signal=None,  # Will be added by orchestrator after route_step()
+                work_summary=work_summary,
+            )
+            if envelope:
+                logger.debug("Handoff envelope created for step %s: status=%s", ctx.step_id, envelope.status)
+                raw_events.append({
+                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                    "phase": "envelope",
+                    "type": "handoff_envelope_written",
+                    "envelope_path": str(make_handoff_envelope_path(ctx.run_base, ctx.step_id)),
+                    "status": envelope.status,
+                })
+        except Exception as envelope_error:
+            logger.warning("Failed to write handoff envelope for step %s: %s", ctx.step_id, envelope_error)
+            raw_events.append({
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                "phase": "envelope",
+                "type": "error",
+                "error": str(envelope_error),
+            })
+
+        return FinalizationResult(
+            handoff_data=handoff_data,
+            envelope=envelope,
+            work_summary=work_summary,
+            events=events,
+        )
+
+    def route_step(
+        self,
+        ctx: StepContext,
+        handoff_data: Dict[str, Any],
+    ) -> Optional[RoutingSignal]:
+        """Determine next step via routing resolver.
+
+        This method first checks deterministic termination conditions
+        (microloop exit criteria) and only runs the LLM router session
+        if no deterministic decision can be made.
+
+        Args:
+            ctx: Step execution context with routing configuration.
+            handoff_data: Parsed handoff data from finalization.
+
+        Returns:
+            RoutingSignal if routing was determined, None if routing failed.
+        """
+        # Stub mode: return deterministic routing signal
+        if self.stub_mode or self._mode == "stub":
+            return self._route_step_stub(ctx, handoff_data)
+
+        # SDK mode requires the claude_code_sdk
+        if not self._check_sdk_available():
+            logger.warning("SDK not available for route_step, falling back to stub")
+            return self._route_step_stub(ctx, handoff_data)
+
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(
+                    asyncio.run, self._route_step_async(ctx, handoff_data)
+                )
+                return future.result()
+        except RuntimeError:
+            return asyncio.run(self._route_step_async(ctx, handoff_data))
+
+    def _route_step_stub(
+        self,
+        ctx: StepContext,
+        handoff_data: Dict[str, Any],
+    ) -> Optional[RoutingSignal]:
+        """Stub implementation of route_step for testing.
+
+        Uses deterministic routing based on routing config from ctx.extra.
+        This allows testing of the orchestrator's routing logic without LLM calls.
+
+        Args:
+            ctx: Step execution context.
+            handoff_data: Parsed handoff data.
+
+        Returns:
+            RoutingSignal with deterministic routing decision.
+        """
+        routing_config = ctx.extra.get("routing", {})
+
+        # Check for microloop termination
+        if routing_config.get("kind") == "microloop":
+            # In stub mode, always exit the loop (VERIFIED status)
+            status = handoff_data.get("status", "").upper()
+            success_values = routing_config.get("loop_success_values", ["VERIFIED"])
+
+            if status in [v.upper() for v in success_values]:
+                # Exit the loop - move to next step
+                next_step = routing_config.get("next")
+                return RoutingSignal(
+                    decision=RoutingDecision.ADVANCE,
+                    next_step_id=next_step,
+                    reason=f"stub_microloop_exit:{status}",
+                    confidence=1.0,
+                    needs_human=False,
+                )
+
+            # Check can_further_iteration_help
+            can_help = handoff_data.get("can_further_iteration_help", "no")
+            if isinstance(can_help, str) and can_help.lower() == "no":
+                next_step = routing_config.get("next")
+                return RoutingSignal(
+                    decision=RoutingDecision.ADVANCE,
+                    next_step_id=next_step,
+                    reason="stub_microloop_no_further_help",
+                    confidence=1.0,
+                    needs_human=False,
+                )
+
+        # Default: advance to next step
+        next_step = routing_config.get("next")
+        if next_step:
+            return RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                next_step_id=next_step,
+                reason="stub_linear_advance",
+                confidence=1.0,
+                needs_human=False,
+            )
+
+        # No next step - terminate flow
+        return RoutingSignal(
+            decision=RoutingDecision.TERMINATE,
+            reason="stub_flow_complete",
+            confidence=1.0,
+            needs_human=False,
+        )
+
+    async def _route_step_async(
+        self,
+        ctx: StepContext,
+        handoff_data: Dict[str, Any],
+    ) -> Optional[RoutingSignal]:
+        """Async implementation of route_step.
+
+        Args:
+            ctx: Step execution context.
+            handoff_data: Parsed handoff data.
+
+        Returns:
+            RoutingSignal if routing was determined, None if routing failed.
+        """
+        cwd = str(ctx.repo_root) if ctx.repo_root else str(Path.cwd())
+
+        try:
+            routing_signal = await self._run_router_session(
+                handoff_data=handoff_data,
+                ctx=ctx,
+                cwd=cwd,
+            )
+            if routing_signal:
+                logger.debug(
+                    "Router decision for step %s: %s -> %s (confidence=%.2f)",
+                    ctx.step_id,
+                    routing_signal.decision.value,
+                    routing_signal.next_step_id,
+                    routing_signal.confidence,
+                )
+            return routing_signal
+
+        except Exception as route_error:
+            logger.warning("Router session failed for step %s: %s", ctx.step_id, route_error)
+            return None
+
+    # =========================================================================
+    # END PUBLIC LIFECYCLE METHODS
+    # =========================================================================
 
     def _build_prompt(
         self, ctx: StepContext
