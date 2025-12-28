@@ -11,11 +11,15 @@ and enable static type checking across the runtime layer.
 Usage:
     from swarm.runtime.types import (
         RunId, BackendId, RunStatus, SDLCStatus,
+        RoutingDecision, RoutingSignal, HandoffEnvelope, RunState,
         RunSpec, RunSummary, RunEvent, BackendCapabilities,
         generate_run_id,
         run_spec_to_dict, run_spec_from_dict,
         run_summary_to_dict, run_summary_from_dict,
         run_event_to_dict, run_event_from_dict,
+        routing_signal_to_dict, routing_signal_from_dict,
+        handoff_envelope_to_dict, handoff_envelope_from_dict,
+        run_state_to_dict, run_state_from_dict,
     )
 """
 
@@ -57,6 +61,73 @@ class SDLCStatus(str, Enum):
     WARNING = "warning"
     ERROR = "error"
     UNKNOWN = "unknown"
+
+
+class RoutingDecision(str, Enum):
+    """Routing decision types for stepwise execution."""
+
+    ADVANCE = "advance"
+    LOOP = "loop"
+    TERMINATE = "terminate"
+    BRANCH = "branch"
+
+
+@dataclass
+class RoutingSignal:
+    """Normalized routing decision signal for stepwise flow execution.
+
+    Encapsulates the judgment about where to go next in a flow, providing
+    structured, machine-readable routing decisions instead of fragile receipt
+    field parsing.
+
+    Attributes:
+        decision: The routing decision (advance, loop, terminate, branch).
+        next_step_id: The ID of the next step to execute (for advance/branch).
+        route: Named route identifier (for branch routing).
+        reason: Human-readable explanation for the routing decision.
+        confidence: Confidence score for this decision (0.0 to 1.0).
+        needs_human: Whether human intervention is required before proceeding.
+    """
+
+    decision: RoutingDecision
+    next_step_id: Optional[str] = None
+    route: Optional[str] = None
+    reason: str = ""
+    confidence: float = 1.0
+    needs_human: bool = False
+
+
+@dataclass
+class HandoffEnvelope:
+    """Durable per-step handoff artifact for cross-step communication.
+
+    Serves as a compression layer containing the routing signal, artifact
+    pointers, and a summary (1-2k chars max) for efficient context
+    handoff between steps.
+
+    Attributes:
+        step_id: The step ID that produced this envelope.
+        flow_key: The flow key this step belongs to.
+        run_id: The run ID.
+        routing_signal: The routing decision signal for this step.
+        summary: Compressed summary of step output (1-2k chars max).
+        artifacts: Map of artifact names to their file paths (relative to RUN_BASE).
+        status: Execution status of the step.
+        error: Error message if the step failed.
+        duration_ms: Execution duration in milliseconds.
+        timestamp: ISO 8601 timestamp when this envelope was created.
+    """
+
+    step_id: str
+    flow_key: str
+    run_id: str
+    routing_signal: RoutingSignal
+    summary: str
+    artifacts: Dict[str, str] = field(default_factory=dict)
+    status: str = "succeeded"
+    error: Optional[str] = None
+    duration_ms: int = 0
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -350,4 +421,188 @@ def run_event_from_dict(data: Dict[str, Any]) -> RunEvent:
         step_id=data.get("step_id"),
         agent_key=data.get("agent_key"),
         payload=dict(data.get("payload", {})),
+    )
+
+
+# -----------------------------------------------------------------------------
+# RoutingSignal Serialization
+# -----------------------------------------------------------------------------
+
+
+def routing_signal_to_dict(signal: RoutingSignal) -> Dict[str, Any]:
+    """Convert RoutingSignal to a dictionary for serialization.
+
+    Args:
+        signal: The RoutingSignal to convert.
+
+    Returns:
+        Dictionary representation suitable for JSON/YAML serialization.
+    """
+    return {
+        "decision": signal.decision.value if isinstance(signal.decision, RoutingDecision) else signal.decision,
+        "next_step_id": signal.next_step_id,
+        "route": signal.route,
+        "reason": signal.reason,
+        "confidence": signal.confidence,
+        "needs_human": signal.needs_human,
+    }
+
+
+def routing_signal_from_dict(data: Dict[str, Any]) -> RoutingSignal:
+    """Parse RoutingSignal from a dictionary.
+
+    Args:
+        data: Dictionary with RoutingSignal fields.
+
+    Returns:
+        Parsed RoutingSignal instance.
+    """
+    decision_value = data.get("decision", "advance")
+    decision = RoutingDecision(decision_value) if isinstance(decision_value, str) else decision_value
+
+    return RoutingSignal(
+        decision=decision,
+        next_step_id=data.get("next_step_id"),
+        route=data.get("route"),
+        reason=data.get("reason", ""),
+        confidence=data.get("confidence", 1.0),
+        needs_human=data.get("needs_human", False),
+    )
+
+
+# -----------------------------------------------------------------------------
+# HandoffEnvelope Serialization
+# -----------------------------------------------------------------------------
+
+
+def handoff_envelope_to_dict(envelope: HandoffEnvelope) -> Dict[str, Any]:
+    """Convert HandoffEnvelope to a dictionary for serialization.
+
+    Args:
+        envelope: The HandoffEnvelope to convert.
+
+    Returns:
+        Dictionary representation suitable for JSON/YAML serialization.
+    """
+    return {
+        "step_id": envelope.step_id,
+        "flow_key": envelope.flow_key,
+        "run_id": envelope.run_id,
+        "routing_signal": routing_signal_to_dict(envelope.routing_signal),
+        "summary": envelope.summary,
+        "artifacts": dict(envelope.artifacts),
+        "status": envelope.status,
+        "error": envelope.error,
+        "duration_ms": envelope.duration_ms,
+        "timestamp": _datetime_to_iso(envelope.timestamp),
+    }
+
+
+def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
+    """Parse HandoffEnvelope from a dictionary.
+
+    Args:
+        data: Dictionary with HandoffEnvelope fields.
+
+    Returns:
+        Parsed HandoffEnvelope instance.
+    """
+    routing_signal_data = data.get("routing_signal", {})
+    routing_signal = routing_signal_from_dict(routing_signal_data)
+
+    return HandoffEnvelope(
+        step_id=data.get("step_id", ""),
+        flow_key=data.get("flow_key", ""),
+        run_id=data.get("run_id", ""),
+        routing_signal=routing_signal,
+        summary=data.get("summary", ""),
+        artifacts=dict(data.get("artifacts", {})),
+        status=data.get("status", "succeeded"),
+        error=data.get("error"),
+        duration_ms=data.get("duration_ms", 0),
+        timestamp=_iso_to_datetime(data.get("timestamp")) or datetime.now(timezone.utc),
+    )
+
+
+# -----------------------------------------------------------------------------
+# RunState Serialization (for durable program counter)
+# -----------------------------------------------------------------------------
+
+
+@dataclass
+class RunState:
+    """Durable program counter for stepwise flow execution.
+
+    Tracks current execution state of a run, enabling resumption
+    from any step after process restart.
+
+    Attributes:
+        run_id: The run identifier.
+        flow_key: The flow being executed.
+        current_step_id: The ID of current step being executed.
+        step_index: The 0-based index of current step in the flow.
+        loop_state: Dictionary tracking iteration counts per microloop.
+        handoff_envelopes: Map of step_id to HandoffEnvelope for completed steps.
+        status: Current run status (pending, running, succeeded, failed, canceled).
+        timestamp: ISO 8601 timestamp when this state was last updated.
+    """
+
+    run_id: str
+    flow_key: str
+    current_step_id: Optional[str] = None
+    step_index: int = 0
+    loop_state: Dict[str, int] = field(default_factory=dict)
+    handoff_envelopes: Dict[str, HandoffEnvelope] = field(default_factory=dict)
+    status: str = "pending"
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+def run_state_to_dict(state: RunState) -> Dict[str, Any]:
+    """Convert RunState to a dictionary for serialization.
+
+    Args:
+        state: The RunState to convert.
+
+    Returns:
+        Dictionary representation suitable for JSON serialization.
+    """
+    return {
+        "run_id": state.run_id,
+        "flow_key": state.flow_key,
+        "current_step_id": state.current_step_id,
+        "step_index": state.step_index,
+        "loop_state": dict(state.loop_state),
+        "handoff_envelopes": {
+            step_id: handoff_envelope_to_dict(env)
+            for step_id, env in state.handoff_envelopes.items()
+        },
+        "status": state.status,
+        "timestamp": _datetime_to_iso(state.timestamp),
+    }
+
+
+def run_state_from_dict(data: Dict[str, Any]) -> RunState:
+    """Parse RunState from a dictionary.
+
+    Args:
+        data: Dictionary with RunState fields.
+
+    Returns:
+        Parsed RunState instance.
+    """
+    envelopes_data = data.get("handoff_envelopes", {})
+    handoff_envelopes = {
+        step_id: handoff_envelope_from_dict(env_data)
+        for step_id, env_data in envelopes_data.items()
+    }
+
+    return RunState(
+        run_id=data.get("run_id", ""),
+        flow_key=data.get("flow_key", ""),
+        current_step_id=data.get("current_step_id"),
+        step_index=data.get("step_index", 0),
+        loop_state=dict(data.get("loop_state", {})),
+        handoff_envelopes=handoff_envelopes,
+        status=data.get("status", "pending"),
+        timestamp=_iso_to_datetime(data.get("timestamp")) or datetime.now(timezone.utc),
     )

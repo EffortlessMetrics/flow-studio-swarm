@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://swarm.dev/schemas/handoff_envelope.schema.json",
+  "title": "HandoffEnvelope",
+  "description": "Durable per-step handoff artifact for cross-step communication. Contains routing signal, artifact pointers, and a compressed summary.",
+  "type": "object",
+  "required": ["step_id", "flow_key", "run_id", "routing_signal", "summary"],
+  "properties": {
+    "step_id": {
+      "type": "string",
+      "description": "The step ID that produced this envelope."
+    },
+    "flow_key": {
+      "type": "string",
+      "description": "The flow key this step belongs to."
+    },
+    "run_id": {
+      "type": "string",
+      "description": "The run ID."
+    },
+    "routing_signal": {
+      "$ref": "https://swarm.dev/schemas/routing_signal.schema.json",
+      "description": "The routing decision signal for this step."
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Compressed summary of step output (1-2k chars max) for context handoff."
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Map of artifact names to their file paths (relative to RUN_BASE)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["succeeded", "failed", "skipped"],
+      "description": "Execution status of the step."
+    },
+    "error": {
+      "type": "string",
+      "description": "Error message if the step failed."
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Execution duration in milliseconds."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when this envelope was created."
+    }
+  },
+  "additionalProperties": false
+}

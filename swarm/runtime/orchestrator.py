@@ -47,7 +47,12 @@ from .types import (
     RunStatus,
     RunSummary,
     SDLCStatus,
+    RoutingDecision,
+    RoutingSignal,
+    HandoffEnvelope,
+    RunState,
     generate_run_id,
+    handoff_envelope_to_dict,
 )
 
 # Module logger
@@ -99,6 +104,7 @@ class GeminiStepOrchestrator:
         spec: RunSpec,
         start_step: Optional[str] = None,
         end_step: Optional[str] = None,
+        resume: bool = False,
     ) -> RunId:
         """Execute a flow step-by-step, one Gemini CLI call per step.
 
@@ -110,6 +116,7 @@ class GeminiStepOrchestrator:
             spec: Run specification with params and initiator info.
             start_step: Optional step ID to start from (skip earlier steps).
             end_step: Optional step ID to stop at (skip later steps).
+            resume: Whether to resume from existing run_state.json.
 
         Returns:
             The generated run ID.
@@ -140,12 +147,39 @@ class GeminiStepOrchestrator:
             profile_id=spec.profile_id,
             backend=spec.backend,
             initiator=spec.initiator,
-            params={**spec.params, "stepwise": True},
+            params={**spec.params, "stepwise": True, "resume": resume},
         )
 
         # Persist initial state
         storage_module.create_run_dir(run_id)
         storage_module.write_spec(run_id, run_spec)
+
+        # Initialize or load run state
+        if resume:
+            # Try to load existing run state for resumption
+            existing_state = storage_module.read_run_state(run_id)
+            if existing_state and existing_state.flow_key == flow_key:
+                # Resume from saved state
+                run_state = existing_state
+                logger.info("Resuming run %s from step %s", run_id, existing_state.current_step_id)
+            else:
+                # Create fresh state if resume requested but no valid state found
+                run_state = RunState(
+                    run_id=run_id,
+                    flow_key=flow_key,
+                    status="running",
+                    timestamp=datetime.now(timezone.utc),
+                )
+                storage_module.write_run_state(run_id, run_state)
+        else:
+            # Create fresh run state
+            run_state = RunState(
+                run_id=run_id,
+                flow_key=flow_key,
+                status="pending",
+                timestamp=datetime.now(timezone.utc),
+            )
+            storage_module.write_run_state(run_id, run_state)
 
         summary = RunSummary(
             id=run_id,
@@ -177,7 +211,7 @@ class GeminiStepOrchestrator:
         # Execute in background thread
         thread = threading.Thread(
             target=self._execute_stepwise,
-            args=(run_id, flow_key, flow_def, run_spec, start_step, end_step),
+            args=(run_id, flow_key, flow_def, run_spec, run_state, start_step, end_step),
             daemon=True,
         )
         thread.start()
@@ -190,6 +224,7 @@ class GeminiStepOrchestrator:
         flow_key: str,
         flow_def: FlowDefinition,
         spec: RunSpec,
+        run_state: RunState,
         start_step: Optional[str],
         end_step: Optional[str],
     ) -> None:
@@ -224,9 +259,12 @@ class GeminiStepOrchestrator:
                 ts=now,
                 kind="run_started",
                 flow_key=flow_key,
-                payload={"mode": "stepwise", "routing_enabled": True},
+                payload={"mode": "stepwise", "routing_enabled": True, "resume": run_state.current_step_id is not None},
             ),
         )
+
+        # Update run state to running
+        storage_module.update_run_state(run_id, {"status": "running"})
 
         # Determine starting step
         if start_step:
@@ -234,8 +272,17 @@ class GeminiStepOrchestrator:
             if not current_step:
                 # Fall back to first step
                 current_step = flow_def.steps[0] if flow_def.steps else None
+        elif run_state.current_step_id:
+            # Resume from saved step
+            current_step = self._get_step_by_id(flow_def, run_state.current_step_id)
+            if not current_step:
+                # Fall back to first step if saved step not found
+                current_step = flow_def.steps[0] if flow_def.steps else None
         else:
             current_step = flow_def.steps[0] if flow_def.steps else None
+
+        # Restore loop state from saved state
+        loop_state = dict(run_state.loop_state)
 
         error_msg = None
         final_status = RunStatus.SUCCEEDED
@@ -244,8 +291,13 @@ class GeminiStepOrchestrator:
         # Track step history for context building
         step_history: List[Dict[str, Any]] = []
 
-        # Track loop iterations per microloop (step_id:loop_target -> count)
-        loop_state: Dict[str, int] = {}
+        # Reconstruct step history from saved handoff envelopes
+        for step_id, envelope in run_state.handoff_envelopes.items():
+            step_history.append({
+                "step_id": envelope.step_id,
+                "status": envelope.status,
+                "output": envelope.summary,
+            })
 
         # Track total steps executed for safety limit
         total_steps_executed = 0
@@ -282,6 +334,39 @@ class GeminiStepOrchestrator:
                 # Add to history for next step's context
                 step_history.append(step_result)
 
+                # Create handoff envelope for this step
+                handoff_envelope = HandoffEnvelope(
+                    step_id=current_step.id,
+                    flow_key=flow_key,
+                    run_id=run_id,
+                    routing_signal=self._create_routing_signal(
+                        current_step, step_result, loop_state
+                    ),
+                    summary=step_result.get("output", "")[:2000],  # Limit to 2k chars
+                    status=step_result.get("status", "succeeded"),
+                    error=step_result.get("error"),
+                    duration_ms=step_result.get("duration_ms", 0),
+                    timestamp=datetime.now(timezone.utc),
+                )
+
+                # Write envelope to durable storage
+                storage_module.write_envelope(run_id, flow_key, current_step.id, handoff_envelope)
+
+                # Store handoff envelope in run state
+                run_state.handoff_envelopes[current_step.id] = handoff_envelope
+
+                # Update run state after step completion
+                storage_module.update_run_state(run_id, {
+                    "current_step_id": current_step.id,
+                    "step_index": current_step.index,
+                    "loop_state": dict(loop_state),
+                    "handoff_envelopes": {
+                        step_id: handoff_envelope_to_dict(env)
+                        for step_id, env in run_state.handoff_envelopes.items()
+                    },
+                    "timestamp": handoff_envelope.timestamp.isoformat() + "Z",
+                })
+
                 # Check for step failure
                 if step_result.get("status") == "failed":
                     final_status = RunStatus.FAILED
@@ -294,7 +379,7 @@ class GeminiStepOrchestrator:
                     logger.info("Reached end_step %s, stopping execution", end_step)
                     break
 
-                # Route to next step
+                # Route to next step using RoutingSignal
                 next_step_id, route_reason = self._route(
                     flow_def=flow_def,
                     current_step=current_step,
@@ -320,7 +405,7 @@ class GeminiStepOrchestrator:
                         run_id, flow_key, current_step.id, agent_key, routing_ctx
                     )
 
-                # Emit routing decision event
+                # Emit routing decision event with routing signal details
                 storage_module.append_event(
                     run_id,
                     RunEvent(
@@ -334,6 +419,9 @@ class GeminiStepOrchestrator:
                             "to_step": next_step_id,
                             "reason": route_reason,
                             "loop_state": dict(loop_state),
+                            "decision": routing_ctx.decision if routing_ctx else "unknown",
+                            "confidence": handoff_envelope.routing_signal.confidence,
+                            "needs_human": handoff_envelope.routing_signal.needs_human,
                         },
                     ),
                 )
@@ -444,45 +532,126 @@ class GeminiStepOrchestrator:
                 return step
         return None
 
-    def _read_receipt_field(
+    def _create_routing_signal(
         self,
-        run_id: RunId,
-        flow_key: str,
-        step_id: str,
-        agent_key: str,
-        field_name: str,
-    ) -> Optional[str]:
-        """Read a specific field from a step's receipt file.
-
-        Receipts are stored at RUN_BASE/receipts/<step_id>-<agent_key>.json.
+        step: StepDefinition,
+        result: Dict[str, Any],
+        loop_state: Dict[str, int],
+    ) -> RoutingSignal:
+        """Create a RoutingSignal from step result and routing config.
 
         Args:
-            run_id: The run identifier.
-            flow_key: The flow key.
-            step_id: The step identifier.
-            agent_key: The agent key.
-            field_name: The field name to extract from the receipt.
+            step: The step that was executed.
+            result: The step execution result dictionary.
+            loop_state: Dictionary tracking iteration counts per microloop.
 
         Returns:
-            The field value as a string, or None if not found.
+            A RoutingSignal with the routing decision.
         """
-        run_base = self._repo_root / "swarm" / "runs" / run_id / flow_key
-        receipt_path = run_base / "receipts" / f"{step_id}-{agent_key}.json"
+        routing = step.routing
 
-        if not receipt_path.exists():
-            logger.debug("Receipt not found: %s", receipt_path)
-            return None
+        # Default routing signal - advance to next step
+        decision = RoutingDecision.ADVANCE
+        next_step_id = None
+        reason = "step_complete"
+        confidence = 1.0
+        needs_human = False
 
-        try:
-            with open(receipt_path) as f:
-                receipt = json.load(f)
-            value = receipt.get(field_name)
-            if value is not None:
-                return str(value)
-        except (json.JSONDecodeError, OSError) as e:
-            logger.warning("Failed to read receipt %s: %s", receipt_path, e)
+        if routing is None:
+            # No routing config: fall back to linear progression
+            # Find next step by index
+            for s in step.flow_def.steps:
+                if s.index == step.index + 1:
+                    next_step_id = s.id
+                    reason = "linear_default"
+                    break
+            if next_step_id is None:
+                decision = RoutingDecision.TERMINATE
+                reason = "flow_complete_no_routing"
+        elif routing.kind == "linear":
+            if routing.next:
+                next_step_id = routing.next
+                reason = "linear_explicit"
+            else:
+                decision = RoutingDecision.TERMINATE
+                reason = "flow_complete_linear"
+        elif routing.kind == "microloop":
+            # Check loop iteration count
+            loop_key = f"{step.id}:{routing.loop_target}"
+            current_iter = loop_state.get(loop_key, 0)
 
-        return None
+            # Safety check: max iterations
+            if current_iter >= routing.max_iterations:
+                if routing.next:
+                    next_step_id = routing.next
+                    reason = f"max_iterations_reached:{routing.max_iterations}"
+                else:
+                    decision = RoutingDecision.TERMINATE
+                    reason = f"flow_complete_max_iterations:{routing.max_iterations}"
+
+            # Check loop condition from receipt (will be replaced by RoutingSignal in future)
+            if routing.loop_condition_field:
+                agent_key = step.agents[0] if step.agents else "unknown"
+                field_value = self._read_receipt_field(
+                    result.get("run_id", ""),
+                    result.get("flow_key", ""),
+                    step.id,
+                    agent_key,
+                    routing.loop_condition_field
+                )
+
+                if field_value and field_value in routing.loop_success_values:
+                    # Condition met, exit loop
+                    if routing.next:
+                        next_step_id = routing.next
+                        reason = f"loop_exit_condition_met:{field_value}"
+                    else:
+                        decision = RoutingDecision.TERMINATE
+                        reason = f"flow_complete_condition_met:{field_value}"
+
+                # Check can_further_iteration_help field as fallback
+                can_iterate = self._read_receipt_field(
+                    result.get("run_id", ""),
+                    result.get("flow_key", ""),
+                    step.id,
+                    agent_key,
+                    "can_further_iteration_help"
+                )
+                if can_iterate and can_iterate.lower() == "no":
+                    # Critic says no further iteration will help
+                    if routing.next:
+                        next_step_id = routing.next
+                        reason = "loop_exit_no_further_help"
+                    else:
+                        decision = RoutingDecision.TERMINATE
+                        reason = "flow_complete_no_further_help"
+
+            # Loop back to target
+            if next_step_id is None and routing.loop_target:
+                next_step_id = routing.loop_target
+                reason = f"loop_iteration:{current_iter + 1}"
+                decision = RoutingDecision.LOOP
+
+        elif routing.kind == "branch":
+            # Branch routing based on result values
+            if routing.branches and result.get("status"):
+                branch_key = result.get("status")
+                if branch_key in routing.branches:
+                    next_step_id = routing.branches[branch_key]
+                    reason = f"branch:{branch_key}"
+
+            # Fallback to next
+            if next_step_id is None and routing.next:
+                next_step_id = routing.next
+                reason = "branch_fallback"
+
+        return RoutingSignal(
+            decision=decision,
+            next_step_id=next_step_id,
+            reason=reason,
+            confidence=confidence,
+            needs_human=needs_human,
+        )
 
     def _route(
         self,

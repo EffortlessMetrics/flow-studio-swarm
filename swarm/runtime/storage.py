@@ -9,7 +9,10 @@ The storage layout is:
         meta.json          # RunSummary serialized
         spec.json          # RunSpec serialized
         events.jsonl       # newline-delimited RunEvent objects
+        run_state.json     # RunState serialized (durable program counter)
         <flow_key>/        # existing artifact directories (signal/, plan/, etc.)
+          handoff/        # HandoffEnvelope JSON files for each step
+            <step_id>.json
 
 Usage:
     from swarm.runtime.storage import (
@@ -18,6 +21,8 @@ Usage:
         write_spec, read_spec,
         write_summary, read_summary, update_summary,
         append_event, read_events,
+        write_run_state, read_run_state, update_run_state,
+        write_envelope, read_envelope, list_envelopes,
         list_runs, discover_legacy_runs,
     )
 """
@@ -33,16 +38,22 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .types import (
+    HandoffEnvelope,
     RunEvent,
     RunId,
     RunSpec,
     RunSummary,
+    RunState,
+    handoff_envelope_from_dict,
+    handoff_envelope_to_dict,
     run_event_from_dict,
     run_event_to_dict,
     run_spec_from_dict,
     run_spec_to_dict,
     run_summary_from_dict,
     run_summary_to_dict,
+    run_state_from_dict,
+    run_state_to_dict,
 )
 
 # Module logger
@@ -56,6 +67,7 @@ EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 META_FILE = "meta.json"
 SPEC_FILE = "spec.json"
 EVENTS_FILE = "events.jsonl"
+RUN_STATE_FILE = "run_state.json"
 LEGACY_META_FILE = "run.json"  # Old-style optional metadata
 
 # -----------------------------------------------------------------------------
@@ -659,3 +671,206 @@ def list_all_runs(include_examples: bool = True) -> List[Dict[str, Any]]:
     # Sort: examples first, then by run_id
     results.sort(key=lambda r: (0 if r["run_type"] == "example" else 1, r["run_id"]))
     return results
+
+
+# -----------------------------------------------------------------------------
+# RunState I/O (for durable program counter)
+# -----------------------------------------------------------------------------
+
+
+def write_run_state(run_id: RunId, state: RunState, runs_dir: Path = RUNS_DIR) -> Path:
+    """Write RunState to run_state.json atomically.
+
+    Uses atomic write (temp file + rename) to prevent partial writes.
+
+    Args:
+        run_id: The unique run identifier.
+        state: The RunState to persist.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        Path to the written run_state.json file.
+    """
+    run_path = create_run_dir(run_id, runs_dir)
+    state_path = run_path / RUN_STATE_FILE
+
+    data = run_state_to_dict(state)
+    _atomic_write_json(state_path, data)
+
+    return state_path
+
+
+def read_run_state(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Optional[RunState]:
+    """Read RunState from run_state.json with graceful error handling.
+
+    Args:
+        run_id: The unique run identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        The RunState if it exists and is valid, None otherwise.
+    """
+    run_path = get_run_path(run_id, runs_dir)
+    state_path = run_path / RUN_STATE_FILE
+
+    data = _load_json_safe(state_path, run_id, "run_state")
+    if data is None:
+        return None
+
+    try:
+        return run_state_from_dict(data)
+    except (KeyError, TypeError) as e:
+        logger.warning("Invalid run_state data for run '%s' at %s: %s", run_id, state_path, e)
+        return None
+
+
+def update_run_state(run_id: RunId, updates: Dict[str, Any], runs_dir: Path = RUNS_DIR) -> RunState:
+    """Partial update of RunState fields.
+
+    Reads the existing state, applies updates, and writes back.
+    Only updates fields that are present in the updates dict.
+
+    This function is thread-safe via per-run locking to prevent lost updates
+    when multiple threads update the same run concurrently.
+
+    Args:
+        run_id: The unique run identifier.
+        updates: Dictionary of fields to update. Supports top-level fields
+                 like "current_step_id", "step_index", "status", etc.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        The updated RunState.
+
+    Raises:
+        FileNotFoundError: If the run's run_state.json doesn't exist.
+    """
+    lock = _get_run_lock(run_id)
+    with lock:
+        state = read_run_state(run_id, runs_dir)
+        if state is None:
+            raise FileNotFoundError(f"Run state not found: {run_id}")
+
+        # Convert to dict, apply updates, convert back
+        data = run_state_to_dict(state)
+
+        for key, value in updates.items():
+            if key in data:
+                data[key] = value
+
+        updated_state = run_state_from_dict(data)
+        write_run_state(run_id, updated_state, runs_dir)
+
+        return updated_state
+
+
+# -----------------------------------------------------------------------------
+# HandoffEnvelope I/O (for per-step handoff artifacts)
+# -----------------------------------------------------------------------------
+
+
+def write_envelope(
+    run_id: RunId,
+    flow_key: str,
+    step_id: str,
+    envelope: HandoffEnvelope,
+    runs_dir: Path = RUNS_DIR,
+) -> Path:
+    """Write HandoffEnvelope to handoff/<step_id>.json atomically.
+
+    Uses atomic write (temp file + rename) to prevent partial writes.
+    The envelope is written to: .runs/<run_id>/<flow_key>/handoff/<step_id>.json
+
+    Args:
+        run_id: The unique run identifier.
+        flow_key: The flow key (e.g., "signal", "build").
+        step_id: The step identifier.
+        envelope: The HandoffEnvelope to persist.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        Path to the written envelope JSON file.
+    """
+    run_path = get_run_path(run_id, runs_dir)
+    flow_path = run_path / flow_key
+    handoff_dir = flow_path / "handoff"
+    envelope_path = handoff_dir / f"{step_id}.json"
+
+    # Create handoff directory if it doesn't exist
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+
+    data = handoff_envelope_to_dict(envelope)
+    _atomic_write_json(envelope_path, data)
+
+    return envelope_path
+
+
+def read_envelope(
+    run_id: RunId,
+    flow_key: str,
+    step_id: str,
+    runs_dir: Path = RUNS_DIR,
+) -> Optional[HandoffEnvelope]:
+    """Read HandoffEnvelope from handoff/<step_id>.json with graceful error handling.
+
+    Args:
+        run_id: The unique run identifier.
+        flow_key: The flow key (e.g., "signal", "build").
+        step_id: The step identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        The HandoffEnvelope if it exists and is valid, None otherwise.
+    """
+    run_path = get_run_path(run_id, runs_dir)
+    flow_path = run_path / flow_key
+    envelope_path = flow_path / "handoff" / f"{step_id}.json"
+
+    data = _load_json_safe(envelope_path, run_id, "envelope")
+    if data is None:
+        return None
+
+    try:
+        return handoff_envelope_from_dict(data)
+    except (KeyError, TypeError) as e:
+        logger.warning(
+            "Invalid envelope data for run '%s', step '%s' at %s: %s",
+            run_id, step_id, envelope_path, e
+        )
+        return None
+
+
+def list_envelopes(
+    run_id: RunId,
+    flow_key: str,
+    runs_dir: Path = RUNS_DIR,
+) -> Dict[str, HandoffEnvelope]:
+    """Read all HandoffEnvelope objects for a flow.
+
+    Args:
+        run_id: The unique run identifier.
+        flow_key: The flow key (e.g., "signal", "build").
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        Dictionary mapping step_id to HandoffEnvelope for all envelopes found.
+        Returns empty dict if no envelopes exist.
+    """
+    run_path = get_run_path(run_id, runs_dir)
+    flow_path = run_path / flow_key
+    handoff_dir = flow_path / "handoff"
+
+    if not handoff_dir.exists():
+        return {}
+
+    envelopes: Dict[str, HandoffEnvelope] = {}
+    for entry in handoff_dir.iterdir():
+        if not entry.is_file() or not entry.suffix == ".json":
+            continue
+
+        step_id = entry.stem
+        envelope = read_envelope(run_id, flow_key, step_id, runs_dir)
+        if envelope:
+            envelopes[step_id] = envelope
+
+    return envelopes
