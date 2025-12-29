@@ -167,15 +167,26 @@ class ResilientStatsDB:
 
             return self._health
 
-    def _trigger_rebuild(self) -> bool:
+    def _trigger_rebuild(self) -> Dict[str, Any]:
         """Trigger a rebuild of the database from events.jsonl.
 
         Returns:
-            True if rebuild was successful, False otherwise.
+            Dict with rebuild statistics including:
+            - success: bool indicating if rebuild succeeded
+            - runs_processed: total runs attempted
+            - runs_succeeded: runs that succeeded
+            - events_ingested: total events ingested
+            - errors: list of error dicts
         """
         try:
             if self._db is None:
-                return False
+                return {
+                    "success": False,
+                    "runs_processed": 0,
+                    "runs_succeeded": 0,
+                    "events_ingested": 0,
+                    "errors": [{"error": "DB not initialized"}],
+                }
 
             logger.info("Starting DB rebuild from events.jsonl...")
             stats = self._db.rebuild_all_from_events(runs_dir=self.config.runs_dir)
@@ -184,20 +195,36 @@ class ResilientStatsDB:
             self._health.last_rebuild = datetime.now(timezone.utc)
             self._health.needs_rebuild = False
 
+            runs_succeeded = stats.get("runs_succeeded", 0)
+            events_ingested = stats.get("events_ingested", 0)
+            errors = stats.get("errors", [])
+
             logger.info(
                 "DB rebuild complete: %d runs, %d events, %d errors",
-                stats.get("runs_succeeded", 0),
-                stats.get("events_ingested", 0),
-                len(stats.get("errors", [])),
+                runs_succeeded,
+                events_ingested,
+                len(errors),
             )
 
-            return True
+            return {
+                "success": len(errors) == 0,
+                "runs_processed": stats.get("runs_processed", runs_succeeded),
+                "runs_succeeded": runs_succeeded,
+                "events_ingested": events_ingested,
+                "errors": errors,
+            }
 
         except Exception as e:
             logger.error("DB rebuild failed: %s", e)
             self._health.last_error = str(e)
             self._health.error_count += 1
-            return False
+            return {
+                "success": False,
+                "runs_processed": 0,
+                "runs_succeeded": 0,
+                "events_ingested": 0,
+                "errors": [{"error": str(e)}],
+            }
 
     def check_health(self) -> DBHealthStatus:
         """Check database health and trigger rebuild if needed.
@@ -363,6 +390,44 @@ class ResilientStatsDB:
             f"rebuild_from_events({run_id})",
             {"success": False, "error": "Operation failed"},
         )
+
+    def rebuild_all_safe(self) -> Dict[str, Any]:
+        """Rebuild projection for all runs safely.
+
+        This method provides a safe wrapper around the full database rebuild,
+        updating health status and returning detailed statistics.
+
+        Returns:
+            Dict with rebuild statistics including runs_processed, runs_succeeded,
+            events_ingested, and any errors encountered.
+        """
+        if not self._initialized:
+            self.initialize()
+
+        try:
+            if self._db is None:
+                return {
+                    "success": False,
+                    "runs_processed": 0,
+                    "runs_succeeded": 0,
+                    "events_ingested": 0,
+                    "errors": [{"error": "DB not initialized"}],
+                }
+
+            # _trigger_rebuild now returns detailed stats
+            return self._trigger_rebuild()
+
+        except Exception as e:
+            logger.error("Failed to rebuild all: %s", e)
+            self._health.error_count += 1
+            self._health.last_error = str(e)
+            return {
+                "success": False,
+                "runs_processed": 0,
+                "runs_succeeded": 0,
+                "events_ingested": 0,
+                "errors": [{"error": str(e)}],
+            }
 
     # =========================================================================
     # Raw DB Access (for when you need full control)

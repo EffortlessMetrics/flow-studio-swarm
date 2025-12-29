@@ -816,7 +816,8 @@ export function extractBoundaryReviewData(flowKey, flowTitle, status, artifacts,
         durationSeconds: options?.durationSeconds,
         blockingIssues: options?.blockingIssues,
         warnings: options?.warnings,
-        receipts: options?.receipts
+        receipts: options?.receipts,
+        confidenceScore: options?.confidenceScore
     };
 }
 // ============================================================================

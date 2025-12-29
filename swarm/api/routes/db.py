@@ -128,6 +128,9 @@ async def rebuild_database(request: DBRebuildRequest):
 
     The rebuild is idempotent - running it multiple times is safe.
 
+    All operations are routed through the ResilientStatsDB wrapper to ensure
+    consistent health tracking and error handling.
+
     Args:
         request: Rebuild request with optional run_ids filter and force flag.
 
@@ -139,9 +142,12 @@ async def rebuild_database(request: DBRebuildRequest):
     start_time = time.time()
 
     try:
-        from swarm.runtime.resilient_db import get_resilient_db
+        from swarm.runtime.resilient_db import check_db_health, get_resilient_db
 
         db = get_resilient_db()
+
+        # Perform health check before rebuild (keeps health status coherent)
+        check_db_health()
 
         # Check if rebuild is needed
         if not request.force and db.health.healthy and not db.health.needs_rebuild:
@@ -155,29 +161,17 @@ async def rebuild_database(request: DBRebuildRequest):
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
-        # Get the underlying StatsDB
-        stats_db = db.db
-        if stats_db is None:
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "error": "db_unavailable",
-                    "message": "Database is not available",
-                    "details": {},
-                },
-            )
-
-        # Perform rebuild
+        # Perform rebuild through the wrapper (not through db.db directly)
         if request.run_ids:
-            # Rebuild specific runs
-            total_stats = {
+            # Rebuild specific runs using wrapper method
+            total_stats: Dict[str, Any] = {
                 "runs_processed": 0,
                 "runs_succeeded": 0,
                 "events_ingested": 0,
                 "errors": [],
             }
             for run_id in request.run_ids:
-                result = stats_db.rebuild_from_events(run_id)
+                result = db.rebuild_from_events_safe(run_id)
                 total_stats["runs_processed"] += 1
                 if result.get("success"):
                     total_stats["runs_succeeded"] += 1
@@ -191,8 +185,8 @@ async def rebuild_database(request: DBRebuildRequest):
                     )
             stats = total_stats
         else:
-            # Rebuild all runs
-            stats = stats_db.rebuild_all_from_events()
+            # Rebuild all runs using wrapper method
+            stats = db.rebuild_all_safe()
 
         duration_ms = int((time.time() - start_time) * 1000)
 
@@ -225,10 +219,15 @@ async def get_db_stats():
 
     Returns counts of all major entities in the database.
     Useful for monitoring and debugging.
+
+    Performs a health check to ensure DB status stays coherent.
     """
     try:
         from swarm.runtime.db import PROJECTION_VERSION, SCHEMA_VERSION
-        from swarm.runtime.resilient_db import get_resilient_db
+        from swarm.runtime.resilient_db import check_db_health, get_resilient_db
+
+        # Perform health check to keep status coherent
+        check_db_health()
 
         db = get_resilient_db()
         stats_db = db.db

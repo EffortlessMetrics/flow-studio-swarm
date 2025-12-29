@@ -501,3 +501,113 @@ class TestAcceptanceCriteria:
         db2.initialize()
         assert db2.get_run_stats_safe("nonexistent") is None
         db2.close()
+
+
+class TestRebuildAllSafe:
+    """Tests for rebuild_all_safe method."""
+
+    def test_rebuild_all_safe_returns_stats(self, tmp_path):
+        """Test that rebuild_all_safe returns proper statistics."""
+        runs_dir = tmp_path / "runs"
+        runs_dir.mkdir()
+
+        # Create a run with events
+        run_path = runs_dir / "test-run"
+        run_path.mkdir()
+        events_file = run_path / "events.jsonl"
+        events = [
+            {
+                "event_id": "evt-1",
+                "seq": 1,
+                "run_id": "test-run",
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "kind": "run_started",
+                "flow_key": "signal",
+                "payload": {"flow_keys": ["signal"]},
+            },
+        ]
+        with events_file.open("w") as f:
+            for event in events:
+                f.write(json.dumps(event) + "\n")
+
+        config = ResilientDBConfig(
+            db_path=tmp_path / "test.duckdb",
+            runs_dir=runs_dir,
+            auto_rebuild=False,
+        )
+        db = ResilientStatsDB(config)
+        db.initialize()
+
+        result = db.rebuild_all_safe()
+
+        assert result["success"] is True
+        assert result["runs_succeeded"] >= 0
+        assert "errors" in result
+        assert isinstance(result["errors"], list)
+
+        db.close()
+
+    def test_rebuild_all_safe_handles_db_not_initialized(self, tmp_path):
+        """Test that rebuild_all_safe handles uninitialized DB."""
+        runs_dir = tmp_path / "runs"
+        runs_dir.mkdir()
+
+        config = ResilientDBConfig(
+            db_path=tmp_path / "test.duckdb",
+            runs_dir=runs_dir,
+            auto_rebuild=False,
+        )
+        db = ResilientStatsDB(config)
+        # Don't call initialize
+
+        # Should auto-initialize and run
+        result = db.rebuild_all_safe()
+
+        # Should succeed (with no events to rebuild)
+        assert "success" in result
+        assert "errors" in result
+
+        db.close()
+
+    def test_rebuild_all_safe_updates_health(self, tmp_path):
+        """Test that rebuild_all_safe updates health status."""
+        runs_dir = tmp_path / "runs"
+        runs_dir.mkdir()
+
+        # Create a run with events
+        run_path = runs_dir / "test-run"
+        run_path.mkdir()
+        events_file = run_path / "events.jsonl"
+        events = [
+            {
+                "event_id": "evt-1",
+                "seq": 1,
+                "run_id": "test-run",
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "kind": "run_started",
+                "flow_key": "signal",
+                "payload": {"flow_keys": ["signal"]},
+            },
+        ]
+        with events_file.open("w") as f:
+            for event in events:
+                f.write(json.dumps(event) + "\n")
+
+        config = ResilientDBConfig(
+            db_path=tmp_path / "test.duckdb",
+            runs_dir=runs_dir,
+            auto_rebuild=False,
+        )
+        db = ResilientStatsDB(config)
+        db.initialize()
+
+        initial_rebuild_count = db.health.rebuild_count
+
+        result = db.rebuild_all_safe()
+        assert result["success"] is True
+
+        # Rebuild count should have increased
+        assert db.health.rebuild_count == initial_rebuild_count + 1
+        assert db.health.last_rebuild is not None
+
+        db.close()

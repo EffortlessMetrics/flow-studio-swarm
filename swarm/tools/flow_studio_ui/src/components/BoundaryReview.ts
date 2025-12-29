@@ -67,6 +67,8 @@ export interface BoundaryReviewData {
   blockingIssues?: string[];
   /** Any warnings */
   warnings?: string[];
+  /** Confidence score from boundary review API (0-100) */
+  confidenceScore?: number;
 }
 
 /**
@@ -948,6 +950,7 @@ export function extractBoundaryReviewData(
     blockingIssues?: string[];
     warnings?: string[];
     receipts?: StepReceipt[];
+    confidenceScore?: number;
   }
 ): BoundaryReviewData {
   return {
@@ -962,7 +965,8 @@ export function extractBoundaryReviewData(
     durationSeconds: options?.durationSeconds,
     blockingIssues: options?.blockingIssues,
     warnings: options?.warnings,
-    receipts: options?.receipts
+    receipts: options?.receipts,
+    confidenceScore: options?.confidenceScore
   };
 }
 

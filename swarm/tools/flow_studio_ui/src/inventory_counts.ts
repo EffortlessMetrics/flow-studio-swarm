@@ -56,6 +56,10 @@ interface FactsSummaryResponse {
 let currentRunId: string | null = null;
 let currentData: FactsSummaryResponse | null = null;
 
+// Monotonic sequence counter for request coalescing
+// Prevents out-of-order UI renders under bursty SSE events
+let loadSeq = 0;
+
 // =============================================================================
 // API
 // =============================================================================
@@ -247,15 +251,26 @@ export function renderInventoryPanel(data: FactsSummaryResponse): string {
 
 /**
  * Load and cache facts summary for a run.
+ * Uses monotonic request ID guard to prevent out-of-order UI renders
+ * when multiple requests are in flight (e.g., under bursty SSE).
  */
 export async function loadFactsSummary(runId: string): Promise<FactsSummaryResponse | null> {
+  const seq = ++loadSeq;
   try {
     currentRunId = runId;
-    currentData = await getFactsSummary(runId);
+    const data = await getFactsSummary(runId);
+    // Ignore stale response if a newer request was initiated
+    if (seq !== loadSeq) {
+      return currentData;
+    }
+    currentData = data;
     return currentData;
   } catch (err) {
-    console.error("Failed to load facts summary:", err);
-    currentData = null;
+    // Only update state if this is still the latest request
+    if (seq === loadSeq) {
+      console.error("Failed to load facts summary:", err);
+      currentData = null;
+    }
     return null;
   }
 }

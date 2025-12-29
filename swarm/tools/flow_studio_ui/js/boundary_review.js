@@ -14,6 +14,9 @@ import { Api } from "./api.js";
 let currentRunId = null;
 let currentData = null;
 let isExpanded = false;
+// Monotonic sequence counter for request coalescing
+// Prevents out-of-order UI renders under bursty SSE events
+let loadSeq = 0;
 // =============================================================================
 // Confidence Badge Rendering
 // =============================================================================
@@ -254,16 +257,27 @@ export function renderBoundaryReviewPanel(data) {
 // =============================================================================
 /**
  * Load and render boundary review for a run.
+ * Uses monotonic request ID guard to prevent out-of-order UI renders
+ * when multiple requests are in flight (e.g., under bursty SSE).
  */
 export async function loadBoundaryReview(runId, options) {
+    const seq = ++loadSeq;
     try {
         currentRunId = runId;
-        currentData = await Api.getBoundaryReview(runId, options);
+        const data = await Api.getBoundaryReview(runId, options);
+        // Ignore stale response if a newer request was initiated
+        if (seq !== loadSeq) {
+            return currentData;
+        }
+        currentData = data;
         return currentData;
     }
     catch (err) {
-        console.error("Failed to load boundary review:", err);
-        currentData = null;
+        // Only update state if this is still the latest request
+        if (seq === loadSeq) {
+            console.error("Failed to load boundary review:", err);
+            currentData = null;
+        }
         return null;
     }
 }

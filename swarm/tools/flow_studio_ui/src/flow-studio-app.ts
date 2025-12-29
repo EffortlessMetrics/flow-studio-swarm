@@ -138,7 +138,8 @@ import {
   configure as configureRunControl,
   initRunControl,
   setActiveRun as setRunControlActiveRun,
-  clearActiveRun as clearRunControlActiveRun
+  clearActiveRun as clearRunControlActiveRun,
+  type SSEEvent
 } from "./run_control.js";
 
 // Graph semantic companion
@@ -244,6 +245,12 @@ let selectedBackendId: string = "claude-harness";
 /** Global inventory counts component instance */
 let inventoryCountsComponent: InventoryCounts | null = null;
 
+/** Debounce timer for inventory counts updates */
+let inventoryCountsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounce delay for inventory counts updates (ms) */
+const INVENTORY_COUNTS_DEBOUNCE_MS = 250;
+
 // ============================================================================
 // Inventory Counts
 // ============================================================================
@@ -289,19 +296,30 @@ function initInventoryCounts(): void {
 
 /**
  * Update inventory counts when run changes.
+ * Debounced to prevent excessive API calls under bursty SSE events.
  */
 function updateInventoryCounts(runId: string | null): void {
-  if (!inventoryCountsComponent) {
-    initInventoryCounts();
+  // Cancel any pending debounced update
+  if (inventoryCountsDebounceTimer !== null) {
+    clearTimeout(inventoryCountsDebounceTimer);
+    inventoryCountsDebounceTimer = null;
   }
 
-  if (runId && inventoryCountsComponent) {
-    inventoryCountsComponent.load(runId).catch((err) => {
-      console.warn("Failed to load inventory counts:", err);
-    });
-  } else if (inventoryCountsComponent) {
-    inventoryCountsComponent.clear();
-  }
+  inventoryCountsDebounceTimer = setTimeout(() => {
+    inventoryCountsDebounceTimer = null;
+
+    if (!inventoryCountsComponent) {
+      initInventoryCounts();
+    }
+
+    if (runId && inventoryCountsComponent) {
+      inventoryCountsComponent.load(runId).catch((err) => {
+        console.warn("Failed to load inventory counts:", err);
+      });
+    } else if (inventoryCountsComponent) {
+      inventoryCountsComponent.clear();
+    }
+  }, INVENTORY_COUNTS_DEBOUNCE_MS);
 }
 
 /**
@@ -1041,39 +1059,93 @@ window.addEventListener("load", async () => {
       }
     });
 
-    // Helper to show boundary review for a completed flow
-    async function showBoundaryReviewPanel(flowKey: FlowKey, runId: string): Promise<BoundaryReviewDecision> {
+    /**
+     * Show a non-blocking toast notification when a flow completes during autopilot.
+     */
+    function showFlowCompletedToast(flowKey: string, runId: string): void {
+      // Create toast container if it doesn't exist
+      let toastContainer = document.getElementById("toast-container");
+      if (!toastContainer) {
+        toastContainer = document.createElement("div");
+        toastContainer.id = "toast-container";
+        toastContainer.className = "toast-container";
+        document.body.appendChild(toastContainer);
+      }
+
+      // Create toast element
+      const toast = document.createElement("div");
+      toast.className = "toast toast--info";
+      toast.innerHTML = `
+        <div class="toast__content">
+          <span class="toast__icon">&#10003;</span>
+          <span class="toast__message">Flow <strong>${flowKey}</strong> completed - review available</span>
+          <button class="toast__action" data-flow="${flowKey}" data-run="${runId}">Review</button>
+        </div>
+        <button class="toast__close" aria-label="Dismiss">&times;</button>
+      `;
+
+      // Add event listeners
+      const actionBtn = toast.querySelector(".toast__action") as HTMLButtonElement | null;
+      if (actionBtn) {
+        actionBtn.addEventListener("click", () => {
+          // Navigate to the completed flow for review
+          void setActiveFlow(flowKey as FlowKey, true);
+          toast.remove();
+        });
+      }
+
+      const closeBtn = toast.querySelector(".toast__close") as HTMLButtonElement | null;
+      if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+          toast.remove();
+        });
+      }
+
+      // Auto-dismiss after 8 seconds
+      setTimeout(() => {
+        toast.classList.add("toast--fade-out");
+        setTimeout(() => toast.remove(), 300);
+      }, 8000);
+
+      toastContainer.appendChild(toast);
+    }
+
+    // Helper to show boundary review for a completed flow or run
+    async function showBoundaryReviewPanel(
+      flowKey: FlowKey,
+      runId: string,
+      scope: "flow" | "run" = "flow"
+    ): Promise<BoundaryReviewDecision> {
       try {
-        // Load run summary to get flow status
-        const summary = await Api.getRunSummary(runId);
-        const flowStatus = summary?.flows?.[flowKey];
+        // Fetch boundary review data from the dedicated API endpoint
+        const boundary = await Api.getBoundaryReview(runId, { scope, flowKey: scope === "flow" ? flowKey : undefined });
 
-        if (!flowStatus) {
-          console.warn(`[BoundaryReview] No status found for flow ${flowKey}`);
-          return "cancel";
-        }
-
-        // Determine completion status
+        // Derive status from verification results
         let status: FlowCompletionStatus = "UNKNOWN";
-        if (flowStatus.status === "complete" || flowStatus.status === "done") {
-          status = "VERIFIED";
-        } else if (flowStatus.status === "partial" || flowStatus.status === "in_progress") {
+        if (boundary.verification_failed > 0) {
           status = "UNVERIFIED";
-        } else if (flowStatus.status === "missing") {
+        } else if (boundary.verification_passed > 0) {
+          status = "VERIFIED";
+        } else if (boundary.assumptions_count === 0 && boundary.decisions_count === 0) {
+          // No data available - check if there's anything at all
           status = "BLOCKED";
         }
 
-        // Collect artifacts from steps
+        // Get artifacts from RunSummary for display (boundary API doesn't include them)
         const artifacts: import("./domain.js").ArtifactEntry[] = [];
-        let assumptionsCount = 0;
-        const decisionsCount = 0;
-
-        if (flowStatus.steps) {
-          for (const step of Object.values(flowStatus.steps)) {
-            if (step.artifacts) {
-              artifacts.push(...step.artifacts);
+        try {
+          const summary = await Api.getRunSummary(runId);
+          const flowStatus = summary?.flows?.[flowKey];
+          if (flowStatus?.steps) {
+            for (const step of Object.values(flowStatus.steps)) {
+              if (step.artifacts) {
+                artifacts.push(...step.artifacts);
+              }
             }
           }
+        } catch {
+          // Artifacts are optional for display, continue without them
+          console.warn("[BoundaryReview] Could not load artifacts from run summary");
         }
 
         // Get flow title from flows list
@@ -1081,15 +1153,31 @@ window.addEventListener("load", async () => {
         const flowInfo = flowsResponse.flows.find(f => f.key === flowKey);
         const flowTitle = flowInfo?.title || flowKey;
 
-        // Create review data
+        // Extract blocking issues and warnings from verifications
+        const blockingIssues: string[] = [];
+        const warnings: string[] = [];
+        for (const v of boundary.verifications) {
+          if (!v.verified && v.issues.length > 0) {
+            blockingIssues.push(...v.issues);
+          }
+        }
+        // Add uncertainty notes as warnings
+        if (boundary.uncertainty_notes && boundary.uncertainty_notes.length > 0) {
+          warnings.push(...boundary.uncertainty_notes);
+        }
+
+        // Create review data using endpoint response fields
         const reviewData = extractBoundaryReviewData(
           flowKey,
           flowTitle,
           status,
           artifacts,
           {
-            assumptionsCount,
-            decisionsCount
+            assumptionsCount: boundary.assumptions_count,
+            decisionsCount: boundary.decisions_count,
+            confidenceScore: boundary.confidence_score,
+            blockingIssues: blockingIssues.length > 0 ? blockingIssues : undefined,
+            warnings: warnings.length > 0 ? warnings : undefined
           }
         );
 
@@ -1123,20 +1211,35 @@ window.addEventListener("load", async () => {
         // Refresh status when run state changes
         void loadRunStatus();
       },
-      onRunComplete: (runId) => {
+      onRunComplete: (runId, isAutopilot) => {
         // Reload run history to show completed run
         void initRunHistory().then(() => {
           setRunHistorySelectedRunId(runId);
         });
 
-        // Show boundary review for the completed flow if applicable
-        if (state.currentFlowKey) {
-          void showBoundaryReviewPanel(state.currentFlowKey, runId);
+        // Different behavior for autopilot vs single-flow runs
+        if (isAutopilot) {
+          // Autopilot run: show run-level boundary review (scope="run")
+          void showBoundaryReviewPanel(state.currentFlowKey || "signal" as FlowKey, runId, "run");
+        } else {
+          // Single-flow run: show flow-level boundary review (existing behavior)
+          if (state.currentFlowKey) {
+            void showBoundaryReviewPanel(state.currentFlowKey, runId, "flow");
+          }
         }
       },
       onRunFailed: (_runId, _error) => {
         // Refresh status to show failure
         void loadRunStatus();
+      },
+      onRunStopped: (runId) => {
+        // Refresh status to show stopped state
+        // Stopped runs remain selectable for review (no reset)
+        void loadRunStatus();
+        // Update run history to reflect stopped state
+        void initRunHistory().then(() => {
+          setRunHistorySelectedRunId(runId);
+        });
       },
       onSelectRun: async (runId: string) => {
         // Update the main run selector to match
@@ -1148,6 +1251,36 @@ window.addEventListener("load", async () => {
         updateCompareSelector();
         await loadRunStatus();
         setRunHistorySelectedRunId(runId);
+      },
+      onFlowCompleted: (runId: string, flowKey: string) => {
+        // Individual flow completed during autopilot run
+        // Show a non-blocking toast notification
+        showFlowCompletedToast(flowKey, runId);
+      },
+      onPlanCompleted: (runId: string, _planId: string) => {
+        // Entire plan completed - the run-level review will be shown via onRunComplete
+        console.log(`[AutoPilot] Plan completed for run: ${runId}`);
+      },
+      onRunEvent: (event: SSEEvent, runId: string | null) => {
+        // Only process events for the currently viewed run
+        if (runId !== state.currentRunId) return;
+
+        switch (event.type) {
+          case "step_start":
+            // Update selected step highlight when a new step starts
+            if (event.flowKey && event.stepId && state.currentFlowKey === event.flowKey) {
+              selectStep(event.flowKey, event.stepId, { fitGraph: false, skipUrlUpdate: true });
+            }
+            break;
+
+          case "step_end":
+          case "facts_updated":
+            // Refresh InventoryCounts when step completes or facts are updated
+            if (runId) {
+              updateInventoryCounts(runId);
+            }
+            break;
+        }
       }
     });
     initRunControl();

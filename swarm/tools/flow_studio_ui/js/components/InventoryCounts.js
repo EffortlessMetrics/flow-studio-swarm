@@ -38,6 +38,9 @@ export class InventoryCounts {
         this.isLoading = false;
         this.errorMessage = null;
         this.selectedStep = null;
+        // Monotonic sequence counter for request coalescing
+        // Prevents out-of-order UI renders under bursty SSE events
+        this.loadSeq = 0;
         this.container = options.container;
         this.onTypeClick = options.onTypeClick;
         this.onFlowClick = options.onFlowClick;
@@ -47,14 +50,21 @@ export class InventoryCounts {
     // Data Loading
     // ==========================================================================
     /**
-     * Load inventory counts for a run
+     * Load inventory counts for a run.
+     * Uses monotonic request ID guard to prevent out-of-order UI renders
+     * when multiple requests are in flight (e.g., under bursty SSE).
      */
     async load(runId) {
+        const seq = ++this.loadSeq;
         this.isLoading = true;
         this.errorMessage = null;
         this.render();
         try {
             const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/facts/summary`);
+            // Ignore stale response if a newer request was initiated
+            if (seq !== this.loadSeq) {
+                return;
+            }
             if (!response.ok) {
                 if (response.status === 404) {
                     // No facts found - show empty state
@@ -83,6 +93,10 @@ export class InventoryCounts {
             this.render();
         }
         catch (err) {
+            // Only update state if this is still the latest request
+            if (seq !== this.loadSeq) {
+                return;
+            }
             this.isLoading = false;
             this.errorMessage = err instanceof Error ? err.message : "Failed to load inventory counts";
             this.render();
