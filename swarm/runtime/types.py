@@ -1111,12 +1111,20 @@ class InterruptionFrame:
         interrupted_at: Timestamp when the interruption occurred.
         return_node: Node ID to return to after the detour completes.
         context_snapshot: Snapshot of execution context at interruption time.
+        current_step_index: For multi-step sidequests, tracks the current step
+            (0-indexed). Incremented after each sidequest step completes.
+        total_steps: Total number of steps in the sidequest. When
+            current_step_index == total_steps, the sidequest is complete.
+        sidequest_id: ID of the sidequest being executed (for catalog lookup).
     """
 
     reason: str
     interrupted_at: datetime
     return_node: str
     context_snapshot: Dict[str, Any] = field(default_factory=dict)
+    current_step_index: int = 0
+    total_steps: int = 1
+    sidequest_id: Optional[str] = None
 
 
 @dataclass
@@ -1219,6 +1227,9 @@ class RunState:
         reason: str,
         return_node: str,
         context_snapshot: Optional[Dict[str, Any]] = None,
+        current_step_index: int = 0,
+        total_steps: int = 1,
+        sidequest_id: Optional[str] = None,
     ) -> None:
         """Push an interruption frame onto the stack.
 
@@ -1229,12 +1240,18 @@ class RunState:
             reason: Human-readable reason for the interruption.
             return_node: Node ID to return to after detour.
             context_snapshot: Optional context to restore on resume.
+            current_step_index: For multi-step sidequests, the current step.
+            total_steps: Total number of steps in the sidequest.
+            sidequest_id: ID of the sidequest being executed.
         """
         frame = InterruptionFrame(
             reason=reason,
             interrupted_at=datetime.now(timezone.utc),
             return_node=return_node,
             context_snapshot=context_snapshot or {},
+            current_step_index=current_step_index,
+            total_steps=total_steps,
+            sidequest_id=sidequest_id,
         )
         self.interruption_stack.append(frame)
         self.timestamp = datetime.now(timezone.utc)
@@ -1366,6 +1383,9 @@ def interruption_frame_to_dict(frame: InterruptionFrame) -> Dict[str, Any]:
         "interrupted_at": _datetime_to_iso(frame.interrupted_at),
         "return_node": frame.return_node,
         "context_snapshot": dict(frame.context_snapshot),
+        "current_step_index": frame.current_step_index,
+        "total_steps": frame.total_steps,
+        "sidequest_id": frame.sidequest_id,
     }
 
 
@@ -1383,6 +1403,9 @@ def interruption_frame_from_dict(data: Dict[str, Any]) -> InterruptionFrame:
         interrupted_at=_iso_to_datetime(data.get("interrupted_at")) or datetime.now(timezone.utc),
         return_node=data.get("return_node", ""),
         context_snapshot=dict(data.get("context_snapshot", {})),
+        current_step_index=data.get("current_step_index", 0),
+        total_steps=data.get("total_steps", 1),
+        sidequest_id=data.get("sidequest_id"),
     )
 
 

@@ -713,7 +713,11 @@ class GeminiStepOrchestrator:
             backend=spec.backend,
             initiator=spec.initiator,
             params={**spec.params, "stepwise": True, "resume": resume},
+            no_human_mid_flow=spec.no_human_mid_flow,
         )
+
+        # Capture for use in navigation
+        no_human_mid_flow = spec.no_human_mid_flow
 
         # Persist initial state
         storage_module.create_run_dir(run_id)
@@ -1112,6 +1116,7 @@ class GeminiStepOrchestrator:
                             run_state=run_state,
                             context_digest=context_digest,
                             previous_envelope=previous_envelope,
+                            no_human_mid_flow=no_human_mid_flow,
                         )
 
                         # Use Navigator's routing
@@ -2303,7 +2308,11 @@ class GeminiStepOrchestrator:
             backend=spec.backend,
             initiator=spec.initiator,
             params={**spec.params, "stepwise": True, "resume": resume, "async": True},
+            no_human_mid_flow=spec.no_human_mid_flow,
         )
+
+        # Capture for use in navigation
+        no_human_mid_flow = spec.no_human_mid_flow
 
         # Persist initial state
         storage_module.create_run_dir(run_id)

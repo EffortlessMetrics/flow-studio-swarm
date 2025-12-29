@@ -55,6 +55,7 @@ from .navigator import (
     ProgressTracker,
     ProposedEdge,
     ProposedNode,
+    DetourRequest,
     extract_candidate_edges_from_graph,
     navigator_output_to_dict,
 )
@@ -74,6 +75,73 @@ from .types import (
 from .router import FlowGraph
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# No-Human-Mid-Flow Policy: PAUSE → DETOUR Rewriting
+# =============================================================================
+
+
+def rewrite_pause_to_detour(
+    nav_output: NavigatorOutput,
+    sidequest_catalog: SidequestCatalog,
+) -> NavigatorOutput:
+    """Rewrite PAUSE intent to DETOUR for no-human-mid-flow policy.
+
+    When autopilot mode is enabled (no_human_mid_flow=True), the run
+    should never block on a human. Instead of pausing, PAUSE intents
+    are rewritten to trigger the clarifier sidequest, which:
+
+    1. Loads context (ADR, specs, requirements)
+    2. Attempts to answer the blocking question using existing context
+    3. Documents assumptions if the answer cannot be found definitively
+    4. Never blocks - continues with best interpretation
+
+    Args:
+        nav_output: Navigator output with PAUSE intent.
+        sidequest_catalog: Catalog to look up the clarifier sidequest.
+
+    Returns:
+        Modified NavigatorOutput with DETOUR intent targeting clarifier,
+        or the original nav_output if PAUSE cannot be rewritten.
+    """
+    if nav_output.route.intent != RouteIntent.PAUSE:
+        return nav_output
+
+    # Get clarifier sidequest
+    clarifier = sidequest_catalog.get_by_id("clarifier")
+    if clarifier is None:
+        logger.warning(
+            "No clarifier sidequest found in catalog, cannot rewrite PAUSE to DETOUR. "
+            "The run will block on human input."
+        )
+        return nav_output
+
+    # Deep copy to avoid mutating the original
+    from copy import deepcopy
+    rewritten = deepcopy(nav_output)
+
+    # Rewrite intent to DETOUR
+    rewritten.route.intent = RouteIntent.DETOUR
+    original_reason = nav_output.route.reasoning
+    rewritten.route.reasoning = f"Auto-clarify (no_human_mid_flow): {original_reason}"
+
+    # Create detour request for clarifier sidequest
+    rewritten.detour_request = DetourRequest(
+        sidequest_id="clarifier",
+        objective=f"Clarify: {original_reason}",
+        priority=80,  # High priority - clarification is blocking
+    )
+
+    # Clear needs_human since we're handling it via sidequest
+    rewritten.signals.needs_human = False
+
+    logger.info(
+        "Rewrote PAUSE → DETOUR (clarifier) for no_human_mid_flow policy: %s",
+        original_reason,
+    )
+
+    return rewritten
 
 
 # =============================================================================
@@ -323,7 +391,10 @@ def apply_detour_request(
         "sidequest_id": detour.sidequest_id,
     })
 
-    # Push interruption frame
+    # Calculate total steps for multi-step sidequests
+    total_steps = len(sidequest.steps) if sidequest.steps else 1
+
+    # Push interruption frame with multi-step tracking
     run_state.push_interruption(
         reason=f"Sidequest: {sidequest.name} - {detour.objective}",
         return_node=resume_at,
@@ -332,6 +403,9 @@ def apply_detour_request(
             "objective": detour.objective,
             "priority": detour.priority,
         },
+        current_step_index=0,  # Starting at first step
+        total_steps=total_steps,
+        sidequest_id=detour.sidequest_id,
     )
 
     # Add sidequest node to injected nodes
@@ -358,6 +432,12 @@ def check_and_handle_detour_completion(
     If the interruption stack has frames and the current detour is
     complete, pop and return the resume node based on ReturnBehavior.
 
+    For multi-step sidequests, this function tracks progress using
+    the current_step_index field on InterruptionFrame. When a step
+    completes:
+    - If more steps remain: increment index and return next step's station
+    - If all steps complete: pop frame and resume original flow
+
     Args:
         run_state: Current run state with interruption/resume stacks.
         sidequest_catalog: Optional catalog to look up return behavior.
@@ -373,10 +453,13 @@ def check_and_handle_detour_completion(
     if top_frame is None:
         return None
 
-    # Get sidequest context from frame
-    context_snapshot = top_frame.context_snapshot or {}
-    sidequest_id = context_snapshot.get("sidequest_id")
-    current_step_index = context_snapshot.get("current_step_index", 0)
+    # Get sidequest info from frame fields (new durable cursor approach)
+    # Fall back to context_snapshot for backwards compatibility with existing state
+    sidequest_id = top_frame.sidequest_id
+    if sidequest_id is None:
+        sidequest_id = top_frame.context_snapshot.get("sidequest_id")
+    current_step_index = top_frame.current_step_index
+    total_steps = top_frame.total_steps
 
     # Check if multi-step sidequest has more steps
     if sidequest_catalog and sidequest_id:
@@ -388,13 +471,12 @@ def check_and_handle_detour_completion(
                 next_step_index = current_step_index + 1
                 next_step = steps[next_step_index]
 
-                # Update context with new step index
-                context_snapshot["current_step_index"] = next_step_index
-                # Note: We'd need to update the frame, but stacks are immutable
-                # For now, log and return the next step's template
+                # Update the frame's step index directly (durable cursor)
+                top_frame.current_step_index = next_step_index
+
                 logger.info(
-                    "Multi-step sidequest %s advancing to step %d: %s",
-                    sidequest_id, next_step_index, next_step.template_id,
+                    "Multi-step sidequest %s advancing to step %d/%d: %s",
+                    sidequest_id, next_step_index + 1, len(steps), next_step.template_id,
                 )
                 return next_step.template_id
 
@@ -731,6 +813,7 @@ class NavigationOrchestrator:
         run_state: RunState,
         context_digest: str = "",
         previous_envelope: Optional[HandoffEnvelope] = None,
+        no_human_mid_flow: bool = False,
     ) -> NavigationResult:
         """Execute navigation decision.
 
@@ -746,6 +829,9 @@ class NavigationOrchestrator:
             run_state: Current run state.
             context_digest: Compressed context summary.
             previous_envelope: Previous step's handoff envelope.
+            no_human_mid_flow: If True, rewrite PAUSE intents to DETOUR
+                targeting the clarifier sidequest. This enables fully
+                autonomous flow execution without human intervention.
 
         Returns:
             NavigationResult with routing decision and artifacts.
@@ -799,6 +885,10 @@ class NavigationOrchestrator:
 
         # Run Navigator
         nav_output = self._navigator.navigate(nav_input)
+
+        # Apply no-human-mid-flow policy: rewrite PAUSE → DETOUR
+        if no_human_mid_flow and nav_output.route.intent == RouteIntent.PAUSE:
+            nav_output = rewrite_pause_to_detour(nav_output, self._sidequest_catalog)
 
         # Apply detour if requested
         detour_station = None
