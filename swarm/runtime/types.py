@@ -18,7 +18,7 @@ Usage:
         WP4EliminationEntry, WP4RoutingMetrics, WP4RoutingExplanation,
         wp4_routing_explanation_to_dict, wp4_routing_explanation_from_dict,
         HandoffEnvelope, RunState,
-        InterruptionFrame, ResumePoint, InjectedNode,
+        InterruptionFrame, ResumePoint, InjectedNode, InjectedNodeSpec,
         RunSpec, RunSummary, RunEvent, BackendCapabilities,
         generate_run_id,
         run_spec_to_dict, run_spec_from_dict,
@@ -31,6 +31,7 @@ Usage:
         interruption_frame_to_dict, interruption_frame_from_dict,
         resume_point_to_dict, resume_point_from_dict,
         injected_node_to_dict, injected_node_from_dict,
+        injected_node_spec_to_dict, injected_node_spec_from_dict,
         # Macro navigation types (between-flow routing)
         MacroAction, GateVerdict, FlowOutcome, FlowResult,
         MacroRoutingRule, MacroPolicy, HumanPolicy, RunPlanSpec,
@@ -1185,6 +1186,36 @@ class InjectedNode:
 
 
 @dataclass
+class InjectedNodeSpec:
+    """Full execution specification for a dynamically injected node.
+
+    Unlike InjectedNode which just tracks node_id and insertion point,
+    InjectedNodeSpec contains everything needed to execute the node:
+    the station/template to run, parameters, and traceability.
+
+    Attributes:
+        node_id: Unique identifier for this injected node (e.g., "sq-clarifier-0").
+        station_id: Station identifier to execute (resolved from pack registry).
+        template_id: Optional template ID if different from station_id.
+        agent_key: Agent key to execute at this node.
+        role: Human-readable role/purpose.
+        params: Additional parameters for execution.
+        sidequest_origin: Sidequest ID if this was injected by a sidequest.
+        sequence_index: For multi-step sidequests, the step index (0-based).
+        total_in_sequence: Total steps in the sequence this belongs to.
+    """
+    node_id: str
+    station_id: str
+    template_id: Optional[str] = None
+    agent_key: Optional[str] = None
+    role: str = ""
+    params: Dict[str, Any] = field(default_factory=dict)
+    sidequest_origin: Optional[str] = None
+    sequence_index: int = 0
+    total_in_sequence: int = 1
+
+
+@dataclass
 class RunState:
     """Durable program counter for stepwise flow execution with detour support.
 
@@ -1213,6 +1244,7 @@ class RunState:
         interruption_stack: Stack of interruption frames for nested detours.
         resume_stack: Stack of resume points for continuation after interruption.
         injected_nodes: List of dynamically injected node IDs.
+        injected_node_specs: Map of node_id to InjectedNodeSpec for execution details.
         completed_nodes: List of node IDs that have completed execution.
     """
 
@@ -1231,6 +1263,7 @@ class RunState:
     interruption_stack: List[InterruptionFrame] = field(default_factory=list)
     resume_stack: List[ResumePoint] = field(default_factory=list)
     injected_nodes: List[str] = field(default_factory=list)
+    injected_node_specs: Dict[str, InjectedNodeSpec] = field(default_factory=dict)
     completed_nodes: List[str] = field(default_factory=list)
 
     # -------------------------------------------------------------------------
@@ -1345,6 +1378,28 @@ class RunState:
         if node_id not in self.injected_nodes:
             self.injected_nodes.append(node_id)
             self.timestamp = datetime.now(timezone.utc)
+
+    def register_injected_node(self, spec: InjectedNodeSpec) -> None:
+        """Register an injected node with its full execution spec.
+
+        Args:
+            spec: The full specification for the injected node.
+        """
+        self.injected_node_specs[spec.node_id] = spec
+        if spec.node_id not in self.injected_nodes:
+            self.injected_nodes.append(spec.node_id)
+        self.timestamp = datetime.now(timezone.utc)
+
+    def get_injected_node_spec(self, node_id: str) -> Optional[InjectedNodeSpec]:
+        """Get the execution spec for an injected node.
+
+        Args:
+            node_id: The node ID to look up.
+
+        Returns:
+            InjectedNodeSpec if found, None otherwise.
+        """
+        return self.injected_node_specs.get(node_id)
 
     def mark_node_completed(self, node_id: str) -> None:
         """Mark a node as completed.
@@ -1494,6 +1549,36 @@ def injected_node_from_dict(data: Dict[str, Any]) -> InjectedNode:
     )
 
 
+def injected_node_spec_to_dict(spec: InjectedNodeSpec) -> Dict[str, Any]:
+    """Convert InjectedNodeSpec to dictionary for serialization."""
+    return {
+        "node_id": spec.node_id,
+        "station_id": spec.station_id,
+        "template_id": spec.template_id,
+        "agent_key": spec.agent_key,
+        "role": spec.role,
+        "params": dict(spec.params),
+        "sidequest_origin": spec.sidequest_origin,
+        "sequence_index": spec.sequence_index,
+        "total_in_sequence": spec.total_in_sequence,
+    }
+
+
+def injected_node_spec_from_dict(data: Dict[str, Any]) -> InjectedNodeSpec:
+    """Parse InjectedNodeSpec from dictionary."""
+    return InjectedNodeSpec(
+        node_id=data.get("node_id", ""),
+        station_id=data.get("station_id", ""),
+        template_id=data.get("template_id"),
+        agent_key=data.get("agent_key"),
+        role=data.get("role", ""),
+        params=dict(data.get("params", {})),
+        sidequest_origin=data.get("sidequest_origin"),
+        sequence_index=data.get("sequence_index", 0),
+        total_in_sequence=data.get("total_in_sequence", 1),
+    )
+
+
 def run_state_to_dict(state: RunState) -> Dict[str, Any]:
     """Convert RunState to a dictionary for serialization.
 
@@ -1532,6 +1617,10 @@ def run_state_to_dict(state: RunState) -> Dict[str, Any]:
             for point in state.resume_stack
         ],
         "injected_nodes": list(state.injected_nodes),
+        "injected_node_specs": {
+            node_id: injected_node_spec_to_dict(spec)
+            for node_id, spec in state.injected_node_specs.items()
+        },
         "completed_nodes": list(state.completed_nodes),
         # Schema-compatible aliases
         "artifacts": {
@@ -1574,6 +1663,13 @@ def run_state_from_dict(data: Dict[str, Any]) -> RunState:
         for point_data in resume_stack_data
     ]
 
+    # Parse injected node specs
+    injected_node_specs_data = data.get("injected_node_specs", {})
+    injected_node_specs = {
+        node_id: injected_node_spec_from_dict(spec_data)
+        for node_id, spec_data in injected_node_specs_data.items()
+    }
+
     # Handle both flow_key and flow_id for compatibility
     flow_key = data.get("flow_key") or data.get("flow_id", "")
 
@@ -1596,6 +1692,7 @@ def run_state_from_dict(data: Dict[str, Any]) -> RunState:
         interruption_stack=interruption_stack,
         resume_stack=resume_stack,
         injected_nodes=list(data.get("injected_nodes", [])),
+        injected_node_specs=injected_node_specs,
         completed_nodes=list(data.get("completed_nodes", [])),
     )
 

@@ -1,0 +1,62 @@
+# Worker Stations - Primary implementation and authoring stations
+# These execute the main work of each flow step
+
+- station_id: code-implementer
+  name: Code Implementer
+  description: |
+    Implement code changes based on specifications and work plan.
+    Follows TDD approach, writes tests before implementation.
+  category: worker
+  agent_key: code-implementer
+  tags: [worker, implementation, code, tdd]
+  default_params:
+    approach: tdd
+    max_file_changes: 20
+
+- station_id: test-author
+  name: Test Author
+  description: |
+    Write tests based on specifications and BDD scenarios.
+    Covers unit, integration, and edge cases.
+  category: worker
+  agent_key: test-author
+  tags: [worker, testing, bdd, coverage]
+  default_params:
+    test_types: [unit, integration, edge_cases]
+    min_coverage_target: 80
+
+- station_id: requirements-author
+  name: Requirements Author
+  description: |
+    Draft requirements from problem statement and signal input.
+    Structures functional and non-functional requirements.
+  category: worker
+  agent_key: requirements-author
+  tags: [worker, requirements, specifications]
+
+- station_id: design-author
+  name: Design Author
+  description: |
+    Create ADR and technical design documents.
+    Evaluates options and documents decisions.
+  category: worker
+  agent_key: adr-author
+  tags: [worker, design, adr, architecture]
+
+- station_id: doc-writer
+  name: Documentation Writer
+  description: |
+    Write and update documentation for changes.
+    Covers API docs, README updates, and inline comments.
+  category: worker
+  agent_key: doc-writer
+  tags: [worker, documentation, api-docs]
+
+- station_id: fixer
+  name: Fixer
+  description: |
+    Apply fixes based on critic feedback.
+    Handles both code and test fixes.
+  category: worker
+  agent_key: fixer
+  tags: [worker, fixes, iteration]

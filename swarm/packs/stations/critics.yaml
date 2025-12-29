@@ -1,0 +1,66 @@
+# Critic Stations - Review and verification stations
+# These provide adversarial feedback but never fix - only critique
+
+- station_id: code-critic
+  name: Code Critic
+  description: |
+    Review code implementation for correctness, style, and best practices.
+    Provides harsh but constructive feedback. Never fixes - only critiques.
+  category: critic
+  agent_key: code-critic
+  tags: [critic, review, code, quality]
+  default_params:
+    severity_threshold: medium
+    check_patterns: [solid, dry, security]
+
+- station_id: test-critic
+  name: Test Critic
+  description: |
+    Review test implementation for coverage, quality, and edge cases.
+    Identifies missing scenarios and weak assertions.
+  category: critic
+  agent_key: test-critic
+  tags: [critic, review, testing, coverage]
+  default_params:
+    min_assertion_count: 3
+    check_edge_cases: true
+
+- station_id: requirements-critic
+  name: Requirements Critic
+  description: |
+    Review requirements for completeness, clarity, and testability.
+    Identifies ambiguities and missing acceptance criteria.
+  category: critic
+  agent_key: requirements-critic
+  tags: [critic, review, requirements]
+
+- station_id: design-critic
+  name: Design Critic
+  description: |
+    Review technical design for soundness and completeness.
+    Challenges assumptions and identifies risks.
+  category: critic
+  agent_key: design-critic
+  tags: [critic, review, design, architecture]
+
+- station_id: security-critic
+  name: Security Critic
+  description: |
+    Security-focused code review.
+    Checks for OWASP vulnerabilities and security anti-patterns.
+  category: critic
+  agent_key: security-scanner
+  tags: [critic, security, owasp, vulnerabilities]
+  default_params:
+    scan_depth: thorough
+    check_owasp_top_10: true
+    check_secrets: true
+
+- station_id: gate-reviewer
+  name: Gate Reviewer
+  description: |
+    Final review before merge decision.
+    Aggregates all critic feedback and makes merge recommendation.
+  category: critic
+  agent_key: merge-decider
+  tags: [critic, gate, merge, final-review]

@@ -38,6 +38,7 @@ from swarm.runtime.types import (
     RoutingSignal,
     RunEvent,
 )
+from swarm.runtime.receipt_io import make_receipt_data, write_step_receipt
 
 # Use the unified SDK adapter
 from swarm.runtime.claude_sdk import check_sdk_available as check_claude_sdk_available
@@ -632,10 +633,37 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         This is a combined implementation that handles work + finalization + routing
         in a single flow for backwards compatibility with run_step().
         """
+        from datetime import datetime, timezone
+
+        start_time = datetime.now(timezone.utc)
+        agent_key = ctx.step_agents[0] if ctx.step_agents else "unknown"
+        routing_signal = None
+
         # For run_step(), we use the lifecycle methods but combine them
         step_result, events, work_summary = await self._run_worker_async(ctx)
 
         if step_result.status == "failed":
+            # Write receipt even for failed steps
+            end_time = datetime.now(timezone.utc)
+            receipt_data = make_receipt_data(
+                engine=self.engine_id,
+                mode=self._mode,
+                execution_mode="legacy",
+                provider=self._provider or "claude-sdk",
+                step_id=ctx.step_id,
+                flow_key=ctx.flow_key,
+                run_id=ctx.run_id,
+                agent_key=agent_key,
+                started_at=start_time,
+                completed_at=end_time,
+                duration_ms=step_result.duration_ms,
+                status=step_result.status,
+                model=step_result.artifacts.get("model", "unknown") if step_result.artifacts else "unknown",
+                tokens=step_result.artifacts.get("token_counts") if step_result.artifacts else None,
+                transcript_path=step_result.artifacts.get("transcript_path") if step_result.artifacts else None,
+                error=step_result.error,
+            )
+            write_step_receipt(ctx.run_base, receipt_data)
             return step_result, events
 
         # Finalize
@@ -653,15 +681,52 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         if step_result.artifacts is None:
             step_result.artifacts = {}
 
+        envelope_path_str = None
         if finalization.envelope:
             envelope_path = make_handoff_envelope_path(ctx.run_base, ctx.step_id)
             if envelope_path.exists():
                 step_result.artifacts["handoff_envelope_path"] = str(envelope_path)
+                envelope_path_str = str(envelope_path.relative_to(ctx.run_base))
 
         if finalization.handoff_data:
             step_result.artifacts["handoff"] = {
                 "status": finalization.handoff_data.get("status"),
                 "proposed_next_step": finalization.handoff_data.get("proposed_next_step"),
             }
+
+        # Write receipt for legacy SDK execution
+        end_time = datetime.now(timezone.utc)
+        routing_signal_dict = None
+        if routing_signal:
+            routing_signal_dict = {
+                "decision": routing_signal.decision.value if hasattr(routing_signal.decision, "value") else str(routing_signal.decision),
+                "next_step_id": routing_signal.next_step_id,
+                "reason": routing_signal.reason,
+                "confidence": routing_signal.confidence,
+                "needs_human": routing_signal.needs_human,
+            }
+
+        receipt_data = make_receipt_data(
+            engine=self.engine_id,
+            mode=self._mode,
+            execution_mode="legacy",
+            provider=self._provider or "claude-sdk",
+            step_id=ctx.step_id,
+            flow_key=ctx.flow_key,
+            run_id=ctx.run_id,
+            agent_key=agent_key,
+            started_at=start_time,
+            completed_at=end_time,
+            duration_ms=step_result.duration_ms,
+            status=step_result.status,
+            model=step_result.artifacts.get("model", "unknown") if step_result.artifacts else "unknown",
+            tokens=step_result.artifacts.get("token_counts") if step_result.artifacts else None,
+            transcript_path=step_result.artifacts.get("transcript_path") if step_result.artifacts else None,
+            handoff_envelope_path=envelope_path_str,
+            routing_signal=routing_signal_dict,
+            error=step_result.error,
+        )
+        r_path = write_step_receipt(ctx.run_base, receipt_data)
+        step_result.artifacts["receipt_path"] = str(r_path)
 
         return step_result, events

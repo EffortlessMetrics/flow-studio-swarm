@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
@@ -36,10 +37,13 @@ from swarm.runtime.engines import StepEngine, StepContext
 from swarm.runtime.engines.models import RoutingContext
 from swarm.runtime.types import (
     HandoffEnvelope,
+    InjectedNodeSpec,
+    MacroAction,
     RoutingDecision,
     RoutingSignal,
     RunEvent,
     RunId,
+    RunPlanSpec,
     RunSpec,
     RunState,
     RunStatus,
@@ -49,7 +53,7 @@ from swarm.runtime.types import (
 )
 
 from .receipt_compat import read_receipt_field, update_receipt_routing
-from .routing import create_routing_signal, route_step, build_routing_context
+from .routing import create_routing_signal, build_routing_context
 from .spec_facade import SpecFacade
 
 # A3: Envelope-first routing imports
@@ -60,6 +64,14 @@ from swarm.runtime.handoff_io import (
 from swarm.runtime.routing_utils import parse_routing_decision
 from swarm.runtime.router import FlowGraph, Edge, NodeConfig  # For Navigator integration
 
+# Macro navigation imports (between-flow routing)
+from swarm.runtime.macro_navigator import (
+    MacroNavigator,
+    extract_flow_result,
+    create_default_navigator,
+    create_autopilot_navigator,
+)
+
 if TYPE_CHECKING:
     from swarm.runtime.navigator_integration import NavigationOrchestrator
 
@@ -67,6 +79,33 @@ logger = logging.getLogger(__name__)
 
 # Maximum nested detour depth (prevents runaway sidequests)
 MAX_DETOUR_DEPTH = 10
+
+
+@dataclass
+class ResolvedNode:
+    """Resolved execution context for a node.
+
+    This is the unified representation for both regular flow nodes
+    and dynamically injected nodes.
+
+    Attributes:
+        node_id: The node identifier.
+        step_id: Step ID (same as node_id for compatibility).
+        role: The role/station to execute.
+        agents: List of agent keys to run.
+        index: Position in flow (or -1 for injected nodes).
+        is_injected: Whether this is a dynamically injected node.
+        injected_spec: Full spec if this is an injected node.
+        routing: Routing configuration if from flow definition.
+    """
+    node_id: str
+    step_id: str
+    role: str
+    agents: Tuple[str, ...]
+    index: int = -1
+    is_injected: bool = False
+    injected_spec: Optional[InjectedNodeSpec] = None
+    routing: Optional[Any] = None  # StepRouting from flow_registry
 
 
 class StepwiseOrchestrator:
@@ -223,6 +262,298 @@ class StepwiseOrchestrator:
             )
             raise
 
+    def run_autopilot(
+        self,
+        spec: RunSpec,
+        plan_id: Optional[str] = None,
+        run_plan: Optional[RunPlanSpec] = None,
+        run_id: Optional[RunId] = None,
+    ) -> RunId:
+        """Execute multiple flows in autopilot mode using MacroNavigator.
+
+        This method orchestrates the full SDLC by:
+        1. Loading the run plan (flow sequence + policies)
+        2. Executing flows sequentially
+        3. Using MacroNavigator for between-flow routing
+        4. Handling bounces, retries, and termination
+
+        Args:
+            spec: The run specification.
+            plan_id: ID of a stored run plan to use.
+            run_plan: Explicit RunPlanSpec (overrides plan_id).
+            run_id: Optional run ID (generates if not provided).
+
+        Returns:
+            The run ID.
+
+        Example:
+            # Run full SDLC with autopilot
+            run_id = orchestrator.run_autopilot(
+                spec=RunSpec(flow_keys=["signal"], initiator="cli"),
+                plan_id="default-autopilot",
+            )
+        """
+        # Generate run ID
+        if run_id is None:
+            run_id = generate_run_id()
+
+        # Load run plan - use explicit plan, or create default
+        if run_plan is None:
+            # Note: load_run_plan would be implemented in run_plan_api module
+            # For now, we always use default if no explicit plan provided
+            run_plan = RunPlanSpec.default()
+
+        # Create MacroNavigator
+        macro_nav = MacroNavigator(run_plan)
+
+        # Initialize stop tracking
+        with self._lock:
+            if run_id not in self._stop_requests:
+                self._stop_requests[run_id] = threading.Event()
+
+        # Emit run_started event
+        storage_module.append_event(
+            run_id,
+            RunEvent(
+                run_id=run_id,
+                ts=datetime.now(timezone.utc),
+                kind="autopilot_started",
+                flow_key="",
+                step_id=None,
+                payload={
+                    "plan_id": plan_id,
+                    "flow_sequence": run_plan.flow_sequence,
+                    "human_policy": run_plan.human_policy.mode,
+                },
+            ),
+        )
+
+        # Track overall run state
+        artifacts_base = self._repo_root / "swarm" / "runs" / run_id
+        current_flow_idx = 0
+
+        # Create a shared run state for macro-level tracking
+        run_state = RunState(
+            run_id=run_id,
+            flow_key=run_plan.flow_sequence[0] if run_plan.flow_sequence else "",
+            status="running",
+        )
+
+        try:
+            while current_flow_idx < len(run_plan.flow_sequence):
+                # Check for stop request
+                if self._is_stop_requested(run_id):
+                    logger.info("Stop requested, pausing autopilot at flow %d", current_flow_idx)
+                    storage_module.append_event(
+                        run_id,
+                        RunEvent(
+                            run_id=run_id,
+                            ts=datetime.now(timezone.utc),
+                            kind="autopilot_stopped",
+                            flow_key=run_plan.flow_sequence[current_flow_idx],
+                            step_id=None,
+                            payload={"flow_index": current_flow_idx},
+                        ),
+                    )
+                    break
+
+                flow_key = run_plan.flow_sequence[current_flow_idx]
+                run_state.flow_key = flow_key
+                run_state.current_flow_index = current_flow_idx + 1  # 1-indexed for display
+
+                logger.info(
+                    "Autopilot: Starting flow %d/%d: %s",
+                    current_flow_idx + 1,
+                    len(run_plan.flow_sequence),
+                    flow_key,
+                )
+
+                # Get flow definition
+                flow_def = self._flow_registry.get_flow(flow_key)
+                if flow_def is None:
+                    logger.error("Unknown flow in sequence: %s", flow_key)
+                    break
+
+                # Create run directory for this flow
+                storage_module.init_run(run_id, flow_key, spec)
+
+                # Emit flow_started event
+                storage_module.append_event(
+                    run_id,
+                    RunEvent(
+                        run_id=run_id,
+                        ts=datetime.now(timezone.utc),
+                        kind="flow_started",
+                        flow_key=flow_key,
+                        step_id=None,
+                        payload={"flow_index": current_flow_idx},
+                    ),
+                )
+
+                # Execute the flow
+                try:
+                    summary = self._execute_stepwise(
+                        run_id=run_id,
+                        flow_key=flow_key,
+                        flow_def=flow_def,
+                        spec=spec,
+                        run_state=run_state,
+                    )
+                except Exception as e:
+                    logger.error("Flow %s failed: %s", flow_key, e)
+                    storage_module.append_event(
+                        run_id,
+                        RunEvent(
+                            run_id=run_id,
+                            ts=datetime.now(timezone.utc),
+                            kind="flow_failed",
+                            flow_key=flow_key,
+                            step_id=None,
+                            payload={"error": str(e)},
+                        ),
+                    )
+                    break
+
+                # Extract flow result for MacroNavigator
+                flow_result = extract_flow_result(
+                    flow_key=flow_key,
+                    run_state=run_state,
+                    artifacts_base=artifacts_base,
+                )
+
+                # Get macro routing decision
+                macro_decision = macro_nav.route_after_flow(
+                    completed_flow=flow_key,
+                    flow_result=flow_result,
+                    run_state=run_state,
+                )
+
+                # Emit macro routing event
+                storage_module.append_event(
+                    run_id,
+                    RunEvent(
+                        run_id=run_id,
+                        ts=datetime.now(timezone.utc),
+                        kind="macro_route",
+                        flow_key=flow_key,
+                        step_id=None,
+                        payload={
+                            "action": macro_decision.action.value,
+                            "next_flow": macro_decision.next_flow,
+                            "reason": macro_decision.reason,
+                            "rule_applied": macro_decision.rule_applied,
+                        },
+                    ),
+                )
+
+                # Apply the decision
+                if macro_decision.action == MacroAction.TERMINATE:
+                    logger.info("Autopilot: Terminating - %s", macro_decision.reason)
+                    break
+
+                elif macro_decision.action == MacroAction.PAUSE:
+                    logger.info("Autopilot: Pausing for human - %s", macro_decision.reason)
+                    storage_module.append_event(
+                        run_id,
+                        RunEvent(
+                            run_id=run_id,
+                            ts=datetime.now(timezone.utc),
+                            kind="autopilot_paused",
+                            flow_key=flow_key,
+                            step_id=None,
+                            payload={"reason": macro_decision.reason},
+                        ),
+                    )
+                    break
+
+                elif macro_decision.action == MacroAction.GOTO:
+                    # Jump to a specific flow (e.g., bounce from gate to build)
+                    target_flow = macro_decision.next_flow
+                    if target_flow:
+                        try:
+                            target_idx = run_plan.flow_sequence.index(target_flow)
+                            current_flow_idx = target_idx
+                            logger.info("Autopilot: GOTO %s (index %d)", target_flow, target_idx)
+
+                            # Record flow transition
+                            run_state.flow_transition_history.append({
+                                "from_flow": flow_key,
+                                "to_flow": target_flow,
+                                "action": "goto",
+                                "reason": macro_decision.reason,
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                            })
+                        except ValueError:
+                            logger.error("GOTO target %s not in sequence", target_flow)
+                            break
+                    else:
+                        logger.error("GOTO action without target flow")
+                        break
+
+                elif macro_decision.action == MacroAction.REPEAT:
+                    # Re-run the same flow
+                    logger.info("Autopilot: REPEAT %s", flow_key)
+                    run_state.flow_transition_history.append({
+                        "from_flow": flow_key,
+                        "to_flow": flow_key,
+                        "action": "repeat",
+                        "reason": macro_decision.reason,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    })
+                    # Don't increment current_flow_idx
+
+                elif macro_decision.action == MacroAction.SKIP:
+                    # Skip to next flow
+                    current_flow_idx += 1
+                    logger.info("Autopilot: SKIP to flow %d", current_flow_idx)
+
+                else:  # ADVANCE
+                    # Normal advancement to next flow
+                    current_flow_idx += 1
+                    if current_flow_idx < len(run_plan.flow_sequence):
+                        next_flow = run_plan.flow_sequence[current_flow_idx]
+                        run_state.flow_transition_history.append({
+                            "from_flow": flow_key,
+                            "to_flow": next_flow,
+                            "action": "advance",
+                            "reason": macro_decision.reason,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        })
+
+            # Emit autopilot_completed event
+            storage_module.append_event(
+                run_id,
+                RunEvent(
+                    run_id=run_id,
+                    ts=datetime.now(timezone.utc),
+                    kind="autopilot_completed",
+                    flow_key="",
+                    step_id=None,
+                    payload={
+                        "flows_executed": current_flow_idx,
+                        "total_flows": len(run_plan.flow_sequence),
+                        "routing_history": macro_nav.get_routing_history(),
+                    },
+                ),
+            )
+
+            return run_id
+
+        except Exception as e:
+            logger.error("Autopilot run %s failed: %s", run_id, e)
+            storage_module.append_event(
+                run_id,
+                RunEvent(
+                    run_id=run_id,
+                    ts=datetime.now(timezone.utc),
+                    kind="autopilot_failed",
+                    flow_key="",
+                    step_id=None,
+                    payload={"error": str(e)},
+                ),
+            )
+            raise
+
     def _execute_stepwise(
         self,
         run_id: RunId,
@@ -315,6 +646,19 @@ class StepwiseOrchestrator:
 
             step = steps[current_step_idx]
 
+            # For injected nodes, resolve via the node resolver
+            current_node_id = run_state.current_step_id or step.id
+            resolved = self._resolve_node(current_node_id, flow_def, run_state)
+
+            # If we resolved to an injected node, use its details
+            if resolved and resolved.is_injected:
+                # Create a synthetic step context for the injected node
+                step_role = resolved.role
+                step_agents = resolved.agents
+            else:
+                step_role = step.role
+                step_agents = tuple(step.agents) if step.agents else ()
+
             # Update RunState with current position
             run_state.current_step_id = step.id
             run_state.step_index = current_step_idx
@@ -331,13 +675,13 @@ class StepwiseOrchestrator:
                 repo_root=self._repo_root,
                 run_id=run_id,
                 flow_key=flow_key,
-                step_id=step.id,
-                step_index=step.index,
+                step_id=current_node_id,  # Use current_node_id instead of step.id
+                step_index=resolved.index if resolved else step.index,
                 total_steps=len(steps),
                 spec=spec,
                 flow_title=flow_def.title,
-                step_role=step.role,
-                step_agents=tuple(step.agents) if step.agents else (),
+                step_role=step_role,  # Use resolved role
+                step_agents=step_agents,  # Use resolved agents
                 history=history,
                 routing=routing_ctx,
             )
@@ -505,6 +849,121 @@ class StepwiseOrchestrator:
             edges=edges,
             policy={"max_loop_iterations": 50},  # Safety fuse
         )
+
+    def _resolve_node(
+        self,
+        node_id: str,
+        flow_def: FlowDefinition,
+        run_state: RunState,
+    ) -> Optional[ResolvedNode]:
+        """Resolve a node_id to an executable ResolvedNode.
+
+        This method handles both:
+        1. Regular flow graph nodes (from FlowDefinition)
+        2. Dynamically injected nodes (from run_state.injected_node_specs)
+
+        Injected nodes take precedence - if a node_id exists in both
+        the flow and as an injected node, the injected version is used.
+
+        Args:
+            node_id: The node ID to resolve.
+            flow_def: The flow definition containing regular steps.
+            run_state: RunState containing injected node specs.
+
+        Returns:
+            ResolvedNode if found, None otherwise.
+        """
+        # First, check injected nodes (they take precedence)
+        injected_spec = run_state.get_injected_node_spec(node_id)
+        if injected_spec is not None:
+            return ResolvedNode(
+                node_id=node_id,
+                step_id=node_id,
+                role=injected_spec.station_id,
+                agents=(injected_spec.agent_key or injected_spec.station_id,),
+                index=-1,  # Injected nodes don't have a flow index
+                is_injected=True,
+                injected_spec=injected_spec,
+                routing=None,
+            )
+
+        # Then check regular flow steps
+        for step in flow_def.steps:
+            if step.id == node_id:
+                return ResolvedNode(
+                    node_id=node_id,
+                    step_id=step.id,
+                    role=step.role or step.id,
+                    agents=tuple(step.agents) if step.agents else (),
+                    index=step.index,
+                    is_injected=False,
+                    injected_spec=None,
+                    routing=step.routing,
+                )
+
+        # Node not found
+        logger.warning("Could not resolve node_id: %s", node_id)
+        return None
+
+    def _get_next_node_id(
+        self,
+        current_node_id: str,
+        nav_result_node: Optional[str],
+        flow_def: FlowDefinition,
+        run_state: RunState,
+    ) -> Optional[str]:
+        """Determine the next node_id to execute.
+
+        Priority order:
+        1. Navigator-provided next node (if valid)
+        2. Resume from interruption stack (if sidequest complete)
+        3. Sequential next step in flow
+        4. None (flow complete)
+
+        Args:
+            current_node_id: The current node that just executed.
+            nav_result_node: Navigator's suggested next node.
+            flow_def: The flow definition.
+            run_state: Current run state.
+
+        Returns:
+            Next node_id to execute, or None if flow is complete.
+        """
+        # If navigator provided a target, validate and use it
+        if nav_result_node:
+            resolved = self._resolve_node(nav_result_node, flow_def, run_state)
+            if resolved is not None:
+                return nav_result_node
+            else:
+                logger.warning(
+                    "Navigator target %s could not be resolved, falling back",
+                    nav_result_node,
+                )
+
+        # Check if we're resuming from a sidequest
+        if run_state.peek_resume() is not None:
+            # There's a resume point - sidequest handling will pop it
+            # This is handled by check_and_handle_detour_completion in navigate()
+            pass
+
+        # For injected nodes, check if there's a next in sequence
+        if current_node_id.startswith("sq-"):
+            # This is a sidequest node - next node determined by sidequest cursor
+            # The navigate() call handles this via check_and_handle_detour_completion
+            return None
+
+        # For regular nodes, find sequential next
+        current_idx = None
+        for i, step in enumerate(flow_def.steps):
+            if step.id == current_node_id:
+                current_idx = i
+                break
+
+        if current_idx is not None and current_idx + 1 < len(flow_def.steps):
+            return flow_def.steps[current_idx + 1].id
+
+        # No next step - flow complete
+        return None
 
     def _route_via_navigator(
         self,
@@ -679,7 +1138,7 @@ class StepwiseOrchestrator:
                 next_step_id,
             )
         else:
-            # Fallback: receipt-based routing (legacy path)
+            # Fallback: Use create_routing_signal for proper decision semantics
             routing_source = "fallback"
 
             result_dict = {
@@ -695,24 +1154,39 @@ class StepwiseOrchestrator:
                     repo_root, r, f, s, a, field
                 )
 
-            # Route to next step using legacy path
-            next_step_id, reason = route_step(
-                flow_def=flow_def,
-                current_step=step,
+            # Create a proper RoutingSignal using create_routing_signal
+            # This preserves LOOP/BRANCH/ADVANCE/TERMINATE semantics
+            routing_signal = create_routing_signal(
+                step=step,
                 result=result_dict,
                 loop_state=loop_state,
-                run_id=run_id,
-                flow_key=flow_key,
                 receipt_reader=make_receipt_reader(),
             )
 
+            # Extract next_step_id and reason from the signal
+            next_step_id = routing_signal.next_step_id
+            reason = routing_signal.reason or "fallback_routing"
+
+            # Handle loop state updates for LOOP decisions
+            if routing_signal.decision == RoutingDecision.LOOP:
+                routing = step.routing
+                if routing and routing.loop_target:
+                    loop_key = f"{step.id}:{routing.loop_target}"
+                    current_iter = loop_state.get(loop_key, 0)
+                    loop_state[loop_key] = current_iter + 1
+                    next_step_id = routing.loop_target
+                    reason = f"loop_via_fallback:{current_iter + 1}"
+
             # Persist routing decision to envelope for consistency
+            # Use the proper decision from the RoutingSignal
             routing_dict = {
-                "decision": "terminate" if next_step_id is None else "advance",
+                "decision": routing_signal.decision.value if hasattr(routing_signal.decision, "value") else str(routing_signal.decision),
                 "next_step_id": next_step_id,
                 "reason": reason,
-                "confidence": 1.0,
-                "needs_human": False,
+                "confidence": routing_signal.confidence,
+                "needs_human": routing_signal.needs_human,
+                "loop_count": routing_signal.loop_count,
+                "exit_condition_met": routing_signal.exit_condition_met,
             }
             updated = update_envelope_routing(
                 run_base=run_base,
@@ -721,8 +1195,9 @@ class StepwiseOrchestrator:
             )
             if updated:
                 logger.debug(
-                    "A3: Persisted fallback routing to envelope for step %s",
+                    "A3: Persisted fallback routing to envelope for step %s (decision=%s)",
                     step.id,
+                    routing_dict["decision"],
                 )
 
         return next_step_id, reason, routing_source
@@ -756,6 +1231,7 @@ def get_orchestrator(
 
 
 __all__ = [
+    "ResolvedNode",
     "StepwiseOrchestrator",
     "GeminiStepOrchestrator",
     "get_orchestrator",

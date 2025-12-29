@@ -65,12 +65,14 @@ from .sidequest_catalog import (
     load_default_catalog,
     sidequests_to_navigator_options,
 )
+from .station_library import StationLibrary, load_station_library
 from .types import (
     HandoffEnvelope,
     RunState,
     RoutingDecision,
     RoutingSignal,
     RunEvent,
+    InjectedNodeSpec,
 )
 from .router import FlowGraph
 
@@ -362,8 +364,17 @@ def apply_detour_request(
 
     If Navigator requested a detour, this:
     1. Pushes current position to resume stack
-    2. Pushes interruption frame
-    3. Returns the sidequest station to execute
+    2. Pushes interruption frame with multi-step tracking
+    3. Injects node specs for ALL steps in the sidequest
+    4. Returns the first sidequest station to execute
+
+    For multi-step sidequests, nodes are injected as:
+    - sq-<sidequest_id>-0
+    - sq-<sidequest_id>-1
+    - ... etc
+
+    Each node has a full InjectedNodeSpec so the orchestrator
+    can resolve it to an execution context.
 
     Args:
         nav_output: Navigator output with detour request.
@@ -372,7 +383,7 @@ def apply_detour_request(
         current_node: Current node (for resume point).
 
     Returns:
-        Station ID to execute for the detour, or None if no detour.
+        First node ID to execute for the detour, or None if no detour.
     """
     if nav_output.detour_request is None:
         return None
@@ -384,15 +395,20 @@ def apply_detour_request(
         logger.warning("Unknown sidequest requested: %s", detour.sidequest_id)
         return None
 
+    # Get steps from sidequest (handles both single and multi-step)
+    steps = sidequest.to_steps() if hasattr(sidequest, 'to_steps') else []
+    if not steps:
+        # Fallback for simple sidequests
+        steps = [type('Step', (), {'station_id': sidequest.station_id, 'template_id': None})()]
+
+    total_steps = len(steps)
+
     # Push resume point (where to continue after detour)
     resume_at = detour.resume_at or current_node
     run_state.push_resume(resume_at, {
         "detour_reason": detour.objective,
         "sidequest_id": detour.sidequest_id,
     })
-
-    # Calculate total steps for multi-step sidequests
-    total_steps = len(sidequest.steps) if sidequest.steps else 1
 
     # Push interruption frame with multi-step tracking
     run_state.push_interruption(
@@ -408,19 +424,46 @@ def apply_detour_request(
         sidequest_id=detour.sidequest_id,
     )
 
-    # Add sidequest node to injected nodes
-    sidequest_node_id = f"sidequest-{detour.sidequest_id}-{run_state.step_index}"
-    run_state.add_injected_node(sidequest_node_id)
+    # Inject node specs for ALL steps in the sidequest
+    first_node_id = None
+    for i, step in enumerate(steps):
+        node_id = f"sq-{detour.sidequest_id}-{i}"
+
+        # Get station_id from step (handle different step formats)
+        station_id = getattr(step, 'station_id', None) or getattr(step, 'template_id', None) or sidequest.station_id
+        template_id = getattr(step, 'template_id', None)
+
+        # Create full execution spec for this node
+        spec = InjectedNodeSpec(
+            node_id=node_id,
+            station_id=station_id,
+            template_id=template_id,
+            agent_key=station_id,  # Default to station_id as agent key
+            role=f"Sidequest {detour.sidequest_id} step {i+1}/{total_steps}",
+            params={
+                "objective": detour.objective,
+                "step_index": i,
+            },
+            sidequest_origin=detour.sidequest_id,
+            sequence_index=i,
+            total_in_sequence=total_steps,
+        )
+
+        # Register the spec (this also adds to injected_nodes list)
+        run_state.register_injected_node(spec)
+
+        if i == 0:
+            first_node_id = node_id
 
     # Record usage in catalog
     sidequest_catalog.record_usage(detour.sidequest_id, run_state.run_id)
 
     logger.info(
-        "Detour injected: %s (station=%s, resume_at=%s)",
-        detour.sidequest_id, sidequest.station_id, resume_at,
+        "Detour injected: %s (%d steps, first=%s, resume_at=%s)",
+        detour.sidequest_id, total_steps, first_node_id, resume_at,
     )
 
-    return sidequest.station_id
+    return first_node_id
 
 
 def check_and_handle_detour_completion(
@@ -469,16 +512,18 @@ def check_and_handle_detour_completion(
             if current_step_index < len(steps) - 1:
                 # More steps remain - advance to next step
                 next_step_index = current_step_index + 1
-                next_step = steps[next_step_index]
+
+                # Use the injected node ID format
+                next_node_id = f"sq-{sidequest_id}-{next_step_index}"
 
                 # Update the frame's step index directly (durable cursor)
                 top_frame.current_step_index = next_step_index
 
                 logger.info(
                     "Multi-step sidequest %s advancing to step %d/%d: %s",
-                    sidequest_id, next_step_index + 1, len(steps), next_step.template_id,
+                    sidequest_id, next_step_index + 1, len(steps), next_node_id,
                 )
-                return next_step.template_id
+                return next_node_id
 
     # Sidequest is complete - apply return behavior
     resume_point = run_state.pop_resume()
@@ -786,6 +831,7 @@ class NavigationOrchestrator:
         navigator: Optional[Navigator] = None,
         sidequest_catalog: Optional[SidequestCatalog] = None,
         progress_tracker: Optional[ProgressTracker] = None,
+        station_library: Optional[StationLibrary] = None,
     ):
         """Initialize NavigationOrchestrator.
 
@@ -794,11 +840,14 @@ class NavigationOrchestrator:
             navigator: Navigator instance. If None, uses deterministic fallback.
             sidequest_catalog: Sidequest catalog. If None, uses default.
             progress_tracker: Progress tracker. If None, creates new one.
+            station_library: Station library for EXTEND_GRAPH validation.
+                If None, loads default + repo pack.
         """
         self._repo_root = repo_root or Path.cwd()
         self._navigator = navigator or Navigator()
         self._sidequest_catalog = sidequest_catalog or load_default_catalog()
         self._progress_tracker = progress_tracker or ProgressTracker()
+        self._station_library = station_library or load_station_library(self._repo_root)
 
     def navigate(
         self,
@@ -914,7 +963,7 @@ class NavigationOrchestrator:
                 nav_output=nav_output,
                 run_state=run_state,
                 current_node=current_node,
-                station_library=None,  # TODO: Pass station library for validation
+                station_library=self._station_library.list_station_ids(),
             )
             if extend_graph_target:
                 extend_graph_injected = True
@@ -964,6 +1013,22 @@ class NavigationOrchestrator:
     def sidequest_catalog(self) -> SidequestCatalog:
         """Get the sidequest catalog for external use."""
         return self._sidequest_catalog
+
+    @property
+    def station_library(self) -> StationLibrary:
+        """Get the station library for external use."""
+        return self._station_library
+
+    def validate_extend_graph_target(self, target_id: str) -> bool:
+        """Validate that a target is valid for EXTEND_GRAPH.
+
+        Args:
+            target_id: The proposed target station/template ID.
+
+        Returns:
+            True if the target exists in the station library.
+        """
+        return self._station_library.validate_target(target_id)
 
     def reset(self, run_id: Optional[str] = None) -> None:
         """Reset state for a new run.

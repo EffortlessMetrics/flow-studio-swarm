@@ -201,8 +201,8 @@ class TestMultiStepSidequestProgression:
         # Call check_and_handle_detour_completion - should advance to step 1
         next_station = check_and_handle_detour_completion(run_state, catalog)
 
-        # Assert it returns the next step's template_id
-        assert next_station == "architecture-critic"
+        # Assert it returns the injected node ID for the next step
+        assert next_station == "sq-deep-analysis-1"
 
         # Assert frame's current_step_index was incremented
         updated_frame = run_state.peek_interruption()
@@ -584,8 +584,8 @@ class TestApplyDetourRequest:
         # Call apply_detour_request
         station = apply_detour_request(nav_output, run_state, catalog, current_node)
 
-        # Assert returns the first step's station
-        assert station == "test-critic"
+        # Assert returns the first step's injected node ID
+        assert station == "sq-test-triage-0"
 
         # Assert resume stack was pushed
         assert len(run_state.resume_stack) == 1
@@ -600,8 +600,23 @@ class TestApplyDetourRequest:
         assert frame.current_step_index == 0
         assert frame.total_steps == 2  # Multi-step sidequest has 2 steps
 
-        # Assert injected node was added
-        assert len(run_state.injected_nodes) == 1
+        # Assert injected nodes were added for ALL steps
+        assert len(run_state.injected_nodes) == 2  # One for each step
+        assert "sq-test-triage-0" in run_state.injected_nodes
+        assert "sq-test-triage-1" in run_state.injected_nodes
+
+        # Assert injected node specs were registered
+        spec_0 = run_state.get_injected_node_spec("sq-test-triage-0")
+        assert spec_0 is not None
+        assert spec_0.station_id == "test-critic"
+        assert spec_0.sequence_index == 0
+        assert spec_0.total_in_sequence == 2
+
+        spec_1 = run_state.get_injected_node_spec("sq-test-triage-1")
+        assert spec_1 is not None
+        assert spec_1.station_id == "fixer"
+        assert spec_1.sequence_index == 1
+        assert spec_1.total_in_sequence == 2
 
     def test_apply_detour_request_returns_none_for_unknown_sidequest(self):
         """apply_detour_request should return None for unknown sidequest."""

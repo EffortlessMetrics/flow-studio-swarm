@@ -1,0 +1,70 @@
+# Sidequest Stations - Detour targets for autonomous clarification and research
+# These stations can be triggered by Navigator when uncertainty is detected
+
+- station_id: clarifier
+  name: Clarifier
+  description: |
+    Resolve ambiguity by researching existing context (ADR, specs, requirements)
+    and documenting assumptions. Never blocks - continues with best interpretation.
+  category: sidequest
+  agent_key: clarifier
+  tags: [sidequest, research, assumptions, autonomous]
+  default_params:
+    max_context_tokens: 20000
+    output_format: assumptions_document
+
+- station_id: research
+  name: Deep Research
+  description: |
+    Deep dive into codebase or documentation to gather comprehensive context.
+    Used when clarifier needs more information than quick lookup provides.
+  category: sidequest
+  agent_key: context-loader
+  tags: [sidequest, research, context, deep-dive]
+  default_params:
+    max_context_tokens: 50000
+    search_depth: comprehensive
+
+- station_id: risk-assessment
+  name: Risk Assessment
+  description: |
+    Evaluate risks in current approach and document mitigations.
+    Triggered when changes touch sensitive areas or patterns suggest risk.
+  category: sidequest
+  agent_key: risk-analyst
+  tags: [sidequest, risk, analysis, security]
+  default_params:
+    risk_categories: [security, performance, data, compliance]
+
+- station_id: policy-check
+  name: Policy Check
+  description: |
+    Verify current work against organizational policies.
+    Triggered when changes may have compliance implications.
+  category: sidequest
+  agent_key: policy-analyst
+  tags: [sidequest, policy, compliance, governance]
+
+- station_id: security-review
+  name: Security Review
+  description: |
+    Quick security assessment of changes.
+    Triggered when changes touch auth, crypto, or data handling.
+  category: sidequest
+  agent_key: security-scanner
+  tags: [sidequest, security, review, owasp]
+  default_params:
+    scan_depth: quick
+    check_owasp_top_10: true
+
+- station_id: impact-analysis
+  name: Impact Analysis
+  description: |
+    Analyze downstream impact of proposed changes.
+    Used before making changes that could affect multiple systems.
+  category: sidequest
+  agent_key: impact-analyzer
+  tags: [sidequest, impact, analysis, dependencies]
+  default_params:
+    max_depth: 3
+    include_test_impact: true
