@@ -36,9 +36,11 @@ from swarm.runtime import storage as storage_module
 from swarm.runtime.engines import StepEngine, StepContext
 from swarm.runtime.engines.models import RoutingContext
 from swarm.runtime.types import (
+    FlowResult,
     HandoffEnvelope,
     InjectedNodeSpec,
     MacroAction,
+    MacroRoutingDecision,
     RoutingDecision,
     RoutingSignal,
     RunEvent,
@@ -74,11 +76,31 @@ from swarm.runtime.macro_navigator import (
 
 if TYPE_CHECKING:
     from swarm.runtime.navigator_integration import NavigationOrchestrator
+    from swarm.runtime.preflight import PreflightResult
 
 logger = logging.getLogger(__name__)
 
 # Maximum nested detour depth (prevents runaway sidequests)
 MAX_DETOUR_DEPTH = 10
+
+
+@dataclass
+class FlowExecutionResult:
+    """Result of a single flow execution including macro routing decision.
+
+    Returned by run_stepwise_flow() when a MacroNavigator is provided,
+    enabling callers to get routing guidance for the next flow.
+
+    Attributes:
+        run_id: The run identifier.
+        summary: The RunSummary with execution details.
+        macro_decision: Optional macro routing decision for next flow.
+        flow_result: Optional structured flow result for routing context.
+    """
+    run_id: RunId
+    summary: Optional["RunSummary"] = None
+    macro_decision: Optional[MacroRoutingDecision] = None
+    flow_result: Optional["FlowResult"] = None
 
 
 @dataclass
@@ -132,6 +154,7 @@ class StepwiseOrchestrator:
         use_spec_bridge: bool = False,
         use_pack_specs: bool = False,
         navigation_orchestrator: Optional["NavigationOrchestrator"] = None,
+        skip_preflight: bool = False,
     ):
         """Initialize the orchestrator.
 
@@ -144,6 +167,8 @@ class StepwiseOrchestrator:
             navigation_orchestrator: Optional NavigationOrchestrator for intelligent
                 routing decisions. If not provided, creates a default one.
                 Set to None explicitly to use envelope-first fallback routing.
+            skip_preflight: If True, skip preflight environment checks.
+                Useful for CI or when environment is known to be valid.
         """
         self._engine = engine
         self._repo_root = repo_root or Path(__file__).resolve().parents[3]
@@ -152,6 +177,7 @@ class StepwiseOrchestrator:
         self._use_pack_specs = use_pack_specs
         self._spec_facade = SpecFacade(self._repo_root, use_pack_specs=use_pack_specs)
         self._lock = threading.Lock()
+        self._skip_preflight = skip_preflight
 
         # Navigation orchestrator for intelligent routing
         # Lazy import to avoid circular dependency
@@ -218,12 +244,89 @@ class StepwiseOrchestrator:
         # Use legacy flow registry
         return self._flow_registry.get_flow(flow_key)
 
+    def _run_preflight(
+        self,
+        run_id: RunId,
+        spec: Optional[RunSpec],
+        backend: str,
+    ) -> "PreflightResult":
+        """Run preflight environment checks before execution.
+
+        Args:
+            run_id: The run ID (for path checks).
+            spec: The run specification.
+            backend: Backend to check.
+
+        Returns:
+            PreflightResult with aggregate status.
+        """
+        from swarm.runtime.preflight import run_preflight, PreflightResult
+
+        # Skip preflight if configured
+        if self._skip_preflight:
+            logger.debug("Preflight checks skipped (skip_preflight=True)")
+            return PreflightResult(
+                passed=True,
+                warnings=["Preflight checks were skipped"],
+                run_id=run_id,
+                backend=backend,
+            )
+
+        # Run preflight checks
+        result = run_preflight(
+            run_spec=spec,
+            backend=backend,
+            run_id=run_id,
+            repo_root=self._repo_root,
+            skip_preflight=False,
+        )
+
+        # Log preflight result
+        if result.passed:
+            logger.info(
+                "Preflight passed (%d checks, %d warnings) in %dms",
+                len(result.checks),
+                len(result.warnings),
+                result.total_duration_ms,
+            )
+        else:
+            logger.warning(
+                "Preflight failed with %d blocking issue(s): %s",
+                len(result.blocking_issues),
+                "; ".join(result.blocking_issues[:3]),  # First 3 issues
+            )
+
+        # Emit preflight event
+        storage_module.append_event(
+            run_id,
+            RunEvent(
+                run_id=run_id,
+                ts=datetime.now(timezone.utc),
+                kind="preflight_completed",
+                flow_key="",
+                step_id=None,
+                payload={
+                    "passed": result.passed,
+                    "blocking_issues": result.blocking_issues,
+                    "warnings": result.warnings,
+                    "duration_ms": result.total_duration_ms,
+                    "checks": [
+                        {"name": c.name, "status": c.status.value}
+                        for c in result.checks
+                    ],
+                },
+            ),
+        )
+
+        return result
+
     def run_stepwise_flow(
         self,
         flow_key: str,
         spec: RunSpec,
         resume: bool = False,
         run_id: Optional[RunId] = None,
+        macro_navigator: Optional[MacroNavigator] = None,
     ) -> RunId:
         """Execute a flow step by step.
 
@@ -232,9 +335,68 @@ class StepwiseOrchestrator:
             spec: The run specification.
             resume: Whether to resume an existing run.
             run_id: Optional run ID for resuming.
+            macro_navigator: Optional MacroNavigator for between-flow routing.
+                If provided, the flow result and routing decision will be
+                computed at flow completion.
 
         Returns:
             The run ID.
+
+        Note:
+            For full macro routing support with flow result and decision,
+            use run_stepwise_flow_with_routing() instead.
+        """
+        result = self.run_stepwise_flow_with_routing(
+            flow_key=flow_key,
+            spec=spec,
+            resume=resume,
+            run_id=run_id,
+            macro_navigator=macro_navigator,
+        )
+        return result.run_id
+
+    def run_stepwise_flow_with_routing(
+        self,
+        flow_key: str,
+        spec: RunSpec,
+        resume: bool = False,
+        run_id: Optional[RunId] = None,
+        macro_navigator: Optional[MacroNavigator] = None,
+        run_state: Optional[RunState] = None,
+    ) -> FlowExecutionResult:
+        """Execute a flow step by step with macro routing support.
+
+        This is the full-featured version of run_stepwise_flow() that returns
+        a FlowExecutionResult with the macro routing decision for the next flow.
+
+        Args:
+            flow_key: The flow to execute (e.g., "build", "plan").
+            spec: The run specification.
+            resume: Whether to resume an existing run.
+            run_id: Optional run ID for resuming.
+            macro_navigator: Optional MacroNavigator for between-flow routing.
+                If provided, route_after_flow() is called at flow completion.
+            run_state: Optional existing RunState for resumption or tracking.
+
+        Returns:
+            FlowExecutionResult with run_id, summary, and optional macro_decision.
+
+        Example:
+            # Run a single flow with macro routing
+            navigator = create_default_navigator()
+            result = orchestrator.run_stepwise_flow_with_routing(
+                flow_key="build",
+                spec=RunSpec(flow_keys=["build"], initiator="cli"),
+                macro_navigator=navigator,
+            )
+
+            # Check the routing decision
+            if result.macro_decision:
+                if result.macro_decision.action == MacroAction.ADVANCE:
+                    next_flow = result.macro_decision.next_flow
+                elif result.macro_decision.action == MacroAction.PAUSE:
+                    # Wait for human intervention
+                    pass
         """
         # Generate or use provided run ID
         if run_id is None:
@@ -248,6 +410,33 @@ class StepwiseOrchestrator:
         if resume:
             self.clear_stop_request(run_id)
 
+        # Run preflight checks before expensive work
+        backend = spec.backend if spec else "claude-harness"
+        preflight_result = self._run_preflight(run_id, spec, backend)
+        if not preflight_result.passed:
+            # Preflight failed - attempt to inject env-doctor sidequest or halt
+            # For now, create a temporary run_state for potential sidequest injection
+            temp_run_state = RunState(run_id=run_id, flow_key=flow_key, status="pending")
+
+            from swarm.runtime.preflight import inject_env_doctor_sidequest
+            if inject_env_doctor_sidequest(temp_run_state, preflight_result):
+                logger.info("Preflight failed but env-doctor sidequest injected")
+                # Continue with the sidequest handling
+                if run_state is None:
+                    run_state = temp_run_state
+                else:
+                    # Copy injected nodes to provided run_state
+                    for node_id, node_spec in temp_run_state.injected_node_specs.items():
+                        run_state.register_injected_node(node_spec)
+            else:
+                # No sidequest available - halt with clear error
+                error_msg = (
+                    f"Preflight failed with {len(preflight_result.blocking_issues)} blocking issue(s): "
+                    f"{'; '.join(preflight_result.blocking_issues)}"
+                )
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
+
         # Load flow definition - use pack specs if enabled
         flow_def = self._load_flow_definition(flow_key)
         if flow_def is None:
@@ -255,6 +444,14 @@ class StepwiseOrchestrator:
 
         # Create run directory and initial state
         storage_module.init_run(run_id, flow_key, spec)
+
+        # Use provided run_state or create new one
+        if run_state is None:
+            run_state = RunState(
+                run_id=run_id,
+                flow_key=flow_key,
+                status="running",
+            )
 
         # Emit run_started event
         storage_module.append_event(
@@ -272,9 +469,96 @@ class StepwiseOrchestrator:
         # Execute steps
         try:
             summary = self._execute_stepwise(
-                run_id, flow_key, flow_def, spec, resume=resume
+                run_id, flow_key, flow_def, spec, resume=resume, run_state=run_state
             )
-            return run_id
+
+            # Perform macro routing if navigator provided
+            macro_decision: Optional[MacroRoutingDecision] = None
+            flow_result: Optional[FlowResult] = None
+
+            if macro_navigator is not None:
+                # Extract flow result for routing decision
+                artifacts_base = self._repo_root / "swarm" / "runs" / run_id
+                flow_result = extract_flow_result(
+                    flow_key=flow_key,
+                    run_state=run_state,
+                    artifacts_base=artifacts_base,
+                )
+
+                # Get macro routing decision
+                macro_decision = macro_navigator.route_after_flow(
+                    completed_flow=flow_key,
+                    flow_result=flow_result,
+                    run_state=run_state,
+                )
+
+                # Log the macro routing decision
+                logger.info(
+                    "MacroNavigator: Flow '%s' completed -> %s (next: %s, reason: %s)",
+                    flow_key,
+                    macro_decision.action.value,
+                    macro_decision.next_flow or "(none)",
+                    macro_decision.reason,
+                )
+
+                # Emit macro_route event for audit trail
+                storage_module.append_event(
+                    run_id,
+                    RunEvent(
+                        run_id=run_id,
+                        ts=datetime.now(timezone.utc),
+                        kind="macro_route",
+                        flow_key=flow_key,
+                        step_id=None,
+                        payload={
+                            "action": macro_decision.action.value,
+                            "next_flow": macro_decision.next_flow,
+                            "reason": macro_decision.reason,
+                            "rule_applied": macro_decision.rule_applied,
+                            "confidence": macro_decision.confidence,
+                        },
+                    ),
+                )
+
+                # Update run_state with the routing decision for audit trail
+                run_state.flow_transition_history.append({
+                    "from_flow": flow_key,
+                    "to_flow": macro_decision.next_flow,
+                    "action": macro_decision.action.value,
+                    "reason": macro_decision.reason,
+                    "rule_applied": macro_decision.rule_applied,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+
+                # Handle PAUSE case - update run state status
+                if macro_decision.action == MacroAction.PAUSE:
+                    run_state.status = "paused"
+                    logger.info(
+                        "MacroNavigator: PAUSE requested - stopping execution for human intervention. Reason: %s",
+                        macro_decision.reason,
+                    )
+                    storage_module.append_event(
+                        run_id,
+                        RunEvent(
+                            run_id=run_id,
+                            ts=datetime.now(timezone.utc),
+                            kind="flow_paused",
+                            flow_key=flow_key,
+                            step_id=None,
+                            payload={
+                                "reason": macro_decision.reason,
+                                "awaiting_human": True,
+                            },
+                        ),
+                    )
+
+            return FlowExecutionResult(
+                run_id=run_id,
+                summary=summary,
+                macro_decision=macro_decision,
+                flow_result=flow_result,
+            )
+
         except Exception as e:
             logger.error("Run %s failed: %s", run_id, e)
             storage_module.append_event(
@@ -1238,6 +1522,7 @@ def get_orchestrator(
     engine: Optional[StepEngine] = None,
     repo_root: Optional[Path] = None,
     use_pack_specs: bool = False,
+    skip_preflight: bool = False,
 ) -> StepwiseOrchestrator:
     """Factory function to create a stepwise orchestrator.
 
@@ -1245,6 +1530,8 @@ def get_orchestrator(
         engine: Optional StepEngine instance. Creates GeminiStepEngine if None.
         repo_root: Optional repository root path.
         use_pack_specs: If True, use pack JSON specs instead of YAML registry.
+        skip_preflight: If True, skip preflight environment checks.
+            Useful for CI or when environment is known to be valid.
 
     Returns:
         Configured StepwiseOrchestrator instance.
@@ -1261,10 +1548,12 @@ def get_orchestrator(
         engine=engine,
         repo_root=repo_root,
         use_pack_specs=use_pack_specs,
+        skip_preflight=skip_preflight,
     )
 
 
 __all__ = [
+    "FlowExecutionResult",
     "ResolvedNode",
     "StepwiseOrchestrator",
     "GeminiStepOrchestrator",

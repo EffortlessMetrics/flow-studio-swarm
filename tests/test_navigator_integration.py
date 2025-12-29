@@ -31,8 +31,10 @@ from swarm.runtime.navigator_integration import (
     apply_extend_graph_request,
     check_and_handle_detour_completion,
     emit_graph_patch_suggested_event,
+    get_current_detour_depth,
     rewrite_pause_to_detour,
 )
+from swarm.runtime.stepwise.orchestrator import MAX_DETOUR_DEPTH
 from swarm.runtime.sidequest_catalog import (
     ReturnBehavior,
     SidequestCatalog,
@@ -645,3 +647,178 @@ class TestApplyDetourRequest:
         # Assert stacks were not modified
         assert run_state.is_interrupted() is False
         assert len(run_state.resume_stack) == 0
+
+
+class TestMaxDetourDepthEnforcement:
+    """Test MAX_DETOUR_DEPTH enforcement to prevent runaway nested sidequests."""
+
+    def test_get_current_detour_depth_returns_zero_when_no_interruptions(self):
+        """get_current_detour_depth should return 0 when interruption stack is empty."""
+        run_state = RunState(
+            run_id="test-depth-001",
+            flow_key="build",
+            current_step_id="3-implement",
+        )
+
+        assert get_current_detour_depth(run_state) == 0
+        assert run_state.is_interrupted() is False
+
+    def test_get_current_detour_depth_counts_interruption_frames(self):
+        """get_current_detour_depth should return the count of interruption frames."""
+        run_state = RunState(
+            run_id="test-depth-002",
+            flow_key="build",
+            current_step_id="3-implement",
+        )
+
+        # Push 3 interruption frames
+        for i in range(3):
+            run_state.push_interruption(
+                reason=f"Detour {i+1}",
+                return_node=f"node-{i}",
+                sidequest_id=f"sidequest-{i+1}",
+            )
+
+        assert get_current_detour_depth(run_state) == 3
+
+    def test_detour_rejected_when_at_max_depth(self):
+        """apply_detour_request should reject detour when already at MAX_DETOUR_DEPTH."""
+        # Create a sidequest that could be applied
+        sidequest = SidequestDefinition(
+            sidequest_id="clarifier",
+            name="Clarifier",
+            description="Resolve ambiguity",
+            station_id="clarifier",
+        )
+        catalog = SidequestCatalog(sidequests=[sidequest])
+
+        run_state = RunState(
+            run_id="test-depth-003",
+            flow_key="build",
+            current_step_id="deep-step",
+        )
+
+        # Push MAX_DETOUR_DEPTH interruption frames to simulate being at the limit
+        for i in range(MAX_DETOUR_DEPTH):
+            run_state.push_interruption(
+                reason=f"Nested detour {i+1}",
+                return_node=f"node-{i}",
+                sidequest_id=f"sidequest-{i+1}",
+            )
+
+        # Verify we are at the limit
+        assert get_current_detour_depth(run_state) == MAX_DETOUR_DEPTH
+
+        # Attempt to apply another detour
+        nav_output = NavigatorOutput(
+            route=RouteProposal(
+                intent=RouteIntent.DETOUR,
+                reasoning="Need to clarify something",
+            ),
+            next_step_brief=NextStepBrief(objective="Clarify"),
+            detour_request=DetourRequest(
+                sidequest_id="clarifier",
+                objective="Clarify requirement",
+                priority=70,
+            ),
+        )
+
+        # Apply detour request - should be rejected
+        station = apply_detour_request(nav_output, run_state, catalog, "deep-step")
+
+        # Assert detour was rejected (returns None)
+        assert station is None
+
+        # Assert no additional interruption was pushed
+        assert get_current_detour_depth(run_state) == MAX_DETOUR_DEPTH
+
+    def test_detour_allowed_when_below_max_depth(self):
+        """apply_detour_request should allow detour when below MAX_DETOUR_DEPTH."""
+        sidequest = SidequestDefinition(
+            sidequest_id="clarifier",
+            name="Clarifier",
+            description="Resolve ambiguity",
+            station_id="clarifier",
+        )
+        catalog = SidequestCatalog(sidequests=[sidequest])
+
+        run_state = RunState(
+            run_id="test-depth-004",
+            flow_key="build",
+            current_step_id="some-step",
+        )
+
+        # Push (MAX_DETOUR_DEPTH - 1) interruption frames to be just below the limit
+        for i in range(MAX_DETOUR_DEPTH - 1):
+            run_state.push_interruption(
+                reason=f"Nested detour {i+1}",
+                return_node=f"node-{i}",
+                sidequest_id=f"sidequest-{i+1}",
+            )
+            run_state.push_resume(f"node-{i}", {})
+
+        # Verify we are one below the limit
+        initial_depth = get_current_detour_depth(run_state)
+        assert initial_depth == MAX_DETOUR_DEPTH - 1
+
+        # Attempt to apply another detour
+        nav_output = NavigatorOutput(
+            route=RouteProposal(
+                intent=RouteIntent.DETOUR,
+                reasoning="Need to clarify",
+            ),
+            next_step_brief=NextStepBrief(objective="Clarify"),
+            detour_request=DetourRequest(
+                sidequest_id="clarifier",
+                objective="Clarify requirement",
+                priority=70,
+            ),
+        )
+
+        # Apply detour request - should succeed
+        station = apply_detour_request(nav_output, run_state, catalog, "some-step")
+
+        # Assert detour was applied (returns station ID)
+        assert station == "sq-clarifier-0"
+
+        # Assert interruption was pushed
+        assert get_current_detour_depth(run_state) == MAX_DETOUR_DEPTH
+
+    def test_max_detour_depth_is_ten(self):
+        """Verify MAX_DETOUR_DEPTH is set to 10 as specified."""
+        assert MAX_DETOUR_DEPTH == 10
+
+    def test_depth_decreases_after_detour_completion(self):
+        """Depth should decrease when detour completes and interruption is popped."""
+        sidequest = SidequestDefinition(
+            sidequest_id="test-sq",
+            name="Test Sidequest",
+            description="For testing",
+            station_id="test-station",
+        )
+        catalog = SidequestCatalog(sidequests=[sidequest])
+
+        run_state = RunState(
+            run_id="test-depth-005",
+            flow_key="build",
+            current_step_id="test-step",
+        )
+
+        # Push an interruption frame (simulating an active detour)
+        run_state.push_interruption(
+            reason="Test detour",
+            return_node="original-node",
+            current_step_index=0,
+            total_steps=1,
+            sidequest_id="test-sq",
+        )
+        run_state.push_resume("original-node", {})
+
+        assert get_current_detour_depth(run_state) == 1
+
+        # Complete the detour
+        resume_node = check_and_handle_detour_completion(run_state, catalog)
+
+        # Verify depth returned to 0
+        assert get_current_detour_depth(run_state) == 0
+        assert resume_node == "original-node"

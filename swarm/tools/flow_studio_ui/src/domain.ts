@@ -568,6 +568,54 @@ export interface SearchResponse {
 // Governance & Validation
 // ============================================================================
 
+/**
+ * Validation error severity levels.
+ * - CRITICAL: Blocking issues that prevent save (missing required fields, invalid IDs, broken edges)
+ * - WARNING: Non-blocking issues that should be reviewed (missing teaching notes, potential issues)
+ * - INFO: Suggestions for improvement (optional enhancements)
+ */
+export type ValidationSeverity = "CRITICAL" | "WARNING" | "INFO";
+
+/**
+ * A single validation issue with severity and actionable information.
+ */
+export interface ValidationIssue {
+  /** Unique identifier for this issue type */
+  code: string;
+  /** Severity level determining how the issue is handled */
+  severity: ValidationSeverity;
+  /** Human-readable description of the issue */
+  message: string;
+  /** Path to the problematic element (e.g., "nodes[0].data.id") */
+  path?: string;
+  /** Suggested fix action */
+  fix?: string;
+  /** Related node or edge ID */
+  elementId?: string;
+}
+
+/**
+ * Result of flow validation for save operations.
+ * Categorizes issues by severity for decision-making.
+ */
+export interface FlowValidationResult {
+  /** Whether the flow is valid for saving (no critical errors) */
+  valid: boolean;
+  /** All validation issues found */
+  issues: ValidationIssue[];
+  /** Count by severity for quick checks */
+  summary: {
+    critical: number;
+    warning: number;
+    info: number;
+  };
+}
+
+/**
+ * User's decision when validation issues are found.
+ */
+export type ValidationDecision = "save" | "fix" | "cancel";
+
 /** FR check result */
 export interface FRCheck {
   status: "pass" | "fail" | "warn";

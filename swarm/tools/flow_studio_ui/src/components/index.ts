@@ -15,9 +15,22 @@ export {
   FlowEditor,
   createFlowEditor,
 } from "./FlowEditor.js";
+export type { ValidationStatus } from "./FlowEditor.js";
+
+// Validation Modal - displays validation results with severity-based actions
+export {
+  ValidationModal,
+  createValidationModal,
+} from "./ValidationModal.js";
 
 // Run Playback - SSE-based run visualization
 export {
   RunPlayback,
   createRunPlayback,
 } from "./RunPlayback.js";
+
+// Node Inspector - step property editing form
+export {
+  NodeInspector,
+  createNodeInspector,
+} from "./NodeInspector.js";

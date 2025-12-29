@@ -52,6 +52,7 @@ from .routing import (
     route_step,
 )
 from .orchestrator import (
+    FlowExecutionResult,
     StepwiseOrchestrator,
     get_orchestrator,
 )
@@ -76,6 +77,7 @@ __all__ = [
     "create_routing_signal",
     "route_step",
     # Orchestrator
+    "FlowExecutionResult",  # Macro routing result with flow result + decision
     "StepwiseOrchestrator",
     "GeminiStepOrchestrator",  # Backwards compat alias
     "get_orchestrator",  # Factory function

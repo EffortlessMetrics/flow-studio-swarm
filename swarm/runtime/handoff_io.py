@@ -30,9 +30,11 @@ from swarm.runtime.path_helpers import (
 
 logger = logging.getLogger(__name__)
 
-# Cached schema to avoid repeated file reads
+# Cached schemas to avoid repeated file reads
 _HANDOFF_SCHEMA: Optional[Dict[str, Any]] = None
 _ROUTING_SIGNAL_SCHEMA: Optional[Dict[str, Any]] = None
+_ASSUMPTION_RECORD_SCHEMA: Optional[Dict[str, Any]] = None
+_DECISION_RECORD_SCHEMA: Optional[Dict[str, Any]] = None
 
 # Try to import jsonschema, graceful fallback if not available
 try:
@@ -92,13 +94,63 @@ def _load_routing_signal_schema() -> Optional[Dict[str, Any]]:
     return None
 
 
+def _load_assumption_record_schema() -> Optional[Dict[str, Any]]:
+    """Load assumption record schema, caching result."""
+    global _ASSUMPTION_RECORD_SCHEMA
+    if _ASSUMPTION_RECORD_SCHEMA is not None:
+        return _ASSUMPTION_RECORD_SCHEMA
+
+    schema_paths = [
+        Path(__file__).parent.parent / "schemas" / "assumption_record.schema.json",
+        Path("swarm/schemas/assumption_record.schema.json"),
+    ]
+
+    for path in schema_paths:
+        if path.exists():
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    _ASSUMPTION_RECORD_SCHEMA = json.load(f)
+                return _ASSUMPTION_RECORD_SCHEMA
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Failed to load assumption record schema from %s: %s", path, e)
+                continue
+
+    return None
+
+
+def _load_decision_record_schema() -> Optional[Dict[str, Any]]:
+    """Load decision record schema, caching result."""
+    global _DECISION_RECORD_SCHEMA
+    if _DECISION_RECORD_SCHEMA is not None:
+        return _DECISION_RECORD_SCHEMA
+
+    schema_paths = [
+        Path(__file__).parent.parent / "schemas" / "decision_record.schema.json",
+        Path("swarm/schemas/decision_record.schema.json"),
+    ]
+
+    for path in schema_paths:
+        if path.exists():
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    _DECISION_RECORD_SCHEMA = json.load(f)
+                return _DECISION_RECORD_SCHEMA
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Failed to load decision record schema from %s: %s", path, e)
+                continue
+
+    return None
+
+
 def _create_schema_resolver() -> Optional[Any]:
-    """Create a JSON schema resolver that handles $ref to routing_signal.schema.json."""
+    """Create a JSON schema resolver that handles $ref to all related schemas."""
     if not JSONSCHEMA_AVAILABLE:
         return None
 
     handoff_schema = _load_handoff_schema()
     routing_schema = _load_routing_signal_schema()
+    assumption_schema = _load_assumption_record_schema()
+    decision_schema = _load_decision_record_schema()
 
     if handoff_schema is None:
         return None
@@ -106,6 +158,10 @@ def _create_schema_resolver() -> Optional[Any]:
     store: Dict[str, Any] = {}
     if routing_schema is not None:
         store["https://swarm.dev/schemas/routing_signal.schema.json"] = routing_schema
+    if assumption_schema is not None:
+        store["https://swarm.dev/schemas/assumption_record.schema.json"] = assumption_schema
+    if decision_schema is not None:
+        store["https://swarm.dev/schemas/decision_record.schema.json"] = decision_schema
 
     resolver = jsonschema.RefResolver.from_schema(handoff_schema, store=store)
     return resolver
@@ -351,3 +407,216 @@ def read_routing_from_envelope(
         routing_signal.get("decision", "unknown"),
     )
     return routing_signal
+
+
+# -----------------------------------------------------------------------------
+# Assumption and Decision Logging Helpers
+# -----------------------------------------------------------------------------
+
+
+def add_assumption(
+    envelope_data: Dict[str, Any],
+    assumption_entry: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Add an assumption entry to an envelope's assumptions_made list.
+
+    This helper enables structured assumption logging during step execution.
+    Assumptions are recorded when agents face ambiguity and proceed with
+    their best interpretation.
+
+    Args:
+        envelope_data: The envelope dictionary to modify.
+        assumption_entry: The assumption entry to add. Should contain:
+            - assumption_id: Unique identifier (auto-generated if not provided)
+            - flow_introduced: Flow key where assumption was made
+            - step_introduced: Step ID where assumption was made
+            - agent: Agent key that made the assumption
+            - statement: The assumption itself
+            - rationale: Why this assumption was made
+            - impact_if_wrong: What changes if assumption is incorrect
+            - confidence: "high", "medium", or "low" (default: "medium")
+            - status: "active", "resolved", or "invalidated" (default: "active")
+            - tags: List of categorization tags (optional)
+            - timestamp: ISO 8601 timestamp (auto-added if not present)
+
+    Returns:
+        The modified envelope_data with the assumption added.
+
+    Example:
+        >>> envelope = {"step_id": "1", "flow_key": "signal", ...}
+        >>> add_assumption(envelope, {
+        ...     "assumption_id": "asm-001",
+        ...     "flow_introduced": "signal",
+        ...     "step_introduced": "1",
+        ...     "agent": "requirements-author",
+        ...     "statement": "User wants REST API, not GraphQL",
+        ...     "rationale": "No explicit API style mentioned; REST is conventional",
+        ...     "impact_if_wrong": "Would need to redesign API layer for GraphQL",
+        ...     "confidence": "medium",
+        ...     "tags": ["architecture", "api"]
+        ... })
+    """
+    if "assumptions_made" not in envelope_data:
+        envelope_data["assumptions_made"] = []
+
+    # Auto-generate ID if not provided
+    if "assumption_id" not in assumption_entry:
+        import uuid
+        assumption_entry["assumption_id"] = f"asm-{uuid.uuid4().hex[:8]}"
+
+    # Add timestamp if not present
+    if "timestamp" not in assumption_entry:
+        assumption_entry["timestamp"] = datetime.now(timezone.utc).isoformat() + "Z"
+
+    # Set defaults
+    if "confidence" not in assumption_entry:
+        assumption_entry["confidence"] = "medium"
+    if "status" not in assumption_entry:
+        assumption_entry["status"] = "active"
+    if "tags" not in assumption_entry:
+        assumption_entry["tags"] = []
+
+    envelope_data["assumptions_made"].append(assumption_entry)
+    logger.debug(
+        "Added assumption %s to envelope for step %s",
+        assumption_entry.get("assumption_id"),
+        envelope_data.get("step_id"),
+    )
+    return envelope_data
+
+
+def add_decision(
+    envelope_data: Dict[str, Any],
+    decision_entry: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Add a decision entry to an envelope's decisions_made list.
+
+    This helper enables structured decision logging during step execution.
+    Decisions are significant choices made by agents that affect the
+    direction of work.
+
+    Args:
+        envelope_data: The envelope dictionary to modify.
+        decision_entry: The decision entry to add. Should contain:
+            - decision_id: Unique identifier (auto-generated if not provided)
+            - flow: Flow key where decision was made
+            - step: Step ID where decision was made
+            - agent: Agent key that made the decision
+            - decision_type: Category (e.g., "design", "implementation", "routing")
+            - subject: What the decision is about
+            - decision: The actual decision made
+            - rationale: Why this decision was made
+            - supporting_evidence: List of evidence (optional)
+            - conditions: Conditions when this applies (optional)
+            - assumptions_applied: IDs of related assumptions (optional)
+            - timestamp: ISO 8601 timestamp (auto-added if not present)
+
+    Returns:
+        The modified envelope_data with the decision added.
+
+    Example:
+        >>> envelope = {"step_id": "3", "flow_key": "plan", ...}
+        >>> add_decision(envelope, {
+        ...     "decision_id": "dec-001",
+        ...     "flow": "plan",
+        ...     "step": "3",
+        ...     "agent": "design-optioneer",
+        ...     "decision_type": "architecture",
+        ...     "subject": "Database selection",
+        ...     "decision": "Use PostgreSQL for primary data store",
+        ...     "rationale": "Team expertise + ACID requirements + JSON support",
+        ...     "supporting_evidence": ["requirements.md:L45", "team_skills.md"],
+        ...     "assumptions_applied": ["asm-001"]
+        ... })
+    """
+    if "decisions_made" not in envelope_data:
+        envelope_data["decisions_made"] = []
+
+    # Auto-generate ID if not provided
+    if "decision_id" not in decision_entry:
+        import uuid
+        decision_entry["decision_id"] = f"dec-{uuid.uuid4().hex[:8]}"
+
+    # Add timestamp if not present
+    if "timestamp" not in decision_entry:
+        decision_entry["timestamp"] = datetime.now(timezone.utc).isoformat() + "Z"
+
+    # Set defaults for optional list fields
+    if "supporting_evidence" not in decision_entry:
+        decision_entry["supporting_evidence"] = []
+    if "conditions" not in decision_entry:
+        decision_entry["conditions"] = []
+    if "assumptions_applied" not in decision_entry:
+        decision_entry["assumptions_applied"] = []
+
+    envelope_data["decisions_made"].append(decision_entry)
+    logger.debug(
+        "Added decision %s to envelope for step %s",
+        decision_entry.get("decision_id"),
+        envelope_data.get("step_id"),
+    )
+    return envelope_data
+
+
+def update_assumption_status(
+    envelope_data: Dict[str, Any],
+    assumption_id: str,
+    new_status: str,
+    resolution_note: Optional[str] = None,
+) -> bool:
+    """Update the status of an assumption in the envelope.
+
+    Args:
+        envelope_data: The envelope dictionary to modify.
+        assumption_id: The ID of the assumption to update.
+        new_status: New status ("active", "resolved", or "invalidated").
+        resolution_note: Optional explanation for the status change.
+
+    Returns:
+        True if the assumption was found and updated, False otherwise.
+    """
+    assumptions = envelope_data.get("assumptions_made", [])
+    for assumption in assumptions:
+        if assumption.get("assumption_id") == assumption_id:
+            assumption["status"] = new_status
+            if resolution_note:
+                assumption["resolution_note"] = resolution_note
+            logger.debug(
+                "Updated assumption %s status to %s",
+                assumption_id,
+                new_status,
+            )
+            return True
+
+    logger.warning("Assumption %s not found in envelope", assumption_id)
+    return False
+
+
+def get_active_assumptions(envelope_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Get all active assumptions from an envelope.
+
+    Args:
+        envelope_data: The envelope dictionary to query.
+
+    Returns:
+        List of assumption entries with status "active".
+    """
+    assumptions = envelope_data.get("assumptions_made", [])
+    return [a for a in assumptions if a.get("status") == "active"]
+
+
+def get_decisions_by_type(
+    envelope_data: Dict[str, Any],
+    decision_type: str,
+) -> List[Dict[str, Any]]:
+    """Get all decisions of a specific type from an envelope.
+
+    Args:
+        envelope_data: The envelope dictionary to query.
+        decision_type: The type of decisions to retrieve.
+
+    Returns:
+        List of decision entries matching the type.
+    """
+    decisions = envelope_data.get("decisions_made", [])
+    return [d for d in decisions if d.get("decision_type") == decision_type]

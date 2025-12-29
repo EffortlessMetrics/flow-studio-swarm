@@ -76,7 +76,30 @@ from .types import (
 )
 from .router import FlowGraph
 
+# Import MAX_DETOUR_DEPTH from orchestrator
+from swarm.runtime.stepwise.orchestrator import MAX_DETOUR_DEPTH
+
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Detour Depth Utilities
+# =============================================================================
+
+
+def get_current_detour_depth(run_state: RunState) -> int:
+    """Get the current detour nesting depth from run state.
+
+    This is a convenience wrapper around run_state.get_interruption_depth()
+    that provides a semantic name for the detour depth concept.
+
+    Args:
+        run_state: The current run state with interruption stack.
+
+    Returns:
+        The number of nested detours currently active (0 if none).
+    """
+    return run_state.get_interruption_depth()
 
 
 # =============================================================================
@@ -363,10 +386,11 @@ def apply_detour_request(
     """Apply a detour request to RunState.
 
     If Navigator requested a detour, this:
-    1. Pushes current position to resume stack
-    2. Pushes interruption frame with multi-step tracking
-    3. Injects node specs for ALL steps in the sidequest
-    4. Returns the first sidequest station to execute
+    1. Validates detour depth against MAX_DETOUR_DEPTH
+    2. Pushes current position to resume stack
+    3. Pushes interruption frame with multi-step tracking
+    4. Injects node specs for ALL steps in the sidequest
+    5. Returns the first sidequest station to execute
 
     For multi-step sidequests, nodes are injected as:
     - sq-<sidequest_id>-0
@@ -383,12 +407,29 @@ def apply_detour_request(
         current_node: Current node (for resume point).
 
     Returns:
-        First node ID to execute for the detour, or None if no detour.
+        First node ID to execute for the detour, or None if:
+        - No detour request in nav_output
+        - Unknown sidequest ID
+        - Maximum detour depth would be exceeded
     """
     if nav_output.detour_request is None:
         return None
 
     detour = nav_output.detour_request
+
+    # Check detour depth BEFORE attempting to push interruption
+    current_depth = get_current_detour_depth(run_state)
+    if current_depth >= MAX_DETOUR_DEPTH:
+        logger.warning(
+            "MAX_DETOUR_DEPTH (%d) reached, rejecting detour request for sidequest '%s'. "
+            "Current depth: %d. This prevents runaway nested sidequests. "
+            "Consider increasing MAX_DETOUR_DEPTH if legitimate deep nesting is required.",
+            MAX_DETOUR_DEPTH,
+            detour.sidequest_id,
+            current_depth,
+        )
+        return None
+
     sidequest = sidequest_catalog.get_by_id(detour.sidequest_id)
 
     if sidequest is None:

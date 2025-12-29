@@ -27,11 +27,12 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 import yaml
 
@@ -92,10 +93,22 @@ class StationSpec:
     tags: List[str] = field(default_factory=list)
     pack_origin: str = "default"
 
+    # Source tracking for write operations
+    source_file: Optional[str] = None  # Absolute path to source file
+    source_index: int = -1  # Index in file if file contains a list, -1 for single
 
-def station_spec_to_dict(spec: StationSpec) -> Dict[str, Any]:
-    """Convert StationSpec to dictionary."""
-    return {
+
+def station_spec_to_dict(spec: StationSpec, include_metadata: bool = False) -> Dict[str, Any]:
+    """Convert StationSpec to dictionary.
+
+    Args:
+        spec: The StationSpec to convert.
+        include_metadata: If True, include source_file and source_index for write operations.
+
+    Returns:
+        Dictionary representation of the spec.
+    """
+    result = {
         "station_id": spec.station_id,
         "name": spec.name,
         "description": spec.description,
@@ -117,12 +130,28 @@ def station_spec_to_dict(spec: StationSpec) -> Dict[str, Any]:
         "tags": list(spec.tags),
         "pack_origin": spec.pack_origin,
     }
+    if include_metadata:
+        result["source_file"] = spec.source_file
+        result["source_index"] = spec.source_index
+    return result
 
 
-def station_spec_from_dict(data: Dict[str, Any]) -> StationSpec:
+def station_spec_from_dict(
+    data: Dict[str, Any],
+    source_file: Optional[str] = None,
+    source_index: int = -1,
+) -> StationSpec:
     """Parse StationSpec from dictionary.
 
     Backward compatible: if new fields are missing, uses sensible defaults.
+
+    Args:
+        data: Dictionary containing station spec data.
+        source_file: Optional path to the source file.
+        source_index: Index in file if file contains a list, -1 for single.
+
+    Returns:
+        StationSpec instance.
     """
     return StationSpec(
         station_id=data.get("station_id", data.get("id", "")),
@@ -145,6 +174,9 @@ def station_spec_from_dict(data: Dict[str, Any]) -> StationSpec:
         default_params=data.get("default_params", {}),
         tags=list(data.get("tags", [])),
         pack_origin=data.get("pack_origin", "default"),
+        # Source tracking
+        source_file=source_file,
+        source_index=source_index,
     )
 
 
@@ -484,6 +516,7 @@ class StationLibrary:
         self._stations: Dict[str, StationSpec] = {}
         self._by_category: Dict[str, List[str]] = {}
         self._by_tag: Dict[str, Set[str]] = {}
+        self._repo_root: Optional[Path] = None
 
     def load_default_pack(self) -> int:
         """Load built-in default stations.
@@ -516,6 +549,7 @@ class StationLibrary:
             Number of stations loaded.
         """
         count = 0
+        self._repo_root = repo_root
 
         # Try multiple locations
         pack_dirs = [
@@ -533,14 +567,23 @@ class StationLibrary:
                     with open(yaml_file, "r") as f:
                         data = yaml.safe_load(f)
 
+                    file_path = str(yaml_file.resolve())
                     if isinstance(data, list):
-                        for item in data:
-                            spec = station_spec_from_dict(item)
+                        for idx, item in enumerate(data):
+                            spec = station_spec_from_dict(
+                                item,
+                                source_file=file_path,
+                                source_index=idx,
+                            )
                             spec.pack_origin = f"repo:{pack_dir.name}"
                             self._register_station(spec)
                             count += 1
                     elif isinstance(data, dict):
-                        spec = station_spec_from_dict(data)
+                        spec = station_spec_from_dict(
+                            data,
+                            source_file=file_path,
+                            source_index=-1,
+                        )
                         spec.pack_origin = f"repo:{pack_dir.name}"
                         self._register_station(spec)
                         count += 1
@@ -553,14 +596,23 @@ class StationLibrary:
                     with open(json_file, "r") as f:
                         data = json.load(f)
 
+                    file_path = str(json_file.resolve())
                     if isinstance(data, list):
-                        for item in data:
-                            spec = station_spec_from_dict(item)
+                        for idx, item in enumerate(data):
+                            spec = station_spec_from_dict(
+                                item,
+                                source_file=file_path,
+                                source_index=idx,
+                            )
                             spec.pack_origin = f"repo:{pack_dir.name}"
                             self._register_station(spec)
                             count += 1
                     elif isinstance(data, dict):
-                        spec = station_spec_from_dict(data)
+                        spec = station_spec_from_dict(
+                            data,
+                            source_file=file_path,
+                            source_index=-1,
+                        )
                         spec.pack_origin = f"repo:{pack_dir.name}"
                         self._register_station(spec)
                         count += 1
@@ -687,6 +739,471 @@ class StationLibrary:
             True if the target is valid and can be executed.
         """
         return self.has_station(target_id)
+
+    # =========================================================================
+    # Write Operations
+    # =========================================================================
+
+    def compute_etag(self, station_id: str) -> str:
+        """Compute ETag for a station.
+
+        The ETag is a hash of the station's serialized form, used for
+        optimistic concurrency control.
+
+        Args:
+            station_id: Station ID to compute ETag for.
+
+        Returns:
+            ETag string (first 16 chars of SHA256 hash).
+
+        Raises:
+            ValueError: If station not found.
+        """
+        spec = self.get_station(station_id)
+        if not spec:
+            raise ValueError(f"Station not found: {station_id}")
+
+        # Serialize to JSON for consistent hashing
+        data = station_spec_to_dict(spec)
+        content = json.dumps(data, sort_keys=True, ensure_ascii=False)
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
+
+    def get_station_with_etag(
+        self, station_id: str
+    ) -> Tuple[Optional[StationSpec], str]:
+        """Get a station with its ETag.
+
+        Args:
+            station_id: Station ID to retrieve.
+
+        Returns:
+            Tuple of (StationSpec, etag) or (None, "") if not found.
+        """
+        spec = self.get_station(station_id)
+        if not spec:
+            return None, ""
+        return spec, self.compute_etag(station_id)
+
+    def validate_station_data(self, data: Dict[str, Any]) -> List[str]:
+        """Validate station data before saving.
+
+        Args:
+            data: Station data dictionary.
+
+        Returns:
+            List of validation error messages. Empty if valid.
+        """
+        errors = []
+
+        # Required fields
+        if not data.get("station_id") and not data.get("id"):
+            errors.append("station_id is required")
+
+        if not data.get("name") and not data.get("title"):
+            errors.append("name is required")
+
+        # station_id format (alphanumeric, hyphens, underscores)
+        station_id = data.get("station_id") or data.get("id", "")
+        if station_id:
+            import re
+            if not re.match(r"^[a-zA-Z][a-zA-Z0-9_-]*$", station_id):
+                errors.append(
+                    "station_id must start with a letter and contain only "
+                    "alphanumeric characters, hyphens, and underscores"
+                )
+
+        # Version must be positive integer
+        version = data.get("version", 1)
+        if not isinstance(version, int) or version < 1:
+            errors.append("version must be a positive integer")
+
+        # Category validation
+        valid_categories = {"sidequest", "worker", "critic", "general", "spec", "design", "implementation"}
+        category = data.get("category", "general")
+        if category not in valid_categories:
+            errors.append(f"category must be one of: {', '.join(sorted(valid_categories))}")
+
+        # SDK validation (if provided)
+        sdk = data.get("sdk", {})
+        if sdk:
+            valid_models = {"inherit", "haiku", "sonnet", "opus"}
+            model = sdk.get("model", "sonnet")
+            if model not in valid_models:
+                errors.append(f"sdk.model must be one of: {', '.join(sorted(valid_models))}")
+
+            max_turns = sdk.get("max_turns")
+            if max_turns is not None:
+                if not isinstance(max_turns, int) or max_turns < 1:
+                    errors.append("sdk.max_turns must be a positive integer")
+
+        return errors
+
+    def create_station(
+        self,
+        data: Dict[str, Any],
+        target_file: Optional[str] = None,
+    ) -> Tuple[StationSpec, str]:
+        """Create a new station.
+
+        Args:
+            data: Station data dictionary.
+            target_file: Optional target file path. If not provided,
+                creates a new file in swarm/packs/stations/.
+
+        Returns:
+            Tuple of (created StationSpec, etag).
+
+        Raises:
+            ValueError: If station_id already exists or validation fails.
+        """
+        # Validate data
+        errors = self.validate_station_data(data)
+        if errors:
+            raise ValueError(f"Validation failed: {'; '.join(errors)}")
+
+        station_id = data.get("station_id") or data.get("id")
+
+        # Check for duplicate
+        if self.has_station(station_id):
+            raise ValueError(f"Station already exists: {station_id}")
+
+        # Determine target file
+        if not target_file:
+            if not hasattr(self, "_repo_root") or not self._repo_root:
+                raise ValueError("Cannot create station: repo_root not set")
+
+            # Create new file for this station
+            pack_dir = self._repo_root / "swarm" / "packs" / "stations"
+            pack_dir.mkdir(parents=True, exist_ok=True)
+            target_file = str(pack_dir / f"{station_id}.yaml")
+
+        # Create spec from data
+        spec = station_spec_from_dict(data, source_file=target_file, source_index=-1)
+        spec.pack_origin = "repo:stations"
+
+        # Write to file
+        self._write_station_to_file(spec, target_file)
+
+        # Register in library
+        self._register_station(spec)
+
+        return spec, self.compute_etag(station_id)
+
+    def update_station(
+        self,
+        station_id: str,
+        data: Dict[str, Any],
+        expected_etag: str,
+    ) -> Tuple[StationSpec, str]:
+        """Replace a station (PUT semantics).
+
+        Args:
+            station_id: Station ID to update.
+            data: Complete station data.
+            expected_etag: Expected ETag for concurrency control.
+
+        Returns:
+            Tuple of (updated StationSpec, new etag).
+
+        Raises:
+            ValueError: If station not found, ETag mismatch, or validation fails.
+        """
+        existing = self.get_station(station_id)
+        if not existing:
+            raise ValueError(f"Station not found: {station_id}")
+
+        # Check ETag
+        current_etag = self.compute_etag(station_id)
+        if current_etag != expected_etag:
+            raise ValueError(
+                f"ETag mismatch: expected {expected_etag}, got {current_etag}"
+            )
+
+        # Cannot update default pack stations
+        if existing.pack_origin == "default":
+            raise ValueError("Cannot update default pack stations")
+
+        # Validate data
+        errors = self.validate_station_data(data)
+        if errors:
+            raise ValueError(f"Validation failed: {'; '.join(errors)}")
+
+        # Ensure station_id in data matches
+        data["station_id"] = station_id
+
+        # Create updated spec preserving source info
+        spec = station_spec_from_dict(
+            data,
+            source_file=existing.source_file,
+            source_index=existing.source_index,
+        )
+        spec.pack_origin = existing.pack_origin
+
+        # Write to file
+        if spec.source_file:
+            self._write_station_to_file(spec, spec.source_file)
+
+        # Re-register (will update indexes)
+        self._unregister_station(station_id)
+        self._register_station(spec)
+
+        return spec, self.compute_etag(station_id)
+
+    def patch_station(
+        self,
+        station_id: str,
+        patch_data: Dict[str, Any],
+        expected_etag: str,
+    ) -> Tuple[StationSpec, str]:
+        """Partially update a station (PATCH semantics).
+
+        Args:
+            station_id: Station ID to update.
+            patch_data: Partial station data to merge.
+            expected_etag: Expected ETag for concurrency control.
+
+        Returns:
+            Tuple of (updated StationSpec, new etag).
+
+        Raises:
+            ValueError: If station not found, ETag mismatch, or validation fails.
+        """
+        existing = self.get_station(station_id)
+        if not existing:
+            raise ValueError(f"Station not found: {station_id}")
+
+        # Check ETag
+        current_etag = self.compute_etag(station_id)
+        if current_etag != expected_etag:
+            raise ValueError(
+                f"ETag mismatch: expected {expected_etag}, got {current_etag}"
+            )
+
+        # Cannot update default pack stations
+        if existing.pack_origin == "default":
+            raise ValueError("Cannot update default pack stations")
+
+        # Merge existing data with patch
+        existing_data = station_spec_to_dict(existing)
+        merged_data = self._deep_merge(existing_data, patch_data)
+
+        # Prevent changing station_id
+        merged_data["station_id"] = station_id
+
+        # Validate merged data
+        errors = self.validate_station_data(merged_data)
+        if errors:
+            raise ValueError(f"Validation failed: {'; '.join(errors)}")
+
+        # Create updated spec
+        spec = station_spec_from_dict(
+            merged_data,
+            source_file=existing.source_file,
+            source_index=existing.source_index,
+        )
+        spec.pack_origin = existing.pack_origin
+
+        # Write to file
+        if spec.source_file:
+            self._write_station_to_file(spec, spec.source_file)
+
+        # Re-register
+        self._unregister_station(station_id)
+        self._register_station(spec)
+
+        return spec, self.compute_etag(station_id)
+
+    def delete_station(
+        self,
+        station_id: str,
+        expected_etag: Optional[str] = None,
+    ) -> None:
+        """Delete a station.
+
+        Args:
+            station_id: Station ID to delete.
+            expected_etag: Optional expected ETag for concurrency control.
+
+        Raises:
+            ValueError: If station not found, is a default station, or ETag mismatch.
+        """
+        existing = self.get_station(station_id)
+        if not existing:
+            raise ValueError(f"Station not found: {station_id}")
+
+        # Check ETag if provided
+        if expected_etag:
+            current_etag = self.compute_etag(station_id)
+            if current_etag != expected_etag:
+                raise ValueError(
+                    f"ETag mismatch: expected {expected_etag}, got {current_etag}"
+                )
+
+        # Cannot delete default pack stations
+        if existing.pack_origin == "default":
+            raise ValueError("Cannot delete default pack stations")
+
+        # Remove from file
+        if existing.source_file:
+            self._remove_station_from_file(existing)
+
+        # Unregister from library
+        self._unregister_station(station_id)
+
+    def _unregister_station(self, station_id: str) -> None:
+        """Remove a station from all indexes.
+
+        Args:
+            station_id: Station ID to unregister.
+        """
+        spec = self._stations.get(station_id)
+        if not spec:
+            return
+
+        # Remove from main dict
+        del self._stations[station_id]
+
+        # Remove from category index
+        if spec.category in self._by_category:
+            try:
+                self._by_category[spec.category].remove(station_id)
+            except ValueError:
+                pass
+
+        # Remove from tag indexes
+        for tag in spec.tags:
+            if tag in self._by_tag:
+                self._by_tag[tag].discard(station_id)
+
+    def _deep_merge(
+        self, base: Dict[str, Any], patch: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Deep merge two dictionaries.
+
+        Args:
+            base: Base dictionary.
+            patch: Patch dictionary to merge into base.
+
+        Returns:
+            Merged dictionary.
+        """
+        result = dict(base)
+        for key, value in patch.items():
+            if (
+                key in result
+                and isinstance(result[key], dict)
+                and isinstance(value, dict)
+            ):
+                result[key] = self._deep_merge(result[key], value)
+            else:
+                result[key] = value
+        return result
+
+    def _write_station_to_file(self, spec: StationSpec, file_path: str) -> None:
+        """Write a station spec to a file.
+
+        Handles both single-station files and list files.
+
+        Args:
+            spec: Station spec to write.
+            file_path: Target file path.
+        """
+        path = Path(file_path)
+
+        # Convert spec to dict (without metadata)
+        spec_dict = station_spec_to_dict(spec, include_metadata=False)
+
+        if spec.source_index >= 0:
+            # This is a list file - need to read/update/write
+            if path.exists():
+                with open(path, "r") as f:
+                    if path.suffix in (".yaml", ".yml"):
+                        data = yaml.safe_load(f) or []
+                    else:
+                        data = json.load(f)
+
+                if not isinstance(data, list):
+                    data = [data]
+
+                # Update or append
+                if spec.source_index < len(data):
+                    data[spec.source_index] = spec_dict
+                else:
+                    data.append(spec_dict)
+                    # Update the source_index
+                    spec.source_index = len(data) - 1
+            else:
+                data = [spec_dict]
+                spec.source_index = 0
+        else:
+            # Single station file
+            data = spec_dict
+
+        # Write to file
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            if path.suffix in (".yaml", ".yml"):
+                yaml.dump(
+                    data,
+                    f,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    sort_keys=False,
+                )
+            else:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def _remove_station_from_file(self, spec: StationSpec) -> None:
+        """Remove a station from its source file.
+
+        Args:
+            spec: Station spec to remove.
+        """
+        if not spec.source_file:
+            return
+
+        path = Path(spec.source_file)
+        if not path.exists():
+            return
+
+        if spec.source_index >= 0:
+            # List file - remove from list
+            with open(path, "r") as f:
+                if path.suffix in (".yaml", ".yml"):
+                    data = yaml.safe_load(f) or []
+                else:
+                    data = json.load(f)
+
+            if isinstance(data, list) and spec.source_index < len(data):
+                data.pop(spec.source_index)
+
+                # Update source_index for all stations that came after this one
+                for sid, station in self._stations.items():
+                    if (
+                        station.source_file == spec.source_file
+                        and station.source_index > spec.source_index
+                    ):
+                        station.source_index -= 1
+
+                if data:
+                    # Write remaining data
+                    with open(path, "w") as f:
+                        if path.suffix in (".yaml", ".yml"):
+                            yaml.dump(
+                                data,
+                                f,
+                                default_flow_style=False,
+                                allow_unicode=True,
+                                sort_keys=False,
+                            )
+                        else:
+                            json.dump(data, f, indent=2, ensure_ascii=False)
+                else:
+                    # No stations left, remove file
+                    path.unlink()
+        else:
+            # Single station file - just delete it
+            path.unlink()
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize library state.

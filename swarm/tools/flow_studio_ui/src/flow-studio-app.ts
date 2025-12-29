@@ -133,6 +133,14 @@ import {
   showRunDetailModal
 } from "./run_detail_modal.js";
 
+// Run control panel
+import {
+  configure as configureRunControl,
+  initRunControl,
+  setActiveRun as setRunControlActiveRun,
+  clearActiveRun as clearRunControlActiveRun
+} from "./run_control.js";
+
 // Graph semantic companion
 import {
   renderFlowOutline,
@@ -815,6 +823,12 @@ window.addEventListener("load", async () => {
         await loadRunStatus();
         // Sync run history selection
         setRunHistorySelectedRunId(runId);
+        // Sync run control panel to monitor this run
+        if (runId) {
+          void setRunControlActiveRun(runId);
+        } else {
+          clearRunControlActiveRun();
+        }
         // Refresh artifact view if in artifact mode
         if (state.currentViewMode === "artifacts" && state.currentFlowKey) {
           setActiveFlow(state.currentFlowKey, true);
@@ -919,6 +933,52 @@ window.addEventListener("load", async () => {
         // Future: call Api.startRun() with appropriate params
       }
     });
+
+    // Configure and initialize run control panel
+    configureRunControl({
+      onRunStart: (runId: string) => {
+        // Update run selector when a new run starts
+        const runSelector = document.getElementById("run-selector") as HTMLSelectElement | null;
+        if (runSelector) {
+          // Add new run option if not present
+          const existingOption = runSelector.querySelector(`option[value="${runId}"]`);
+          if (!existingOption) {
+            const newOption = document.createElement("option");
+            newOption.value = runId;
+            newOption.textContent = runId;
+            runSelector.insertBefore(newOption, runSelector.firstChild);
+          }
+          runSelector.value = runId;
+        }
+        state.currentRunId = runId;
+      },
+      onStateChange: (_runState, _runId) => {
+        // Refresh status when run state changes
+        void loadRunStatus();
+      },
+      onRunComplete: (runId) => {
+        // Reload run history to show completed run
+        void initRunHistory().then(() => {
+          setRunHistorySelectedRunId(runId);
+        });
+      },
+      onRunFailed: (_runId, _error) => {
+        // Refresh status to show failure
+        void loadRunStatus();
+      },
+      onSelectRun: async (runId: string) => {
+        // Update the main run selector to match
+        const runSelector = document.getElementById("run-selector") as HTMLSelectElement | null;
+        if (runSelector) {
+          runSelector.value = runId;
+        }
+        state.currentRunId = runId;
+        updateCompareSelector();
+        await loadRunStatus();
+        setRunHistorySelectedRunId(runId);
+      }
+    });
+    initRunControl();
 
     // Initialize run history in background (non-blocking)
     // This prevents run history loading from blocking the main UI ready state

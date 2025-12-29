@@ -137,7 +137,7 @@ def _get_duckdb():
 # Schema Definitions
 # =============================================================================
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 CREATE_TABLES_SQL = """
 -- Schema version tracking
@@ -250,6 +250,32 @@ CREATE TABLE IF NOT EXISTS ingestion_state (
     last_seq INTEGER NOT NULL DEFAULT 0,
     updated_at TIMESTAMP DEFAULT (now())
 );
+
+-- Facts table: inventory marker extraction (REQ_*, SOL_*, TRC_*, etc.)
+CREATE SEQUENCE IF NOT EXISTS facts_id_seq;
+CREATE TABLE IF NOT EXISTS facts (
+    id INTEGER PRIMARY KEY DEFAULT nextval('facts_id_seq'),
+    fact_id VARCHAR UNIQUE,
+    run_id VARCHAR NOT NULL,
+    step_id VARCHAR NOT NULL,
+    flow_key VARCHAR NOT NULL,
+    agent_key VARCHAR,
+    marker_type VARCHAR,  -- REQ, SOL, TRC, ASM, DEC, etc.
+    marker_id VARCHAR,    -- e.g., REQ_001
+    fact_type VARCHAR,    -- requirement, solution, trace, assumption, decision
+    content TEXT,
+    priority VARCHAR,     -- MUST, SHOULD, NICE_TO_HAVE
+    status VARCHAR,       -- verified, unverified, deprecated
+    evidence TEXT,
+    created_at TIMESTAMP,
+    extracted_at TIMESTAMP DEFAULT (now()),
+    metadata JSON,
+    UNIQUE(run_id, step_id, marker_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_facts_run_id ON facts(run_id);
+CREATE INDEX IF NOT EXISTS idx_facts_marker_type ON facts(run_id, marker_type);
+CREATE INDEX IF NOT EXISTS idx_facts_marker_id ON facts(marker_id);
 """
 
 
@@ -296,6 +322,30 @@ class ToolBreakdown:
     total_duration_ms: int
     success_rate: float
     avg_duration_ms: float
+
+
+@dataclass
+class Fact:
+    """A structured fact extracted from agent output (inventory marker).
+
+    Facts represent requirements, solutions, traces, assumptions, and decisions
+    extracted from agent outputs using REQ_*, SOL_*, TRC_*, ASM_*, DEC_* markers.
+    """
+    fact_id: str
+    run_id: str
+    step_id: str
+    flow_key: str
+    agent_key: Optional[str]
+    marker_type: str  # REQ, SOL, TRC, ASM, DEC
+    marker_id: str    # e.g., REQ_001
+    fact_type: str    # requirement, solution, trace, assumption, decision
+    content: str
+    priority: Optional[str] = None      # MUST, SHOULD, NICE_TO_HAVE
+    status: Optional[str] = None        # verified, unverified, deprecated
+    evidence: Optional[str] = None
+    created_at: Optional[datetime] = None
+    extracted_at: Optional[datetime] = None
+    metadata: Optional[Dict[str, Any]] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -754,6 +804,88 @@ class StatsDB:
                  change_ts]
             )
 
+    def ingest_fact(
+        self,
+        run_id: str,
+        step_id: str,
+        flow_key: str,
+        marker_type: str,
+        marker_id: str,
+        fact_type: str,
+        content: str,
+        agent_key: Optional[str] = None,
+        priority: Optional[str] = None,
+        status: Optional[str] = None,
+        evidence: Optional[str] = None,
+        created_at: Optional[datetime] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        ts: Optional[datetime] = None,
+    ) -> Optional[str]:
+        """Ingest a fact (inventory marker) into the facts table.
+
+        Facts represent structured information extracted from agent outputs
+        using markers like REQ_001, SOL_002, TRC_003, ASM_001, DEC_001.
+
+        Note: In projection-only mode, this is a no-op unless called from
+        within ingest_events() context.
+
+        Args:
+            run_id: The run this fact belongs to.
+            step_id: The step that produced this fact.
+            flow_key: The flow (signal, plan, build, gate, deploy, wisdom).
+            marker_type: The marker prefix (REQ, SOL, TRC, ASM, DEC, etc.).
+            marker_id: The full marker ID (e.g., REQ_001).
+            fact_type: Human-readable type (requirement, solution, trace, etc.).
+            content: The fact content/description.
+            agent_key: The agent that produced this fact.
+            priority: Priority level (MUST, SHOULD, NICE_TO_HAVE).
+            status: Fact status (verified, unverified, deprecated).
+            evidence: Supporting evidence or references.
+            created_at: When the fact was originally created.
+            metadata: Additional structured metadata.
+            ts: Timestamp for extraction (defaults to now).
+
+        Returns:
+            The generated fact_id if successful, None otherwise.
+        """
+        if self.connection is None:
+            return None
+        if not self._projection_guard("ingest_fact"):
+            return None
+
+        import uuid
+        fact_id = f"fact_{uuid.uuid4().hex[:12]}"
+        extracted_at = ts if ts is not None else datetime.now(timezone.utc)
+
+        with self._transaction() as conn:
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO facts (
+                        fact_id, run_id, step_id, flow_key, agent_key,
+                        marker_type, marker_id, fact_type, content,
+                        priority, status, evidence, created_at, extracted_at, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (run_id, step_id, marker_id) DO UPDATE SET
+                        content = EXCLUDED.content,
+                        priority = EXCLUDED.priority,
+                        status = EXCLUDED.status,
+                        evidence = EXCLUDED.evidence,
+                        metadata = EXCLUDED.metadata,
+                        extracted_at = EXCLUDED.extracted_at
+                    """,
+                    [
+                        fact_id, run_id, step_id, flow_key, agent_key,
+                        marker_type, marker_id, fact_type, content,
+                        priority, status, evidence, created_at, extracted_at,
+                        json.dumps(metadata or {})
+                    ]
+                )
+                return fact_id
+            except Exception as e:
+                logger.warning("Failed to ingest fact %s: %s", marker_id, e)
+                return None
+
     # =========================================================================
     # Batch Operations
     # =========================================================================
@@ -1115,6 +1247,103 @@ class StatsDB:
                     "step_id": row[4],
                     "timestamp": row[5].isoformat() if row[5] else None,
                 }
+                for row in results
+            ]
+
+    def get_facts_for_run(self, run_id: str) -> List[Fact]:
+        """Get all facts extracted for a run.
+
+        Args:
+            run_id: The run ID to query.
+
+        Returns:
+            List of Fact objects for the run, ordered by step_id and marker_id.
+        """
+        if self.connection is None:
+            return []
+
+        with self._lock:
+            results = self.connection.execute(
+                """
+                SELECT
+                    fact_id, run_id, step_id, flow_key, agent_key,
+                    marker_type, marker_id, fact_type, content,
+                    priority, status, evidence, created_at, extracted_at, metadata
+                FROM facts
+                WHERE run_id = ?
+                ORDER BY step_id, marker_id
+                """,
+                [run_id]
+            ).fetchall()
+
+            return [
+                Fact(
+                    fact_id=row[0],
+                    run_id=row[1],
+                    step_id=row[2],
+                    flow_key=row[3],
+                    agent_key=row[4],
+                    marker_type=row[5],
+                    marker_id=row[6],
+                    fact_type=row[7],
+                    content=row[8],
+                    priority=row[9],
+                    status=row[10],
+                    evidence=row[11],
+                    created_at=row[12],
+                    extracted_at=row[13],
+                    metadata=json.loads(row[14]) if row[14] else {},
+                )
+                for row in results
+            ]
+
+    def get_facts_by_marker_type(
+        self, run_id: str, marker_type: str
+    ) -> List[Fact]:
+        """Get facts for a run filtered by marker type.
+
+        Args:
+            run_id: The run ID to query.
+            marker_type: The marker type to filter by (REQ, SOL, TRC, ASM, DEC, etc.).
+
+        Returns:
+            List of Fact objects matching the marker type, ordered by marker_id.
+        """
+        if self.connection is None:
+            return []
+
+        with self._lock:
+            results = self.connection.execute(
+                """
+                SELECT
+                    fact_id, run_id, step_id, flow_key, agent_key,
+                    marker_type, marker_id, fact_type, content,
+                    priority, status, evidence, created_at, extracted_at, metadata
+                FROM facts
+                WHERE run_id = ? AND marker_type = ?
+                ORDER BY marker_id
+                """,
+                [run_id, marker_type]
+            ).fetchall()
+
+            return [
+                Fact(
+                    fact_id=row[0],
+                    run_id=row[1],
+                    step_id=row[2],
+                    flow_key=row[3],
+                    agent_key=row[4],
+                    marker_type=row[5],
+                    marker_id=row[6],
+                    fact_type=row[7],
+                    content=row[8],
+                    priority=row[9],
+                    status=row[10],
+                    evidence=row[11],
+                    created_at=row[12],
+                    extracted_at=row[13],
+                    metadata=json.loads(row[14]) if row[14] else {},
+                )
                 for row in results
             ]
 

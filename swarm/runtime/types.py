@@ -17,6 +17,10 @@ Usage:
         # WP4: Bounded, auditable, cheap routing types
         WP4EliminationEntry, WP4RoutingMetrics, WP4RoutingExplanation,
         wp4_routing_explanation_to_dict, wp4_routing_explanation_from_dict,
+        # Assumption and decision logging types
+        ConfidenceLevel, AssumptionStatus, AssumptionEntry, DecisionLogEntry,
+        assumption_entry_to_dict, assumption_entry_from_dict,
+        decision_log_entry_to_dict, decision_log_entry_from_dict,
         HandoffEnvelope, RunState,
         InterruptionFrame, ResumePoint, InjectedNode, InjectedNodeSpec,
         RunSpec, RunSummary, RunEvent, BackendCapabilities,
@@ -52,7 +56,7 @@ import string
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
 # Event ID generation: prefer ulid for time-ordered IDs, fall back to uuid4
 try:
@@ -120,6 +124,96 @@ class DecisionType(str, Enum):
     LLM_TIEBREAKER = "llm_tiebreaker"  # LLM chose among valid edges
     LLM_ANALYSIS = "llm_analysis"  # LLM performed deeper analysis
     ERROR = "error"  # Routing failed
+
+
+class ConfidenceLevel(str, Enum):
+    """Confidence level for assumptions."""
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class AssumptionStatus(str, Enum):
+    """Status of an assumption through its lifecycle."""
+
+    ACTIVE = "active"          # Assumption is currently in effect
+    RESOLVED = "resolved"      # Assumption was confirmed or clarified
+    INVALIDATED = "invalidated"  # Assumption was proven wrong
+
+
+@dataclass
+class AssumptionEntry:
+    """A structured record of an assumption made during flow execution.
+
+    Assumptions are made when agents face ambiguity and need to proceed
+    with their best interpretation. This captures the assumption, its
+    rationale, and potential impact if wrong.
+
+    Attributes:
+        assumption_id: Unique identifier for this assumption (auto-generated if not provided).
+        flow_introduced: Flow key where this assumption was first made.
+        step_introduced: Step ID where this assumption was first made.
+        agent: Agent key that made this assumption.
+        statement: The assumption statement itself.
+        rationale: Why this assumption was made (evidence, context).
+        impact_if_wrong: What would need to change if assumption is incorrect.
+        confidence: Confidence level (high/medium/low).
+        status: Current status (active/resolved/invalidated).
+        tags: Optional categorization tags (e.g., ["architecture", "requirements"]).
+        timestamp: When this assumption was recorded.
+        resolution_note: Explanation when status changes to resolved/invalidated.
+    """
+
+    assumption_id: str
+    flow_introduced: str
+    step_introduced: str
+    agent: str
+    statement: str
+    rationale: str
+    impact_if_wrong: str
+    confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
+    status: AssumptionStatus = AssumptionStatus.ACTIVE
+    tags: List[str] = field(default_factory=list)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    resolution_note: Optional[str] = None
+
+
+@dataclass
+class DecisionLogEntry:
+    """A structured record of a decision made during flow execution.
+
+    Decisions are significant choices made by agents that affect the
+    direction of work. This captures the decision, its context, and
+    traceability information.
+
+    Attributes:
+        decision_id: Unique identifier for this decision (auto-generated if not provided).
+        flow: Flow key where this decision was made.
+        step: Step ID where this decision was made.
+        agent: Agent key that made this decision.
+        decision_type: Category of decision (e.g., "design", "implementation", "routing").
+        subject: What the decision is about (e.g., "API design", "test strategy").
+        decision: The actual decision made.
+        rationale: Why this decision was made.
+        supporting_evidence: Evidence that supports this decision.
+        conditions: Conditions under which this decision applies.
+        assumptions_applied: IDs of assumptions that influenced this decision.
+        timestamp: When this decision was recorded.
+    """
+
+    decision_id: str
+    flow: str
+    step: str
+    agent: str
+    decision_type: str
+    subject: str
+    decision: str
+    rationale: str
+    supporting_evidence: List[str] = field(default_factory=list)
+    conditions: List[str] = field(default_factory=list)
+    assumptions_applied: List[str] = field(default_factory=list)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -351,6 +445,8 @@ class HandoffEnvelope:
         prompt_hash: Hash of the prompt template for reproducibility.
         verification_passed: Whether spec verification passed for this step.
         verification_details: Detailed verification results and diagnostics.
+        assumptions_made: List of assumptions made during this step's execution.
+        decisions_made: List of decisions logged during this step's execution.
     """
 
     step_id: str
@@ -372,6 +468,9 @@ class HandoffEnvelope:
     verification_details: Dict[str, Any] = field(default_factory=dict)
     # Routing audit trail (optional, populated when routing includes explanation)
     routing_audit: Optional[Dict[str, Any]] = None
+    # Assumption and decision logging (structured JSONL-compatible records)
+    assumptions_made: List[AssumptionEntry] = field(default_factory=list)
+    decisions_made: List[DecisionLogEntry] = field(default_factory=list)
 
 
 @dataclass
@@ -964,6 +1063,125 @@ def wp4_routing_explanation_from_dict(data: Dict[str, Any]) -> WP4RoutingExplana
     )
 
 
+# -----------------------------------------------------------------------------
+# AssumptionEntry and DecisionLogEntry Serialization
+# -----------------------------------------------------------------------------
+
+
+def assumption_entry_to_dict(entry: AssumptionEntry) -> Dict[str, Any]:
+    """Convert AssumptionEntry to a dictionary for serialization.
+
+    Args:
+        entry: The AssumptionEntry to convert.
+
+    Returns:
+        Dictionary representation suitable for JSON/JSONL serialization.
+    """
+    return {
+        "assumption_id": entry.assumption_id,
+        "flow_introduced": entry.flow_introduced,
+        "step_introduced": entry.step_introduced,
+        "agent": entry.agent,
+        "statement": entry.statement,
+        "rationale": entry.rationale,
+        "impact_if_wrong": entry.impact_if_wrong,
+        "confidence": entry.confidence.value if isinstance(entry.confidence, ConfidenceLevel) else entry.confidence,
+        "status": entry.status.value if isinstance(entry.status, AssumptionStatus) else entry.status,
+        "tags": list(entry.tags),
+        "timestamp": _datetime_to_iso(entry.timestamp),
+        "resolution_note": entry.resolution_note,
+    }
+
+
+def assumption_entry_from_dict(data: Dict[str, Any]) -> AssumptionEntry:
+    """Parse AssumptionEntry from a dictionary.
+
+    Args:
+        data: Dictionary with AssumptionEntry fields.
+
+    Returns:
+        Parsed AssumptionEntry instance.
+    """
+    confidence_value = data.get("confidence", "medium")
+    confidence = (
+        ConfidenceLevel(confidence_value)
+        if isinstance(confidence_value, str)
+        else confidence_value
+    )
+
+    status_value = data.get("status", "active")
+    status = (
+        AssumptionStatus(status_value)
+        if isinstance(status_value, str)
+        else status_value
+    )
+
+    return AssumptionEntry(
+        assumption_id=data.get("assumption_id", ""),
+        flow_introduced=data.get("flow_introduced", ""),
+        step_introduced=data.get("step_introduced", ""),
+        agent=data.get("agent", ""),
+        statement=data.get("statement", ""),
+        rationale=data.get("rationale", ""),
+        impact_if_wrong=data.get("impact_if_wrong", ""),
+        confidence=confidence,
+        status=status,
+        tags=list(data.get("tags", [])),
+        timestamp=_iso_to_datetime(data.get("timestamp")) or datetime.now(timezone.utc),
+        resolution_note=data.get("resolution_note"),
+    )
+
+
+def decision_log_entry_to_dict(entry: DecisionLogEntry) -> Dict[str, Any]:
+    """Convert DecisionLogEntry to a dictionary for serialization.
+
+    Args:
+        entry: The DecisionLogEntry to convert.
+
+    Returns:
+        Dictionary representation suitable for JSON/JSONL serialization.
+    """
+    return {
+        "decision_id": entry.decision_id,
+        "flow": entry.flow,
+        "step": entry.step,
+        "agent": entry.agent,
+        "decision_type": entry.decision_type,
+        "subject": entry.subject,
+        "decision": entry.decision,
+        "rationale": entry.rationale,
+        "supporting_evidence": list(entry.supporting_evidence),
+        "conditions": list(entry.conditions),
+        "assumptions_applied": list(entry.assumptions_applied),
+        "timestamp": _datetime_to_iso(entry.timestamp),
+    }
+
+
+def decision_log_entry_from_dict(data: Dict[str, Any]) -> DecisionLogEntry:
+    """Parse DecisionLogEntry from a dictionary.
+
+    Args:
+        data: Dictionary with DecisionLogEntry fields.
+
+    Returns:
+        Parsed DecisionLogEntry instance.
+    """
+    return DecisionLogEntry(
+        decision_id=data.get("decision_id", ""),
+        flow=data.get("flow", ""),
+        step=data.get("step", ""),
+        agent=data.get("agent", ""),
+        decision_type=data.get("decision_type", ""),
+        subject=data.get("subject", ""),
+        decision=data.get("decision", ""),
+        rationale=data.get("rationale", ""),
+        supporting_evidence=list(data.get("supporting_evidence", [])),
+        conditions=list(data.get("conditions", [])),
+        assumptions_applied=list(data.get("assumptions_applied", [])),
+        timestamp=_iso_to_datetime(data.get("timestamp")) or datetime.now(timezone.utc),
+    )
+
+
 def routing_signal_to_dict(signal: RoutingSignal) -> Dict[str, Any]:
     """Convert RoutingSignal to a dictionary for serialization.
 
@@ -1065,6 +1283,16 @@ def handoff_envelope_to_dict(envelope: HandoffEnvelope) -> Dict[str, Any]:
     elif envelope.routing_audit:
         result["routing_audit"] = envelope.routing_audit
 
+    # Include assumptions and decisions if present
+    if envelope.assumptions_made:
+        result["assumptions_made"] = [
+            assumption_entry_to_dict(a) for a in envelope.assumptions_made
+        ]
+    if envelope.decisions_made:
+        result["decisions_made"] = [
+            decision_log_entry_to_dict(d) for d in envelope.decisions_made
+        ]
+
     return result
 
 
@@ -1080,13 +1308,22 @@ def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
     Note:
         Provides backwards compatibility for envelopes missing the new
         spec traceability fields (station_id, station_version, prompt_hash,
-        verification_passed, verification_details, routing_audit).
+        verification_passed, verification_details, routing_audit) and
+        assumption/decision logging fields (assumptions_made, decisions_made).
     """
     routing_signal_data = data.get("routing_signal", {})
     routing_signal = routing_signal_from_dict(routing_signal_data)
 
     # Parse routing_audit if present (store as raw dict for flexibility)
     routing_audit = data.get("routing_audit")
+
+    # Parse assumptions and decisions if present (backward compatible)
+    assumptions_made = [
+        assumption_entry_from_dict(a) for a in data.get("assumptions_made", [])
+    ]
+    decisions_made = [
+        decision_log_entry_from_dict(d) for d in data.get("decisions_made", [])
+    ]
 
     return HandoffEnvelope(
         step_id=data.get("step_id", ""),
@@ -1107,6 +1344,9 @@ def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
         verification_passed=data.get("verification_passed", True),
         verification_details=dict(data.get("verification_details", {})),
         routing_audit=routing_audit,
+        # Assumption and decision logging (backward compatible)
+        assumptions_made=assumptions_made,
+        decisions_made=decisions_made,
     )
 
 

@@ -40,10 +40,13 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
+import tempfile
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
@@ -244,6 +247,359 @@ def load_repo_pack(repo_root: Path) -> Optional[Pack]:
 
 
 # =============================================================================
+# Pack Pinning (Lock File Support)
+# =============================================================================
+
+@dataclass
+class PackLock:
+    """Lock file content for pinning pack configuration.
+
+    The lock file captures a point-in-time snapshot of resolved pack
+    configuration, enabling reproducible builds and drift detection.
+
+    Attributes:
+        version: Lock file schema version.
+        pack_hash: SHA256 hash of pack content for integrity verification.
+        timestamp: ISO 8601 timestamp when lock was generated.
+        pack_id: ID of the pack that was locked.
+        pack_version: Version of the pack that was locked.
+        resolved_config: The fully resolved configuration values.
+    """
+    version: str = "1.0"
+    pack_hash: str = ""
+    timestamp: str = ""
+    pack_id: Optional[str] = None
+    pack_version: str = "1.0"
+    resolved_config: Dict[str, Any] = field(default_factory=dict)
+
+
+def get_pack_lock_path(repo_root: Path) -> Path:
+    """Get path to the pack lock file.
+
+    Args:
+        repo_root: Repository root path.
+
+    Returns:
+        Path to .swarm/pack.lock.json
+    """
+    return repo_root / ".swarm" / "pack.lock.json"
+
+
+def _pack_to_hashable_dict(pack: Pack) -> Dict[str, Any]:
+    """Convert a Pack to a dictionary suitable for hashing.
+
+    This creates a deterministic representation of the pack content
+    that can be used for hash computation.
+
+    Args:
+        pack: The Pack to convert.
+
+    Returns:
+        Dictionary with sorted keys for deterministic serialization.
+    """
+    def engine_to_dict(ec: EngineConfig) -> Dict[str, Any]:
+        return {
+            "mode": ec.mode,
+            "execution": ec.execution,
+            "provider": ec.provider,
+        }
+
+    def features_to_dict(fc: FeaturesConfig) -> Dict[str, Any]:
+        return {
+            "stepwise_execution": fc.stepwise_execution,
+            "context_handoff": fc.context_handoff,
+            "write_transcripts": fc.write_transcripts,
+            "write_receipts": fc.write_receipts,
+        }
+
+    def runtime_to_dict(rc: RuntimeConfig) -> Dict[str, Any]:
+        return {
+            "context_budget_chars": rc.context_budget_chars,
+            "history_max_recent_chars": rc.history_max_recent_chars,
+            "history_max_older_chars": rc.history_max_older_chars,
+            "timeout_seconds": rc.timeout_seconds,
+        }
+
+    def flow_to_dict(fc: FlowConfig) -> Dict[str, Any]:
+        return {
+            "enabled": fc.enabled,
+            "context_budgets": fc.context_budgets,
+        }
+
+    return {
+        "version": pack.version,
+        "id": pack.id,
+        "description": pack.description,
+        "extends": pack.extends,
+        "engines": {k: engine_to_dict(v) for k, v in sorted(pack.engines.items())},
+        "features": features_to_dict(pack.features),
+        "runtime": runtime_to_dict(pack.runtime),
+        "flows": {k: flow_to_dict(v) for k, v in sorted(pack.flows.items())},
+    }
+
+
+def compute_pack_hash(pack: Pack) -> str:
+    """Compute SHA256 hash of pack content for integrity verification.
+
+    This creates a deterministic hash of the pack's configuration values.
+    The hash can be used to detect configuration drift between the lock
+    file and current state.
+
+    Args:
+        pack: The Pack to hash.
+
+    Returns:
+        SHA256 hash as hex string (64 characters).
+    """
+    hashable = _pack_to_hashable_dict(pack)
+    # Use sort_keys for deterministic JSON serialization
+    content = json.dumps(hashable, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def generate_pack_lock(pack: Pack, resolved_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Generate lock file content from a pack.
+
+    Creates a complete lock file structure including hash, timestamp,
+    and resolved configuration snapshot.
+
+    Args:
+        pack: The Pack to lock.
+        resolved_config: Optional pre-resolved config dict. If not provided,
+            only pack-level values are included.
+
+    Returns:
+        Dictionary suitable for writing to pack.lock.json.
+    """
+    pack_hash = compute_pack_hash(pack)
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    lock_data = {
+        "version": "1.0",
+        "pack_hash": pack_hash,
+        "timestamp": timestamp,
+        "pack_id": pack.id,
+        "pack_version": pack.version,
+        "resolved_config": resolved_config or _pack_to_hashable_dict(pack),
+    }
+
+    return lock_data
+
+
+def read_pack_lock(path: Path) -> Optional[PackLock]:
+    """Read an existing pack lock file.
+
+    Args:
+        path: Path to the lock file.
+
+    Returns:
+        PackLock if file exists and is valid, None otherwise.
+    """
+    if not path.exists():
+        return None
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+
+        return PackLock(
+            version=data.get("version", "1.0"),
+            pack_hash=data.get("pack_hash", ""),
+            timestamp=data.get("timestamp", ""),
+            pack_id=data.get("pack_id"),
+            pack_version=data.get("pack_version", "1.0"),
+            resolved_config=data.get("resolved_config", {}),
+        )
+
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Failed to read pack lock from %s: %s", path, e)
+        return None
+
+
+def write_pack_lock(path: Path, lock_data: Dict[str, Any]) -> bool:
+    """Write lock file atomically.
+
+    Uses atomic write (write to temp file, then rename) to prevent
+    corrupted lock files from partial writes.
+
+    Args:
+        path: Path to write the lock file.
+        lock_data: Lock file content dictionary.
+
+    Returns:
+        True if write succeeded, False otherwise.
+    """
+    # Ensure parent directory exists
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        # Write to temp file first for atomic operation
+        fd, tmp_path = tempfile.mkstemp(
+            suffix=".json",
+            prefix="pack.lock.",
+            dir=path.parent,
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(lock_data, f, indent=2, sort_keys=True)
+                f.write("\n")  # Trailing newline
+
+            # Atomic rename (on POSIX; on Windows this may fail if target exists)
+            tmp_path_obj = Path(tmp_path)
+            if path.exists():
+                path.unlink()
+            tmp_path_obj.rename(path)
+
+            logger.info("Wrote pack lock to %s", path)
+            return True
+
+        except Exception:
+            # Clean up temp file on error
+            try:
+                Path(tmp_path).unlink()
+            except OSError:
+                pass
+            raise
+
+    except (OSError, IOError) as e:
+        logger.error("Failed to write pack lock to %s: %s", path, e)
+        return False
+
+
+def _pack_from_lock_config(lock: PackLock) -> Pack:
+    """Reconstruct a Pack from lock file resolved_config.
+
+    Args:
+        lock: The PackLock containing resolved_config.
+
+    Returns:
+        Pack instance with values from the lock file.
+    """
+    config = lock.resolved_config
+
+    # Parse engines
+    engines = {}
+    for engine_id, engine_data in config.get("engines", {}).items():
+        if isinstance(engine_data, dict):
+            engines[engine_id] = EngineConfig(
+                mode=engine_data.get("mode"),
+                execution=engine_data.get("execution"),
+                provider=engine_data.get("provider"),
+            )
+
+    # Parse features
+    features_data = config.get("features", {})
+    features = FeaturesConfig(
+        stepwise_execution=features_data.get("stepwise_execution"),
+        context_handoff=features_data.get("context_handoff"),
+        write_transcripts=features_data.get("write_transcripts"),
+        write_receipts=features_data.get("write_receipts"),
+    )
+
+    # Parse runtime
+    runtime_data = config.get("runtime", {})
+    runtime = RuntimeConfig(
+        context_budget_chars=runtime_data.get("context_budget_chars"),
+        history_max_recent_chars=runtime_data.get("history_max_recent_chars"),
+        history_max_older_chars=runtime_data.get("history_max_older_chars"),
+        timeout_seconds=runtime_data.get("timeout_seconds"),
+    )
+
+    # Parse flows
+    flows = {}
+    for flow_id, flow_data in config.get("flows", {}).items():
+        if isinstance(flow_data, dict):
+            flows[flow_id] = FlowConfig(
+                enabled=flow_data.get("enabled", True),
+                context_budgets=flow_data.get("context_budgets"),
+            )
+
+    return Pack(
+        version=config.get("version", lock.pack_version),
+        id=config.get("id", lock.pack_id),
+        description=config.get("description"),
+        extends=config.get("extends"),
+        engines=engines,
+        features=features,
+        runtime=runtime,
+        flows=flows,
+    )
+
+
+def verify_pack_lock(lock: PackLock, current_pack: Pack) -> Tuple[bool, Optional[str]]:
+    """Verify that a lock file matches the current pack state.
+
+    Compares the hash in the lock file against the current pack's
+    computed hash to detect configuration drift.
+
+    Args:
+        lock: The PackLock to verify.
+        current_pack: The current Pack to compare against.
+
+    Returns:
+        Tuple of (is_valid, error_message). If is_valid is True,
+        error_message is None. If False, error_message explains the mismatch.
+    """
+    if not lock.pack_hash:
+        return False, "Lock file has no pack_hash"
+
+    current_hash = compute_pack_hash(current_pack)
+    if lock.pack_hash != current_hash:
+        return False, (
+            f"Pack hash mismatch: lock has {lock.pack_hash[:12]}..., "
+            f"current is {current_hash[:12]}..."
+        )
+
+    return True, None
+
+
+def lock_current_pack(
+    repo_root: Path,
+    cli_overrides: Optional[Dict[str, Any]] = None,
+) -> Tuple[bool, str]:
+    """Lock the current resolved pack configuration.
+
+    Creates or updates .swarm/pack.lock.json with the current resolved
+    configuration. This is the CLI/API entry point for "lock current pack".
+
+    Args:
+        repo_root: Repository root path.
+        cli_overrides: Optional CLI overrides to include in resolution.
+
+    Returns:
+        Tuple of (success, message).
+    """
+    # Import here to avoid circular dependency at module load
+    # We'll use the resolver after defining it, so defer the actual call
+    try:
+        # Load current packs
+        baseline = load_baseline_pack()
+        repo_pack = load_repo_pack(repo_root)
+
+        # Use repo pack if available, otherwise baseline
+        pack_to_lock = repo_pack if repo_pack else baseline
+
+        # Build resolved config for storage
+        # We'll use a simplified approach here - store the merged pack values
+        resolved = _pack_to_hashable_dict(pack_to_lock)
+
+        # Generate lock data
+        lock_data = generate_pack_lock(pack_to_lock, resolved_config=resolved)
+
+        # Write lock file
+        lock_path = get_pack_lock_path(repo_root)
+        success = write_pack_lock(lock_path, lock_data)
+
+        if success:
+            return True, f"Locked pack configuration to {lock_path}"
+        else:
+            return False, f"Failed to write lock file to {lock_path}"
+
+    except Exception as e:
+        return False, f"Failed to lock pack: {e}"
+
+
+# =============================================================================
 # Pack Resolution with Provenance
 # =============================================================================
 
@@ -254,7 +610,7 @@ class PackResolver:
     1. CLI flags
     2. Environment variables
     3. Repo pack (.swarm/pack.yaml)
-    4. Pinned pack (.swarm/pack.lock.json) - not yet implemented
+    4. Pinned pack (.swarm/pack.lock.json)
     5. Baseline pack
 
     Each resolved value includes provenance showing which layer it came from.
@@ -264,12 +620,14 @@ class PackResolver:
         self,
         repo_root: Optional[Path] = None,
         cli_overrides: Optional[Dict[str, Any]] = None,
+        ignore_lock: bool = False,
     ):
         """Initialize the resolver.
 
         Args:
             repo_root: Repository root for loading repo pack.
             cli_overrides: CLI flag overrides (e.g., {"engines.claude.mode": "sdk"}).
+            ignore_lock: If True, skip loading the lock file (useful for lock generation).
         """
         self._repo_root = repo_root
         self._cli_overrides = cli_overrides or {}
@@ -277,6 +635,63 @@ class PackResolver:
         # Load packs
         self._baseline = load_baseline_pack()
         self._repo_pack = load_repo_pack(repo_root) if repo_root else None
+
+        # Load pinned pack from lock file
+        self._pinned_pack: Optional[Pack] = None
+        self._pin_path: Optional[str] = None
+        self._pin_hash_valid: bool = True
+        self._pin_hash_warning: Optional[str] = None
+
+        if repo_root and not ignore_lock:
+            self._load_pinned_pack(repo_root)
+
+    def _load_pinned_pack(self, repo_root: Path) -> None:
+        """Load pinned pack from lock file if it exists.
+
+        Args:
+            repo_root: Repository root path.
+        """
+        lock_path = get_pack_lock_path(repo_root)
+        lock = read_pack_lock(lock_path)
+
+        if lock is None:
+            return
+
+        # Reconstruct Pack from lock file
+        self._pinned_pack = _pack_from_lock_config(lock)
+        self._pin_path = str(lock_path)
+
+        # Verify hash if we have a repo pack to compare against
+        if self._repo_pack and lock.pack_hash:
+            current_hash = compute_pack_hash(self._repo_pack)
+            if lock.pack_hash != current_hash:
+                self._pin_hash_valid = False
+                self._pin_hash_warning = (
+                    f"Pack hash mismatch: lock file was generated from a different "
+                    f"pack configuration. Lock hash: {lock.pack_hash[:12]}..., "
+                    f"current: {current_hash[:12]}... "
+                    f"Consider regenerating the lock file with 'lock_current_pack()'."
+                )
+                logger.warning(self._pin_hash_warning)
+
+    @property
+    def pin_hash_valid(self) -> bool:
+        """Check if the pinned pack hash matches current pack.
+
+        Returns:
+            True if no lock file exists, or if hash matches.
+            False if hash mismatch was detected.
+        """
+        return self._pin_hash_valid
+
+    @property
+    def pin_hash_warning(self) -> Optional[str]:
+        """Get the hash mismatch warning message if any.
+
+        Returns:
+            Warning message if hash mismatch, None otherwise.
+        """
+        return self._pin_hash_warning
 
     def resolve(self) -> ResolvedConfig:
         """Resolve all configuration with provenance.
@@ -397,12 +812,25 @@ class PackResolver:
         env_key: str,
         repo_getter,
         baseline_getter,
+        pin_getter=None,
     ) -> Tuple[Optional[Any], str, Optional[str]]:
         """Resolve a single value through the layer hierarchy.
+
+        Args:
+            cli_key: Key for CLI override lookup.
+            env_key: Environment variable name.
+            repo_getter: Function to extract value from repo pack.
+            baseline_getter: Function to extract value from baseline pack.
+            pin_getter: Optional function to extract value from pinned pack.
+                If None, uses baseline_getter for the pinned pack.
 
         Returns:
             Tuple of (value, source, path).
         """
+        # Use baseline_getter for pin if not specified
+        if pin_getter is None:
+            pin_getter = baseline_getter
+
         # 1. CLI override
         if cli_key in self._cli_overrides:
             return (self._cli_overrides[cli_key], "cli", f"--{cli_key}")
@@ -429,7 +857,13 @@ class PackResolver:
                     path = str(get_repo_pack_path(self._repo_root))
                 return (repo_value, "repo", path)
 
-        # 4. Baseline pack
+        # 4. Pinned pack (from lock file)
+        if self._pinned_pack:
+            pin_value = pin_getter(self._pinned_pack)
+            if pin_value is not None:
+                return (pin_value, "pin", self._pin_path)
+
+        # 5. Baseline pack
         baseline_value = baseline_getter(self._baseline)
         if baseline_value is not None:
             return (baseline_value, "baseline", str(get_baseline_pack_path()))
