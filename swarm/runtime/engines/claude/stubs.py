@@ -293,13 +293,14 @@ def finalize_from_existing_handoff(
     envelope: Optional[HandoffEnvelope] = None
     if handoff_data:
         status_str = handoff_data.get("status", "UNVERIFIED")
+        envelope_status = status_str.lower() if isinstance(status_str, str) else "unverified"
         envelope = HandoffEnvelope(
             step_id=ctx.step_id,
             flow_key=ctx.flow_key,
             run_id=ctx.run_id,
             routing_signal=None,
             summary=handoff_data.get("summary", work_summary[:500]),
-            status=status_str.lower() if isinstance(status_str, str) else "unverified",
+            status=envelope_status,
             error=step_result.error,
             duration_ms=step_result.duration_ms,
             timestamp=datetime.now(timezone.utc),
@@ -307,23 +308,29 @@ def finalize_from_existing_handoff(
             file_changes=file_changes_dict,
         )
     else:
+        envelope_status = "verified" if step_result.status == "succeeded" else "unverified"
         envelope = HandoffEnvelope(
             step_id=ctx.step_id,
             flow_key=ctx.flow_key,
             run_id=ctx.run_id,
             routing_signal=None,
             summary=work_summary[:500] if work_summary else f"Step {ctx.step_id} completed",
-            status="verified" if step_result.status == "succeeded" else "unverified",
+            status=envelope_status,
             error=step_result.error,
             duration_ms=step_result.duration_ms,
             timestamp=datetime.now(timezone.utc),
             file_changes=file_changes_dict,
         )
 
-    envelope_path = make_handoff_envelope_path(ctx.run_base, ctx.step_id)
-    ensure_handoff_dir(ctx.run_base)
-    with envelope_path.open("w", encoding="utf-8") as f:
-        json.dump(handoff_envelope_to_dict(envelope), f, indent=2)
+    # Build envelope dict for writing (no draft since it was written during work phase)
+    envelope_dict = handoff_envelope_to_dict(envelope)
+    write_handoff_envelope(
+        run_base=ctx.run_base,
+        step_id=ctx.step_id,
+        envelope_data=envelope_dict,
+        write_draft=False,  # Draft already exists from work phase
+        validate=True,
+    )
 
     events.append(
         RunEvent(
@@ -334,7 +341,7 @@ def finalize_from_existing_handoff(
             step_id=ctx.step_id,
             agent_key=agent_key,
             payload={
-                "message": f"Handoff envelope written to {envelope_path}",
+                "message": f"Handoff envelope written via handoff_io for step {ctx.step_id}",
                 "status": envelope.status,
             },
         )

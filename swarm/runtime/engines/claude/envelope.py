@@ -3,31 +3,25 @@ envelope.py - HandoffEnvelope creation and writing for Claude step engine.
 
 Handles:
 - Envelope creation from step results
-- Envelope writing to disk
+- Envelope writing to disk (delegating to handoff_io)
 - Fallback envelope generation
+
+NOTE: Actual file I/O is delegated to swarm.runtime.handoff_io for consistency.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Try to import jsonschema, graceful fallback if not available
-try:
-    import jsonschema
-
-    JSONSCHEMA_AVAILABLE = True
-except ImportError:
-    JSONSCHEMA_AVAILABLE = False
-    jsonschema = None  # type: ignore[assignment]
-
-from swarm.runtime.path_helpers import (
-    ensure_handoff_dir,
-    handoff_envelope_path as make_handoff_envelope_path,
+from swarm.runtime.handoff_io import (
+    write_handoff_envelope as _write_handoff_envelope_io,
+    validate_envelope as validate_handoff_envelope,
+    is_strict_validation_enabled as _is_strict_validation_enabled,
+    EnvelopeValidationError,
 )
 from swarm.runtime.types import (
     HandoffEnvelope,
@@ -39,148 +33,6 @@ from swarm.runtime.types import (
 from ..models import StepContext, StepResult
 
 logger = logging.getLogger(__name__)
-
-# Cached schema to avoid repeated file reads
-_HANDOFF_SCHEMA: Optional[Dict[str, Any]] = None
-_ROUTING_SIGNAL_SCHEMA: Optional[Dict[str, Any]] = None
-
-
-def _load_handoff_schema() -> Optional[Dict[str, Any]]:
-    """Load handoff envelope schema, caching result.
-
-    Searches for the schema in multiple locations relative to
-    the file location and repo root.
-
-    Returns:
-        The parsed JSON schema as a dictionary, or None if not found.
-    """
-    global _HANDOFF_SCHEMA
-    if _HANDOFF_SCHEMA is not None:
-        return _HANDOFF_SCHEMA
-
-    # Find schema relative to this file or repo root
-    schema_paths = [
-        Path(__file__).parent.parent.parent.parent / "schemas" / "handoff_envelope.schema.json",
-        Path("swarm/schemas/handoff_envelope.schema.json"),
-    ]
-
-    for path in schema_paths:
-        if path.exists():
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    _HANDOFF_SCHEMA = json.load(f)
-                return _HANDOFF_SCHEMA
-            except (json.JSONDecodeError, OSError) as e:
-                logger.warning("Failed to load handoff schema from %s: %s", path, e)
-                continue
-
-    return None
-
-
-def _load_routing_signal_schema() -> Optional[Dict[str, Any]]:
-    """Load routing signal schema, caching result.
-
-    Returns:
-        The parsed JSON schema as a dictionary, or None if not found.
-    """
-    global _ROUTING_SIGNAL_SCHEMA
-    if _ROUTING_SIGNAL_SCHEMA is not None:
-        return _ROUTING_SIGNAL_SCHEMA
-
-    schema_paths = [
-        Path(__file__).parent.parent.parent.parent / "schemas" / "routing_signal.schema.json",
-        Path("swarm/schemas/routing_signal.schema.json"),
-    ]
-
-    for path in schema_paths:
-        if path.exists():
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    _ROUTING_SIGNAL_SCHEMA = json.load(f)
-                return _ROUTING_SIGNAL_SCHEMA
-            except (json.JSONDecodeError, OSError) as e:
-                logger.warning("Failed to load routing signal schema from %s: %s", path, e)
-                continue
-
-    return None
-
-
-def _create_schema_resolver() -> Optional[Any]:
-    """Create a JSON schema resolver that handles $ref to routing_signal.schema.json.
-
-    Returns:
-        A jsonschema RefResolver, or None if schemas not available.
-    """
-    if not JSONSCHEMA_AVAILABLE:
-        return None
-
-    handoff_schema = _load_handoff_schema()
-    routing_schema = _load_routing_signal_schema()
-
-    if handoff_schema is None:
-        return None
-
-    # Create a store with the routing signal schema
-    store: Dict[str, Any] = {}
-    if routing_schema is not None:
-        store["https://swarm.dev/schemas/routing_signal.schema.json"] = routing_schema
-
-    # Create resolver with the store
-    resolver = jsonschema.RefResolver.from_schema(handoff_schema, store=store)
-    return resolver
-
-
-def validate_handoff_envelope(envelope_dict: Dict[str, Any]) -> List[str]:
-    """Validate envelope dict against JSON schema.
-
-    Performs validation of the HandoffEnvelope dictionary against
-    the handoff_envelope.schema.json schema. Gracefully handles
-    missing dependencies or schema files.
-
-    Args:
-        envelope_dict: The envelope dictionary to validate.
-
-    Returns:
-        List of validation error messages (empty if valid or
-        validation could not be performed).
-    """
-    if not JSONSCHEMA_AVAILABLE:
-        logger.debug("jsonschema not available, skipping envelope validation")
-        return []
-
-    schema = _load_handoff_schema()
-    if schema is None:
-        logger.debug("Handoff envelope schema not found, skipping validation")
-        return []
-
-    errors: List[str] = []
-    try:
-        # Create resolver to handle $ref to routing_signal schema
-        resolver = _create_schema_resolver()
-        if resolver is not None:
-            jsonschema.validate(envelope_dict, schema, resolver=resolver)
-        else:
-            jsonschema.validate(envelope_dict, schema)
-    except jsonschema.ValidationError as e:
-        json_path = e.json_path if hasattr(e, "json_path") else str(list(e.absolute_path))
-        errors.append(f"Validation error at {json_path}: {e.message}")
-    except jsonschema.SchemaError as e:
-        errors.append(f"Schema error: {e.message}")
-    except Exception as e:
-        # Catch any other unexpected errors during validation
-        errors.append(f"Unexpected validation error: {str(e)}")
-
-    return errors
-
-
-def _is_strict_validation_enabled() -> bool:
-    """Check if strict envelope validation mode is enabled.
-
-    Returns:
-        True if SWARM_STRICT_ENVELOPE_VALIDATION is set to a truthy value.
-    """
-    strict_env = os.environ.get("SWARM_STRICT_ENVELOPE_VALIDATION", "").lower()
-    return strict_env in ("1", "true", "yes", "on")
 
 
 def create_fallback_envelope(
@@ -232,24 +84,14 @@ def create_fallback_envelope(
     return envelope
 
 
-class EnvelopeValidationError(Exception):
-    """Raised when envelope validation fails in strict mode."""
-
-    def __init__(self, errors: List[str]) -> None:
-        self.errors = errors
-        super().__init__(f"Envelope validation failed: {'; '.join(errors)}")
-
-
 def write_envelope_to_disk(
     ctx: StepContext,
     envelope: HandoffEnvelope,
 ) -> Optional[Path]:
     """Write HandoffEnvelope to disk at RUN_BASE/<flow_key>/handoff/<step_id>.json.
 
-    Validates the envelope against the JSON schema before writing. In normal
-    mode, validation errors are logged as warnings but writing proceeds.
-    When SWARM_STRICT_ENVELOPE_VALIDATION is set, validation errors raise
-    an EnvelopeValidationError.
+    Delegates to swarm.runtime.handoff_io for actual file writing.
+    Validates the envelope against the JSON schema before writing.
 
     Args:
         ctx: Step execution context.
@@ -262,37 +104,21 @@ def write_envelope_to_disk(
         EnvelopeValidationError: If validation fails and strict mode is enabled.
     """
     try:
-        # Ensure handoff directory exists
-        ensure_handoff_dir(ctx.run_base)
-
-        # Generate envelope file path
-        envelope_path = make_handoff_envelope_path(ctx.run_base, ctx.step_id)
-
         # Convert envelope to dict for JSON serialization
         envelope_dict = handoff_envelope_to_dict(envelope)
 
-        # Validate envelope before writing
-        validation_errors = validate_handoff_envelope(envelope_dict)
-        if validation_errors:
-            if _is_strict_validation_enabled():
-                logger.error(
-                    "Envelope validation failed for step %s: %s",
-                    ctx.step_id,
-                    validation_errors,
-                )
-                raise EnvelopeValidationError(validation_errors)
-            else:
-                logger.warning(
-                    "Envelope validation warnings for step %s: %s",
-                    ctx.step_id,
-                    validation_errors,
-                )
+        # Delegate to unified handoff_io (handles validation, directory creation, writing)
+        _write_handoff_envelope_io(
+            run_base=ctx.run_base,
+            step_id=ctx.step_id,
+            envelope_data=envelope_dict,
+            write_draft=False,  # envelope.py only writes committed path
+            validate=True,
+        )
 
-        # Write to disk
-        with envelope_path.open("w", encoding="utf-8") as f:
-            json.dump(envelope_dict, f, indent=2)
-
-        return envelope_path
+        # Return the path that was written
+        from swarm.runtime.path_helpers import handoff_envelope_path
+        return handoff_envelope_path(ctx.run_base, ctx.step_id)
 
     except EnvelopeValidationError:
         # Re-raise validation errors in strict mode
