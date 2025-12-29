@@ -8,8 +8,11 @@ This module provides a facade for loading and caching spec-first types:
 The facade abstracts away the file I/O and caching, making specs available
 to routing, verification, and orchestration without repeated loading.
 
-Future: When Graph IR becomes authoritative, this facade can be extended
-with a GraphSpecFacade implementation that reads from JSON specs instead.
+Supports two loading modes:
+1. Legacy YAML mode: Loads from swarm/spec/flows/*.yaml (original)
+2. Pack JSON mode: Loads from swarm/packs/flows/*.json (new graph-based)
+
+Use `use_pack_specs=True` to enable pack-based loading for gradual migration.
 """
 
 from __future__ import annotations
@@ -18,8 +21,16 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from swarm.config.flow_registry import get_flow_spec_id
+from swarm.config.flow_registry import get_flow_spec_id, FlowDefinition
 from swarm.runtime.router import FlowGraph, Edge, NodeConfig, EdgeCondition
+
+# Pack-based loading support
+from swarm.runtime.spec_bridge import (
+    load_flow_from_pack,
+    PackFlowRegistry,
+    flow_spec_to_definition,
+)
+from swarm.config.pack_registry import PackRegistry
 
 # Conditional imports for spec module (may not be available in all environments)
 try:
@@ -49,20 +60,33 @@ class SpecFacade:
     Provides thread-safe caching of specs to avoid repeated file I/O.
     Returns None for missing specs rather than raising exceptions.
 
+    Supports two modes:
+    - use_pack_specs=False (default): Load from legacy YAML specs
+    - use_pack_specs=True: Load from new JSON pack specs
+
     Attributes:
         repo_root: Repository root path.
+        use_pack_specs: Whether to use pack-based JSON loading.
     """
 
-    def __init__(self, repo_root: Path):
+    def __init__(self, repo_root: Path, use_pack_specs: bool = False):
         """Initialize the facade.
 
         Args:
             repo_root: Repository root path.
+            use_pack_specs: If True, load flows from pack JSON specs
+                instead of legacy YAML specs.
         """
         self._repo_root = repo_root
+        self._use_pack_specs = use_pack_specs
         self._flow_cache: Dict[str, Any] = {}
         self._station_cache: Dict[str, Any] = {}
         self._flow_graph_cache: Dict[str, Optional[FlowGraph]] = {}
+        self._flow_def_cache: Dict[str, Optional[FlowDefinition]] = {}
+
+        # Pack registry for pack-based loading
+        self._pack_registry: Optional[PackRegistry] = None
+        self._pack_flow_registry: Optional[PackFlowRegistry] = None
 
     @property
     def spec_available(self) -> bool:
@@ -238,17 +262,185 @@ class SpecFacade:
         self._flow_cache.clear()
         self._station_cache.clear()
         self._flow_graph_cache.clear()
+        self._flow_def_cache.clear()
+        self._pack_registry = None
+        self._pack_flow_registry = None
+
+    # -------------------------------------------------------------------------
+    # Pack-Based Loading (New JSON Format)
+    # -------------------------------------------------------------------------
+
+    def _ensure_pack_registry(self) -> PackRegistry:
+        """Lazily initialize pack registry."""
+        if self._pack_registry is None:
+            self._pack_registry = PackRegistry(self._repo_root)
+            self._pack_registry.load()
+        return self._pack_registry
+
+    def _ensure_pack_flow_registry(self) -> PackFlowRegistry:
+        """Lazily initialize pack flow registry."""
+        if self._pack_flow_registry is None:
+            self._pack_flow_registry = PackFlowRegistry(self._repo_root)
+        return self._pack_flow_registry
+
+    def load_flow_definition(self, flow_key: str) -> Optional[FlowDefinition]:
+        """Load FlowDefinition from pack or legacy source.
+
+        If use_pack_specs is True, loads from pack JSON specs.
+        Otherwise, returns None (caller should use flow_registry).
+
+        Args:
+            flow_key: The flow key (e.g., "build", "plan").
+
+        Returns:
+            FlowDefinition or None if not available.
+        """
+        if flow_key in self._flow_def_cache:
+            return self._flow_def_cache[flow_key]
+
+        if not self._use_pack_specs:
+            # Pack specs disabled, return None for legacy path
+            return None
+
+        try:
+            flow_def = load_flow_from_pack(flow_key, self._repo_root)
+            self._flow_def_cache[flow_key] = flow_def
+            logger.debug("Loaded FlowDefinition from pack for %s", flow_key)
+            return flow_def
+        except Exception as e:
+            logger.warning("Failed to load FlowDefinition from pack for %s: %s", flow_key, e)
+            self._flow_def_cache[flow_key] = None
+            return None
+
+    def get_pack_flow_registry(self) -> PackFlowRegistry:
+        """Get the PackFlowRegistry for pack-based loading.
+
+        Returns:
+            PackFlowRegistry instance.
+
+        Raises:
+            RuntimeError: If use_pack_specs is False.
+        """
+        if not self._use_pack_specs:
+            raise RuntimeError(
+                "Pack specs not enabled. Initialize SpecFacade with use_pack_specs=True"
+            )
+        return self._ensure_pack_flow_registry()
+
+    def build_flow_graph_from_pack(self, flow_key: str) -> Optional[FlowGraph]:
+        """Build FlowGraph from pack JSON spec.
+
+        Alternative to build_flow_graph() that uses the new pack format.
+
+        Args:
+            flow_key: The flow key to build graph for.
+
+        Returns:
+            FlowGraph if available, None otherwise.
+        """
+        cache_key = f"pack:{flow_key}"
+        if cache_key in self._flow_graph_cache:
+            return self._flow_graph_cache[cache_key]
+
+        try:
+            pack_registry = self._ensure_pack_registry()
+            flow_spec = pack_registry.get_flow(flow_key)
+
+            if flow_spec is None:
+                self._flow_graph_cache[cache_key] = None
+                return None
+
+            # Convert pack nodes/edges to FlowGraph
+            nodes: Dict[str, NodeConfig] = {}
+            edges: List[Edge] = []
+
+            for node in flow_spec.nodes:
+                exit_on = None
+                if node.overrides and "exit_on" in node.overrides:
+                    exit_on = node.overrides["exit_on"]
+
+                nodes[node.node_id] = NodeConfig(
+                    node_id=node.node_id,
+                    template_id=node.template_id or node.node_id,
+                    max_iterations=node.params.get("max_iterations") if node.params else None,
+                    exit_on=exit_on,
+                )
+
+            for edge in flow_spec.edges:
+                condition = None
+                if edge.condition:
+                    # Convert condition dict to EdgeCondition if needed
+                    if isinstance(edge.condition, dict):
+                        condition = EdgeCondition(
+                            field=edge.condition.get("field", "status"),
+                            operator=edge.condition.get("operator", "=="),
+                            value=edge.condition.get("value", ""),
+                            expression=edge.condition.get("expression"),
+                        )
+
+                edges.append(Edge(
+                    edge_id=edge.edge_id,
+                    from_node=edge.from_node,
+                    to_node=edge.to_node,
+                    edge_type=edge.edge_type,
+                    priority=edge.priority,
+                    condition=condition,
+                ))
+
+            policy = {}
+            if flow_spec.policy:
+                if isinstance(flow_spec.policy, dict):
+                    policy = flow_spec.policy
+                elif hasattr(flow_spec.policy, 'max_loop_iterations'):
+                    policy = {
+                        "max_loop_iterations": flow_spec.policy.max_loop_iterations,
+                        "suggested_sidequests": getattr(flow_spec.policy, 'suggested_sidequests', []),
+                    }
+
+            graph = FlowGraph(
+                graph_id=flow_key,
+                nodes=nodes,
+                edges=edges,
+                policy=policy,
+            )
+
+            self._flow_graph_cache[cache_key] = graph
+            return graph
+
+        except Exception as e:
+            logger.warning("Failed to build FlowGraph from pack for %s: %s", flow_key, e)
+            self._flow_graph_cache[cache_key] = None
+            return None
+
+    @property
+    def use_pack_specs(self) -> bool:
+        """Whether pack-based loading is enabled."""
+        return self._use_pack_specs
+
+    @use_pack_specs.setter
+    def use_pack_specs(self, value: bool) -> None:
+        """Enable or disable pack-based loading.
+
+        Clears caches when mode changes.
+        """
+        if value != self._use_pack_specs:
+            self._use_pack_specs = value
+            self.clear_cache()
 
 
 # Module-level convenience functions for simple use cases
 _default_facade: Optional[SpecFacade] = None
 
 
-def get_facade(repo_root: Optional[Path] = None) -> SpecFacade:
+def get_facade(
+    repo_root: Optional[Path] = None,
+    use_pack_specs: bool = False,
+) -> SpecFacade:
     """Get or create a module-level SpecFacade.
 
     Args:
         repo_root: Repository root path. Uses auto-detection if not provided.
+        use_pack_specs: If True, enable pack-based loading.
 
     Returns:
         SpecFacade instance.
@@ -257,7 +449,9 @@ def get_facade(repo_root: Optional[Path] = None) -> SpecFacade:
     if _default_facade is None or (repo_root and _default_facade._repo_root != repo_root):
         if repo_root is None:
             repo_root = Path(__file__).resolve().parents[3]
-        _default_facade = SpecFacade(repo_root)
+        _default_facade = SpecFacade(repo_root, use_pack_specs=use_pack_specs)
+    elif _default_facade._use_pack_specs != use_pack_specs:
+        _default_facade.use_pack_specs = use_pack_specs
     return _default_facade
 
 
@@ -277,4 +471,7 @@ __all__ = [
     "load_flow_spec",
     "load_station_spec",
     "SPEC_AVAILABLE",
+    # Pack-based loading re-exports
+    "PackFlowRegistry",
+    "load_flow_from_pack",
 ]

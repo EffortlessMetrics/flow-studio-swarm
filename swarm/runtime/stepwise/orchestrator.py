@@ -130,6 +130,7 @@ class StepwiseOrchestrator:
         engine: StepEngine,
         repo_root: Optional[Path] = None,
         use_spec_bridge: bool = False,
+        use_pack_specs: bool = False,
         navigation_orchestrator: Optional["NavigationOrchestrator"] = None,
     ):
         """Initialize the orchestrator.
@@ -137,7 +138,9 @@ class StepwiseOrchestrator:
         Args:
             engine: StepEngine instance for executing steps.
             repo_root: Repository root path. Defaults to auto-detection.
-            use_spec_bridge: If True, load flows from JSON specs.
+            use_spec_bridge: If True, load flows from JSON specs (legacy path).
+            use_pack_specs: If True, load flows from pack JSON specs (new path).
+                Takes precedence over use_spec_bridge when enabled.
             navigation_orchestrator: Optional NavigationOrchestrator for intelligent
                 routing decisions. If not provided, creates a default one.
                 Set to None explicitly to use envelope-first fallback routing.
@@ -146,7 +149,8 @@ class StepwiseOrchestrator:
         self._repo_root = repo_root or Path(__file__).resolve().parents[3]
         self._flow_registry = FlowRegistry.get_instance()
         self._use_spec_bridge = use_spec_bridge
-        self._spec_facade = SpecFacade(self._repo_root)
+        self._use_pack_specs = use_pack_specs
+        self._spec_facade = SpecFacade(self._repo_root, use_pack_specs=use_pack_specs)
         self._lock = threading.Lock()
 
         # Navigation orchestrator for intelligent routing
@@ -190,6 +194,30 @@ class StepwiseOrchestrator:
             return False
         return self._stop_requests[run_id].is_set()
 
+    def _load_flow_definition(self, flow_key: str) -> Optional[FlowDefinition]:
+        """Load flow definition from appropriate source.
+
+        If use_pack_specs is enabled, loads from pack JSON specs.
+        Otherwise falls back to the YAML-based flow registry.
+
+        Args:
+            flow_key: The flow to load (e.g., "build", "signal").
+
+        Returns:
+            FlowDefinition if found, None otherwise.
+        """
+        # Try pack specs first if enabled
+        if self._use_pack_specs:
+            flow_def = self._spec_facade.load_flow_definition(flow_key)
+            if flow_def is not None:
+                logger.debug("Loaded flow %s from pack specs", flow_key)
+                return flow_def
+            # Fall back to legacy if pack doesn't have it
+            logger.debug("Flow %s not in pack, falling back to registry", flow_key)
+
+        # Use legacy flow registry
+        return self._flow_registry.get_flow(flow_key)
+
     def run_stepwise_flow(
         self,
         flow_key: str,
@@ -220,8 +248,8 @@ class StepwiseOrchestrator:
         if resume:
             self.clear_stop_request(run_id)
 
-        # Load flow definition
-        flow_def = self._flow_registry.get_flow(flow_key)
+        # Load flow definition - use pack specs if enabled
+        flow_def = self._load_flow_definition(flow_key)
         if flow_def is None:
             raise ValueError(f"Unknown flow: {flow_key}")
 
@@ -368,8 +396,8 @@ class StepwiseOrchestrator:
                     flow_key,
                 )
 
-                # Get flow definition
-                flow_def = self._flow_registry.get_flow(flow_key)
+                # Get flow definition - use pack specs if enabled
+                flow_def = self._load_flow_definition(flow_key)
                 if flow_def is None:
                     logger.error("Unknown flow in sequence: %s", flow_key)
                     break
@@ -1209,12 +1237,14 @@ GeminiStepOrchestrator = StepwiseOrchestrator
 def get_orchestrator(
     engine: Optional[StepEngine] = None,
     repo_root: Optional[Path] = None,
+    use_pack_specs: bool = False,
 ) -> StepwiseOrchestrator:
     """Factory function to create a stepwise orchestrator.
 
     Args:
         engine: Optional StepEngine instance. Creates GeminiStepEngine if None.
         repo_root: Optional repository root path.
+        use_pack_specs: If True, use pack JSON specs instead of YAML registry.
 
     Returns:
         Configured StepwiseOrchestrator instance.
@@ -1227,7 +1257,11 @@ def get_orchestrator(
     if engine is None:
         engine = GeminiStepEngine(repo_root)
 
-    return StepwiseOrchestrator(engine=engine, repo_root=repo_root)
+    return StepwiseOrchestrator(
+        engine=engine,
+        repo_root=repo_root,
+        use_pack_specs=use_pack_specs,
+    )
 
 
 __all__ = [
