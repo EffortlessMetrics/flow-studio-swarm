@@ -34,3 +34,24 @@ export {
   NodeInspector,
   createNodeInspector,
 } from "./NodeInspector.js";
+
+// Inventory Counts - marker count display with deltas
+export {
+  InventoryCounts,
+  createInventoryCounts,
+} from "./InventoryCounts.js";
+export type { FactsSummaryResponse } from "./InventoryCounts.js";
+
+// Boundary Review - flow completion summary for human review
+export {
+  BoundaryReview,
+  createBoundaryReview,
+  extractBoundaryReviewData,
+} from "./BoundaryReview.js";
+export type {
+  BoundaryReviewData,
+  BoundaryReviewDecision,
+  BoundaryReviewOptions,
+  FlowCompletionStatus,
+  RoutingDecision,
+} from "./BoundaryReview.js";

@@ -7,6 +7,8 @@ This package contains the FastAPI routers for:
 - events: SSE event streaming for runs
 - wisdom: Wisdom artifact reading and patch application
 - compile: Compile preview endpoints for prompt inspection
+- facts: Inventory marker extraction and summary endpoints
+- evolution: Evolution patch parsing and application endpoints
 """
 
 from .specs import router as specs_router
@@ -14,6 +16,8 @@ from .runs import router as runs_router
 from .events import router as events_router
 from .wisdom import router as wisdom_router
 from .compile import router as compile_router
+from .facts import router as facts_router
+from .evolution import router as evolution_router
 
 __all__ = [
     "specs_router",
@@ -21,4 +25,6 @@ __all__ = [
     "events_router",
     "wisdom_router",
     "compile_router",
+    "facts_router",
+    "evolution_router",
 ]

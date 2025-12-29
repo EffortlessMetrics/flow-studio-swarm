@@ -432,6 +432,20 @@ async def pause_run(
             expected_etag=expected_etag,
         )
 
+        # Emit pause event for SSE subscribers
+        from .events import write_event_sync, EventType
+        write_event_sync(
+            run_id=run_id,
+            runs_root=state_manager.runs_root,
+            event_type=EventType.RUN_PAUSED,
+            data={
+                "run_id": run_id,
+                "previous_status": state["status"],
+                "current_step": state.get("current_step"),
+                "paused_at": now,
+            },
+        )
+
         return RunActionResponse(
             run_id=run_id,
             status="paused",
@@ -499,10 +513,25 @@ async def resume_run(
             )
 
         now = datetime.now(timezone.utc).isoformat()
+        paused_at = state.get("paused_at")
         await state_manager.update_run(
             run_id,
             {"status": "running", "paused_at": None},
             expected_etag=expected_etag,
+        )
+
+        # Emit resume event for SSE subscribers
+        from .events import write_event_sync, EventType
+        write_event_sync(
+            run_id=run_id,
+            runs_root=state_manager.runs_root,
+            event_type=EventType.RUN_RESUMED,
+            data={
+                "run_id": run_id,
+                "current_step": state.get("current_step"),
+                "paused_at": paused_at,
+                "resumed_at": now,
+            },
         )
 
         return RunActionResponse(

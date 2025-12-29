@@ -45,6 +45,10 @@ import { configure as configureRunControl, initRunControl, setActiveRun as setRu
 import { renderFlowOutline, getCurrentGraphState } from "./graph_outline.js";
 // Layout spec for SDK
 import { screens as layoutScreens, getScreenById as getLayoutScreenByIdImpl, getAllKnownUIIDs as getAllKnownUIIDsImpl } from "./layout_spec.js";
+// Boundary Review - flow completion summaries
+import { BoundaryReview, createBoundaryReview, extractBoundaryReviewData, } from "./components/BoundaryReview.js";
+// Inventory Counts - marker statistics
+import { InventoryCounts } from "./components/InventoryCounts.js";
 // ============================================================================
 // Details Wrappers
 // ============================================================================
@@ -107,6 +111,73 @@ async function loadProfileStatus() {
 // ============================================================================
 /** Track the currently selected backend ID */
 let selectedBackendId = "claude-harness";
+/** Global inventory counts component instance */
+let inventoryCountsComponent = null;
+// ============================================================================
+// Inventory Counts
+// ============================================================================
+/**
+ * Initialize and load the inventory counts component.
+ */
+function initInventoryCounts() {
+    const container = document.getElementById("inventory-counts-container");
+    if (!container)
+        return;
+    // Create component instance if not already created
+    if (!inventoryCountsComponent) {
+        inventoryCountsComponent = new InventoryCounts({
+            container,
+            onTypeClick: (markerType) => {
+                // Could navigate to filtered facts view in future
+                console.log("Clicked marker type:", markerType);
+            },
+            onFlowClick: async (flowKey) => {
+                // Navigate to the flow
+                await setActiveFlow(flowKey, true);
+            },
+            onStepClick: async (flowKey, stepId) => {
+                // Navigate to the step
+                await setActiveFlow(flowKey, true);
+                setTimeout(() => {
+                    selectStep(flowKey, stepId, { fitGraph: true });
+                }, 300);
+            },
+        });
+    }
+    // Load data if we have a run selected
+    if (state.currentRunId) {
+        inventoryCountsComponent.load(state.currentRunId).catch((err) => {
+            console.warn("Failed to load inventory counts:", err);
+        });
+    }
+    else {
+        inventoryCountsComponent.clear();
+    }
+}
+/**
+ * Update inventory counts when run changes.
+ */
+function updateInventoryCounts(runId) {
+    if (!inventoryCountsComponent) {
+        initInventoryCounts();
+    }
+    if (runId && inventoryCountsComponent) {
+        inventoryCountsComponent.load(runId).catch((err) => {
+            console.warn("Failed to load inventory counts:", err);
+        });
+    }
+    else if (inventoryCountsComponent) {
+        inventoryCountsComponent.clear();
+    }
+}
+/**
+ * Update inventory counts selected step.
+ */
+function updateInventoryCountsSelectedStep(flowKey, stepId) {
+    if (inventoryCountsComponent) {
+        inventoryCountsComponent.setSelectedStep(flowKey, stepId);
+    }
+}
 /**
  * Load and display available backends in the selector.
  */
@@ -633,6 +704,8 @@ window.addEventListener("load", async () => {
                 clearWisdomCache(); // Clear wisdom cache when run changes
                 updateCompareSelector();
                 await loadRunStatus();
+                // Update inventory counts for new run
+                updateInventoryCounts(runId || null);
                 // Sync run history selection
                 setRunHistorySelectedRunId(runId);
                 // Sync run control panel to monitor this run
@@ -739,6 +812,70 @@ window.addEventListener("load", async () => {
                 // Future: call Api.startRun() with appropriate params
             }
         });
+        // Initialize boundary review component for flow completion summaries
+        const boundaryReview = createBoundaryReview({
+            onApprove: (flowKey) => {
+                console.log(`[BoundaryReview] Approved flow: ${flowKey}`);
+                // Continue to next flow automatically if applicable
+            },
+            onPause: (flowKey) => {
+                console.log(`[BoundaryReview] Paused for review: ${flowKey}`);
+                // User wants to pause and review - no automatic continuation
+            },
+            onClose: () => {
+                // Refresh status after review
+                void loadRunStatus();
+            }
+        });
+        // Helper to show boundary review for a completed flow
+        async function showBoundaryReviewPanel(flowKey, runId) {
+            try {
+                // Load run summary to get flow status
+                const summary = await Api.getRunSummary(runId);
+                const flowStatus = summary?.flows?.[flowKey];
+                if (!flowStatus) {
+                    console.warn(`[BoundaryReview] No status found for flow ${flowKey}`);
+                    return "cancel";
+                }
+                // Determine completion status
+                let status = "UNKNOWN";
+                if (flowStatus.status === "complete" || flowStatus.status === "done") {
+                    status = "VERIFIED";
+                }
+                else if (flowStatus.status === "partial" || flowStatus.status === "in_progress") {
+                    status = "UNVERIFIED";
+                }
+                else if (flowStatus.status === "missing") {
+                    status = "BLOCKED";
+                }
+                // Collect artifacts from steps
+                const artifacts = [];
+                let assumptionsCount = 0;
+                const decisionsCount = 0;
+                if (flowStatus.steps) {
+                    for (const step of Object.values(flowStatus.steps)) {
+                        if (step.artifacts) {
+                            artifacts.push(...step.artifacts);
+                        }
+                    }
+                }
+                // Get flow title from flows list
+                const flowsResponse = await Api.getFlows();
+                const flowInfo = flowsResponse.flows.find(f => f.key === flowKey);
+                const flowTitle = flowInfo?.title || flowKey;
+                // Create review data
+                const reviewData = extractBoundaryReviewData(flowKey, flowTitle, status, artifacts, {
+                    assumptionsCount,
+                    decisionsCount
+                });
+                // Show the boundary review panel
+                return await boundaryReview.show(reviewData);
+            }
+            catch (err) {
+                console.error("[BoundaryReview] Error loading review data:", err);
+                return "cancel";
+            }
+        }
         // Configure and initialize run control panel
         configureRunControl({
             onRunStart: (runId) => {
@@ -766,6 +903,10 @@ window.addEventListener("load", async () => {
                 void initRunHistory().then(() => {
                     setRunHistorySelectedRunId(runId);
                 });
+                // Show boundary review for the completed flow if applicable
+                if (state.currentFlowKey) {
+                    void showBoundaryReviewPanel(state.currentFlowKey, runId);
+                }
             },
             onRunFailed: (_runId, _error) => {
                 // Refresh status to show failure
@@ -853,6 +994,8 @@ window.addEventListener("load", async () => {
         catch (err) {
             console.error("Failed to apply deep link params", err);
         }
+        // Initialize inventory counts component (operator mode feature)
+        initInventoryCounts();
         // Signal that UI is fully initialized and ready for interaction
         if (debugPerf) {
             // Performance timing logged in development mode

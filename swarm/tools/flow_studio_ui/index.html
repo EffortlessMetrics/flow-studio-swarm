@@ -121,6 +121,9 @@
         <option value="gemini-step-orchestrator">Gemini Stepwise</option>
       </select>
     </div>
+    <!-- Inventory Counts Panel -->
+    <div id="inventory-counts-container" class="inventory-counts-container operator-only" data-uiid="flow_studio.sidebar.inventory_counts">
+    </div>
     <nav id="flow-list" class="muted" role="navigation" aria-label="Flow list" data-uiid="flow_studio.sidebar.flow_list">Loading...</nav>
     <!-- Run History Panel (collapsible) -->
     <div class="run-history-section" data-uiid="flow_studio.sidebar.run_history">
@@ -3443,6 +3446,256 @@ make validate-swarm</pre>
       border-top-color: white;
       border-radius: 50%;
       animation: run-control-spin 0.8s linear infinite;
+    }
+
+    /* =========================================================================
+     * Inventory Counts Component
+     * =========================================================================
+     * Displays inventory marker counts (REQ/SOL/TRC/ASM/DEC) with deltas.
+     * Appears in the sidebar in operator mode.
+     */
+    .inventory-counts-container {
+      margin-bottom: var(--fs-spacing-md);
+      padding: var(--fs-spacing-sm);
+      background: var(--fs-color-bg-muted);
+      border-radius: var(--fs-radius-md);
+      border: 1px solid var(--fs-color-border);
+    }
+
+    .inventory-counts {
+      font-size: var(--fs-font-size-sm);
+    }
+
+    .inventory-counts__loading {
+      display: flex;
+      align-items: center;
+      gap: var(--fs-spacing-sm);
+      color: var(--fs-color-text-muted);
+      font-style: italic;
+    }
+
+    .inventory-counts__spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--fs-color-border);
+      border-top-color: var(--fs-color-accent);
+      border-radius: 50%;
+      animation: run-control-spin 0.8s linear infinite;
+    }
+
+    .inventory-counts__error {
+      display: flex;
+      align-items: center;
+      gap: var(--fs-spacing-xs);
+      color: var(--fs-color-error);
+      font-size: var(--fs-font-size-xs);
+    }
+
+    .inventory-counts__error-icon {
+      font-size: 14px;
+    }
+
+    .inventory-counts__empty {
+      color: var(--fs-color-text-subtle);
+      font-size: var(--fs-font-size-xs);
+      text-align: center;
+      padding: var(--fs-spacing-sm) 0;
+    }
+
+    .inventory-counts__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--fs-spacing-sm);
+    }
+
+    .inventory-counts__title {
+      font-weight: 600;
+      font-size: var(--fs-font-size-xs);
+      color: var(--fs-color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .inventory-counts__total {
+      font-size: var(--fs-font-size-xs);
+      color: var(--fs-color-text-subtle);
+    }
+
+    .inventory-counts__expand-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 10px;
+      color: var(--fs-color-text-muted);
+      padding: 2px 4px;
+      border-radius: var(--fs-radius-sm);
+      transition: background-color var(--fs-transition-fast);
+    }
+
+    .inventory-counts__expand-btn:hover {
+      background: var(--fs-color-bg-subtle);
+    }
+
+    .inventory-counts__bar {
+      display: flex;
+      gap: var(--fs-spacing-sm);
+      flex-wrap: wrap;
+    }
+
+    .inventory-counts__item {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 4px;
+      border-radius: var(--fs-radius-sm);
+      background: var(--fs-color-bg-base);
+      transition: background-color var(--fs-transition-fast);
+    }
+
+    .inventory-counts__item:hover {
+      background: var(--fs-color-bg-subtle);
+    }
+
+    .inventory-counts__icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      font-size: 9px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .inventory-counts__count {
+      font-size: var(--fs-font-size-xs);
+      font-weight: 500;
+      color: var(--fs-color-text);
+      min-width: 12px;
+      text-align: center;
+    }
+
+    .inventory-counts__delta {
+      font-size: 9px;
+      font-weight: 600;
+      margin-left: 2px;
+    }
+
+    .inventory-counts__delta--positive {
+      color: var(--fs-color-success);
+    }
+
+    .inventory-counts__delta--negative {
+      color: var(--fs-color-error);
+    }
+
+    /* Expanded details section */
+    .inventory-counts__details {
+      margin-top: var(--fs-spacing-sm);
+      padding-top: var(--fs-spacing-sm);
+      border-top: 1px solid var(--fs-color-border);
+    }
+
+    .inventory-counts__section {
+      margin-bottom: var(--fs-spacing-sm);
+    }
+
+    .inventory-counts__section:last-child {
+      margin-bottom: 0;
+    }
+
+    .inventory-counts__section-header {
+      font-size: var(--fs-font-size-xs);
+      font-weight: 600;
+      color: var(--fs-color-text-muted);
+      margin-bottom: var(--fs-spacing-xs);
+    }
+
+    .inventory-counts__flow-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .inventory-counts__flow-item {
+      display: flex;
+      align-items: center;
+      gap: var(--fs-spacing-sm);
+      padding: 3px var(--fs-spacing-xs);
+      border-radius: var(--fs-radius-sm);
+      transition: background-color var(--fs-transition-fast);
+    }
+
+    .inventory-counts__flow-item:hover {
+      background: var(--fs-color-bg-subtle);
+    }
+
+    .inventory-counts__flow-name {
+      font-size: var(--fs-font-size-xs);
+      font-weight: 500;
+      color: var(--fs-color-text);
+      min-width: 50px;
+    }
+
+    .inventory-counts__flow-counts {
+      display: flex;
+      gap: var(--fs-spacing-xs);
+      flex: 1;
+    }
+
+    .inventory-counts__flow-total {
+      font-size: var(--fs-font-size-xs);
+      color: var(--fs-color-text-subtle);
+    }
+
+    .inventory-counts__mini-count {
+      font-size: 9px;
+      font-weight: 600;
+    }
+
+    .inventory-counts__delta-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .inventory-counts__delta-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 3px var(--fs-spacing-xs);
+      border-radius: var(--fs-radius-sm);
+      transition: background-color var(--fs-transition-fast);
+    }
+
+    .inventory-counts__delta-item:hover {
+      background: var(--fs-color-bg-subtle);
+    }
+
+    .inventory-counts__delta-steps {
+      font-size: 9px;
+      color: var(--fs-color-text-muted);
+      font-family: var(--fs-font-family-mono);
+    }
+
+    .inventory-counts__delta-changes {
+      display: flex;
+      gap: var(--fs-spacing-xs);
+    }
+
+    .inventory-counts__delta-change {
+      font-size: 9px;
+      font-weight: 600;
+    }
+
+    .inventory-counts__delta-change--positive {
+      opacity: 1;
+    }
+
+    .inventory-counts__delta-change--negative {
+      opacity: 0.8;
     }
   </style>
   <script type="application/json" data-inline-source="flowstudio-js-bundle">

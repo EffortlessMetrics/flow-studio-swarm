@@ -814,6 +814,8 @@ def create_app(
             events_router,
             wisdom_router,
             compile_router,
+            facts_router,
+            evolution_router,
         )
 
         app.include_router(specs_router, prefix="/api")
@@ -821,6 +823,8 @@ def create_app(
         app.include_router(events_router, prefix="/api")
         app.include_router(wisdom_router, prefix="/api")
         app.include_router(compile_router, prefix="/api")
+        app.include_router(facts_router, prefix="/api")
+        app.include_router(evolution_router, prefix="/api")
         logger.info("Loaded modular API routers")
     except ImportError as e:
         logger.warning("Could not load modular routers: %s", e)

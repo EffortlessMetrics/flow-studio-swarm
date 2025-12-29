@@ -13,3 +13,7 @@ export { ValidationModal, createValidationModal, } from "./ValidationModal.js";
 export { RunPlayback, createRunPlayback, } from "./RunPlayback.js";
 // Node Inspector - step property editing form
 export { NodeInspector, createNodeInspector, } from "./NodeInspector.js";
+// Inventory Counts - marker count display with deltas
+export { InventoryCounts, createInventoryCounts, } from "./InventoryCounts.js";
+// Boundary Review - flow completion summary for human review
+export { BoundaryReview, createBoundaryReview, extractBoundaryReviewData, } from "./BoundaryReview.js";
