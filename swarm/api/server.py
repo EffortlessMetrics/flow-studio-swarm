@@ -808,12 +808,19 @@ def create_app(
     # -------------------------------------------------------------------------
     # These routers provide the new API structure with full run control
     try:
-        from .routes import specs_router, runs_router, events_router, wisdom_router
+        from .routes import (
+            specs_router,
+            runs_router,
+            events_router,
+            wisdom_router,
+            compile_router,
+        )
 
         app.include_router(specs_router, prefix="/api")
         app.include_router(runs_router, prefix="/api")
         app.include_router(events_router, prefix="/api")
         app.include_router(wisdom_router, prefix="/api")
+        app.include_router(compile_router, prefix="/api")
         logger.info("Loaded modular API routers")
     except ImportError as e:
         logger.warning("Could not load modular routers: %s", e)
@@ -1090,6 +1097,11 @@ def main():
     print("    PATCH  /api/specs/flows/{id}         - Update flow (requires If-Match)")
     print("    POST   /api/specs/flows/{id}/validate - Validate flow spec")
     print("    POST   /api/specs/flows/{id}/compile  - Compile flow")
+    print("  Compile Preview:")
+    print("    POST   /api/compile/preview          - Preview compiled prompt (NEW)")
+    print("    GET    /api/compile/stations         - List available stations (NEW)")
+    print("    GET    /api/compile/stations/{id}    - Get station details (NEW)")
+    print("    POST   /api/compile/validate         - Validate station/step (NEW)")
     print("  Runs:")
     print("    POST   /api/runs                     - Start new run")
     print("    GET    /api/runs                     - List runs")

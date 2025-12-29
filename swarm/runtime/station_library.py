@@ -31,9 +31,12 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 import yaml
+
+if TYPE_CHECKING:
+    from swarm.spec import types as compiler_types
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,18 @@ class StationSpec:
         name: Human-readable name.
         description: What this station does.
         category: Category (sidequest, worker, critic, etc.).
+        version: Spec version number.
+
+        # Execution config (enriched schema)
+        sdk: SDK configuration (model, tools, permissions, etc.).
+        identity: Identity configuration (system_append, tone).
+        io: Input/output contract (required/optional inputs/outputs).
+        handoff: Handoff contract (path_template, required_fields).
+        runtime_prompt: Runtime prompt configuration (fragments, template).
+        invariants: List of invariant strings.
+        routing_hints: Default routing behavior (on_verified, on_unverified, etc.).
+
+        # Existing fields
         agent_key: Default agent to execute.
         template_id: Template identifier if different from station_id.
         params_schema: JSON Schema for parameters (optional).
@@ -58,6 +73,18 @@ class StationSpec:
     name: str
     description: str = ""
     category: str = "general"
+    version: int = 1
+
+    # Execution config (enriched schema)
+    sdk: Dict[str, Any] = field(default_factory=dict)
+    identity: Dict[str, Any] = field(default_factory=dict)
+    io: Dict[str, Any] = field(default_factory=dict)
+    handoff: Dict[str, Any] = field(default_factory=dict)
+    runtime_prompt: Dict[str, Any] = field(default_factory=dict)
+    invariants: List[str] = field(default_factory=list)
+    routing_hints: Dict[str, Any] = field(default_factory=dict)
+
+    # Existing fields
     agent_key: Optional[str] = None
     template_id: Optional[str] = None
     params_schema: Dict[str, Any] = field(default_factory=dict)
@@ -73,6 +100,16 @@ def station_spec_to_dict(spec: StationSpec) -> Dict[str, Any]:
         "name": spec.name,
         "description": spec.description,
         "category": spec.category,
+        "version": spec.version,
+        # Enriched schema fields
+        "sdk": dict(spec.sdk) if spec.sdk else {},
+        "identity": dict(spec.identity) if spec.identity else {},
+        "io": dict(spec.io) if spec.io else {},
+        "handoff": dict(spec.handoff) if spec.handoff else {},
+        "runtime_prompt": dict(spec.runtime_prompt) if spec.runtime_prompt else {},
+        "invariants": list(spec.invariants) if spec.invariants else [],
+        "routing_hints": dict(spec.routing_hints) if spec.routing_hints else {},
+        # Existing fields
         "agent_key": spec.agent_key,
         "template_id": spec.template_id,
         "params_schema": spec.params_schema,
@@ -83,12 +120,25 @@ def station_spec_to_dict(spec: StationSpec) -> Dict[str, Any]:
 
 
 def station_spec_from_dict(data: Dict[str, Any]) -> StationSpec:
-    """Parse StationSpec from dictionary."""
+    """Parse StationSpec from dictionary.
+
+    Backward compatible: if new fields are missing, uses sensible defaults.
+    """
     return StationSpec(
-        station_id=data.get("station_id", ""),
-        name=data.get("name", data.get("station_id", "")),
+        station_id=data.get("station_id", data.get("id", "")),
+        name=data.get("name", data.get("title", data.get("station_id", data.get("id", "")))),
         description=data.get("description", ""),
         category=data.get("category", "general"),
+        version=data.get("version", 1),
+        # Enriched schema fields (defaults to empty if not present)
+        sdk=dict(data.get("sdk", {})),
+        identity=dict(data.get("identity", {})),
+        io=dict(data.get("io", {})),
+        handoff=dict(data.get("handoff", {})),
+        runtime_prompt=dict(data.get("runtime_prompt", {})),
+        invariants=list(data.get("invariants", [])),
+        routing_hints=dict(data.get("routing_hints", {})),
+        # Existing fields
         agent_key=data.get("agent_key"),
         template_id=data.get("template_id"),
         params_schema=data.get("params_schema", {}),
@@ -98,6 +148,35 @@ def station_spec_from_dict(data: Dict[str, Any]) -> StationSpec:
     )
 
 
+def to_compiler_spec(spec: StationSpec) -> "compiler_types.StationSpec":
+    """Convert a StationLibrary StationSpec to the compiler's StationSpec.
+
+    This bridges the runtime's StationSpec (used for library management)
+    to the compiler's StationSpec (used for prompt compilation and execution).
+
+    Args:
+        spec: StationLibrary StationSpec instance.
+
+    Returns:
+        Compiler StationSpec instance suitable for prompt compilation.
+    """
+    from swarm.spec.types import station_spec_from_dict as compiler_from_dict
+
+    return compiler_from_dict({
+        "id": spec.station_id,
+        "version": spec.version,
+        "title": spec.name,
+        "category": spec.category,
+        "sdk": spec.sdk,
+        "identity": spec.identity,
+        "io": spec.io,
+        "handoff": spec.handoff,
+        "runtime_prompt": spec.runtime_prompt,
+        "invariants": spec.invariants,
+        "routing_hints": spec.routing_hints,
+    })
+
+
 # =============================================================================
 # Default Pack Stations
 # =============================================================================
@@ -105,46 +184,173 @@ def station_spec_from_dict(data: Dict[str, Any]) -> StationSpec:
 # These are the built-in stations that ship with the system.
 # They provide core sidequest and utility functionality.
 
+# Default SDK configuration for sidequest stations
+_DEFAULT_SDK_SIDEQUEST = {
+    "model": "sonnet",
+    "permission_mode": "bypassPermissions",
+    "allowed_tools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
+    "denied_tools": [],
+    "max_turns": 8,
+    "sandbox": {"enabled": True, "auto_allow_bash": True},
+    "context_budget": {"total_chars": 150000, "recent_chars": 50000, "older_chars": 10000},
+}
+
+# Default SDK configuration for worker stations
+_DEFAULT_SDK_WORKER = {
+    "model": "sonnet",
+    "permission_mode": "bypassPermissions",
+    "allowed_tools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
+    "denied_tools": [],
+    "max_turns": 12,
+    "sandbox": {"enabled": True, "auto_allow_bash": True},
+    "context_budget": {"total_chars": 200000, "recent_chars": 60000, "older_chars": 10000},
+}
+
+# Default SDK configuration for critic stations
+_DEFAULT_SDK_CRITIC = {
+    "model": "sonnet",
+    "permission_mode": "bypassPermissions",
+    "allowed_tools": ["Read", "Grep", "Glob"],
+    "denied_tools": ["Write", "Edit", "Bash"],
+    "max_turns": 6,
+    "sandbox": {"enabled": True, "auto_allow_bash": False},
+    "context_budget": {"total_chars": 150000, "recent_chars": 50000, "older_chars": 10000},
+}
+
+# Default routing hints
+_DEFAULT_ROUTING_HINTS = {
+    "on_verified": "advance",
+    "on_unverified": "loop",
+    "on_partial": "advance_with_concerns",
+    "on_blocked": "escalate",
+}
+
+# Default handoff configuration
+_DEFAULT_HANDOFF = {
+    "path_template": "{{run.base}}/handoff/{{step.id}}.draft.json",
+    "required_fields": ["status", "summary", "artifacts", "can_further_iteration_help"],
+}
+
 DEFAULT_STATIONS: List[Dict[str, Any]] = [
     {
         "station_id": "clarifier",
         "name": "Clarifier",
         "description": "Resolve ambiguity by researching context and documenting assumptions",
         "category": "sidequest",
+        "version": 1,
         "agent_key": "clarifier",
         "tags": ["sidequest", "research", "assumptions"],
+        "sdk": _DEFAULT_SDK_SIDEQUEST,
+        "identity": {
+            "system_append": "You are the Clarifier. Your job is to resolve ambiguity by researching the codebase and documenting clear assumptions.",
+            "tone": "analytical",
+        },
+        "io": {
+            "required_inputs": [],
+            "optional_inputs": ["{{run.base}}/signal/problem_statement.md"],
+            "required_outputs": ["{{run.base}}/sidequest/clarifications.md"],
+            "optional_outputs": [],
+        },
+        "handoff": _DEFAULT_HANDOFF,
+        "runtime_prompt": {"fragments": [], "template": ""},
+        "invariants": ["Document all assumptions explicitly", "Never block on ambiguity"],
+        "routing_hints": _DEFAULT_ROUTING_HINTS,
     },
     {
         "station_id": "research",
         "name": "Research",
         "description": "Deep dive into codebase or documentation to gather context",
         "category": "sidequest",
+        "version": 1,
         "agent_key": "context-loader",
         "tags": ["sidequest", "research", "context"],
+        "sdk": _DEFAULT_SDK_SIDEQUEST,
+        "identity": {
+            "system_append": "You are the Research station. Your job is to deeply explore the codebase and gather comprehensive context.",
+            "tone": "analytical",
+        },
+        "io": {
+            "required_inputs": [],
+            "optional_inputs": [],
+            "required_outputs": ["{{run.base}}/sidequest/research_findings.md"],
+            "optional_outputs": [],
+        },
+        "handoff": _DEFAULT_HANDOFF,
+        "runtime_prompt": {"fragments": [], "template": ""},
+        "invariants": ["Load 20-50k tokens of relevant context", "Document sources explicitly"],
+        "routing_hints": _DEFAULT_ROUTING_HINTS,
     },
     {
         "station_id": "risk-assessment",
         "name": "Risk Assessment",
         "description": "Evaluate risks in current approach and document mitigations",
         "category": "sidequest",
+        "version": 1,
         "agent_key": "risk-analyst",
         "tags": ["sidequest", "risk", "analysis"],
+        "sdk": _DEFAULT_SDK_SIDEQUEST,
+        "identity": {
+            "system_append": "You are the Risk Analyst. Your job is to identify and evaluate risks in the current approach.",
+            "tone": "analytical",
+        },
+        "io": {
+            "required_inputs": [],
+            "optional_inputs": ["{{run.base}}/plan/adr.md"],
+            "required_outputs": ["{{run.base}}/sidequest/risk_assessment.md"],
+            "optional_outputs": [],
+        },
+        "handoff": _DEFAULT_HANDOFF,
+        "runtime_prompt": {"fragments": [], "template": ""},
+        "invariants": ["Assess security, compliance, data, and performance risks"],
+        "routing_hints": _DEFAULT_ROUTING_HINTS,
     },
     {
         "station_id": "policy-check",
         "name": "Policy Check",
         "description": "Verify current work against organizational policies",
         "category": "sidequest",
+        "version": 1,
         "agent_key": "policy-analyst",
         "tags": ["sidequest", "policy", "compliance"],
+        "sdk": _DEFAULT_SDK_SIDEQUEST,
+        "identity": {
+            "system_append": "You are the Policy Analyst. Your job is to verify work against organizational policies.",
+            "tone": "analytical",
+        },
+        "io": {
+            "required_inputs": [],
+            "optional_inputs": ["POLICIES.md"],
+            "required_outputs": ["{{run.base}}/sidequest/policy_check.md"],
+            "optional_outputs": [],
+        },
+        "handoff": _DEFAULT_HANDOFF,
+        "runtime_prompt": {"fragments": [], "template": ""},
+        "invariants": ["Check all applicable policies", "Document any violations"],
+        "routing_hints": _DEFAULT_ROUTING_HINTS,
     },
     {
         "station_id": "security-review",
         "name": "Security Review",
         "description": "Quick security assessment of changes",
         "category": "sidequest",
+        "version": 1,
         "agent_key": "security-scanner",
         "tags": ["sidequest", "security", "review"],
+        "sdk": _DEFAULT_SDK_SIDEQUEST,
+        "identity": {
+            "system_append": "You are the Security Scanner. Your job is to identify security vulnerabilities in changes.",
+            "tone": "critical",
+        },
+        "io": {
+            "required_inputs": [],
+            "optional_inputs": [],
+            "required_outputs": ["{{run.base}}/sidequest/security_review.md"],
+            "optional_outputs": [],
+        },
+        "handoff": _DEFAULT_HANDOFF,
+        "runtime_prompt": {"fragments": [], "template": ""},
+        "invariants": ["Check for common vulnerability patterns", "Flag any secrets or credentials"],
+        "routing_hints": _DEFAULT_ROUTING_HINTS,
     },
     # Core worker stations (for EXTEND_GRAPH targets)
     {
@@ -152,32 +358,106 @@ DEFAULT_STATIONS: List[Dict[str, Any]] = [
         "name": "Code Implementer",
         "description": "Implement code changes based on specifications",
         "category": "worker",
+        "version": 1,
         "agent_key": "code-implementer",
         "tags": ["worker", "implementation", "code"],
+        "sdk": _DEFAULT_SDK_WORKER,
+        "identity": {
+            "system_append": "You are the Code Implementer. Your job is to write production-quality code based on specifications.",
+            "tone": "neutral",
+        },
+        "io": {
+            "required_inputs": ["{{run.base}}/plan/work_plan.md"],
+            "optional_inputs": ["{{run.base}}/build/test_summary.md"],
+            "required_outputs": [],
+            "optional_outputs": ["{{run.base}}/build/implementation_notes.md"],
+        },
+        "handoff": _DEFAULT_HANDOFF,
+        "runtime_prompt": {"fragments": [], "template": ""},
+        "invariants": ["Follow the work plan", "Write tests alongside code when applicable"],
+        "routing_hints": _DEFAULT_ROUTING_HINTS,
     },
     {
         "station_id": "test-author",
         "name": "Test Author",
         "description": "Write tests based on specifications",
         "category": "worker",
+        "version": 1,
         "agent_key": "test-author",
         "tags": ["worker", "testing", "code"],
+        "sdk": _DEFAULT_SDK_WORKER,
+        "identity": {
+            "system_append": "You are the Test Author. Your job is to write comprehensive tests based on specifications.",
+            "tone": "neutral",
+        },
+        "io": {
+            "required_inputs": ["{{run.base}}/plan/test_plan.md"],
+            "optional_inputs": ["{{run.base}}/signal/bdd_scenarios.md"],
+            "required_outputs": ["{{run.base}}/build/test_summary.md"],
+            "optional_outputs": [],
+        },
+        "handoff": _DEFAULT_HANDOFF,
+        "runtime_prompt": {"fragments": [], "template": ""},
+        "invariants": ["Cover all BDD scenarios", "Include edge cases"],
+        "routing_hints": _DEFAULT_ROUTING_HINTS,
     },
     {
         "station_id": "code-critic",
         "name": "Code Critic",
         "description": "Review code implementation for issues",
         "category": "critic",
+        "version": 1,
         "agent_key": "code-critic",
         "tags": ["critic", "review", "code"],
+        "sdk": _DEFAULT_SDK_CRITIC,
+        "identity": {
+            "system_append": "You are the Code Critic. Your job is to provide harsh, thorough critique of code implementations.",
+            "tone": "critical",
+        },
+        "io": {
+            "required_inputs": [],
+            "optional_inputs": ["{{run.base}}/plan/adr.md"],
+            "required_outputs": ["{{run.base}}/build/code_critique.md"],
+            "optional_outputs": [],
+        },
+        "handoff": _DEFAULT_HANDOFF,
+        "runtime_prompt": {"fragments": [], "template": ""},
+        "invariants": ["Never fix code yourself", "Provide actionable critique"],
+        "routing_hints": {
+            "on_verified": "advance",
+            "on_unverified": "loop",
+            "on_partial": "loop",
+            "on_blocked": "escalate",
+        },
     },
     {
         "station_id": "test-critic",
         "name": "Test Critic",
         "description": "Review test implementation for coverage and quality",
         "category": "critic",
+        "version": 1,
         "agent_key": "test-critic",
         "tags": ["critic", "review", "testing"],
+        "sdk": _DEFAULT_SDK_CRITIC,
+        "identity": {
+            "system_append": "You are the Test Critic. Your job is to critique test coverage and quality.",
+            "tone": "critical",
+        },
+        "io": {
+            "required_inputs": ["{{run.base}}/build/test_summary.md"],
+            "optional_inputs": ["{{run.base}}/signal/bdd_scenarios.md"],
+            "required_outputs": ["{{run.base}}/build/test_critique.md"],
+            "optional_outputs": [],
+        },
+        "handoff": _DEFAULT_HANDOFF,
+        "runtime_prompt": {"fragments": [], "template": ""},
+        "invariants": ["Never write tests yourself", "Check BDD coverage"],
+        "routing_hints": {
+            "on_verified": "advance",
+            "on_unverified": "loop",
+            "on_partial": "loop",
+            "on_blocked": "escalate",
+        },
     },
 ]
 
@@ -334,6 +614,26 @@ class StationLibrary:
         """
         return self._stations.get(station_id)
 
+    def get_compiler_spec(self, station_id: str) -> "compiler_types.StationSpec":
+        """Get a station spec in compiler format.
+
+        This converts the runtime StationSpec to the compiler's StationSpec
+        type, suitable for prompt compilation and SDK execution.
+
+        Args:
+            station_id: Station ID to retrieve.
+
+        Returns:
+            Compiler StationSpec instance.
+
+        Raises:
+            ValueError: If station not found.
+        """
+        spec = self.get_station(station_id)
+        if not spec:
+            raise ValueError(f"Station not found: {station_id}")
+        return to_compiler_spec(spec)
+
     def get_stations_by_category(self, category: str) -> List[StationSpec]:
         """Get all stations in a category.
 
@@ -431,4 +731,5 @@ __all__ = [
     "load_station_library",
     "station_spec_to_dict",
     "station_spec_from_dict",
+    "to_compiler_spec",
 ]

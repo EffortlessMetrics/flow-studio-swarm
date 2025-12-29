@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from swarm.runtime.claude_sdk import (
     create_high_trust_options,
+    create_options_from_plan,
     get_sdk_module,
 )
 from swarm.runtime.diff_scanner import (
@@ -181,18 +182,46 @@ async def run_worker_async(
 
     # Try spec-based prompt compilation first, fall back to legacy
     spec_result = try_compile_from_spec(ctx, repo_root)
+    plan = None  # Track plan for later use in envelope creation
 
     if spec_result:
-        # Use spec-based prompts
+        # Use spec-based prompts and SDK options from PromptPlan
         prompt, agent_persona, plan = spec_result
-        logger.debug(
-            "Using spec-based prompt for step %s (hash=%s, station=%s v%d)",
-            ctx.step_id,
+        logger.info(
+            "Spec-based execution for step %s: hash=%s, station=%s v%d, model=%s",
+            plan.step_id,
             plan.prompt_hash,
             plan.station_id,
             plan.station_version,
+            plan.model,
+        )
+        logger.debug(
+            "PromptPlan SDK options: permission_mode=%s, max_turns=%d, sandbox=%s, tools=%s",
+            plan.permission_mode,
+            plan.max_turns,
+            plan.sandbox_enabled,
+            plan.allowed_tools[:3] if plan.allowed_tools else [],  # Log first 3 tools
         )
         truncation_info = None  # Spec compilation handles context management
+
+        # Use create_options_from_plan to wire all PromptPlan SDK options
+        cwd = str(repo_root) if repo_root else str(Path.cwd())
+        options = create_options_from_plan(plan, cwd=cwd)
+
+        # Log verification and handoff contracts for traceability
+        if plan.verification.required_artifacts:
+            logger.debug(
+                "Step %s verification: required_artifacts=%s",
+                ctx.step_id,
+                plan.verification.required_artifacts,
+            )
+        if plan.handoff.path:
+            logger.debug(
+                "Step %s handoff: path=%s, required_fields=%s",
+                ctx.step_id,
+                plan.handoff.path,
+                plan.handoff.required_fields,
+            )
     else:
         # Fall back to legacy prompt builder
         logger.debug(
@@ -201,13 +230,12 @@ async def run_worker_async(
         )
         prompt, truncation_info, agent_persona = build_prompt_fn(ctx)
 
-    cwd = str(repo_root) if repo_root else str(Path.cwd())
-
-    options = create_high_trust_options(
-        cwd=cwd,
-        permission_mode="bypassPermissions",
-        system_prompt_append=agent_persona,
-    )
+        cwd = str(repo_root) if repo_root else str(Path.cwd())
+        options = create_high_trust_options(
+            cwd=cwd,
+            permission_mode="bypassPermissions",
+            system_prompt_append=agent_persona,
+        )
 
     # DEPRECATED: Direct stats recording is a no-op in projection-only mode.
     if stats_db:
@@ -418,17 +446,37 @@ async def run_worker_async(
         for event in raw_events:
             f.write(json.dumps(event) + "\n")
 
+    # Build artifacts dict with optional spec traceability
+    artifacts: Dict[str, Any] = {
+        "transcript_path": str(t_path),
+        "token_counts": token_counts,
+        "model": model_name,
+    }
+
+    # Add spec traceability if plan was used
+    if plan:
+        artifacts["spec_based"] = True
+        artifacts["prompt_hash"] = plan.prompt_hash
+        artifacts["station_id"] = plan.station_id
+        artifacts["station_version"] = plan.station_version
+        artifacts["flow_id"] = plan.flow_id
+        artifacts["flow_version"] = plan.flow_version
+        # Include handoff path from spec for envelope validation
+        if plan.handoff.path:
+            artifacts["spec_handoff_path"] = plan.handoff.path
+        # Include verification requirements for downstream validation
+        if plan.verification.required_artifacts:
+            artifacts["spec_required_artifacts"] = list(plan.verification.required_artifacts)
+    else:
+        artifacts["spec_based"] = False
+
     result = StepResult(
         step_id=ctx.step_id,
         status=status,
         output=output_text,
         error=error,
         duration_ms=duration_ms,
-        artifacts={
-            "transcript_path": str(t_path),
-            "token_counts": token_counts,
-            "model": model_name,
-        },
+        artifacts=artifacts,
     )
 
     return result, events, work_summary
