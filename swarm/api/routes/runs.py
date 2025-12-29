@@ -811,3 +811,447 @@ async def cancel_run(
                 },
             )
         raise
+
+
+# =============================================================================
+# Autopilot Endpoints
+# =============================================================================
+
+
+class AutopilotStartRequest(BaseModel):
+    """Request to start an autopilot run."""
+
+    issue_ref: Optional[str] = Field(None, description="Issue reference (e.g., 'owner/repo#123')")
+    flow_keys: Optional[List[str]] = Field(None, description="Specific flows to execute (defaults to all SDLC flows)")
+    profile_id: Optional[str] = Field(None, description="Profile ID to use")
+    backend: str = Field("claude-step-orchestrator", description="Backend for execution")
+    params: Optional[Dict[str, Any]] = Field(None, description="Additional parameters")
+
+
+class AutopilotStartResponse(BaseModel):
+    """Response when starting an autopilot run."""
+
+    run_id: str
+    status: str
+    flows: List[str]
+    events_url: str
+    created_at: str
+
+
+class AutopilotStatusResponse(BaseModel):
+    """Response for autopilot status check."""
+
+    run_id: str
+    status: str
+    current_flow: Optional[str] = None
+    flows_completed: List[str]
+    flows_failed: List[str]
+    error: Optional[str] = None
+    duration_ms: int = 0
+
+
+# Global autopilot controller (initialized on first use)
+_autopilot_controller = None
+
+
+def _get_autopilot_controller():
+    """Get or create the global autopilot controller."""
+    global _autopilot_controller
+    if _autopilot_controller is None:
+        from swarm.runtime.autopilot import AutopilotController
+        _autopilot_controller = AutopilotController()
+    return _autopilot_controller
+
+
+@router.post("/autopilot", response_model=AutopilotStartResponse, status_code=201)
+async def start_autopilot(request: AutopilotStartRequest):
+    """Start an autopilot run for end-to-end SDLC execution.
+
+    Creates a new run configured for autonomous execution. All flows are
+    executed sequentially without mid-flow human intervention. PAUSE intents
+    are automatically rewritten to DETOUR (clarifier sidequest).
+
+    Args:
+        request: Autopilot start request with optional issue_ref and flow configuration.
+
+    Returns:
+        AutopilotStartResponse with run_id and scheduled flows.
+    """
+    try:
+        controller = _get_autopilot_controller()
+
+        run_id = controller.start(
+            issue_ref=request.issue_ref,
+            flow_keys=request.flow_keys,
+            profile_id=request.profile_id,
+            backend=request.backend,
+            initiator="api",
+            params=request.params,
+        )
+
+        result = controller.get_result(run_id)
+
+        return AutopilotStartResponse(
+            run_id=run_id,
+            status=result.status.value,
+            flows=request.flow_keys or controller._get_sdlc_flows(),
+            events_url=f"/api/runs/{run_id}/events",
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+    except Exception as e:
+        logger.error("Failed to start autopilot run: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "autopilot_start_failed",
+                "message": str(e),
+                "details": {},
+            },
+        )
+
+
+@router.get("/autopilot/{run_id}", response_model=AutopilotStatusResponse)
+async def get_autopilot_status(run_id: str):
+    """Get the status of an autopilot run.
+
+    Args:
+        run_id: The autopilot run identifier.
+
+    Returns:
+        AutopilotStatusResponse with current status and progress.
+    """
+    try:
+        controller = _get_autopilot_controller()
+        result = controller.get_result(run_id)
+
+        return AutopilotStatusResponse(
+            run_id=run_id,
+            status=result.status.value,
+            current_flow=result.current_flow,
+            flows_completed=result.flows_completed,
+            flows_failed=result.flows_failed,
+            error=result.error,
+            duration_ms=result.duration_ms,
+        )
+
+    except Exception as e:
+        logger.error("Failed to get autopilot status: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "autopilot_status_failed",
+                "message": str(e),
+                "details": {},
+            },
+        )
+
+
+@router.post("/autopilot/{run_id}/tick", response_model=AutopilotStatusResponse)
+async def tick_autopilot(run_id: str):
+    """Advance an autopilot run by one flow.
+
+    Each tick executes one complete flow in the sequence. Call repeatedly
+    until the run completes.
+
+    Args:
+        run_id: The autopilot run identifier.
+
+    Returns:
+        AutopilotStatusResponse with updated status.
+    """
+    try:
+        controller = _get_autopilot_controller()
+        controller.tick(run_id)
+        result = controller.get_result(run_id)
+
+        return AutopilotStatusResponse(
+            run_id=run_id,
+            status=result.status.value,
+            current_flow=result.current_flow,
+            flows_completed=result.flows_completed,
+            flows_failed=result.flows_failed,
+            error=result.error,
+            duration_ms=result.duration_ms,
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "autopilot_not_found",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+    except Exception as e:
+        logger.error("Failed to tick autopilot: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "autopilot_tick_failed",
+                "message": str(e),
+                "details": {},
+            },
+        )
+
+
+@router.delete("/autopilot/{run_id}", response_model=RunActionResponse)
+async def cancel_autopilot(run_id: str):
+    """Cancel an autopilot run.
+
+    Terminates the autopilot run and marks it as canceled.
+
+    Args:
+        run_id: The autopilot run identifier.
+
+    Returns:
+        Action response confirming cancellation.
+    """
+    try:
+        controller = _get_autopilot_controller()
+        canceled = controller.cancel(run_id)
+
+        if not canceled:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "invalid_state",
+                    "message": "Run is already complete or not found",
+                    "details": {"run_id": run_id},
+                },
+            )
+
+        return RunActionResponse(
+            run_id=run_id,
+            status="canceled",
+            message="Autopilot run canceled successfully",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to cancel autopilot: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "autopilot_cancel_failed",
+                "message": str(e),
+                "details": {},
+            },
+        )
+
+
+# =============================================================================
+# Issue Ingestion Endpoint
+# =============================================================================
+
+
+class IssueIngestionRequest(BaseModel):
+    """Request to start a run from an issue."""
+
+    provider: str = Field("github", description="Issue provider (github, gitlab, etc.)")
+    repo: Optional[str] = Field(None, description="Repository in 'owner/repo' format")
+    issue_number: Optional[int] = Field(None, description="Issue number")
+    issue_url: Optional[str] = Field(None, description="Full issue URL (alternative to repo+number)")
+    title: Optional[str] = Field(None, description="Issue title (if not fetching)")
+    body: Optional[str] = Field(None, description="Issue body (if not fetching)")
+    labels: Optional[List[str]] = Field(None, description="Issue labels")
+    start_autopilot: bool = Field(False, description="Start autopilot run after ingestion")
+    flow_keys: Optional[List[str]] = Field(None, description="Flows to execute (defaults to all)")
+
+
+class IssueIngestionResponse(BaseModel):
+    """Response from issue ingestion."""
+
+    run_id: str
+    status: str
+    issue_snapshot_path: str
+    autopilot_started: bool = False
+    events_url: str
+    created_at: str
+
+
+class IssueSnapshot(BaseModel):
+    """Snapshot of an issue for Flow 1 input."""
+
+    provider: str
+    repo: str
+    issue_number: int
+    title: str
+    body: str
+    labels: List[str] = Field(default_factory=list)
+    url: Optional[str] = None
+    fetched_at: str
+    source_metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+def _parse_issue_url(url: str) -> tuple[str, str, int]:
+    """Parse an issue URL into provider, repo, and number.
+
+    Args:
+        url: Issue URL (e.g., 'https://github.com/owner/repo/issues/123')
+
+    Returns:
+        Tuple of (provider, repo, issue_number)
+
+    Raises:
+        ValueError: If URL format is not recognized.
+    """
+    import re
+
+    # GitHub: https://github.com/owner/repo/issues/123
+    gh_match = re.match(r'https?://github\.com/([^/]+/[^/]+)/issues/(\d+)', url)
+    if gh_match:
+        return "github", gh_match.group(1), int(gh_match.group(2))
+
+    # GitLab: https://gitlab.com/owner/repo/-/issues/123
+    gl_match = re.match(r'https?://gitlab\.com/([^/]+/[^/]+)/-/issues/(\d+)', url)
+    if gl_match:
+        return "gitlab", gl_match.group(1), int(gl_match.group(2))
+
+    raise ValueError(f"Unrecognized issue URL format: {url}")
+
+
+@router.post("/from-issue", response_model=IssueIngestionResponse, status_code=201)
+async def ingest_issue(request: IssueIngestionRequest):
+    """Create a run from an issue reference.
+
+    Writes an issue snapshot to the run's signal/ directory as the canonical
+    input artifact for Flow 1 (Signal). Optionally starts an autopilot run.
+
+    The issue can be specified by:
+    - repo + issue_number: e.g., "owner/repo" and 123
+    - issue_url: e.g., "https://github.com/owner/repo/issues/123"
+    - title + body: Manual issue data (no fetching)
+
+    Args:
+        request: Issue ingestion request.
+
+    Returns:
+        IssueIngestionResponse with run_id and snapshot path.
+
+    Raises:
+        400: Invalid issue reference.
+        500: Ingestion failed.
+    """
+    try:
+        # Determine issue details
+        provider = request.provider
+        repo = request.repo
+        issue_number = request.issue_number
+
+        if request.issue_url:
+            try:
+                provider, repo, issue_number = _parse_issue_url(request.issue_url)
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "invalid_url",
+                        "message": str(e),
+                        "details": {"url": request.issue_url},
+                    },
+                )
+
+        if not repo or issue_number is None:
+            if not request.title:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "missing_reference",
+                        "message": "Must provide repo+issue_number, issue_url, or title+body",
+                        "details": {},
+                    },
+                )
+
+        # Create issue snapshot
+        now = datetime.now(timezone.utc)
+        snapshot = IssueSnapshot(
+            provider=provider,
+            repo=repo or "local/manual",
+            issue_number=issue_number or 0,
+            title=request.title or f"Issue #{issue_number}",
+            body=request.body or "",
+            labels=request.labels or [],
+            url=request.issue_url or (
+                f"https://github.com/{repo}/issues/{issue_number}"
+                if provider == "github" and repo and issue_number
+                else None
+            ),
+            fetched_at=now.isoformat(),
+            source_metadata={
+                "ingested_via": "api",
+                "provider": provider,
+            },
+        )
+
+        # Generate run ID
+        run_id = f"issue-{repo.replace('/', '-') if repo else 'manual'}-{issue_number or 0}-{now.strftime('%Y%m%d%H%M%S')}"
+
+        # Create run directory structure
+        state_manager = _get_state_manager()
+        run_dir = state_manager.runs_root / run_id
+        signal_dir = run_dir / "signal"
+        signal_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write issue snapshot
+        snapshot_path = signal_dir / "issue_snapshot.json"
+        snapshot_path.write_text(
+            json.dumps(snapshot.model_dump(), indent=2),
+            encoding="utf-8",
+        )
+
+        # Also write as markdown for human readability
+        issue_md_path = signal_dir / "issue.md"
+        issue_md_path.write_text(
+            f"# {snapshot.title}\n\n"
+            f"**Source:** {snapshot.url or 'Manual input'}\n"
+            f"**Labels:** {', '.join(snapshot.labels) if snapshot.labels else 'None'}\n\n"
+            f"---\n\n"
+            f"{snapshot.body}\n",
+            encoding="utf-8",
+        )
+
+        # Create initial run state
+        await state_manager.create_run(
+            flow_id="signal",
+            run_id=run_id,
+            context={
+                "issue_ref": f"{repo}#{issue_number}" if repo else "manual",
+                "issue_snapshot_path": str(snapshot_path.relative_to(run_dir)),
+            },
+        )
+
+        # Optionally start autopilot
+        autopilot_started = False
+        if request.start_autopilot:
+            controller = _get_autopilot_controller()
+            controller.start(
+                issue_ref=f"{repo}#{issue_number}" if repo else None,
+                flow_keys=request.flow_keys,
+            )
+            autopilot_started = True
+
+        return IssueIngestionResponse(
+            run_id=run_id,
+            status="created",
+            issue_snapshot_path=str(snapshot_path.relative_to(run_dir)),
+            autopilot_started=autopilot_started,
+            events_url=f"/api/runs/{run_id}/events",
+            created_at=now.isoformat(),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to ingest issue: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "ingestion_failed",
+                "message": str(e),
+                "details": {},
+            },
+        )

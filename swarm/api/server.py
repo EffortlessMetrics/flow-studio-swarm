@@ -808,11 +808,12 @@ def create_app(
     # -------------------------------------------------------------------------
     # These routers provide the new API structure with full run control
     try:
-        from .routes import specs_router, runs_router, events_router
+        from .routes import specs_router, runs_router, events_router, wisdom_router
 
         app.include_router(specs_router, prefix="/api")
         app.include_router(runs_router, prefix="/api")
         app.include_router(events_router, prefix="/api")
+        app.include_router(wisdom_router, prefix="/api")
         logger.info("Loaded modular API routers")
     except ImportError as e:
         logger.warning("Could not load modular routers: %s", e)

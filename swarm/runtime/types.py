@@ -377,6 +377,8 @@ class RunSpec:
         backend: Backend identifier for execution.
         initiator: Source of the run ("cli", "flow-studio", "api", "ci").
         params: Arbitrary per-backend extra parameters.
+        no_human_mid_flow: If True, rewrite PAUSE intents to DETOUR for
+            autonomous execution (autopilot mode).
     """
 
     flow_keys: List[str]
@@ -384,6 +386,7 @@ class RunSpec:
     backend: BackendId = "claude-harness"
     initiator: str = "cli"
     params: Dict[str, Any] = field(default_factory=dict)
+    no_human_mid_flow: bool = False
 
 
 @dataclass
@@ -555,6 +558,7 @@ def run_spec_to_dict(spec: RunSpec) -> Dict[str, Any]:
         "backend": spec.backend,
         "initiator": spec.initiator,
         "params": dict(spec.params),
+        "no_human_mid_flow": spec.no_human_mid_flow,
     }
 
 
@@ -573,6 +577,7 @@ def run_spec_from_dict(data: Dict[str, Any]) -> RunSpec:
         backend=data.get("backend", "claude-harness"),
         initiator=data.get("initiator", "unknown"),
         params=dict(data.get("params", {})),
+        no_human_mid_flow=data.get("no_human_mid_flow", False),
     )
 
 
