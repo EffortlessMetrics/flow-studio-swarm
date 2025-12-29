@@ -25,7 +25,7 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from swarm.config.flow_registry import (
     FlowDefinition,
@@ -33,46 +33,41 @@ from swarm.config.flow_registry import (
     StepDefinition,
 )
 from swarm.runtime import storage as storage_module
-from swarm.runtime.engines import StepEngine, StepContext
-from swarm.runtime.engines.models import RoutingContext
-from swarm.runtime.types import (
-    FlowResult,
-    HandoffEnvelope,
-    InjectedNodeSpec,
-    MacroAction,
-    MacroRoutingDecision,
-    RoutingDecision,
-    RoutingSignal,
-    RunEvent,
-    RunId,
-    RunPlanSpec,
-    RunSpec,
-    RunState,
-    RunStatus,
-    SDLCStatus,
-    RunSummary,
-    generate_run_id,
-)
-
-from .receipt_compat import read_receipt_field, update_receipt_routing
-from .routing import create_routing_signal, build_routing_context
-from .spec_facade import SpecFacade
+from swarm.runtime.engines import StepContext, StepEngine
 
 # A3: Envelope-first routing imports
 from swarm.runtime.handoff_io import (
     read_routing_from_envelope,
     update_envelope_routing,
 )
-from swarm.runtime.routing_utils import parse_routing_decision
-from swarm.runtime.router import FlowGraph, Edge, NodeConfig  # For Navigator integration
 
 # Macro navigation imports (between-flow routing)
 from swarm.runtime.macro_navigator import (
     MacroNavigator,
     extract_flow_result,
-    create_default_navigator,
-    create_autopilot_navigator,
 )
+from swarm.runtime.router import Edge, FlowGraph, NodeConfig  # For Navigator integration
+from swarm.runtime.routing_utils import parse_routing_decision
+from swarm.runtime.types import (
+    FlowResult,
+    InjectedNodeSpec,
+    MacroAction,
+    MacroRoutingDecision,
+    RoutingDecision,
+    RunEvent,
+    RunId,
+    RunPlanSpec,
+    RunSpec,
+    RunState,
+    RunStatus,
+    RunSummary,
+    SDLCStatus,
+    generate_run_id,
+)
+
+from .receipt_compat import read_receipt_field, update_receipt_routing
+from .routing import build_routing_context, create_routing_signal
+from .spec_facade import SpecFacade
 
 if TYPE_CHECKING:
     from swarm.runtime.navigator_integration import NavigationOrchestrator
@@ -97,6 +92,7 @@ class FlowExecutionResult:
         macro_decision: Optional macro routing decision for next flow.
         flow_result: Optional structured flow result for routing context.
     """
+
     run_id: RunId
     summary: Optional["RunSummary"] = None
     macro_decision: Optional[MacroRoutingDecision] = None
@@ -120,6 +116,7 @@ class ResolvedNode:
         injected_spec: Full spec if this is an injected node.
         routing: Routing configuration if from flow definition.
     """
+
     node_id: str
     step_id: str
     role: str
@@ -183,8 +180,9 @@ class StepwiseOrchestrator:
         # Lazy import to avoid circular dependency
         if navigation_orchestrator is None:
             from swarm.runtime.navigator_integration import NavigationOrchestrator
-            self._navigation_orchestrator: Optional["NavigationOrchestrator"] = NavigationOrchestrator(
-                repo_root=self._repo_root
+
+            self._navigation_orchestrator: Optional["NavigationOrchestrator"] = (
+                NavigationOrchestrator(repo_root=self._repo_root)
             )
         else:
             self._navigation_orchestrator = navigation_orchestrator
@@ -260,7 +258,7 @@ class StepwiseOrchestrator:
         Returns:
             PreflightResult with aggregate status.
         """
-        from swarm.runtime.preflight import run_preflight, PreflightResult
+        from swarm.runtime.preflight import PreflightResult, run_preflight
 
         # Skip preflight if configured
         if self._skip_preflight:
@@ -310,10 +308,7 @@ class StepwiseOrchestrator:
                     "blocking_issues": result.blocking_issues,
                     "warnings": result.warnings,
                     "duration_ms": result.total_duration_ms,
-                    "checks": [
-                        {"name": c.name, "status": c.status.value}
-                        for c in result.checks
-                    ],
+                    "checks": [{"name": c.name, "status": c.status.value} for c in result.checks],
                 },
             ),
         )
@@ -419,6 +414,7 @@ class StepwiseOrchestrator:
             temp_run_state = RunState(run_id=run_id, flow_key=flow_key, status="pending")
 
             from swarm.runtime.preflight import inject_env_doctor_sidequest
+
             if inject_env_doctor_sidequest(temp_run_state, preflight_result):
                 logger.info("Preflight failed but env-doctor sidequest injected")
                 # Continue with the sidequest handling
@@ -521,14 +517,16 @@ class StepwiseOrchestrator:
                 )
 
                 # Update run_state with the routing decision for audit trail
-                run_state.flow_transition_history.append({
-                    "from_flow": flow_key,
-                    "to_flow": macro_decision.next_flow,
-                    "action": macro_decision.action.value,
-                    "reason": macro_decision.reason,
-                    "rule_applied": macro_decision.rule_applied,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                })
+                run_state.flow_transition_history.append(
+                    {
+                        "from_flow": flow_key,
+                        "to_flow": macro_decision.next_flow,
+                        "action": macro_decision.action.value,
+                        "reason": macro_decision.reason,
+                        "rule_applied": macro_decision.rule_applied,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
 
                 # Handle PAUSE case - update run state status
                 if macro_decision.action == MacroAction.PAUSE:
@@ -704,7 +702,7 @@ class StepwiseOrchestrator:
 
                 # Execute the flow
                 try:
-                    summary = self._execute_stepwise(
+                    self._execute_stepwise(
                         run_id=run_id,
                         flow_key=flow_key,
                         flow_def=flow_def,
@@ -788,13 +786,15 @@ class StepwiseOrchestrator:
                             logger.info("Autopilot: GOTO %s (index %d)", target_flow, target_idx)
 
                             # Record flow transition
-                            run_state.flow_transition_history.append({
-                                "from_flow": flow_key,
-                                "to_flow": target_flow,
-                                "action": "goto",
-                                "reason": macro_decision.reason,
-                                "timestamp": datetime.now(timezone.utc).isoformat(),
-                            })
+                            run_state.flow_transition_history.append(
+                                {
+                                    "from_flow": flow_key,
+                                    "to_flow": target_flow,
+                                    "action": "goto",
+                                    "reason": macro_decision.reason,
+                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                                }
+                            )
                         except ValueError:
                             logger.error("GOTO target %s not in sequence", target_flow)
                             break
@@ -805,13 +805,15 @@ class StepwiseOrchestrator:
                 elif macro_decision.action == MacroAction.REPEAT:
                     # Re-run the same flow
                     logger.info("Autopilot: REPEAT %s", flow_key)
-                    run_state.flow_transition_history.append({
-                        "from_flow": flow_key,
-                        "to_flow": flow_key,
-                        "action": "repeat",
-                        "reason": macro_decision.reason,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    })
+                    run_state.flow_transition_history.append(
+                        {
+                            "from_flow": flow_key,
+                            "to_flow": flow_key,
+                            "action": "repeat",
+                            "reason": macro_decision.reason,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
                     # Don't increment current_flow_idx
 
                 elif macro_decision.action == MacroAction.SKIP:
@@ -824,13 +826,15 @@ class StepwiseOrchestrator:
                     current_flow_idx += 1
                     if current_flow_idx < len(run_plan.flow_sequence):
                         next_flow = run_plan.flow_sequence[current_flow_idx]
-                        run_state.flow_transition_history.append({
-                            "from_flow": flow_key,
-                            "to_flow": next_flow,
-                            "action": "advance",
-                            "reason": macro_decision.reason,
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                        })
+                        run_state.flow_transition_history.append(
+                            {
+                                "from_flow": flow_key,
+                                "to_flow": next_flow,
+                                "action": "advance",
+                                "reason": macro_decision.reason,
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                            }
+                        )
 
             # Emit autopilot_completed event
             storage_module.append_event(
@@ -1006,12 +1010,14 @@ class StepwiseOrchestrator:
                 storage_module.append_event(run_id, event)
 
             # Add to history
-            history.append({
-                "step_id": step.id,
-                "status": step_result.status,
-                "output": step_result.output,
-                "duration_ms": step_result.duration_ms,
-            })
+            history.append(
+                {
+                    "step_id": step.id,
+                    "status": step_result.status,
+                    "output": step_result.output,
+                    "duration_ms": step_result.duration_ms,
+                }
+            )
 
             # Mark node as completed in RunState
             run_state.mark_node_completed(step.id)
@@ -1137,23 +1143,27 @@ class StepwiseOrchestrator:
             if step.routing:
                 # Add edge to next step
                 if step.routing.next:
-                    edges.append(Edge(
-                        edge_id=f"{step.id}->{step.routing.next}",
-                        from_node=step.id,
-                        to_node=step.routing.next,
-                        edge_type="sequence",
-                        priority=50,
-                    ))
+                    edges.append(
+                        Edge(
+                            edge_id=f"{step.id}->{step.routing.next}",
+                            from_node=step.id,
+                            to_node=step.routing.next,
+                            edge_type="sequence",
+                            priority=50,
+                        )
+                    )
 
                 # Add loop edge if configured
                 if step.routing.loop_target:
-                    edges.append(Edge(
-                        edge_id=f"{step.id}->{step.routing.loop_target}:loop",
-                        from_node=step.id,
-                        to_node=step.routing.loop_target,
-                        edge_type="loop",
-                        priority=40,
-                    ))
+                    edges.append(
+                        Edge(
+                            edge_id=f"{step.id}->{step.routing.loop_target}:loop",
+                            from_node=step.id,
+                            to_node=step.routing.loop_target,
+                            edge_type="loop",
+                            priority=40,
+                        )
+                    )
 
         return FlowGraph(
             graph_id=flow_def.title or "flow",
@@ -1363,7 +1373,9 @@ class StepwiseOrchestrator:
 
         # Persist routing decision to envelope for consistency
         routing_dict = {
-            "decision": routing_signal.decision.value if hasattr(routing_signal.decision, "value") else str(routing_signal.decision),
+            "decision": routing_signal.decision.value
+            if hasattr(routing_signal.decision, "value")
+            else str(routing_signal.decision),
             "next_step_id": next_step_id,
             "reason": reason,
             "confidence": routing_signal.confidence,
@@ -1462,9 +1474,7 @@ class StepwiseOrchestrator:
             # Create receipt reader for routing
             def make_receipt_reader():
                 repo_root = self._repo_root
-                return lambda r, f, s, a, field: read_receipt_field(
-                    repo_root, r, f, s, a, field
-                )
+                return lambda r, f, s, a, field: read_receipt_field(repo_root, r, f, s, a, field)
 
             # Create a proper RoutingSignal using create_routing_signal
             # This preserves LOOP/BRANCH/ADVANCE/TERMINATE semantics
@@ -1492,7 +1502,9 @@ class StepwiseOrchestrator:
             # Persist routing decision to envelope for consistency
             # Use the proper decision from the RoutingSignal
             routing_dict = {
-                "decision": routing_signal.decision.value if hasattr(routing_signal.decision, "value") else str(routing_signal.decision),
+                "decision": routing_signal.decision.value
+                if hasattr(routing_signal.decision, "value")
+                else str(routing_signal.decision),
                 "next_step_id": next_step_id,
                 "reason": reason,
                 "confidence": routing_signal.confidence,
@@ -1517,6 +1529,7 @@ class StepwiseOrchestrator:
 
 # Backwards compatibility alias
 GeminiStepOrchestrator = StepwiseOrchestrator
+
 
 def get_orchestrator(
     engine: Optional[StepEngine] = None,

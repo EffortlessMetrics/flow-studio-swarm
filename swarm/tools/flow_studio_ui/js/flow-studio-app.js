@@ -643,7 +643,8 @@ window.addEventListener("load", async () => {
             showAgentDetails: showAgentDetails,
             showArtifactDetails: showArtifactDetails,
             showEmptyState: showEmptyState,
-            updateURL: updateURL
+            updateURL: updateURL,
+            onStepSelected: updateInventoryCountsSelectedStep
         });
         // Initialize search handlers
         initSearchHandlers();

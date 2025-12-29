@@ -50,7 +50,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -62,16 +62,18 @@ logger = logging.getLogger(__name__)
 
 class RouteIntent(str, Enum):
     """Navigator's routing intent."""
-    ADVANCE = "advance"        # Proceed to next node
-    LOOP = "loop"              # Continue iteration (microloop)
-    DETOUR = "detour"          # Inject sidequest before continuing
-    PAUSE = "pause"            # Request human intervention
-    TERMINATE = "terminate"    # Flow complete
+
+    ADVANCE = "advance"  # Proceed to next node
+    LOOP = "loop"  # Continue iteration (microloop)
+    DETOUR = "detour"  # Inject sidequest before continuing
+    PAUSE = "pause"  # Request human intervention
+    TERMINATE = "terminate"  # Flow complete
     EXTEND_GRAPH = "extend_graph"  # Propose edge not in graph (map gap)
 
 
 class SignalLevel(str, Enum):
     """Signal severity levels."""
+
     NONE = "none"
     LOW = "low"
     MEDIUM = "medium"
@@ -81,6 +83,7 @@ class SignalLevel(str, Enum):
 @dataclass
 class EdgeCandidate:
     """A candidate edge for navigation (pre-filtered by graph)."""
+
     edge_id: str
     target_node: str
     edge_type: str = "sequence"  # sequence, loop, branch, detour
@@ -91,6 +94,7 @@ class EdgeCandidate:
 @dataclass
 class SidequestOption:
     """A sidequest option from the catalog."""
+
     sidequest_id: str
     station_template: str  # Station/template to execute
     trigger_description: str  # When to use this sidequest
@@ -102,6 +106,7 @@ class SidequestOption:
 @dataclass
 class VerificationSummary:
     """Summary of verification results from traditional tooling."""
+
     passed: bool
     checks_run: int = 0
     checks_passed: int = 0
@@ -114,6 +119,7 @@ class VerificationSummary:
 @dataclass
 class FileChangesSummary:
     """Summary of file changes from diff scanner."""
+
     files_modified: int = 0
     files_added: int = 0
     files_deleted: int = 0
@@ -126,6 +132,7 @@ class FileChangesSummary:
 @dataclass
 class StallSignals:
     """Signals for stall detection from ProgressTracker."""
+
     is_stalled: bool = False
     stall_count: int = 0  # Consecutive iterations with no progress
     last_change_signature: str = ""
@@ -147,6 +154,7 @@ class ProposedNode:
         objective: Specific objective for this node execution.
         params: Additional parameters for execution.
     """
+
     template_id: Optional[str] = None
     station_id: Optional[str] = None
     node_id: Optional[str] = None
@@ -179,6 +187,7 @@ class ProposedEdge:
         is_return: Whether execution should return after this node.
         proposed_node: Optional ProposedNode with execution details.
     """
+
     from_node: str
     to_node: str
     why: str
@@ -195,6 +204,7 @@ class NavigatorInput:
     All fields are pre-computed by traditional tooling. The Navigator
     receives a digested view, not raw data.
     """
+
     # Identity
     run_id: str
     flow_key: str
@@ -228,6 +238,7 @@ class NavigatorInput:
 @dataclass
 class RouteProposal:
     """Navigator's proposed route."""
+
     intent: RouteIntent
     target_node: Optional[str] = None  # Required for advance/loop
     reasoning: str = ""  # Why this route (stored in audit, not sent to worker)
@@ -237,6 +248,7 @@ class RouteProposal:
 @dataclass
 class DetourRequest:
     """Request to inject a sidequest."""
+
     sidequest_id: str
     objective: str  # Specific objective for this detour
     priority: int = 50
@@ -246,6 +258,7 @@ class DetourRequest:
 @dataclass
 class NavigatorSignals:
     """Signals emitted by Navigator for observability."""
+
     stall: SignalLevel = SignalLevel.NONE
     risk: SignalLevel = SignalLevel.NONE
     uncertainty: SignalLevel = SignalLevel.NONE
@@ -259,6 +272,7 @@ class NextStepBrief:
     This is the key output - tells the next worker what to focus on
     given what just happened.
     """
+
     objective: str  # What the next station should accomplish
     focus_areas: List[str] = field(default_factory=list)  # Specific things to check
     context_pointers: List[str] = field(default_factory=list)  # File paths to read
@@ -269,6 +283,7 @@ class NextStepBrief:
 @dataclass
 class NavigatorOutput:
     """Complete output from Navigator."""
+
     route: RouteProposal
     next_step_brief: NextStepBrief
     signals: NavigatorSignals = field(default_factory=NavigatorSignals)
@@ -381,9 +396,9 @@ class ProgressTracker:
             same_failure = history[-1] == history[-2] if len(history) >= 2 else False
 
         no_file_changes = file_changes is None or (
-            file_changes.files_modified == 0 and
-            file_changes.files_added == 0 and
-            file_changes.files_deleted == 0
+            file_changes.files_modified == 0
+            and file_changes.files_added == 0
+            and file_changes.files_deleted == 0
         )
 
         return StallSignals(
@@ -463,15 +478,19 @@ def extract_candidate_edges_from_graph(
             if edge.condition.expression:
                 condition_summary = edge.condition.expression
             elif edge.condition.field:
-                condition_summary = f"{edge.condition.field} {edge.condition.operator} {edge.condition.value}"
+                condition_summary = (
+                    f"{edge.condition.field} {edge.condition.operator} {edge.condition.value}"
+                )
 
-        candidates.append(EdgeCandidate(
-            edge_id=edge.edge_id,
-            target_node=edge.to_node,
-            edge_type=edge.edge_type,
-            priority=edge.priority,
-            condition_summary=condition_summary,
-        ))
+        candidates.append(
+            EdgeCandidate(
+                edge_id=edge.edge_id,
+                target_node=edge.to_node,
+                edge_type=edge.edge_type,
+                priority=edge.priority,
+                condition_summary=condition_summary,
+            )
+        )
 
     # Sort by priority (higher first)
     candidates.sort(key=lambda e: -e.priority)

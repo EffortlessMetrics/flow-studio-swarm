@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -121,6 +121,7 @@ class PatchValidationResponse(BaseModel):
 def _get_repo_root() -> Path:
     """Get the repository root path."""
     from ..server import get_spec_manager
+
     manager = get_spec_manager()
     return manager.repo_root
 
@@ -128,6 +129,7 @@ def _get_repo_root() -> Path:
 def _get_runs_root() -> Path:
     """Get the runs root directory."""
     from ..server import get_spec_manager
+
     manager = get_spec_manager()
     return manager.runs_root
 
@@ -136,11 +138,12 @@ def _get_evolution_module():
     """Import evolution module (lazy to avoid circular imports)."""
     from swarm.runtime.evolution import (
         EvolutionPatch,
-        generate_evolution_patch,
         apply_evolution_patch,
-        validate_evolution_patch,
+        generate_evolution_patch,
         list_pending_patches,
+        validate_evolution_patch,
     )
+
     return {
         "EvolutionPatch": EvolutionPatch,
         "generate_evolution_patch": generate_evolution_patch,
@@ -301,11 +304,13 @@ async def get_evolution_patch_details(
     # Compute ETag
     import hashlib
     import json
+
     etag = hashlib.sha256(json.dumps(patch_dict, sort_keys=True).encode()).hexdigest()[:16]
 
     # Check If-None-Match for caching
     if if_none_match and if_none_match.strip('"') == etag:
         from fastapi import Response
+
         return Response(status_code=304)
 
     return JSONResponse(
@@ -548,6 +553,7 @@ async def reject_evolution_patch_endpoint(
         404: Patch not found.
     """
     import json
+
     runs_root = _get_runs_root()
     wisdom_dir = runs_root / run_id / "wisdom"
 
@@ -564,11 +570,15 @@ async def reject_evolution_patch_endpoint(
     # Record rejection
     rejection_path = wisdom_dir / f".rejected_{patch_id}"
     try:
-        rejection_path.write_text(json.dumps({
-            "rejected_at": datetime.now(timezone.utc).isoformat(),
-            "patch_id": patch_id,
-            "reason": request.reason,
-        }))
+        rejection_path.write_text(
+            json.dumps(
+                {
+                    "rejected_at": datetime.now(timezone.utc).isoformat(),
+                    "patch_id": patch_id,
+                    "reason": request.reason,
+                }
+            )
+        )
     except Exception as e:
         logger.error("Failed to write rejection record: %s", e)
         raise HTTPException(

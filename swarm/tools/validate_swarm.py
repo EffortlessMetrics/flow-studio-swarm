@@ -2565,9 +2565,9 @@ def print_json_output(result: ValidationResult, registry: Dict[str, Dict[str, An
 def print_success(result: ValidationResult) -> None:
     """Print success message to stdout, including warnings if any."""
     print("Swarm validation PASSED.")
-    print("  ✓ All agents conform to Claude Code platform spec")
-    print("  ✓ All agents follow swarm design constraints")
-    print("  ✓ Flow specs reference valid agents")
+    print("  [PASS] All agents conform to Claude Code platform spec")
+    print("  [PASS] All agents follow swarm design constraints")
+    print("  [PASS] Flow specs reference valid agents")
 
     # Print warnings if any (they don't fail validation)
     if result.has_warnings():
@@ -2584,7 +2584,7 @@ def print_success(result: ValidationResult) -> None:
             warnings = warnings_by_type[warn_type]
             print(f"\n{warn_type} Warnings ({len(warnings)}):", file=sys.stderr)
             for warning in warnings:
-                print(warning.format().replace("✗", "⚠"), file=sys.stderr)
+                print(warning.format().replace("[FAIL]", "[WARN]"), file=sys.stderr)
 
         print("\nNote: Warnings indicate swarm design guideline violations.", file=sys.stderr)
         print("      Use --strict flag to treat warnings as errors.", file=sys.stderr)
@@ -2620,7 +2620,7 @@ def print_errors(result: ValidationResult) -> None:
             warnings = warnings_by_type[warn_type]
             print(f"\n{warn_type} Warnings ({len(warnings)}):", file=sys.stderr)
             for warning in warnings:
-                print(warning.format().replace("✗", "⚠"), file=sys.stderr)
+                print(warning.format().replace("[FAIL]", "[WARN]"), file=sys.stderr)
 
         print("\nNote: Warnings indicate swarm design guideline violations.", file=sys.stderr)
         print("      Use --strict flag to treat warnings as errors.", file=sys.stderr)

@@ -104,9 +104,7 @@ class EvolutionPatch:
     operations: List[Dict[str, Any]] = field(default_factory=list)
     risk: str = "low"
     human_review_required: bool = True
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -140,9 +138,7 @@ class EvolutionPatch:
             operations=data.get("operations", []),
             risk=data.get("risk", "low"),
             human_review_required=data.get("human_review_required", True),
-            created_at=data.get(
-                "created_at", datetime.now(timezone.utc).isoformat()
-            ),
+            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
         )
 
 
@@ -285,7 +281,7 @@ def _parse_flow_evolution_patch(
 
         for patch_data in data.get("patches", []):
             patch = EvolutionPatch(
-                id=patch_data.get("id", f"FLOW-PATCH-{len(patches)+1:03d}"),
+                id=patch_data.get("id", f"FLOW-PATCH-{len(patches) + 1:03d}"),
                 target_file=patch_data.get("target_flow", ""),
                 patch_type=PatchType.FLOW_SPEC,
                 content=json.dumps(patch_data.get("operations", []), indent=2),
@@ -358,14 +354,18 @@ def _parse_station_tuning(
                 re.DOTALL,
             )
             evidence_text = evidence_match.group(1).strip() if evidence_match else ""
-            evidence = [line.strip("- ").strip() for line in evidence_text.split("\n") if line.strip()]
+            evidence = [
+                line.strip("- ").strip() for line in evidence_text.split("\n") if line.strip()
+            ]
 
             # Extract target file
             file_match = re.search(
                 r"File:\s*`([^`]+)`",
                 section_content,
             )
-            target_file = file_match.group(1) if file_match else f"swarm/spec/stations/{station_name}.yaml"
+            target_file = (
+                file_match.group(1) if file_match else f"swarm/spec/stations/{station_name}.yaml"
+            )
 
             # Extract diff content
             diff_match = re.search(
@@ -384,7 +384,7 @@ def _parse_station_tuning(
 
             if diff_content:
                 patch = EvolutionPatch(
-                    id=f"STATION-TUNE-{len(patches)+1:03d}",
+                    id=f"STATION-TUNE-{len(patches) + 1:03d}",
                     target_file=target_file,
                     patch_type=PatchType.STATION_SPEC,
                     content=diff_content,
@@ -452,7 +452,9 @@ def _parse_pack_improvements(
                 re.DOTALL,
             )
             evidence_text = evidence_match.group(1).strip() if evidence_match else ""
-            evidence = [line.strip("- ").strip() for line in evidence_text.split("\n") if line.strip()]
+            evidence = [
+                line.strip("- ").strip() for line in evidence_text.split("\n") if line.strip()
+            ]
 
             # Extract target file
             file_match = re.search(
@@ -556,7 +558,7 @@ def _parse_feedback_actions(
 
             if issue and suggestion:
                 patch = EvolutionPatch(
-                    id=f"EVOLUTION-{len(patches)+1:03d}",
+                    id=f"EVOLUTION-{len(patches) + 1:03d}",
                     target_file=f"swarm/spec/stations/{station_name}.yaml",
                     patch_type=PatchType.STATION_SPEC,
                     content=f"# Suggested improvement for {station_name}\n# Issue: {issue}\n# Suggestion: {suggestion}",
@@ -650,6 +652,7 @@ def apply_evolution_patch(
         if create_backup and target_path.exists():
             backup_path = target_path.with_suffix(target_path.suffix + ".bak")
             import shutil
+
             shutil.copy2(target_path, backup_path)
 
         # Apply based on patch type
@@ -749,11 +752,13 @@ def validate_evolution_patch(
             if "path" not in op:
                 errors.append(f"Operation {i} missing 'path' field")
 
-            preview.append({
-                "operation": op.get("op", "unknown"),
-                "path": op.get("path", ""),
-                "value_preview": str(op.get("value", ""))[:100] if "value" in op else None,
-            })
+            preview.append(
+                {
+                    "operation": op.get("op", "unknown"),
+                    "path": op.get("path", ""),
+                    "value_preview": str(op.get("value", ""))[:100] if "value" in op else None,
+                }
+            )
 
     # Validate diff content if present
     if patch.content and (patch.content.startswith("-") or patch.content.startswith("+")):
@@ -960,7 +965,8 @@ def list_pending_patches(
 
         # Filter out applied/rejected patches
         pending_patches = [
-            p for p in patches
+            p
+            for p in patches
             if not any(m.name.endswith(p.id) for m in applied_markers)
             and not any(m.name.endswith(p.id) for m in rejected_markers)
         ]

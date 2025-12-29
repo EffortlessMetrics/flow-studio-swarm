@@ -971,6 +971,102 @@ export interface ResolutionHint {
 }
 
 // ============================================================================
+// Boundary Review API
+// ============================================================================
+
+/** Summary of an assumption made during execution */
+export interface AssumptionSummary {
+  assumption_id: string;
+  statement: string;
+  rationale: string;
+  impact_if_wrong: string;
+  confidence: "high" | "medium" | "low";
+  status: "active" | "resolved" | "invalidated";
+  tags: string[];
+  flow_introduced?: string;
+  step_introduced?: string;
+  agent?: string;
+  timestamp?: string;
+}
+
+/** Summary of a decision made during execution */
+export interface DecisionSummary {
+  decision_id: string;
+  decision_type: string;
+  subject: string;
+  decision: string;
+  rationale: string;
+  supporting_evidence: string[];
+  conditions: string[];
+  assumptions_applied: string[];
+  flow?: string;
+  step?: string;
+  agent?: string;
+  timestamp?: string;
+}
+
+/** Summary of a detour taken during execution */
+export interface DetourSummary {
+  detour_id: string;
+  from_step: string;
+  to_step: string;
+  reason: string;
+  detour_type: string;
+  evidence_path?: string;
+  timestamp?: string;
+}
+
+/** Verification result for a step */
+export interface VerificationSummary {
+  step_id: string;
+  station_id?: string;
+  status: string;
+  verified: boolean;
+  can_further_iteration_help?: boolean;
+  issues: string[];
+  timestamp?: string;
+}
+
+/** Inventory marker delta */
+export interface InventoryDelta {
+  marker_type: string;
+  label: string;
+  count: number;
+  delta: number;
+}
+
+/** Response from /api/runs/:id/boundary-review */
+export interface BoundaryReviewResponse {
+  run_id: string;
+  scope: "flow" | "run";
+  current_flow?: FlowKey;
+
+  assumptions_count: number;
+  assumptions_high_risk: number;
+  assumptions: AssumptionSummary[];
+
+  decisions_count: number;
+  decisions: DecisionSummary[];
+
+  detours_count: number;
+  detours: DetourSummary[];
+
+  verification_passed: number;
+  verification_failed: number;
+  verifications: VerificationSummary[];
+
+  inventory_deltas: InventoryDelta[];
+
+  has_evolution_patches: boolean;
+  evolution_patch_count: number;
+
+  confidence_score: number;
+  uncertainty_notes: string[];
+
+  timestamp: string;
+}
+
+// ============================================================================
 // Cytoscape Types (minimal interface for our usage)
 // ============================================================================
 
@@ -1081,8 +1177,25 @@ export type FlowStudioUIID =
   | "flow_studio.sidebar.compare_selector"
   | "flow_studio.sidebar.flow_list"
   | "flow_studio.sidebar.view_toggle"
+  | "flow_studio.sidebar.view_toggle.agents"
+  | "flow_studio.sidebar.view_toggle.artifacts"
   | "flow_studio.sidebar.backend_selector"
   | "flow_studio.sidebar.backend_selector.select"
+  // Sidebar: Inventory Counts
+  | "flow_studio.sidebar.inventory_counts"
+  | "flow_studio.sidebar.run_control"
+  | "flow_studio.sidebar.run_control.buttons"
+  | "flow_studio.sidebar.run_control.play"
+  | "flow_studio.sidebar.run_control.pause"
+  | "flow_studio.sidebar.run_control.resume"
+  | "flow_studio.sidebar.run_control.cancel"
+  | "flow_studio.sidebar.run_control.status"
+  // Sidebar: Run History
+  | "flow_studio.sidebar.run_history"
+  | "flow_studio.sidebar.run_history.filter"
+  | "flow_studio.sidebar.run_history.list"
+  // Inventory Component
+  | "flow_studio.inventory.counts"
   // Canvas
   | "flow_studio.canvas"
   | "flow_studio.canvas.graph"
@@ -1136,7 +1249,10 @@ export type FlowStudioUIID =
  * if (searchInput) searchInput.focus();
  */
 export function qsByUiid<T extends HTMLElement = HTMLElement>(
-  id: FlowStudioUIID | `flow_studio.canvas.outline.${"flow" | "step" | "agent" | "artifact"}:${string}`
+  id: FlowStudioUIID
+    | `flow_studio.canvas.outline.${"flow" | "step" | "agent" | "artifact"}:${string}`
+    | `flow_studio.inventory.type.${string}`
+    | `flow_studio.inventory.flow.${string}`
 ): T | null {
   return document.querySelector<T>(`[data-uiid="${id}"]`);
 }

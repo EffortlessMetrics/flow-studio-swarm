@@ -30,18 +30,20 @@ from swarm.config.runtime_config import (
     get_history_max_recent_chars,
     get_resolved_context_budgets,
 )
+
+# Use the unified SDK adapter
+from swarm.runtime.claude_sdk import check_sdk_available as check_claude_sdk_available
+
+# ContextPack support for hydration phase
+from swarm.runtime.context_pack import build_context_pack
 from swarm.runtime.path_helpers import (
-    ensure_handoff_dir,
     handoff_envelope_path as make_handoff_envelope_path,
 )
+from swarm.runtime.receipt_io import make_receipt_data, write_step_receipt
 from swarm.runtime.types import (
     RoutingSignal,
     RunEvent,
 )
-from swarm.runtime.receipt_io import make_receipt_data, write_step_receipt
-
-# Use the unified SDK adapter
-from swarm.runtime.claude_sdk import check_sdk_available as check_claude_sdk_available
 
 from ..async_utils import run_async_safely
 from ..base import LifecycleCapableEngine
@@ -51,30 +53,29 @@ from ..models import (
     StepContext,
     StepResult,
 )
+from .cli_runner import run_step_cli
 
 # Import from specialized modules
 from .prompt_builder import build_prompt
 from .router import route_step_stub
-from .stubs import (
-    run_worker_stub,
-    finalize_step_stub,
-    finalize_from_existing_handoff,
-    run_step_stub,
-    make_failed_result,
-)
-from .cli_runner import run_step_cli
 from .sdk_runner import (
-    run_worker_async,
     finalize_step_async,
     route_step_async,
+    run_worker_async,
 )
 from .session_runner import (
     execute_step_session as _execute_step_session,
+)
+from .session_runner import (
     execute_step_session_sync as _execute_step_session_sync,
 )
-
-# ContextPack support for hydration phase
-from swarm.runtime.context_pack import build_context_pack
+from .stubs import (
+    finalize_from_existing_handoff,
+    finalize_step_stub,
+    make_failed_result,
+    run_step_stub,
+    run_worker_stub,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -214,15 +215,11 @@ class ClaudeStepEngine(LifecycleCapableEngine):
 
         self._cli_available = shutil.which(self._cli_cmd) is not None
         if not self._cli_available:
-            logger.debug(
-                "Claude CLI not available at '%s', will use stub mode", self._cli_cmd
-            )
+            logger.debug("Claude CLI not available at '%s', will use stub mode", self._cli_cmd)
 
         return self._cli_available
 
-    def _get_resolved_budgets(
-        self, flow_key: Optional[str] = None, step_id: Optional[str] = None
-    ):
+    def _get_resolved_budgets(self, flow_key: Optional[str] = None, step_id: Optional[str] = None):
         """Get resolved budgets for the given flow/step context."""
         return get_resolved_context_budgets(
             flow_key=flow_key,
@@ -249,7 +246,9 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         """
         # Skip if already hydrated
         if ctx.extra.get("context_pack"):
-            logger.debug("ContextPack already populated for step %s, skipping hydration", ctx.step_id)
+            logger.debug(
+                "ContextPack already populated for step %s, skipping hydration", ctx.step_id
+            )
             return ctx
 
         # Build ContextPack
@@ -308,9 +307,7 @@ class ClaudeStepEngine(LifecycleCapableEngine):
     # PUBLIC LIFECYCLE METHODS
     # =========================================================================
 
-    def run_worker(
-        self, ctx: StepContext
-    ) -> Tuple[StepResult, List[RunEvent], str]:
+    def run_worker(self, ctx: StepContext) -> Tuple[StepResult, List[RunEvent], str]:
         """Execute the work phase only (no finalization or routing).
 
         This method implements automatic context hydration:
@@ -330,9 +327,7 @@ class ClaudeStepEngine(LifecycleCapableEngine):
 
         return run_async_safely(self._run_worker_async(ctx))
 
-    async def run_worker_async(
-        self, ctx: StepContext
-    ) -> Tuple[StepResult, List[RunEvent], str]:
+    async def run_worker_async(self, ctx: StepContext) -> Tuple[StepResult, List[RunEvent], str]:
         """Async version of run_worker for async-native orchestration.
 
         Implements automatic context hydration before execution.
@@ -365,9 +360,7 @@ class ClaudeStepEngine(LifecycleCapableEngine):
                 "Handoff already written during work phase for step %s (inline finalization)",
                 ctx.step_id,
             )
-            return finalize_from_existing_handoff(
-                ctx, step_result, work_summary, handoff_path
-            )
+            return finalize_from_existing_handoff(ctx, step_result, work_summary, handoff_path)
 
         logger.debug(
             "Handoff not found after work phase for step %s, running fallback finalization",
@@ -375,15 +368,17 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         )
 
         if self.stub_mode or self._mode == "stub":
-            return finalize_step_stub(ctx, step_result, work_summary, self.engine_id, self._provider)
+            return finalize_step_stub(
+                ctx, step_result, work_summary, self.engine_id, self._provider
+            )
 
         if not self._check_sdk_available():
             logger.warning("SDK not available for finalize_step, falling back to stub")
-            return finalize_step_stub(ctx, step_result, work_summary, self.engine_id, self._provider)
+            return finalize_step_stub(
+                ctx, step_result, work_summary, self.engine_id, self._provider
+            )
 
-        return run_async_safely(
-            self._finalize_step_async(ctx, step_result, work_summary)
-        )
+        return run_async_safely(self._finalize_step_async(ctx, step_result, work_summary))
 
     async def finalize_step_async(
         self,
@@ -400,9 +395,7 @@ class ClaudeStepEngine(LifecycleCapableEngine):
                 "Handoff already written during work phase for step %s (inline finalization)",
                 ctx.step_id,
             )
-            return finalize_from_existing_handoff(
-                ctx, step_result, work_summary, handoff_path
-            )
+            return finalize_from_existing_handoff(ctx, step_result, work_summary, handoff_path)
 
         logger.debug(
             "Handoff not found after work phase for step %s, running fallback finalization",
@@ -410,11 +403,15 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         )
 
         if self.stub_mode or self._mode == "stub":
-            return finalize_step_stub(ctx, step_result, work_summary, self.engine_id, self._provider)
+            return finalize_step_stub(
+                ctx, step_result, work_summary, self.engine_id, self._provider
+            )
 
         if not self._check_sdk_available():
             logger.warning("SDK not available for finalize_step_async, falling back to stub")
-            return finalize_step_stub(ctx, step_result, work_summary, self.engine_id, self._provider)
+            return finalize_step_stub(
+                ctx, step_result, work_summary, self.engine_id, self._provider
+            )
 
         return await self._finalize_step_async(ctx, step_result, work_summary)
 
@@ -492,7 +489,9 @@ class ClaudeStepEngine(LifecycleCapableEngine):
 
         # Legacy execution modes
         if self._mode == "stub":
-            logger.debug("ClaudeStepEngine using stub for step %s (explicit stub mode)", ctx.step_id)
+            logger.debug(
+                "ClaudeStepEngine using stub for step %s (explicit stub mode)", ctx.step_id
+            )
             return run_step_stub(ctx, self.engine_id, self._provider, self._build_prompt)
 
         if self._mode == "cli":
@@ -577,9 +576,7 @@ class ClaudeStepEngine(LifecycleCapableEngine):
     # INTERNAL ASYNC IMPLEMENTATIONS (delegate to sdk_runner)
     # =========================================================================
 
-    async def _run_worker_async(
-        self, ctx: StepContext
-    ) -> Tuple[StepResult, List[RunEvent], str]:
+    async def _run_worker_async(self, ctx: StepContext) -> Tuple[StepResult, List[RunEvent], str]:
         """Async implementation of run_worker."""
         # Prefer self.repo_root but fall back to ctx.repo_root
         effective_repo_root = self.repo_root or ctx.repo_root
@@ -625,9 +622,7 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         """Execute a step using the Claude Agent SDK."""
         return run_async_safely(self._run_step_sdk_async(ctx))
 
-    async def _run_step_sdk_async(
-        self, ctx: StepContext
-    ) -> Tuple[StepResult, Iterable[RunEvent]]:
+    async def _run_step_sdk_async(self, ctx: StepContext) -> Tuple[StepResult, Iterable[RunEvent]]:
         """Execute a step using the Claude Agent SDK (async implementation).
 
         This is a combined implementation that handles work + finalization + routing
@@ -658,9 +653,13 @@ class ClaudeStepEngine(LifecycleCapableEngine):
                 completed_at=end_time,
                 duration_ms=step_result.duration_ms,
                 status=step_result.status,
-                model=step_result.artifacts.get("model", "unknown") if step_result.artifacts else "unknown",
+                model=step_result.artifacts.get("model", "unknown")
+                if step_result.artifacts
+                else "unknown",
                 tokens=step_result.artifacts.get("token_counts") if step_result.artifacts else None,
-                transcript_path=step_result.artifacts.get("transcript_path") if step_result.artifacts else None,
+                transcript_path=step_result.artifacts.get("transcript_path")
+                if step_result.artifacts
+                else None,
                 error=step_result.error,
             )
             write_step_receipt(ctx.run_base, receipt_data)
@@ -699,7 +698,9 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         routing_signal_dict = None
         if routing_signal:
             routing_signal_dict = {
-                "decision": routing_signal.decision.value if hasattr(routing_signal.decision, "value") else str(routing_signal.decision),
+                "decision": routing_signal.decision.value
+                if hasattr(routing_signal.decision, "value")
+                else str(routing_signal.decision),
                 "next_step_id": routing_signal.next_step_id,
                 "reason": routing_signal.reason,
                 "confidence": routing_signal.confidence,
@@ -719,9 +720,13 @@ class ClaudeStepEngine(LifecycleCapableEngine):
             completed_at=end_time,
             duration_ms=step_result.duration_ms,
             status=step_result.status,
-            model=step_result.artifacts.get("model", "unknown") if step_result.artifacts else "unknown",
+            model=step_result.artifacts.get("model", "unknown")
+            if step_result.artifacts
+            else "unknown",
             tokens=step_result.artifacts.get("token_counts") if step_result.artifacts else None,
-            transcript_path=step_result.artifacts.get("transcript_path") if step_result.artifacts else None,
+            transcript_path=step_result.artifacts.get("transcript_path")
+            if step_result.artifacts
+            else None,
             handoff_envelope_path=envelope_path_str,
             routing_signal=routing_signal_dict,
             error=step_result.error,

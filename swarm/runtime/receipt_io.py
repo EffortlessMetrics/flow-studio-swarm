@@ -48,6 +48,7 @@ class StepReceiptData:
 
     All required fields must be provided. Optional fields can be None.
     """
+
     # Engine/mode info
     engine: str
     mode: str  # stub | sdk | cli
@@ -70,7 +71,9 @@ class StepReceiptData:
 
     # Model/tokens
     model: str = "unknown"
-    tokens: Dict[str, int] = field(default_factory=lambda: {"prompt": 0, "completion": 0, "total": 0})
+    tokens: Dict[str, int] = field(
+        default_factory=lambda: {"prompt": 0, "completion": 0, "total": 0}
+    )
 
     # Paths
     transcript_path: Optional[str] = None

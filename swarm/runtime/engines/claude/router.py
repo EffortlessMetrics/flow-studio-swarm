@@ -13,14 +13,21 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
-from swarm.runtime.types import (
-    RoutingDecision, RoutingSignal, RoutingExplanation,
-    DecisionType, EdgeOption, Elimination, LLMReasoning,
-    MicroloopContext, DecisionMetrics, RoutingFactor,
-)
 from swarm.runtime.routing_utils import parse_routing_decision
+from swarm.runtime.types import (
+    DecisionMetrics,
+    DecisionType,
+    EdgeOption,
+    Elimination,
+    LLMReasoning,
+    MicroloopContext,
+    RoutingDecision,
+    RoutingExplanation,
+    RoutingFactor,
+    RoutingSignal,
+)
 from swarm.spec.types import RoutingConfig, RoutingKind
 
 from ..models import RoutingContext, StepContext
@@ -163,9 +170,7 @@ def load_resolver_template(repo_root: Optional[Path], resolver_name: str) -> Opt
     if not repo_root:
         return None
 
-    resolver_path = (
-        Path(repo_root) / "swarm" / "prompts" / "resolvers" / f"{resolver_name}.md"
-    )
+    resolver_path = Path(repo_root) / "swarm" / "prompts" / "resolvers" / f"{resolver_name}.md"
     if not resolver_path.exists():
         logger.debug("Resolver template not found: %s", resolver_path)
         return None
@@ -211,7 +216,7 @@ def check_microloop_termination(
         RoutingSignal if termination condition met, None to continue looping.
     """
     # Extract routing configuration
-    loop_target = routing_config.get("loop_target")
+    # Note: loop_target is defined in routing config but routing uses success_values + max_iterations
     success_values = routing_config.get("loop_success_values", ["VERIFIED"])
     max_iterations = routing_config.get("max_iterations", 3)
     loop_condition_field = routing_config.get("loop_condition_field", "status")
@@ -279,7 +284,7 @@ async def run_router_session(
     Returns:
         RoutingSignal if routing was determined, None if routing failed.
     """
-    from swarm.runtime.claude_sdk import get_sdk_module, create_high_trust_options
+    from swarm.runtime.claude_sdk import create_high_trust_options, get_sdk_module
 
     sdk = get_sdk_module()
     query = sdk.query
@@ -329,23 +334,23 @@ async def run_router_session(
 ## Handoff from Previous Step
 
 ```json
-{template_vars['handoff_json']}
+{template_vars["handoff_json"]}
 ```
 
 ## Step Routing Configuration
 
 ```yaml
-step_id: {template_vars['step_id']}
-flow_key: {template_vars['flow_key']}
+step_id: {template_vars["step_id"]}
+flow_key: {template_vars["flow_key"]}
 routing:
-  kind: {template_vars['routing_kind']}
-  next: {template_vars['routing_next']}
-  loop_target: {template_vars['loop_target']}
-  loop_condition_field: {template_vars['loop_condition_field']}
-  loop_success_values: {template_vars['loop_success_values']}
-  max_iterations: {template_vars['max_iterations']}
-  can_further_iteration_help: {template_vars['can_further_iteration_help']}
-current_iteration: {template_vars['current_iteration']}
+  kind: {template_vars["routing_kind"]}
+  next: {template_vars["routing_next"]}
+  loop_target: {template_vars["loop_target"]}
+  loop_condition_field: {template_vars["loop_condition_field"]}
+  loop_success_values: {template_vars["loop_success_values"]}
+  max_iterations: {template_vars["max_iterations"]}
+  can_further_iteration_help: {template_vars["can_further_iteration_help"]}
+current_iteration: {template_vars["current_iteration"]}
 ```
 
 {resolver_template}
@@ -377,8 +382,7 @@ current_iteration: {template_vars['current_iteration']}
                 content = getattr(message, "content", "")
                 if isinstance(content, list):
                     text_parts = [
-                        getattr(b, "text", str(getattr(b, "content", "")))
-                        for b in content
+                        getattr(b, "text", str(getattr(b, "content", ""))) for b in content
                     ]
                     content = "\n".join(text_parts)
                 if content:
@@ -437,6 +441,7 @@ current_iteration: {template_vars['current_iteration']}
 
         # Build explanation
         from datetime import datetime, timezone
+
         explanation = RoutingExplanation(
             decision_type=DecisionType.LLM_TIEBREAKER,
             selected_target=routing_data.get("next_step_id") or "",
@@ -595,9 +600,7 @@ def route_from_routing_config(
     # Handle microloop routing - checks success, max iterations, or loops back
     if routing_config.kind == RoutingKind.MICROLOOP:
         # Normalize success values for comparison
-        success_values_upper = tuple(
-            v.upper() for v in routing_config.loop_success_values
-        )
+        success_values_upper = tuple(v.upper() for v in routing_config.loop_success_values)
 
         # Check if success condition met
         if normalized_status in success_values_upper:
@@ -775,11 +778,13 @@ def smart_route(
             # Mark loop edge as eliminated
             for e in edges_considered:
                 if e.edge_type == "loop":
-                    elimination_log.append(Elimination(
-                        edge_id=e.edge_id,
-                        reason_code="exit_condition_met",
-                        detail=f"Status {normalized_status} matches success values",
-                    ))
+                    elimination_log.append(
+                        Elimination(
+                            edge_id=e.edge_id,
+                            reason_code="exit_condition_met",
+                            detail=f"Status {normalized_status} matches success values",
+                        )
+                    )
                 else:
                     e.evaluated_result = True
                     e.score = 1.0
@@ -812,11 +817,13 @@ def smart_route(
             elapsed_ms = int((time.time() - start_time) * 1000)
             for e in edges_considered:
                 if e.edge_type == "loop":
-                    elimination_log.append(Elimination(
-                        edge_id=e.edge_id,
-                        reason_code="max_iterations",
-                        detail=f"Iteration {iteration_count + 1} >= max {routing_config.max_iterations}",
-                    ))
+                    elimination_log.append(
+                        Elimination(
+                            edge_id=e.edge_id,
+                            reason_code="max_iterations",
+                            detail=f"Iteration {iteration_count + 1} >= max {routing_config.max_iterations}",
+                        )
+                    )
 
             return RoutingSignal(
                 decision=RoutingDecision.ADVANCE,
@@ -849,11 +856,13 @@ def smart_route(
             elapsed_ms = int((time.time() - start_time) * 1000)
             for e in edges_considered:
                 if e.edge_type == "loop":
-                    elimination_log.append(Elimination(
-                        edge_id=e.edge_id,
-                        reason_code="status_mismatch",
-                        detail="Critic indicated no further iteration can help",
-                    ))
+                    elimination_log.append(
+                        Elimination(
+                            edge_id=e.edge_id,
+                            reason_code="status_mismatch",
+                            detail="Critic indicated no further iteration can help",
+                        )
+                    )
 
             return RoutingSignal(
                 decision=RoutingDecision.ADVANCE,
@@ -882,11 +891,13 @@ def smart_route(
         elapsed_ms = int((time.time() - start_time) * 1000)
         for e in edges_considered:
             if e.edge_type != "loop":
-                elimination_log.append(Elimination(
-                    edge_id=e.edge_id,
-                    reason_code="condition_false",
-                    detail=f"Status {normalized_status} not in success values, loop continues",
-                ))
+                elimination_log.append(
+                    Elimination(
+                        edge_id=e.edge_id,
+                        reason_code="condition_false",
+                        detail=f"Status {normalized_status} not in success values, loop continues",
+                    )
+                )
 
         return RoutingSignal(
             decision=RoutingDecision.LOOP,
@@ -971,11 +982,13 @@ def smart_route(
                 matched_key = branch_key
                 break
             else:
-                elimination_log.append(Elimination(
-                    edge_id=f"branch_{branch_key}",
-                    reason_code="condition_false",
-                    detail=f"Status '{handoff_status}' != branch key '{branch_key}'",
-                ))
+                elimination_log.append(
+                    Elimination(
+                        edge_id=f"branch_{branch_key}",
+                        reason_code="condition_false",
+                        detail=f"Status '{handoff_status}' != branch key '{branch_key}'",
+                    )
+                )
 
         if matched_target:
             return RoutingSignal(

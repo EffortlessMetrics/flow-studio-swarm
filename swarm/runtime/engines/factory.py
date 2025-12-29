@@ -22,8 +22,8 @@ from typing import Any, Dict, List, Optional
 from swarm.config.pack_registry import resolve_runtime
 
 from .base import StepEngine
-from .gemini import GeminiStepEngine
 from .claude import ClaudeStepEngine
+from .gemini import GeminiStepEngine
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,9 @@ def get_step_engine(
 
         # Use explicit overrides, then pack-resolved values
         resolved_mode = mode or (claude_settings.mode if claude_settings else "stub")
-        resolved_execution = execution or (claude_settings.execution if claude_settings else "legacy")
+        resolved_execution = execution or (
+            claude_settings.execution if claude_settings else "legacy"
+        )
 
         logger.debug(
             "get_step_engine(claude): mode=%s (source=%s), execution=%s (source=%s)",
@@ -105,10 +107,7 @@ def get_step_engine(
             execution=resolved_execution,
         )
 
-    raise ValueError(
-        f"Unknown engine ID: {engine_id}. "
-        f"Valid options: gemini-step, claude-step"
-    )
+    raise ValueError(f"Unknown engine ID: {engine_id}. Valid options: gemini-step, claude-step")
 
 
 def list_available_engines(

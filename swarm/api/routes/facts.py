@@ -10,8 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -44,9 +43,7 @@ class FlowMarkerCounts(BaseModel):
     """Marker counts for a single flow."""
 
     flow_key: str = Field(..., description="Flow key (signal, plan, etc.)")
-    counts: Dict[str, int] = Field(
-        default_factory=dict, description="Counts by marker type"
-    )
+    counts: Dict[str, int] = Field(default_factory=dict, description="Counts by marker type")
     total: int = Field(0, description="Total markers in this flow")
 
 
@@ -55,9 +52,7 @@ class StepMarkerCounts(BaseModel):
 
     flow_key: str = Field(..., description="Flow key")
     step_id: str = Field(..., description="Step identifier")
-    counts: Dict[str, int] = Field(
-        default_factory=dict, description="Counts by marker type"
-    )
+    counts: Dict[str, int] = Field(default_factory=dict, description="Counts by marker type")
     total: int = Field(0, description="Total markers in this step")
 
 
@@ -78,21 +73,13 @@ class FactsSummaryResponse(BaseModel):
 
     run_id: str = Field(..., description="Run identifier")
     total_facts: int = Field(0, description="Total facts extracted")
-    by_type: List[MarkerCount] = Field(
-        default_factory=list, description="Counts per marker type"
-    )
-    by_flow: List[FlowMarkerCounts] = Field(
-        default_factory=list, description="Counts per flow"
-    )
-    by_step: List[StepMarkerCounts] = Field(
-        default_factory=list, description="Counts per step"
-    )
+    by_type: List[MarkerCount] = Field(default_factory=list, description="Counts per marker type")
+    by_flow: List[FlowMarkerCounts] = Field(default_factory=list, description="Counts per flow")
+    by_step: List[StepMarkerCounts] = Field(default_factory=list, description="Counts per step")
     deltas: List[MarkerDelta] = Field(
         default_factory=list, description="Deltas between consecutive steps"
     )
-    errors: List[str] = Field(
-        default_factory=list, description="Errors during extraction"
-    )
+    errors: List[str] = Field(default_factory=list, description="Errors during extraction")
 
 
 class FactDetail(BaseModel):
@@ -196,9 +183,7 @@ async def get_facts_summary(run_id: str):
     sorted_steps = sorted(
         by_step.keys(),
         key=lambda k: (
-            flow_order.index(k.split(":")[0])
-            if k.split(":")[0] in flow_order
-            else 99,
+            flow_order.index(k.split(":")[0]) if k.split(":")[0] in flow_order else 99,
             k.split(":")[1] if ":" in k else "",
         ),
     )

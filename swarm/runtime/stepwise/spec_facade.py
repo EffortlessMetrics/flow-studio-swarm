@@ -19,18 +19,17 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional
 
-from swarm.config.flow_registry import get_flow_spec_id, FlowDefinition
-from swarm.runtime.router import FlowGraph, Edge, NodeConfig, EdgeCondition
+from swarm.config.flow_registry import FlowDefinition, get_flow_spec_id
+from swarm.config.pack_registry import PackRegistry
+from swarm.runtime.router import Edge, EdgeCondition, FlowGraph, NodeConfig
 
 # Pack-based loading support
 from swarm.runtime.spec_bridge import (
-    load_flow_from_pack,
     PackFlowRegistry,
-    flow_spec_to_definition,
+    load_flow_from_pack,
 )
-from swarm.config.pack_registry import PackRegistry
 
 # Conditional imports for spec module (may not be available in all environments)
 try:
@@ -199,11 +198,7 @@ class SpecFacade:
 
                 # Create edges from routing
                 routing = step.routing
-                routing_kind = (
-                    routing.kind.value
-                    if hasattr(routing.kind, "value")
-                    else str(routing.kind)
-                )
+                # routing_kind available via routing.kind but not needed for edge creation
 
                 # Next edge (linear/terminal/branch default)
                 if routing.next:
@@ -378,23 +373,27 @@ class SpecFacade:
                             expression=edge.condition.get("expression"),
                         )
 
-                edges.append(Edge(
-                    edge_id=edge.edge_id,
-                    from_node=edge.from_node,
-                    to_node=edge.to_node,
-                    edge_type=edge.edge_type,
-                    priority=edge.priority,
-                    condition=condition,
-                ))
+                edges.append(
+                    Edge(
+                        edge_id=edge.edge_id,
+                        from_node=edge.from_node,
+                        to_node=edge.to_node,
+                        edge_type=edge.edge_type,
+                        priority=edge.priority,
+                        condition=condition,
+                    )
+                )
 
             policy = {}
             if flow_spec.policy:
                 if isinstance(flow_spec.policy, dict):
                     policy = flow_spec.policy
-                elif hasattr(flow_spec.policy, 'max_loop_iterations'):
+                elif hasattr(flow_spec.policy, "max_loop_iterations"):
                     policy = {
                         "max_loop_iterations": flow_spec.policy.max_loop_iterations,
-                        "suggested_sidequests": getattr(flow_spec.policy, 'suggested_sidequests', []),
+                        "suggested_sidequests": getattr(
+                            flow_spec.policy, "suggested_sidequests", []
+                        ),
                     }
 
             graph = FlowGraph(

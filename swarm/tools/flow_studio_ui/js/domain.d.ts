@@ -553,3 +553,205 @@ export interface ResolutionHint {
   command: string;
   docs: string;
 }
+
+// ============================================================================
+// Boundary Review API
+// ============================================================================
+
+/** Summary of an assumption made during execution */
+export interface AssumptionSummary {
+  assumption_id: string;
+  statement: string;
+  rationale: string;
+  impact_if_wrong: string;
+  confidence: "high" | "medium" | "low";
+  status: "active" | "resolved" | "invalidated";
+  tags: string[];
+  flow_introduced?: string;
+  step_introduced?: string;
+  agent?: string;
+  timestamp?: string;
+}
+
+/** Summary of a decision made during execution */
+export interface DecisionSummary {
+  decision_id: string;
+  decision_type: string;
+  subject: string;
+  decision: string;
+  rationale: string;
+  supporting_evidence: string[];
+  conditions: string[];
+  assumptions_applied: string[];
+  flow?: string;
+  step?: string;
+  agent?: string;
+  timestamp?: string;
+}
+
+/** Summary of a detour taken during execution */
+export interface DetourSummary {
+  detour_id: string;
+  from_step: string;
+  to_step: string;
+  reason: string;
+  detour_type: string;
+  evidence_path?: string;
+  timestamp?: string;
+}
+
+/** Verification result for a step */
+export interface VerificationSummary {
+  step_id: string;
+  station_id?: string;
+  status: string;
+  verified: boolean;
+  can_further_iteration_help?: boolean;
+  issues: string[];
+  timestamp?: string;
+}
+
+/** Inventory marker delta */
+export interface InventoryDelta {
+  marker_type: string;
+  label: string;
+  count: number;
+  delta: number;
+}
+
+/** Response from /api/runs/:id/boundary-review */
+export interface BoundaryReviewResponse {
+  run_id: string;
+  scope: "flow" | "run";
+  current_flow?: FlowKey;
+
+  assumptions_count: number;
+  assumptions_high_risk: number;
+  assumptions: AssumptionSummary[];
+
+  decisions_count: number;
+  decisions: DecisionSummary[];
+
+  detours_count: number;
+  detours: DetourSummary[];
+
+  verification_passed: number;
+  verification_failed: number;
+  verifications: VerificationSummary[];
+
+  inventory_deltas: InventoryDelta[];
+
+  has_evolution_patches: boolean;
+  evolution_patch_count: number;
+
+  confidence_score: number;
+  uncertainty_notes: string[];
+
+  timestamp: string;
+}
+
+// ============================================================================
+// Backends API
+// ============================================================================
+
+/** Backend capability flags */
+export interface BackendCapabilities {
+  supports_stepwise: boolean;
+  supports_stream: boolean;
+  supports_stub: boolean;
+}
+
+/** A backend option for execution */
+export interface BackendOption {
+  id: string;
+  name: string;
+  description: string;
+  capabilities: BackendCapabilities;
+  requires_env?: string[];
+}
+
+/** Response from /api/backends */
+export interface BackendsResponse {
+  backends: BackendOption[];
+  default_backend: string;
+}
+
+// ============================================================================
+// Run Events API
+// ============================================================================
+
+/** A structured event from run execution */
+export interface RunEvent {
+  event: string;
+  timestamp: string;
+  flow_key?: FlowKey;
+  step_id?: string;
+  station_id?: string;
+  data?: Record<string, unknown>;
+}
+
+/** Response from /api/runs/:id/events (JSON mode) */
+export interface RunEventsResponse {
+  run_id: string;
+  events: RunEvent[];
+}
+
+// ============================================================================
+// Transcript & Receipt API
+// ============================================================================
+
+/** LLM message in a transcript */
+export interface TranscriptMessage {
+  role: "user" | "assistant" | "system" | "tool";
+  content: string;
+  timestamp?: string;
+  tool_calls?: unknown[];
+}
+
+/** Response from /api/runs/:id/flows/:flow/steps/:step/transcript */
+export interface StepTranscriptResponse {
+  run_id: string;
+  flow_key: FlowKey;
+  step_id: string;
+  messages: TranscriptMessage[];
+  token_count?: number;
+}
+
+/** Response from /api/runs/:id/flows/:flow/steps/:step/receipt */
+export interface StepReceiptResponse {
+  run_id: string;
+  flow_key: FlowKey;
+  step_id: string;
+  status: string;
+  started_at?: string;
+  completed_at?: string;
+  duration_ms?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  error?: string;
+}
+
+// ============================================================================
+// Wisdom API
+// ============================================================================
+
+/** Flow status entry in wisdom summary */
+export interface WisdomFlowStatus {
+  flow_key: FlowKey;
+  status: "complete" | "partial" | "missing";
+  step_count: number;
+  verified_count: number;
+}
+
+/** Wisdom summary for a run */
+export interface WisdomSummary {
+  run_id: string;
+  flows: WisdomFlowStatus[];
+  total_assumptions: number;
+  total_decisions: number;
+  high_risk_assumptions: number;
+  has_learnings: boolean;
+  has_evolution_patches: boolean;
+  labels: string[];
+  key_artifacts: string[];
+}

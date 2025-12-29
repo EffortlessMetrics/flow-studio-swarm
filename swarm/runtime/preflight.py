@@ -30,7 +30,6 @@ import logging
 import os
 import shutil
 import subprocess
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -147,9 +146,7 @@ class PreflightOrchestrator:
         self._repo_root = repo_root or Path(__file__).resolve().parents[2]
         self._skip_checks = set(skip_checks or [])
 
-    def _time_check(
-        self, check_fn: Callable[[], CheckResult]
-    ) -> CheckResult:
+    def _time_check(self, check_fn: Callable[[], CheckResult]) -> CheckResult:
         """Run a check function and measure duration.
 
         Args:
@@ -256,8 +253,8 @@ class PreflightOrchestrator:
         try:
             from swarm.config.runtime_config import (
                 get_available_engines,
-                get_engine_mode,
                 get_engine_env,
+                get_engine_mode,
                 get_engine_required_env_keys,
             )
 
@@ -660,7 +657,7 @@ class PreflightOrchestrator:
                     CheckResult(
                         name=check_name,
                         status=CheckStatus.SKIPPED,
-                        message=f"Skipped by configuration",
+                        message="Skipped by configuration",
                     )
                 )
                 continue
@@ -782,7 +779,12 @@ def inject_env_doctor_sidequest(
             params={
                 "blocking_issues": preflight_result.blocking_issues,
                 "warnings": preflight_result.warnings,
-                "checks": [c.to_dict() if hasattr(c, "to_dict") else {"name": c.name, "status": c.status.value, "message": c.message} for c in preflight_result.checks],
+                "checks": [
+                    c.to_dict()
+                    if hasattr(c, "to_dict")
+                    else {"name": c.name, "status": c.status.value, "message": c.message}
+                    for c in preflight_result.checks
+                ],
             },
             sidequest_origin="preflight",
         )

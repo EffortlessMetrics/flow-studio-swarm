@@ -57,7 +57,7 @@ _ingestion_context = threading.local()
 
 def _is_in_ingestion_context() -> bool:
     """Check if we're currently inside ingest_events()."""
-    return getattr(_ingestion_context, 'active', False)
+    return getattr(_ingestion_context, "active", False)
 
 
 # =============================================================================
@@ -73,22 +73,24 @@ def _is_in_ingestion_context() -> bool:
 #   - file_changes, route_decision
 
 # Canonical event kinds (the "truth" names)
-CANONICAL_EVENT_KINDS = frozenset({
-    # Run lifecycle
-    "run_created",
-    "run_started",
-    "run_completed",
-    "run_stop_requested",
-    # Step lifecycle
-    "step_start",
-    "step_end",
-    # Tool lifecycle
-    "tool_start",
-    "tool_end",
-    # Data events
-    "file_changes",
-    "route_decision",
-})
+CANONICAL_EVENT_KINDS = frozenset(
+    {
+        # Run lifecycle
+        "run_created",
+        "run_started",
+        "run_completed",
+        "run_stop_requested",
+        # Step lifecycle
+        "step_start",
+        "step_end",
+        # Tool lifecycle
+        "tool_start",
+        "tool_end",
+        # Data events
+        "file_changes",
+        "route_decision",
+    }
+)
 
 # Alias map: legacy_name -> canonical_name
 # Entries map to canonical names; missing keys mean name is already canonical
@@ -97,10 +99,10 @@ EVENT_KIND_ALIASES: Dict[str, str] = {
     "run_start": "run_started",
     "run_end": "run_completed",
     "run_cancelled": "run_completed",  # Status indicates actual outcome
-    "run_failed": "run_completed",     # Status indicates actual outcome
+    "run_failed": "run_completed",  # Status indicates actual outcome
     # Step aliases
     "step_complete": "step_end",
-    "step_error": "step_end",          # Status indicates actual outcome
+    "step_error": "step_end",  # Status indicates actual outcome
 }
 
 
@@ -126,11 +128,139 @@ def _get_duckdb():
     if _duckdb is None:
         try:
             import duckdb
+
             _duckdb = duckdb
         except ImportError:
             logger.warning("DuckDB not available - stats will not be persisted")
             return None
     return _duckdb
+
+
+def _check_projection_version(db_path: Path) -> bool:
+    """Check if the projection version matches and handle mismatch.
+
+    This function implements the schema resilience pattern:
+    1. Open the existing DB (if any) and read _projection_meta.projection_version
+    2. If version matches PROJECTION_VERSION, return True (DB is compatible)
+    3. If version mismatches or DB doesn't exist, rename old DB and return False
+
+    The caller is responsible for rebuilding from events.jsonl when this returns False.
+
+    Args:
+        db_path: Path to the DuckDB file.
+
+    Returns:
+        True if DB is compatible and can be used as-is.
+        False if DB was renamed/missing and needs rebuild.
+    """
+    duckdb = _get_duckdb()
+    if duckdb is None:
+        return False
+
+    if not db_path.exists():
+        logger.debug("No existing DB at %s, will create fresh", db_path)
+        return False
+
+    # Try to read the projection version from existing DB
+    try:
+        conn = duckdb.connect(str(db_path), read_only=True)
+        try:
+            # Check if _projection_meta table exists
+            result = conn.execute(
+                "SELECT COUNT(*) FROM information_schema.tables "
+                "WHERE table_name = '_projection_meta'"
+            ).fetchone()
+
+            if result[0] == 0:
+                # Table doesn't exist - old schema, needs rebuild
+                logger.info("DB at %s missing _projection_meta table, will rebuild", db_path)
+                conn.close()
+                _rename_old_db(db_path)
+                return False
+
+            # Read version
+            result = conn.execute(
+                "SELECT value FROM _projection_meta WHERE key = 'projection_version'"
+            ).fetchone()
+
+            if result is None:
+                logger.info("DB at %s missing projection_version, will rebuild", db_path)
+                conn.close()
+                _rename_old_db(db_path)
+                return False
+
+            stored_version = int(result[0])
+            if stored_version != PROJECTION_VERSION:
+                logger.info(
+                    "Projection version mismatch: DB has v%d, code expects v%d. Rebuilding.",
+                    stored_version,
+                    PROJECTION_VERSION,
+                )
+                conn.close()
+                _rename_old_db(db_path)
+                return False
+
+            # Version matches, DB is compatible
+            conn.close()
+            return True
+
+        except Exception as e:
+            logger.warning("Error reading projection version from %s: %s", db_path, e)
+            try:
+                conn.close()
+            except Exception:
+                pass
+            _rename_old_db(db_path)
+            return False
+
+    except Exception as e:
+        logger.warning("Error opening DB at %s: %s", db_path, e)
+        _rename_old_db(db_path)
+        return False
+
+
+def _rename_old_db(db_path: Path) -> None:
+    """Rename old DB file to stats.db.old.<timestamp>.
+
+    Args:
+        db_path: Path to the DuckDB file to rename.
+    """
+    if not db_path.exists():
+        return
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    old_path = db_path.parent / f"{db_path.name}.old.{timestamp}"
+
+    try:
+        db_path.rename(old_path)
+        logger.info("Renamed old DB to %s", old_path)
+    except OSError as e:
+        logger.warning("Failed to rename old DB %s: %s", db_path, e)
+        # Try to delete if rename failed
+        try:
+            db_path.unlink()
+            logger.info("Deleted old DB at %s", db_path)
+        except OSError as e2:
+            logger.error("Failed to delete old DB %s: %s", db_path, e2)
+
+
+def _set_projection_version(conn, version: int) -> None:
+    """Store the projection version in _projection_meta.
+
+    Args:
+        conn: Active DuckDB connection.
+        version: The projection version to store.
+    """
+    conn.execute(
+        """
+        INSERT INTO _projection_meta (key, value, updated_at)
+        VALUES ('projection_version', ?, now())
+        ON CONFLICT (key) DO UPDATE SET
+            value = excluded.value,
+            updated_at = excluded.updated_at
+    """,
+        [str(version)],
+    )
 
 
 # =============================================================================
@@ -139,11 +269,42 @@ def _get_duckdb():
 
 SCHEMA_VERSION = 2
 
+# =============================================================================
+# Projection Version (Schema Resilience)
+# =============================================================================
+# The projection version tracks breaking changes to the DuckDB projection layer.
+# Unlike SCHEMA_VERSION (which is stored in the DB and used for migrations),
+# PROJECTION_VERSION is used to detect when a full rebuild from events.jsonl
+# is required.
+#
+# Increment this when:
+# - Adding new tables that need data from existing events
+# - Changing column types in ways that require re-ingestion
+# - Modifying how events are projected into tables
+#
+# DO NOT increment for:
+# - Adding new indexes (additive, non-breaking)
+# - Adding nullable columns with defaults (additive, non-breaking)
+#
+# When PROJECTION_VERSION mismatches the stored version in _projection_meta:
+# 1. The old DB file is renamed to stats.db.old.<timestamp>
+# 2. A fresh DB is created with the new version
+# 3. Data is rebuilt from events.jsonl (empty projection if no events exist)
+
+PROJECTION_VERSION = 1
+
 CREATE_TABLES_SQL = """
 -- Schema version tracking
 CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Projection version tracking (for schema resilience / rebuild-from-events)
+CREATE TABLE IF NOT EXISTS _projection_meta (
+    key VARCHAR PRIMARY KEY,
+    value VARCHAR NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Runs table: one row per run
@@ -287,6 +448,7 @@ CREATE INDEX IF NOT EXISTS idx_facts_marker_id ON facts(marker_id);
 @dataclass
 class RunStats:
     """Aggregated statistics for a run."""
+
     run_id: str
     flow_keys: List[str]
     status: str
@@ -303,6 +465,7 @@ class RunStats:
 @dataclass
 class StepStats:
     """Statistics for a single step."""
+
     step_id: str
     flow_key: str
     agent_key: Optional[str]
@@ -317,6 +480,7 @@ class StepStats:
 @dataclass
 class ToolBreakdown:
     """Breakdown of tool usage."""
+
     tool_name: str
     call_count: int
     total_duration_ms: int
@@ -331,17 +495,18 @@ class Fact:
     Facts represent requirements, solutions, traces, assumptions, and decisions
     extracted from agent outputs using REQ_*, SOL_*, TRC_*, ASM_*, DEC_* markers.
     """
+
     fact_id: str
     run_id: str
     step_id: str
     flow_key: str
     agent_key: Optional[str]
     marker_type: str  # REQ, SOL, TRC, ASM, DEC
-    marker_id: str    # e.g., REQ_001
-    fact_type: str    # requirement, solution, trace, assumption, decision
+    marker_id: str  # e.g., REQ_001
+    fact_type: str  # requirement, solution, trace, assumption, decision
     content: str
-    priority: Optional[str] = None      # MUST, SHOULD, NICE_TO_HAVE
-    status: Optional[str] = None        # verified, unverified, deprecated
+    priority: Optional[str] = None  # MUST, SHOULD, NICE_TO_HAVE
+    status: Optional[str] = None  # verified, unverified, deprecated
     evidence: Optional[str] = None
     created_at: Optional[datetime] = None
     extracted_at: Optional[datetime] = None
@@ -384,17 +549,17 @@ class StatsDB:
         self._connection = None
         self._lock = threading.RLock()
         self._initialized = False
+        self._version_checked = False
+        self._needs_rebuild = False
 
         # Capture projection config at construction time (not import time)
         # This allows tests to set env vars after import but before construction
         if projection_only is None:
-            projection_only = os.environ.get(
-                "SWARM_DB_PROJECTION_ONLY", "true"
-            ).lower() == "true"
+            projection_only = os.environ.get("SWARM_DB_PROJECTION_ONLY", "true").lower() == "true"
         if projection_strict is None:
-            projection_strict = os.environ.get(
-                "SWARM_DB_PROJECTION_STRICT", "false"
-            ).lower() == "true"
+            projection_strict = (
+                os.environ.get("SWARM_DB_PROJECTION_STRICT", "false").lower() == "true"
+            )
 
         self._projection_only = projection_only
         self._projection_strict = projection_strict
@@ -435,7 +600,13 @@ class StatsDB:
 
     @property
     def connection(self):
-        """Get or create the DuckDB connection."""
+        """Get or create the DuckDB connection.
+
+        On first access, performs projection version check. If the stored version
+        doesn't match PROJECTION_VERSION, the old DB is renamed and a fresh one
+        is created. The _needs_rebuild flag is set to signal that the caller
+        should rebuild from events.jsonl.
+        """
         if self._connection is None:
             duckdb = _get_duckdb()
             if duckdb is None:
@@ -444,6 +615,17 @@ class StatsDB:
             with self._lock:
                 if self._connection is None:
                     if self.db_path:
+                        # Check projection version before connecting
+                        if not self._version_checked:
+                            self._version_checked = True
+                            is_compatible = _check_projection_version(self.db_path)
+                            if not is_compatible:
+                                self._needs_rebuild = True
+                                logger.info(
+                                    "Projection version mismatch or missing DB. "
+                                    "Will rebuild from events.jsonl."
+                                )
+
                         self.db_path.parent.mkdir(parents=True, exist_ok=True)
                         self._connection = duckdb.connect(str(self.db_path))
                     else:
@@ -470,11 +652,17 @@ class StatsDB:
 
             if result is None:
                 self.connection.execute(
-                    "INSERT INTO schema_version (version) VALUES (?)",
-                    [SCHEMA_VERSION]
+                    "INSERT INTO schema_version (version) VALUES (?)", [SCHEMA_VERSION]
                 )
 
-            logger.debug("StatsDB schema initialized (version %d)", SCHEMA_VERSION)
+            # Set projection version (for schema resilience)
+            _set_projection_version(self.connection, PROJECTION_VERSION)
+
+            logger.debug(
+                "StatsDB schema initialized (schema_version=%d, projection_version=%d)",
+                SCHEMA_VERSION,
+                PROJECTION_VERSION,
+            )
 
     @contextmanager
     def _transaction(self) -> Iterator[Any]:
@@ -508,22 +696,25 @@ class StatsDB:
         """Insert raw event if not already present. Returns True if inserted."""
         try:
             # Use RETURNING to detect if insert happened (empty result = conflict/no insert)
-            result = self.connection.execute("""
+            result = self.connection.execute(
+                """
                 INSERT INTO events (event_id, seq, run_id, ts, kind, flow_key, step_id, agent_key, payload)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (event_id) DO NOTHING
                 RETURNING event_id
-            """, [
-                event.get("event_id"),
-                event.get("seq", 0),
-                event["run_id"],
-                event["ts"],
-                event["kind"],
-                event["flow_key"],
-                event.get("step_id"),
-                event.get("agent_key"),
-                json.dumps(event.get("payload", {}))
-            ])
+            """,
+                [
+                    event.get("event_id"),
+                    event.get("seq", 0),
+                    event["run_id"],
+                    event["ts"],
+                    event["kind"],
+                    event["flow_key"],
+                    event.get("step_id"),
+                    event.get("agent_key"),
+                    json.dumps(event.get("payload", {})),
+                ],
+            )
             return len(result.fetchall()) > 0
         except Exception as e:
             logger.warning(f"Failed to insert event {event.get('event_id')}: {e}")
@@ -536,8 +727,7 @@ class StatsDB:
 
         with self._lock:
             result = self.connection.execute(
-                "SELECT last_offset, last_seq FROM ingestion_state WHERE run_id = ?",
-                [run_id]
+                "SELECT last_offset, last_seq FROM ingestion_state WHERE run_id = ?", [run_id]
             ).fetchone()
             return (result[0], result[1]) if result else (0, 0)
 
@@ -547,14 +737,17 @@ class StatsDB:
             return
 
         with self._lock:
-            self.connection.execute("""
+            self.connection.execute(
+                """
                 INSERT INTO ingestion_state (run_id, last_offset, last_seq, updated_at)
                 VALUES (?, ?, ?, now())
                 ON CONFLICT (run_id) DO UPDATE SET
                     last_offset = excluded.last_offset,
                     last_seq = excluded.last_seq,
                     updated_at = excluded.updated_at
-            """, [run_id, offset, seq])
+            """,
+                [run_id, offset, seq],
+            )
 
     # =========================================================================
     # Write Operations
@@ -594,8 +787,7 @@ class StatsDB:
                     started_at = EXCLUDED.started_at,
                     status = 'running'
                 """,
-                [run_id, flow_keys, profile_id, engine_id,
-                 started_at, json.dumps(metadata or {})]
+                [run_id, flow_keys, profile_id, engine_id, started_at, json.dumps(metadata or {})],
             )
 
     def record_run_end(
@@ -634,8 +826,15 @@ class StatsDB:
                     total_duration_ms = ?
                 WHERE run_id = ?
                 """,
-                [completed_at, status, total_steps, completed_steps,
-                 total_tokens, total_duration_ms, run_id]
+                [
+                    completed_at,
+                    status,
+                    total_steps,
+                    completed_steps,
+                    total_tokens,
+                    total_duration_ms,
+                    run_id,
+                ],
             )
 
     def record_step_start(
@@ -667,7 +866,7 @@ class StatsDB:
                 INSERT INTO steps (run_id, flow_key, step_id, step_index, agent_key, started_at, status)
                 VALUES (?, ?, ?, ?, ?, ?, 'running')
                 """,
-                [run_id, flow_key, step_id, step_index, agent_key, started_at]
+                [run_id, flow_key, step_id, step_index, agent_key, started_at],
             )
 
     def record_step_end(
@@ -717,10 +916,22 @@ class StatsDB:
                     error_message = ?
                 WHERE run_id = ? AND flow_key = ? AND step_id = ? AND status = 'running'
                 """,
-                [completed_at, status, duration_ms,
-                 prompt_tokens, completion_tokens, prompt_tokens + completion_tokens,
-                 handoff_status, routing_decision, routing_next_step, routing_confidence,
-                 error_message, run_id, flow_key, step_id]
+                [
+                    completed_at,
+                    status,
+                    duration_ms,
+                    prompt_tokens,
+                    completion_tokens,
+                    prompt_tokens + completion_tokens,
+                    handoff_status,
+                    routing_decision,
+                    routing_next_step,
+                    routing_confidence,
+                    error_message,
+                    run_id,
+                    flow_key,
+                    step_id,
+                ],
             )
 
     def record_tool_call(
@@ -761,9 +972,21 @@ class StatsDB:
                     exit_code, error_message
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                [run_id, step_id, tool_name, phase, tool_ts, tool_ts,
-                 duration_ms, success, target_path, diff_lines_added, diff_lines_removed,
-                 exit_code, error_message]
+                [
+                    run_id,
+                    step_id,
+                    tool_name,
+                    phase,
+                    tool_ts,
+                    tool_ts,
+                    duration_ms,
+                    success,
+                    target_path,
+                    diff_lines_added,
+                    diff_lines_removed,
+                    exit_code,
+                    error_message,
+                ],
             )
 
     def record_file_change(
@@ -800,8 +1023,7 @@ class StatsDB:
                     lines_added = file_changes.lines_added + EXCLUDED.lines_added,
                     lines_removed = file_changes.lines_removed + EXCLUDED.lines_removed
                 """,
-                [run_id, step_id, file_path, change_type, lines_added, lines_removed,
-                 change_ts]
+                [run_id, step_id, file_path, change_type, lines_added, lines_removed, change_ts],
             )
 
     def ingest_fact(
@@ -854,6 +1076,7 @@ class StatsDB:
             return None
 
         import uuid
+
         fact_id = f"fact_{uuid.uuid4().hex[:12]}"
         extracted_at = ts if ts is not None else datetime.now(timezone.utc)
 
@@ -875,11 +1098,22 @@ class StatsDB:
                         extracted_at = EXCLUDED.extracted_at
                     """,
                     [
-                        fact_id, run_id, step_id, flow_key, agent_key,
-                        marker_type, marker_id, fact_type, content,
-                        priority, status, evidence, created_at, extracted_at,
-                        json.dumps(metadata or {})
-                    ]
+                        fact_id,
+                        run_id,
+                        step_id,
+                        flow_key,
+                        agent_key,
+                        marker_type,
+                        marker_id,
+                        fact_type,
+                        content,
+                        priority,
+                        status,
+                        evidence,
+                        created_at,
+                        extracted_at,
+                        json.dumps(metadata or {}),
+                    ],
                 )
                 return fact_id
             except Exception as e:
@@ -1085,7 +1319,7 @@ class StatsDB:
                 FROM runs r
                 WHERE r.run_id = ?
                 """,
-                [run_id]
+                [run_id],
             ).fetchone()
 
             if result is None:
@@ -1127,7 +1361,7 @@ class StatsDB:
                 WHERE s.run_id = ?
                 ORDER BY s.step_index
                 """,
-                [run_id]
+                [run_id],
             ).fetchall()
 
             return [
@@ -1164,7 +1398,7 @@ class StatsDB:
                 GROUP BY tool_name
                 ORDER BY call_count DESC
                 """,
-                [run_id]
+                [run_id],
             ).fetchall()
 
             return [
@@ -1202,7 +1436,7 @@ class StatsDB:
                 ORDER BY r.started_at DESC
                 LIMIT ?
                 """,
-                [limit]
+                [limit],
             ).fetchall()
 
             return [
@@ -1235,7 +1469,7 @@ class StatsDB:
                 WHERE run_id = ?
                 ORDER BY timestamp
                 """,
-                [run_id]
+                [run_id],
             ).fetchall()
 
             return [
@@ -1273,7 +1507,7 @@ class StatsDB:
                 WHERE run_id = ?
                 ORDER BY step_id, marker_id
                 """,
-                [run_id]
+                [run_id],
             ).fetchall()
 
             return [
@@ -1297,9 +1531,7 @@ class StatsDB:
                 for row in results
             ]
 
-    def get_facts_by_marker_type(
-        self, run_id: str, marker_type: str
-    ) -> List[Fact]:
+    def get_facts_by_marker_type(self, run_id: str, marker_type: str) -> List[Fact]:
         """Get facts for a run filtered by marker type.
 
         Args:
@@ -1323,7 +1555,7 @@ class StatsDB:
                 WHERE run_id = ? AND marker_type = ?
                 ORDER BY marker_id
                 """,
-                [run_id, marker_type]
+                [run_id, marker_type],
             ).fetchall()
 
             return [
@@ -1347,6 +1579,176 @@ class StatsDB:
                 for row in results
             ]
 
+    # =========================================================================
+    # Schema Resilience: Rebuild from Events
+    # =========================================================================
+
+    def rebuild_from_events(
+        self,
+        run_id: str,
+        runs_dir: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Rebuild projection for a single run from its events.jsonl.
+
+        This method re-ingests all events from a run's events.jsonl file
+        into the DuckDB projection tables. It's used when:
+        - Projection version mismatch is detected
+        - User requests a rebuild
+        - Recovering from corruption
+
+        The events.jsonl is the authoritative ledger; DuckDB is disposable.
+
+        Args:
+            run_id: The run ID to rebuild.
+            runs_dir: Base directory for runs. Defaults to RUNS_DIR from storage.
+
+        Returns:
+            Dict with rebuild statistics:
+            - events_ingested: Number of events processed
+            - success: True if rebuild completed
+            - error: Error message if failed
+        """
+        from . import storage as storage_module
+
+        if runs_dir is None:
+            runs_dir = storage_module.RUNS_DIR
+
+        result = {
+            "run_id": run_id,
+            "events_ingested": 0,
+            "success": False,
+            "error": None,
+        }
+
+        run_path = runs_dir / run_id
+        events_file = run_path / storage_module.EVENTS_FILE
+
+        if not events_file.exists():
+            # No events file is fine - empty projection
+            logger.debug("No events.jsonl for run %s, projection will be empty", run_id)
+            result["success"] = True
+            return result
+
+        try:
+            # Read and parse events
+            events: List[Dict[str, Any]] = []
+            with events_file.open("r", encoding="utf-8") as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                        events.append(event)
+                    except json.JSONDecodeError as e:
+                        logger.warning(
+                            "Skipping malformed event at line %d in %s: %s",
+                            line_num,
+                            events_file,
+                            e,
+                        )
+
+            if events:
+                # Ingest events into DuckDB (idempotent)
+                count = self.ingest_events(events, run_id)
+                result["events_ingested"] = count
+                logger.info("Rebuilt projection for run %s: %d events ingested", run_id, count)
+
+            result["success"] = True
+
+        except Exception as e:
+            result["error"] = str(e)
+            logger.warning("Failed to rebuild projection for run %s: %s", run_id, e)
+
+        return result
+
+    def rebuild_all_from_events(
+        self,
+        runs_dir: Optional[Path] = None,
+        run_ids: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Rebuild projections for all runs from their events.jsonl files.
+
+        This method scans the runs directory and rebuilds projections for
+        each run that has an events.jsonl file. Use this after a projection
+        version bump to repopulate the entire database.
+
+        Args:
+            runs_dir: Base directory for runs. Defaults to RUNS_DIR from storage.
+            run_ids: Optional list of specific run IDs to rebuild.
+                     If None, rebuilds all runs found in runs_dir.
+
+        Returns:
+            Dict with rebuild statistics:
+            - runs_processed: Number of runs processed
+            - runs_succeeded: Number of runs successfully rebuilt
+            - events_ingested: Total events ingested
+            - errors: List of any errors encountered
+        """
+        from . import storage as storage_module
+
+        if runs_dir is None:
+            runs_dir = storage_module.RUNS_DIR
+
+        stats = {
+            "runs_processed": 0,
+            "runs_succeeded": 0,
+            "events_ingested": 0,
+            "errors": [],
+        }
+
+        # Get list of run IDs to process
+        if run_ids is None:
+            if not runs_dir.exists():
+                logger.warning("Runs directory does not exist: %s", runs_dir)
+                return stats
+
+            run_ids = [
+                d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")
+            ]
+
+        logger.info("Rebuilding projections for %d runs", len(run_ids))
+
+        for run_id in run_ids:
+            result = self.rebuild_from_events(run_id, runs_dir)
+            stats["runs_processed"] += 1
+
+            if result["success"]:
+                stats["runs_succeeded"] += 1
+                stats["events_ingested"] += result["events_ingested"]
+            else:
+                stats["errors"].append(
+                    {
+                        "run_id": run_id,
+                        "error": result.get("error", "Unknown error"),
+                    }
+                )
+
+        logger.info(
+            "Rebuild complete: %d/%d runs, %d events, %d errors",
+            stats["runs_succeeded"],
+            stats["runs_processed"],
+            stats["events_ingested"],
+            len(stats["errors"]),
+        )
+
+        # Clear the needs_rebuild flag after successful rebuild
+        self._needs_rebuild = False
+
+        return stats
+
+    @property
+    def needs_rebuild(self) -> bool:
+        """Check if the database needs to be rebuilt from events.jsonl.
+
+        This is set to True when:
+        - Projection version mismatch is detected
+        - Database was missing and freshly created
+
+        After calling rebuild_all_from_events(), this is set to False.
+        """
+        return self._needs_rebuild
+
 
 # =============================================================================
 # Global Instance (Singleton Pattern)
@@ -1356,14 +1758,20 @@ _global_db: Optional[StatsDB] = None
 _global_db_lock = threading.Lock()
 
 
-def get_stats_db(db_path: Optional[Path] = None) -> StatsDB:
+def get_stats_db(
+    db_path: Optional[Path] = None,
+    auto_rebuild: bool = True,
+) -> StatsDB:
     """Get the global StatsDB instance.
 
     Creates a new instance if one doesn't exist, or if a different
-    db_path is requested.
+    db_path is requested. If the projection version mismatches, the
+    old database is renamed and a rebuild from events.jsonl is triggered.
 
     Args:
         db_path: Path to the DuckDB file. If None, uses default location.
+        auto_rebuild: If True (default), automatically rebuild from
+            events.jsonl when projection version mismatch is detected.
 
     Returns:
         The StatsDB instance.
@@ -1376,6 +1784,19 @@ def get_stats_db(db_path: Optional[Path] = None) -> StatsDB:
                 # Default to .runs/.stats.duckdb
                 db_path = Path("swarm/runs/.stats.duckdb")
             _global_db = StatsDB(db_path)
+
+            # Trigger connection to perform version check
+            _ = _global_db.connection
+
+            # Auto-rebuild if needed
+            if auto_rebuild and _global_db.needs_rebuild:
+                logger.info("Projection version mismatch detected, rebuilding from events.jsonl...")
+                stats = _global_db.rebuild_all_from_events()
+                logger.info(
+                    "Auto-rebuild complete: %d runs, %d events",
+                    stats.get("runs_succeeded", 0),
+                    stats.get("events_ingested", 0),
+                )
 
         return _global_db
 
@@ -1453,10 +1874,7 @@ def rebuild_stats_db(
             logger.warning("Runs directory does not exist: %s", runs_dir)
             return stats
 
-        run_ids = [
-            d.name for d in runs_dir.iterdir()
-            if d.is_dir() and not d.name.startswith(".")
-        ]
+        run_ids = [d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
 
     logger.info("Rebuilding stats DB from %d runs", len(run_ids))
 
@@ -1480,12 +1898,14 @@ def rebuild_stats_db(
                         event = json.loads(line)
                         events.append(event)
                     except json.JSONDecodeError as e:
-                        stats["errors"].append({
-                            "run_id": run_id,
-                            "file": "events.jsonl",
-                            "line": line_num,
-                            "error": str(e),
-                        })
+                        stats["errors"].append(
+                            {
+                                "run_id": run_id,
+                                "file": "events.jsonl",
+                                "line": line_num,
+                                "error": str(e),
+                            }
+                        )
 
             if events:
                 # Ingest events into DuckDB
@@ -1526,11 +1946,13 @@ def rebuild_stats_db(
                             stats["envelopes_processed"] += 1
 
                         except (json.JSONDecodeError, IOError) as e:
-                            stats["errors"].append({
-                                "run_id": run_id,
-                                "file": str(envelope_file),
-                                "error": str(e),
-                            })
+                            stats["errors"].append(
+                                {
+                                    "run_id": run_id,
+                                    "file": str(envelope_file),
+                                    "error": str(e),
+                                }
+                            )
             finally:
                 _ingestion_context.active = False
 
@@ -1538,10 +1960,12 @@ def rebuild_stats_db(
 
         except Exception as e:
             logger.warning("Error processing run %s: %s", run_id, e)
-            stats["errors"].append({
-                "run_id": run_id,
-                "error": str(e),
-            })
+            stats["errors"].append(
+                {
+                    "run_id": run_id,
+                    "error": str(e),
+                }
+            )
 
     db.close()
 
@@ -1646,7 +2070,7 @@ def main():
             db_path=args.db_path,
             run_ids=args.run_ids,
         )
-        print(f"\nRebuild complete:")
+        print("\nRebuild complete:")
         print(f"  Runs processed: {result['runs_processed']}")
         print(f"  Events ingested: {result['events_ingested']}")
         print(f"  Envelopes processed: {result['envelopes_processed']}")
@@ -1675,18 +2099,16 @@ def main():
 
     elif args.command == "doctor":
         from .event_validator import (
+            format_violations,
             validate_run_from_db,
             validate_run_from_disk,
-            format_violations,
         )
         from .storage import RUNS_DIR
 
         runs_dir = args.runs_dir or RUNS_DIR
 
         if args.from_disk:
-            violations = validate_run_from_disk(
-                args.run_id, runs_dir, strict=args.strict
-            )
+            violations = validate_run_from_disk(args.run_id, runs_dir, strict=args.strict)
         else:
             db = get_stats_db()
             violations = validate_run_from_db(args.run_id, db, strict=args.strict)

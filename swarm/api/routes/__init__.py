@@ -9,15 +9,19 @@ This package contains the FastAPI routers for:
 - compile: Compile preview endpoints for prompt inspection
 - facts: Inventory marker extraction and summary endpoints
 - evolution: Evolution patch parsing and application endpoints
+- boundary: Boundary review aggregation endpoints
+- db: Database health, rebuild, and statistics endpoints
 """
 
-from .specs import router as specs_router
-from .runs import router as runs_router
-from .events import router as events_router
-from .wisdom import router as wisdom_router
+from .boundary import router as boundary_router
 from .compile import router as compile_router
-from .facts import router as facts_router
+from .db import router as db_router
+from .events import router as events_router
 from .evolution import router as evolution_router
+from .facts import router as facts_router
+from .runs import router as runs_router
+from .specs import router as specs_router
+from .wisdom import router as wisdom_router
 
 __all__ = [
     "specs_router",
@@ -27,4 +31,6 @@ __all__ = [
     "compile_router",
     "facts_router",
     "evolution_router",
+    "boundary_router",
+    "db_router",
 ]

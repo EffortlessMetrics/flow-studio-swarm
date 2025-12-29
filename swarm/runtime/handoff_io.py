@@ -21,10 +21,12 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from swarm.runtime.path_helpers import (
     ensure_handoff_dir,
+)
+from swarm.runtime.path_helpers import (
     handoff_envelope_path as make_handoff_envelope_path,
 )
 
@@ -462,6 +464,7 @@ def add_assumption(
     # Auto-generate ID if not provided
     if "assumption_id" not in assumption_entry:
         import uuid
+
         assumption_entry["assumption_id"] = f"asm-{uuid.uuid4().hex[:8]}"
 
     # Add timestamp if not present
@@ -535,6 +538,7 @@ def add_decision(
     # Auto-generate ID if not provided
     if "decision_id" not in decision_entry:
         import uuid
+
         decision_entry["decision_id"] = f"dec-{uuid.uuid4().hex[:8]}"
 
     # Add timestamp if not present

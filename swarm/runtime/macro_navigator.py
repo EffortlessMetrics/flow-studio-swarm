@@ -66,12 +66,11 @@ from __future__ import annotations
 
 import logging
 import re
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 from swarm.runtime.types import (
     FlowOutcome,
@@ -81,11 +80,8 @@ from swarm.runtime.types import (
     MacroAction,
     MacroPolicy,
     MacroRoutingDecision,
-    MacroRoutingRule,
     RunPlanSpec,
     RunState,
-    flow_result_to_dict,
-    macro_routing_decision_to_dict,
 )
 
 logger = logging.getLogger(__name__)
@@ -480,9 +476,8 @@ class ConstraintEvaluator:
             bounce_key = f"{source}->{target}"
             alt_key = f"{target}->{source}"
 
-            current_count = (
-                context.bounce_counts.get(bounce_key, 0)
-                + context.bounce_counts.get(alt_key, 0)
+            current_count = context.bounce_counts.get(bounce_key, 0) + context.bounce_counts.get(
+                alt_key, 0
             )
 
             if current_count >= max_count:
@@ -635,9 +630,7 @@ def extract_flow_result(
         gate_verdict = _extract_gate_verdict(flow_envelopes, artifacts_base)
         if gate_verdict in (GateVerdict.BOUNCE_BUILD, GateVerdict.BOUNCE_PLAN):
             outcome = FlowOutcome.BOUNCED
-            bounce_target = (
-                "build" if gate_verdict == GateVerdict.BOUNCE_BUILD else "plan"
-            )
+            bounce_target = "build" if gate_verdict == GateVerdict.BOUNCE_BUILD else "plan"
 
     return FlowResult(
         flow_key=flow_key,
@@ -837,7 +830,7 @@ class MacroNavigator:
             return MacroRoutingDecision(
                 action=MacroAction.TERMINATE,
                 reason=f"Flow '{completed_flow}' exceeded max repeats "
-                       f"({self._run_plan.macro_policy.max_repeats_per_flow})",
+                f"({self._run_plan.macro_policy.max_repeats_per_flow})",
                 warnings=[f"Flow {completed_flow} repeated too many times"],
             )
 
@@ -861,9 +854,7 @@ class MacroNavigator:
                     proposed_next_flow = sequence[idx + 1]
 
         # Check hard constraints with knowledge of proposed next flow
-        constraint_result = self._check_constraints(
-            completed_flow, flow_result, proposed_next_flow
-        )
+        constraint_result = self._check_constraints(completed_flow, flow_result, proposed_next_flow)
         if constraint_result:
             return constraint_result
 
@@ -881,16 +872,16 @@ class MacroNavigator:
 
     def _record_execution(self, flow_key: str) -> None:
         """Record a flow execution for tracking."""
-        self._flow_execution_counts[flow_key] = (
-            self._flow_execution_counts.get(flow_key, 0) + 1
-        )
+        self._flow_execution_counts[flow_key] = self._flow_execution_counts.get(flow_key, 0) + 1
         self._total_flow_executions += 1
 
-        self._routing_history.append({
-            "flow": flow_key,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "execution_number": self._flow_execution_counts[flow_key],
-        })
+        self._routing_history.append(
+            {
+                "flow": flow_key,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "execution_number": self._flow_execution_counts[flow_key],
+            }
+        )
 
     def _record_bounce(self, from_flow: str, to_flow: Optional[str]) -> None:
         """Record a bounce between flows for constraint tracking.
@@ -949,9 +940,7 @@ class MacroNavigator:
         constraints_checked: List[str] = []
 
         for constraint in self._parsed_constraints:
-            is_valid, violation = self._constraint_evaluator.evaluate(
-                constraint, context
-            )
+            is_valid, violation = self._constraint_evaluator.evaluate(constraint, context)
             constraints_checked.append(constraint.raw_text)
 
             if not is_valid and violation is not None:
@@ -965,9 +954,7 @@ class MacroNavigator:
         if violations:
             # Sort by severity: TERMINATE > PAUSE
             severity_order = {MacroAction.TERMINATE: 0, MacroAction.PAUSE: 1}
-            violations.sort(
-                key=lambda v: severity_order.get(v.suggested_action, 2)
-            )
+            violations.sort(key=lambda v: severity_order.get(v.suggested_action, 2))
 
             most_severe = violations[0]
 
@@ -979,9 +966,7 @@ class MacroNavigator:
                 action=most_severe.suggested_action,
                 reason=f"Constraint violation: {combined_reason}",
                 constraints_checked=constraints_checked,
-                warnings=[
-                    f"Violated: {v.constraint.raw_text}" for v in violations
-                ],
+                warnings=[f"Violated: {v.constraint.raw_text}" for v in violations],
             )
 
         return None

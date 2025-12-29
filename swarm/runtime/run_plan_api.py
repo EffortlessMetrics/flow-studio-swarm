@@ -37,7 +37,6 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -47,13 +46,12 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from .types import (
-    RunPlanSpec,
-    MacroPolicy,
-    MacroRoutingRule,
-    MacroAction,
     HumanPolicy,
-    run_plan_spec_to_dict,
+    MacroAction,
+    MacroPolicy,
+    RunPlanSpec,
     run_plan_spec_from_dict,
+    run_plan_spec_to_dict,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,6 +76,7 @@ class PlanMetadata:
         tags: Tags for filtering/search.
         is_default: Whether this is a system default plan.
     """
+
     plan_id: str
     name: str
     description: str = ""
@@ -141,6 +140,7 @@ class StoredPlan:
         metadata: Plan metadata (id, name, timestamps).
         spec: The actual RunPlanSpec.
     """
+
     metadata: PlanMetadata
     spec: RunPlanSpec
 
@@ -518,6 +518,7 @@ class RunPlanAPI:
 
         # Deep copy the spec
         import copy
+
         new_spec = copy.deepcopy(source.spec)
 
         new_plan = StoredPlan(

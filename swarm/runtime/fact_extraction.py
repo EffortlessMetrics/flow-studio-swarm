@@ -90,9 +90,7 @@ MARKER_PATTERNS: Dict[str, Pattern[str]] = {
 }
 
 # Simple pattern to find any marker (for line number detection)
-ANY_MARKER_PATTERN = re.compile(
-    r"\b(REQ|SOL|TRC|ASM|DEC)_(\d{3})\b", re.IGNORECASE
-)
+ANY_MARKER_PATTERN = re.compile(r"\b(REQ|SOL|TRC|ASM|DEC)_(\d{3})\b", re.IGNORECASE)
 
 # Context window: number of characters before/after marker to capture
 CONTEXT_WINDOW = 100
@@ -261,6 +259,7 @@ def extract_facts_from_text(
     seen_markers: set = set()  # Deduplicate markers
 
     from datetime import datetime, timezone
+
     extracted_at = datetime.now(timezone.utc).isoformat() + "Z"
 
     for marker_type, pattern in MARKER_PATTERNS.items():
@@ -519,7 +518,9 @@ def extract_facts_from_run(
         if key not in seen:
             seen[key] = fact
 
-    result.facts = sorted(seen.values(), key=lambda f: (f.flow_key or "", f.marker_type, f.marker_id))
+    result.facts = sorted(
+        seen.values(), key=lambda f: (f.flow_key or "", f.marker_type, f.marker_id)
+    )
     result.source_files = sorted(set(result.source_files))
 
     return result
@@ -636,7 +637,7 @@ def query_facts(
         return []
 
     # Use StatsDB's query methods if available
-    if hasattr(db, 'get_facts_for_run') and run_id:
+    if hasattr(db, "get_facts_for_run") and run_id:
         try:
             if marker_type:
                 facts = db.get_facts_by_marker_type(run_id, marker_type)
@@ -652,21 +653,23 @@ def query_facts(
             for fact in facts:
                 # Extract source location from metadata
                 metadata = fact.metadata or {}
-                results.append({
-                    "run_id": fact.run_id,
-                    "flow_key": fact.flow_key,
-                    "step_id": fact.step_id,
-                    "agent_key": fact.agent_key,
-                    "marker_type": fact.marker_type,
-                    "marker_id": fact.marker_id,
-                    "content": fact.content,
-                    "source_file": metadata.get("source_file", ""),
-                    "source_line": metadata.get("source_line", 0),
-                    "context": metadata.get("context", ""),
-                    "extracted_at": (
-                        fact.extracted_at.isoformat() if fact.extracted_at else None
-                    ),
-                })
+                results.append(
+                    {
+                        "run_id": fact.run_id,
+                        "flow_key": fact.flow_key,
+                        "step_id": fact.step_id,
+                        "agent_key": fact.agent_key,
+                        "marker_type": fact.marker_type,
+                        "marker_id": fact.marker_id,
+                        "content": fact.content,
+                        "source_file": metadata.get("source_file", ""),
+                        "source_line": metadata.get("source_line", 0),
+                        "context": metadata.get("context", ""),
+                        "extracted_at": (
+                            fact.extracted_at.isoformat() if fact.extracted_at else None
+                        ),
+                    }
+                )
             return results
         except Exception as e:
             logger.warning("Failed to query facts via StatsDB methods: %s", e)
@@ -700,24 +703,27 @@ def query_facts(
         for r in results:
             # Parse metadata JSON for source location
             import json as json_mod
+
             try:
                 metadata = json_mod.loads(r[7]) if r[7] else {}
             except (json_mod.JSONDecodeError, TypeError):
                 metadata = {}
 
-            parsed_results.append({
-                "run_id": r[0],
-                "flow_key": r[1],
-                "step_id": r[2],
-                "agent_key": r[3],
-                "marker_type": r[4],
-                "marker_id": r[5],
-                "content": r[6],
-                "source_file": metadata.get("source_file", ""),
-                "source_line": metadata.get("source_line", 0),
-                "context": metadata.get("context", ""),
-                "extracted_at": r[8].isoformat() if r[8] else None,
-            })
+            parsed_results.append(
+                {
+                    "run_id": r[0],
+                    "flow_key": r[1],
+                    "step_id": r[2],
+                    "agent_key": r[3],
+                    "marker_type": r[4],
+                    "marker_id": r[5],
+                    "content": r[6],
+                    "source_file": metadata.get("source_file", ""),
+                    "source_line": metadata.get("source_line", 0),
+                    "context": metadata.get("context", ""),
+                    "extracted_at": r[8].isoformat() if r[8] else None,
+                }
+            )
         return parsed_results
     except Exception as e:
         logger.warning("Failed to query facts: %s", e)
@@ -848,7 +854,7 @@ def main():
     args = parser.parse_args()
 
     # Determine runs directory
-    from .storage import RUNS_DIR, EXAMPLES_DIR, find_run_path
+    from .storage import find_run_path
 
     if args.runs_dir:
         run_base = args.runs_dir / args.run_id
@@ -888,9 +894,7 @@ def main():
 
     # Filter by marker type if specified
     if args.marker_type:
-        result.facts = [
-            f for f in result.facts if f.marker_type == args.marker_type.upper()
-        ]
+        result.facts = [f for f in result.facts if f.marker_type == args.marker_type.upper()]
 
     # Ingest if requested
     if args.ingest:
@@ -926,7 +930,9 @@ def main():
             print(f"{type_desc}s ({len(facts)}):")
             for fact in facts:
                 source = Path(fact.source_file).name
-                print(f"  {fact.marker_id}: {fact.content[:60]}{'...' if len(fact.content) > 60 else ''}")
+                print(
+                    f"  {fact.marker_id}: {fact.content[:60]}{'...' if len(fact.content) > 60 else ''}"
+                )
                 print(f"    Source: {source}:{fact.source_line}")
             print()
 

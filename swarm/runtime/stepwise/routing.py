@@ -20,8 +20,7 @@ The routing module is stateless - loop state and receipt reading are passed in.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple
 
 from swarm.config.flow_registry import FlowDefinition, StepDefinition
 from swarm.runtime.types import (
@@ -72,9 +71,7 @@ def create_routing_signal(
         )
 
     # Fall back to config-based routing
-    return _create_routing_signal_from_config(
-        step, result, loop_state, receipt_reader
-    )
+    return _create_routing_signal_from_config(step, result, loop_state, receipt_reader)
 
 
 def _create_routing_signal_from_config(
@@ -125,9 +122,7 @@ def _create_routing_signal_from_config(
             reason = "flow_complete_linear"
 
     elif routing.kind == "microloop":
-        result_signal = _handle_microloop_routing(
-            step, result, loop_state, routing, receipt_reader
-        )
+        result_signal = _handle_microloop_routing(step, result, loop_state, routing, receipt_reader)
         return result_signal
 
     elif routing.kind == "branch":
@@ -465,9 +460,7 @@ def route_step(
         return None, "flow_complete_linear"
 
     elif routing.kind == "microloop":
-        return _route_microloop(
-            current_step, routing, loop_state, run_id, flow_key, receipt_reader
-        )
+        return _route_microloop(current_step, routing, loop_state, run_id, flow_key, receipt_reader)
 
     elif routing.kind == "branch":
         # Branch routing based on result values

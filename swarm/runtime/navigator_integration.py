@@ -39,45 +39,41 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
+
+# Import MAX_DETOUR_DEPTH from orchestrator
+from swarm.runtime.stepwise.orchestrator import MAX_DETOUR_DEPTH
 
 from .navigator import (
+    DetourRequest,
+    FileChangesSummary,
     Navigator,
     NavigatorInput,
     NavigatorOutput,
     NextStepBrief,
-    RouteIntent,
-    RouteProposal,
-    EdgeCandidate,
-    VerificationSummary,
-    FileChangesSummary,
-    StallSignals,
     ProgressTracker,
     ProposedEdge,
-    ProposedNode,
-    DetourRequest,
+    RouteIntent,
+    RouteProposal,
+    StallSignals,
+    VerificationSummary,
     extract_candidate_edges_from_graph,
     navigator_output_to_dict,
 )
+from .router import FlowGraph
 from .sidequest_catalog import (
     SidequestCatalog,
-    SidequestDefinition,
     load_default_catalog,
-    sidequests_to_navigator_options,
 )
 from .station_library import StationLibrary, load_station_library
 from .types import (
     HandoffEnvelope,
-    RunState,
+    InjectedNodeSpec,
     RoutingDecision,
     RoutingSignal,
     RunEvent,
-    InjectedNodeSpec,
+    RunState,
 )
-from .router import FlowGraph
-
-# Import MAX_DETOUR_DEPTH from orchestrator
-from swarm.runtime.stepwise.orchestrator import MAX_DETOUR_DEPTH
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +140,7 @@ def rewrite_pause_to_detour(
 
     # Deep copy to avoid mutating the original
     from copy import deepcopy
+
     rewritten = deepcopy(nav_output)
 
     # Rewrite intent to DETOUR
@@ -232,6 +229,7 @@ def extract_file_changes_summary(
 
     # Compute change signature for stall detection
     import hashlib
+
     sig_input = "|".join(sorted(all_paths))
     change_signature = hashlib.sha256(sig_input.encode()).hexdigest()[:16]
 
@@ -270,17 +268,25 @@ def build_navigation_context(
 
     # Build context for sidequest trigger evaluation
     trigger_context = {
-        "verification_passed": verification_result.get("passed", True) if verification_result else True,
+        "verification_passed": verification_result.get("passed", True)
+        if verification_result
+        else True,
         "stall_signals": {
             "is_stalled": stall_signals.is_stalled if stall_signals else False,
             "stall_count": stall_signals.stall_count if stall_signals else 0,
-            "same_failure_signature": stall_signals.same_failure_signature if stall_signals else False,
-        } if stall_signals else {},
+            "same_failure_signature": stall_signals.same_failure_signature
+            if stall_signals
+            else False,
+        }
+        if stall_signals
+        else {},
         "changed_paths": (
-            file_changes.get("modified", []) +
-            file_changes.get("added", []) +
-            file_changes.get("deleted", [])
-        ) if file_changes else [],
+            file_changes.get("modified", [])
+            + file_changes.get("added", [])
+            + file_changes.get("deleted", [])
+        )
+        if file_changes
+        else [],
         "iteration": iteration,
     }
 
@@ -289,6 +295,7 @@ def build_navigation_context(
     if sidequest_catalog:
         applicable = sidequest_catalog.get_applicable_sidequests(trigger_context, run_id)
         from .navigator import SidequestOption
+
         sidequest_options = [
             SidequestOption(
                 sidequest_id=sq.sidequest_id,
@@ -437,19 +444,22 @@ def apply_detour_request(
         return None
 
     # Get steps from sidequest (handles both single and multi-step)
-    steps = sidequest.to_steps() if hasattr(sidequest, 'to_steps') else []
+    steps = sidequest.to_steps() if hasattr(sidequest, "to_steps") else []
     if not steps:
         # Fallback for simple sidequests
-        steps = [type('Step', (), {'station_id': sidequest.station_id, 'template_id': None})()]
+        steps = [type("Step", (), {"station_id": sidequest.station_id, "template_id": None})()]
 
     total_steps = len(steps)
 
     # Push resume point (where to continue after detour)
     resume_at = detour.resume_at or current_node
-    run_state.push_resume(resume_at, {
-        "detour_reason": detour.objective,
-        "sidequest_id": detour.sidequest_id,
-    })
+    run_state.push_resume(
+        resume_at,
+        {
+            "detour_reason": detour.objective,
+            "sidequest_id": detour.sidequest_id,
+        },
+    )
 
     # Push interruption frame with multi-step tracking
     run_state.push_interruption(
@@ -471,8 +481,12 @@ def apply_detour_request(
         node_id = f"sq-{detour.sidequest_id}-{i}"
 
         # Get station_id from step (handle different step formats)
-        station_id = getattr(step, 'station_id', None) or getattr(step, 'template_id', None) or sidequest.station_id
-        template_id = getattr(step, 'template_id', None)
+        station_id = (
+            getattr(step, "station_id", None)
+            or getattr(step, "template_id", None)
+            or sidequest.station_id
+        )
+        template_id = getattr(step, "template_id", None)
 
         # Create full execution spec for this node
         spec = InjectedNodeSpec(
@@ -480,7 +494,7 @@ def apply_detour_request(
             station_id=station_id,
             template_id=template_id,
             agent_key=station_id,  # Default to station_id as agent key
-            role=f"Sidequest {detour.sidequest_id} step {i+1}/{total_steps}",
+            role=f"Sidequest {detour.sidequest_id} step {i + 1}/{total_steps}",
             params={
                 "objective": detour.objective,
                 "step_index": i,
@@ -501,7 +515,10 @@ def apply_detour_request(
 
     logger.info(
         "Detour injected: %s (%d steps, first=%s, resume_at=%s)",
-        detour.sidequest_id, total_steps, first_node_id, resume_at,
+        detour.sidequest_id,
+        total_steps,
+        first_node_id,
+        resume_at,
     )
 
     return first_node_id
@@ -543,7 +560,7 @@ def check_and_handle_detour_completion(
     if sidequest_id is None:
         sidequest_id = top_frame.context_snapshot.get("sidequest_id")
     current_step_index = top_frame.current_step_index
-    total_steps = top_frame.total_steps
+    # total_steps is available on top_frame but not needed for advance logic
 
     # Check if multi-step sidequest has more steps
     if sidequest_catalog and sidequest_id:
@@ -562,7 +579,10 @@ def check_and_handle_detour_completion(
 
                 logger.info(
                     "Multi-step sidequest %s advancing to step %d/%d: %s",
-                    sidequest_id, next_step_index + 1, len(steps), next_node_id,
+                    sidequest_id,
+                    next_step_index + 1,
+                    len(steps),
+                    next_node_id,
                 )
                 return next_node_id
 
@@ -579,7 +599,8 @@ def check_and_handle_detour_completion(
             if return_behavior.mode == "bounce_to" and return_behavior.target_node:
                 logger.info(
                     "Sidequest %s bouncing to: %s",
-                    sidequest_id, return_behavior.target_node,
+                    sidequest_id,
+                    return_behavior.target_node,
                 )
                 return return_behavior.target_node
 
@@ -653,10 +674,13 @@ def apply_extend_graph_request(
 
     # Push resume point if this is a return edge
     if proposed.is_return:
-        run_state.push_resume(current_node, {
-            "extend_graph_reason": proposed.why,
-            "injected_node_id": injected_node_id,
-        })
+        run_state.push_resume(
+            current_node,
+            {
+                "extend_graph_reason": proposed.why,
+                "injected_node_id": injected_node_id,
+            },
+        )
 
         # Push interruption frame for map gap
         run_state.push_interruption(
@@ -679,7 +703,9 @@ def apply_extend_graph_request(
 
     logger.info(
         "EXTEND_GRAPH: Injected node %s (target=%s, resume=%s)",
-        injected_node_id, target_id, proposed.is_return,
+        injected_node_id,
+        target_id,
+        proposed.is_return,
     )
 
     return target_id
@@ -707,11 +733,12 @@ def emit_graph_patch_suggested_event(
     """
     if append_event_fn is None:
         from . import storage as storage_module
+
         append_event_fn = storage_module.append_event
 
     patch_payload = {
         "op": "add",
-        "path": f"/edges/-",
+        "path": "/edges/-",
         "value": {
             "edge_id": f"suggested-{proposed_edge.from_node}-{proposed_edge.to_node}",
             "from": proposed_edge.from_node,
@@ -725,9 +752,10 @@ def emit_graph_patch_suggested_event(
         # Also suggest adding the node
         node_patch = {
             "op": "add",
-            "path": f"/nodes/-",
+            "path": "/nodes/-",
             "value": {
-                "node_id": proposed_edge.proposed_node.node_id or f"suggested-{proposed_edge.to_node}",
+                "node_id": proposed_edge.proposed_node.node_id
+                or f"suggested-{proposed_edge.to_node}",
                 "template_id": proposed_edge.proposed_node.template_id or proposed_edge.to_node,
                 "station_id": proposed_edge.proposed_node.station_id,
             },
@@ -832,6 +860,7 @@ def load_next_step_brief(
 @dataclass
 class NavigationResult:
     """Result of navigation decision."""
+
     next_node: Optional[str]
     routing_signal: RoutingSignal
     brief_stored: bool
@@ -1104,6 +1133,7 @@ def emit_navigation_event(
     """
     if append_event_fn is None:
         from . import storage as storage_module
+
         append_event_fn = storage_module.append_event
 
     event = RunEvent(

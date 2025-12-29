@@ -11,7 +11,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 from swarm.runtime.claude_sdk import (
     create_high_trust_options,
@@ -25,11 +25,17 @@ from swarm.runtime.diff_scanner import (
 from swarm.runtime.path_helpers import (
     ensure_llm_dir,
     ensure_receipts_dir,
+)
+from swarm.runtime.path_helpers import (
     handoff_envelope_path as make_handoff_envelope_path,
+)
+from swarm.runtime.path_helpers import (
     transcript_path as make_transcript_path,
 )
 from swarm.runtime.resolvers import (
     build_finalization_prompt as build_finalization_prompt_from_template,
+)
+from swarm.runtime.resolvers import (
     load_envelope_writer_prompt,
 )
 from swarm.runtime.types import (
@@ -155,7 +161,9 @@ async def run_worker_async(
     ctx: StepContext,
     repo_root: Optional[Path],
     profile_id: Optional[str],
-    build_prompt_fn: Callable[[StepContext], Tuple[str, Optional[HistoryTruncationInfo], Optional[str]]],
+    build_prompt_fn: Callable[
+        [StepContext], Tuple[str, Optional[HistoryTruncationInfo], Optional[str]]
+    ],
     stats_db: Optional[Any] = None,
 ) -> Tuple[StepResult, List[RunEvent], str]:
     """Async implementation of run_worker.
@@ -542,8 +550,7 @@ async def finalize_step_async(
                 content = getattr(message, "content", "")
                 if isinstance(content, list):
                     text_parts = [
-                        getattr(b, "text", str(getattr(b, "content", "")))
-                        for b in content
+                        getattr(b, "text", str(getattr(b, "content", ""))) for b in content
                     ]
                     content = "\n".join(text_parts)
                 event_dict["type"] = "message"
@@ -630,9 +637,7 @@ async def finalize_step_async(
                     "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                     "phase": "envelope",
                     "type": "handoff_envelope_written",
-                    "envelope_path": str(
-                        make_handoff_envelope_path(ctx.run_base, ctx.step_id)
-                    ),
+                    "envelope_path": str(make_handoff_envelope_path(ctx.run_base, ctx.step_id)),
                     "status": envelope.status,
                 }
             )

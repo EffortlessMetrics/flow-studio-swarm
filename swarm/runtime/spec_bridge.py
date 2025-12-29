@@ -27,19 +27,19 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from swarm.config.flow_registry import (
+    EngineProfile,
     FlowDefinition,
     StepDefinition,
     StepRouting,
     TeachingNotes,
-    EngineProfile,
 )
 from swarm.config.pack_registry import (
-    FlowSpecData,
-    FlowNode,
     FlowEdge,
+    FlowNode,
+    FlowSpecData,
     PackRegistry,
 )
 
@@ -61,6 +61,7 @@ FLOW_INDEX_MAP = {
 @dataclass
 class EdgeAnalysis:
     """Analysis of edges for a single node to determine routing."""
+
     node_id: str
     outgoing_edges: List[FlowEdge]
     loop_edge: Optional[FlowEdge] = None
@@ -155,7 +156,9 @@ def infer_step_order(nodes: List[FlowNode], edges: List[FlowEdge]) -> List[str]:
     if len(result) != len(node_ids):
         logger.warning(
             "Could not fully order nodes via topology, using definition order. "
-            "Ordered: %d, Total: %d", len(result), len(node_ids)
+            "Ordered: %d, Total: %d",
+            len(result),
+            len(node_ids),
         )
         # Add any missing nodes in their original order
         for node in nodes:
@@ -203,7 +206,7 @@ def node_to_routing(
 
         if edge_analysis.loop_edge.condition:
             cond = edge_analysis.loop_edge.condition
-            if hasattr(cond, 'expression'):
+            if hasattr(cond, "expression"):
                 expr = cond.expression
                 # Parse simple expressions like "status != 'VERIFIED'"
                 if "VERIFIED" in expr:
@@ -363,7 +366,7 @@ def flow_spec_to_definition(
 
     # Extract cross-cutting from policy
     cross_cutting = ()
-    if spec.policy and hasattr(spec.policy, 'suggested_sidequests'):
+    if spec.policy and hasattr(spec.policy, "suggested_sidequests"):
         cross_cutting = tuple(spec.policy.suggested_sidequests or [])
     elif isinstance(spec.policy, dict):
         cross_cutting = tuple(spec.policy.get("suggested_sidequests", []))
@@ -440,24 +443,28 @@ def load_flow_from_json(
         # Parse nodes
         nodes = []
         for node_data in data.get("nodes", []):
-            nodes.append(FlowNode(
-                node_id=node_data.get("node_id", ""),
-                template_id=node_data.get("template_id", ""),
-                params=node_data.get("params", {}),
-                overrides=node_data.get("overrides", {}),
-            ))
+            nodes.append(
+                FlowNode(
+                    node_id=node_data.get("node_id", ""),
+                    template_id=node_data.get("template_id", ""),
+                    params=node_data.get("params", {}),
+                    overrides=node_data.get("overrides", {}),
+                )
+            )
 
         # Parse edges
         edges = []
         for edge_data in data.get("edges", []):
-            edges.append(FlowEdge(
-                edge_id=edge_data.get("edge_id", ""),
-                from_node=edge_data.get("from", ""),
-                to_node=edge_data.get("to", ""),
-                edge_type=edge_data.get("type", "sequence"),
-                priority=edge_data.get("priority", 50),
-                condition=edge_data.get("condition"),
-            ))
+            edges.append(
+                FlowEdge(
+                    edge_id=edge_data.get("edge_id", ""),
+                    from_node=edge_data.get("from", ""),
+                    to_node=edge_data.get("to", ""),
+                    edge_type=edge_data.get("type", "sequence"),
+                    priority=edge_data.get("priority", 50),
+                    condition=edge_data.get("condition"),
+                )
+            )
 
         # Create FlowSpecData
         spec = FlowSpecData(
@@ -533,16 +540,12 @@ class PackFlowRegistry:
             for agent in step.agents:
                 if agent not in self._agent_index:
                     self._agent_index[agent] = []
-                self._agent_index[agent].append(
-                    (flow_def.key, step.id, flow_def.index, step.index)
-                )
+                self._agent_index[agent].append((flow_def.key, step.id, flow_def.index, step.index))
 
         for agent in flow_def.cross_cutting:
             if agent not in self._agent_index:
                 self._agent_index[agent] = []
-            self._agent_index[agent].append(
-                (flow_def.key, None, flow_def.index, 0)
-            )
+            self._agent_index[agent].append((flow_def.key, None, flow_def.index, 0))
 
     @property
     def flow_order(self) -> List[str]:
@@ -579,9 +582,7 @@ class PackFlowRegistry:
                 return step.index
         return 0
 
-    def get_agent_positions(
-        self, agent_key: str
-    ) -> List[Tuple[str, Optional[str], int, int]]:
+    def get_agent_positions(self, agent_key: str) -> List[Tuple[str, Optional[str], int, int]]:
         """Get all positions for an agent."""
         self._ensure_loaded()
         return self._agent_index.get(agent_key, [])

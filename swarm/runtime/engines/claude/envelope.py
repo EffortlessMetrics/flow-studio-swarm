@@ -13,15 +13,14 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from swarm.runtime.handoff_io import (
-    write_handoff_envelope as _write_handoff_envelope_io,
-    validate_envelope as validate_handoff_envelope,
-    is_strict_validation_enabled as _is_strict_validation_enabled,
     EnvelopeValidationError,
+)
+from swarm.runtime.handoff_io import (
+    write_handoff_envelope as _write_handoff_envelope_io,
 )
 from swarm.runtime.types import (
     HandoffEnvelope,
@@ -118,15 +117,14 @@ def write_envelope_to_disk(
 
         # Return the path that was written
         from swarm.runtime.path_helpers import handoff_envelope_path
+
         return handoff_envelope_path(ctx.run_base, ctx.step_id)
 
     except EnvelopeValidationError:
         # Re-raise validation errors in strict mode
         raise
     except (OSError, IOError) as e:
-        logger.warning(
-            "Failed to write handoff envelope for step %s: %s", ctx.step_id, e
-        )
+        logger.warning("Failed to write handoff envelope for step %s: %s", ctx.step_id, e)
         return None
 
 
@@ -175,7 +173,7 @@ async def write_handoff_envelope(
         )
 
     # Import SDK here to avoid circular imports
-    from swarm.runtime.claude_sdk import get_sdk_module, create_high_trust_options
+    from swarm.runtime.claude_sdk import create_high_trust_options, get_sdk_module
 
     sdk = get_sdk_module()
     query = sdk.query
@@ -241,8 +239,7 @@ Error: {step_result.error or "None"}
                 content = getattr(message, "content", "")
                 if isinstance(content, list):
                     text_parts = [
-                        getattr(b, "text", str(getattr(b, "content", "")))
-                        for b in content
+                        getattr(b, "text", str(getattr(b, "content", ""))) for b in content
                     ]
                     content = "\n".join(text_parts)
                 if content:
@@ -284,9 +281,7 @@ Error: {step_result.error or "None"}
                 reason="default_advance",
                 confidence=0.7,
             ),
-            summary=envelope_data.get(
-                "summary", work_summary[:2000] if work_summary else ""
-            ),
+            summary=envelope_data.get("summary", work_summary[:2000] if work_summary else ""),
             artifacts=envelope_data.get("artifacts", {}),
             file_changes=file_changes or {},
             status=envelope_data.get("status", step_result.status),
@@ -302,16 +297,12 @@ Error: {step_result.error or "None"}
         return envelope
 
     except json.JSONDecodeError as e:
-        logger.warning(
-            "Failed to parse envelope writer response as JSON: %s", e
-        )
+        logger.warning("Failed to parse envelope writer response as JSON: %s", e)
         return create_fallback_envelope(
             ctx, step_result, routing_signal, work_summary, file_changes
         )
     except Exception as e:
-        logger.warning(
-            "Envelope writer session failed for step %s: %s", ctx.step_id, e
-        )
+        logger.warning("Envelope writer session failed for step %s: %s", ctx.step_id, e)
         return create_fallback_envelope(
             ctx, step_result, routing_signal, work_summary, file_changes
         )

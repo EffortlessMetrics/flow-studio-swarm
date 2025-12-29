@@ -39,11 +39,14 @@ class EventType:
     # Run lifecycle events
     RUN_STARTED = "run:started"
     RUN_PAUSED = "run:paused"
+    RUN_PAUSING = "run:pausing"  # Graceful pause initiated (waiting for step)
     RUN_RESUMED = "run:resumed"
     RUN_COMPLETED = "run:completed"
     RUN_FAILED = "run:failed"
     RUN_CANCELED = "run:canceled"
     RUN_INTERRUPTED = "run:interrupted"
+    RUN_STOPPING = "run:stopping"  # Graceful stop initiated
+    RUN_STOPPED = "run:stopped"  # Clean stop with savepoint
 
     # Step events
     STEP_STARTED = "step:started"
@@ -60,6 +63,13 @@ class EventType:
     LLM_STARTED = "llm:started"
     LLM_TOKEN = "llm:token"
     LLM_COMPLETED = "llm:completed"
+
+    # Wisdom events
+    WISDOM_PATCH_APPLIED = "wisdom:patch_applied"
+    WISDOM_PATCH_REJECTED = "wisdom:patch_rejected"
+    WISDOM_PATCH_VALIDATED = "wisdom:patch_validated"
+    WISDOM_AUTO_APPLY_STARTED = "wisdom:auto_apply_started"
+    WISDOM_AUTO_APPLY_COMPLETED = "wisdom:auto_apply_completed"
 
     # Error events
     ERROR = "error"
@@ -238,7 +248,7 @@ async def generate_run_events(
                 last_heartbeat = now
 
             # Check for terminal states
-            if status in ("succeeded", "failed", "canceled"):
+            if status in ("succeeded", "failed", "canceled", "stopped"):
                 event_counter += 1
 
                 # Map status to event type
@@ -246,6 +256,7 @@ async def generate_run_events(
                     "succeeded": EventType.RUN_COMPLETED,
                     "failed": EventType.RUN_FAILED,
                     "canceled": EventType.RUN_CANCELED,
+                    "stopped": EventType.RUN_STOPPED,
                 }
 
                 yield format_sse_event(
@@ -254,7 +265,9 @@ async def generate_run_events(
                         "run_id": run_id,
                         "status": status,
                         "completed_at": state.get("completed_at"),
+                        "stopped_at": state.get("stopped_at"),
                         "error": state.get("error"),
+                        "stop_reason": state.get("stop_reason"),
                     },
                     event_id=str(event_counter),
                 )

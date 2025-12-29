@@ -70,6 +70,7 @@ class StationSpec:
         tags: Tags for filtering/search.
         pack_origin: Which pack this station came from.
     """
+
     station_id: str
     name: str
     description: str = ""
@@ -194,19 +195,21 @@ def to_compiler_spec(spec: StationSpec) -> "compiler_types.StationSpec":
     """
     from swarm.spec.types import station_spec_from_dict as compiler_from_dict
 
-    return compiler_from_dict({
-        "id": spec.station_id,
-        "version": spec.version,
-        "title": spec.name,
-        "category": spec.category,
-        "sdk": spec.sdk,
-        "identity": spec.identity,
-        "io": spec.io,
-        "handoff": spec.handoff,
-        "runtime_prompt": spec.runtime_prompt,
-        "invariants": spec.invariants,
-        "routing_hints": spec.routing_hints,
-    })
+    return compiler_from_dict(
+        {
+            "id": spec.station_id,
+            "version": spec.version,
+            "title": spec.name,
+            "category": spec.category,
+            "sdk": spec.sdk,
+            "identity": spec.identity,
+            "io": spec.io,
+            "handoff": spec.handoff,
+            "runtime_prompt": spec.runtime_prompt,
+            "invariants": spec.invariants,
+            "routing_hints": spec.routing_hints,
+        }
+    )
 
 
 # =============================================================================
@@ -381,7 +384,10 @@ DEFAULT_STATIONS: List[Dict[str, Any]] = [
         },
         "handoff": _DEFAULT_HANDOFF,
         "runtime_prompt": {"fragments": [], "template": ""},
-        "invariants": ["Check for common vulnerability patterns", "Flag any secrets or credentials"],
+        "invariants": [
+            "Check for common vulnerability patterns",
+            "Flag any secrets or credentials",
+        ],
         "routing_hints": _DEFAULT_ROUTING_HINTS,
     },
     # Core worker stations (for EXTEND_GRAPH targets)
@@ -768,9 +774,7 @@ class StationLibrary:
         content = json.dumps(data, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
 
-    def get_station_with_etag(
-        self, station_id: str
-    ) -> Tuple[Optional[StationSpec], str]:
+    def get_station_with_etag(self, station_id: str) -> Tuple[Optional[StationSpec], str]:
         """Get a station with its ETag.
 
         Args:
@@ -806,6 +810,7 @@ class StationLibrary:
         station_id = data.get("station_id") or data.get("id", "")
         if station_id:
             import re
+
             if not re.match(r"^[a-zA-Z][a-zA-Z0-9_-]*$", station_id):
                 errors.append(
                     "station_id must start with a letter and contain only "
@@ -818,7 +823,15 @@ class StationLibrary:
             errors.append("version must be a positive integer")
 
         # Category validation
-        valid_categories = {"sidequest", "worker", "critic", "general", "spec", "design", "implementation"}
+        valid_categories = {
+            "sidequest",
+            "worker",
+            "critic",
+            "general",
+            "spec",
+            "design",
+            "implementation",
+        }
         category = data.get("category", "general")
         if category not in valid_categories:
             errors.append(f"category must be one of: {', '.join(sorted(valid_categories))}")
@@ -915,9 +928,7 @@ class StationLibrary:
         # Check ETag
         current_etag = self.compute_etag(station_id)
         if current_etag != expected_etag:
-            raise ValueError(
-                f"ETag mismatch: expected {expected_etag}, got {current_etag}"
-            )
+            raise ValueError(f"ETag mismatch: expected {expected_etag}, got {current_etag}")
 
         # Cannot update default pack stations
         if existing.pack_origin == "default":
@@ -975,9 +986,7 @@ class StationLibrary:
         # Check ETag
         current_etag = self.compute_etag(station_id)
         if current_etag != expected_etag:
-            raise ValueError(
-                f"ETag mismatch: expected {expected_etag}, got {current_etag}"
-            )
+            raise ValueError(f"ETag mismatch: expected {expected_etag}, got {current_etag}")
 
         # Cannot update default pack stations
         if existing.pack_origin == "default":
@@ -1035,9 +1044,7 @@ class StationLibrary:
         if expected_etag:
             current_etag = self.compute_etag(station_id)
             if current_etag != expected_etag:
-                raise ValueError(
-                    f"ETag mismatch: expected {expected_etag}, got {current_etag}"
-                )
+                raise ValueError(f"ETag mismatch: expected {expected_etag}, got {current_etag}")
 
         # Cannot delete default pack stations
         if existing.pack_origin == "default":
@@ -1075,9 +1082,7 @@ class StationLibrary:
             if tag in self._by_tag:
                 self._by_tag[tag].discard(station_id)
 
-    def _deep_merge(
-        self, base: Dict[str, Any], patch: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _deep_merge(self, base: Dict[str, Any], patch: Dict[str, Any]) -> Dict[str, Any]:
         """Deep merge two dictionaries.
 
         Args:
@@ -1089,11 +1094,7 @@ class StationLibrary:
         """
         result = dict(base)
         for key, value in patch.items():
-            if (
-                key in result
-                and isinstance(result[key], dict)
-                and isinstance(value, dict)
-            ):
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
                 result[key] = self._deep_merge(result[key], value)
             else:
                 result[key] = value
@@ -1212,10 +1213,7 @@ class StationLibrary:
             Dictionary representation of the library.
         """
         return {
-            "stations": {
-                sid: station_spec_to_dict(spec)
-                for sid, spec in self._stations.items()
-            },
+            "stations": {sid: station_spec_to_dict(spec) for sid, spec in self._stations.items()},
             "categories": dict(self._by_category),
             "tags": {tag: list(ids) for tag, ids in self._by_tag.items()},
         }

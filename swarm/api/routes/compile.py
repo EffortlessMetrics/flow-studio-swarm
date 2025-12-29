@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -166,10 +165,8 @@ def _compile_from_station(
     )
     from swarm.spec.compiler import (
         build_system_append,
-        build_user_prompt,
         render_template,
     )
-    from swarm.spec.types import FlowStep, RoutingConfig
 
     repo_root = _get_repo_root()
 
@@ -185,18 +182,6 @@ def _compile_from_station(
 
     # Convert to compiler spec format
     station = to_compiler_spec(station_runtime)
-
-    # Create a synthetic FlowStep for compilation
-    step = FlowStep(
-        id=step_id,
-        station=station_id,
-        objective=objective,
-        scope=None,
-        inputs=(),
-        outputs=(),
-        routing=RoutingConfig(),
-        sdk_overrides={},
-    )
 
     # Build template variables
     run_base_path = Path(run_base)
@@ -277,7 +262,9 @@ def _compile_from_station(
     for i, fld in enumerate(station.handoff.required_fields):
         comma = "," if i < len(station.handoff.required_fields) - 1 else ""
         if fld == "status":
-            user_prompt_parts.append(f'  "status": "VERIFIED | UNVERIFIED | PARTIAL | BLOCKED"{comma}')
+            user_prompt_parts.append(
+                f'  "status": "VERIFIED | UNVERIFIED | PARTIAL | BLOCKED"{comma}'
+            )
         elif fld == "summary":
             user_prompt_parts.append(f'  "summary": "2-paragraph summary of work done"{comma}')
         elif fld == "artifacts":
@@ -293,9 +280,7 @@ def _compile_from_station(
     user_prompt = "\n".join(user_prompt_parts)
 
     # Compute prompt hash
-    prompt_hash = hashlib.sha256(
-        (system_prompt + user_prompt).encode("utf-8")
-    ).hexdigest()[:16]
+    prompt_hash = hashlib.sha256((system_prompt + user_prompt).encode("utf-8")).hexdigest()[:16]
 
     # Build verification requirements
     verification_artifacts = []

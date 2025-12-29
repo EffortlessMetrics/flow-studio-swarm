@@ -19,36 +19,40 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
-from swarm.runtime.path_helpers import (
-    ensure_llm_dir,
-    ensure_receipts_dir,
-    handoff_envelope_path as make_handoff_envelope_path,
-    receipt_path as make_receipt_path,
-    transcript_path as make_transcript_path,
-)
-from swarm.runtime.handoff_io import (
-    write_handoff_envelope,
-    update_envelope_routing,
-)
-from swarm.runtime.types import (
-    RoutingDecision,
-    RoutingSignal,
-    RunEvent,
-)
-from swarm.runtime.routing_utils import parse_routing_decision
 from swarm.runtime.claude_sdk import (
     ClaudeSDKClient,
-    create_tool_policy_hook,
     TelemetryData,
     create_dangerous_command_hook,
     create_telemetry_hook,
+    create_tool_policy_hook,
 )
+from swarm.runtime.handoff_io import (
+    update_envelope_routing,
+    write_handoff_envelope,
+)
+from swarm.runtime.path_helpers import (
+    ensure_llm_dir,
+    ensure_receipts_dir,
+)
+from swarm.runtime.path_helpers import (
+    handoff_envelope_path as make_handoff_envelope_path,
+)
+from swarm.runtime.path_helpers import (
+    receipt_path as make_receipt_path,
+)
+from swarm.runtime.path_helpers import (
+    transcript_path as make_transcript_path,
+)
+from swarm.runtime.routing_utils import parse_routing_decision
+from swarm.runtime.types import (
+    RoutingSignal,
+    RunEvent,
+)
+
 from ..async_utils import run_async_safely
 from ..models import StepContext, StepResult
-
 from .prompt_builder import load_agent_persona
 from .stubs import run_step_stub
 
@@ -89,7 +93,9 @@ async def execute_step_session(
             engine._mode,
             engine._check_sdk_available(),
         )
-        result, events = run_step_stub(ctx, engine.engine_id, engine._provider, engine._build_prompt)
+        result, events = run_step_stub(
+            ctx, engine.engine_id, engine._provider, engine._build_prompt
+        )
         return result, events, None
 
     return await _execute_step_session_sdk(engine, ctx, is_terminal)
@@ -182,7 +188,7 @@ async def _execute_step_session_sdk(
         if finalize_result.success and finalize_result.envelope:
             # Enrich envelope with file_changes if available from work phase
             envelope_data = dict(finalize_result.envelope)
-            if hasattr(work_result, 'file_changes') and work_result.file_changes:
+            if hasattr(work_result, "file_changes") and work_result.file_changes:
                 envelope_data["file_changes"] = work_result.file_changes
 
             # Write envelope using unified IO (handles draft + committed)

@@ -44,18 +44,18 @@ from .types import (
     RunEvent,
     RunId,
     RunSpec,
-    RunSummary,
     RunState,
+    RunSummary,
     handoff_envelope_from_dict,
     handoff_envelope_to_dict,
     run_event_from_dict,
     run_event_to_dict,
     run_spec_from_dict,
     run_spec_to_dict,
-    run_summary_from_dict,
-    run_summary_to_dict,
     run_state_from_dict,
     run_state_to_dict,
+    run_summary_from_dict,
+    run_summary_to_dict,
 )
 
 # Module logger
@@ -146,10 +146,7 @@ def _init_seq_from_disk(run_id: str, run_dir: Path) -> None:
             current = _run_sequences.get(run_id, 0)
             if max_seq > current:
                 _run_sequences[run_id] = max_seq
-                logger.debug(
-                    "Recovered sequence counter for run '%s': max_seq=%d",
-                    run_id, max_seq
-                )
+                logger.debug("Recovered sequence counter for run '%s': max_seq=%d", run_id, max_seq)
 
 
 def _get_run_lock(run_id: RunId) -> threading.Lock:
@@ -235,15 +232,11 @@ def _load_json_safe(path: Path, run_id: str, file_type: str = "file") -> Optiona
             return json.load(f)
     except json.JSONDecodeError as e:
         logger.warning(
-            "Corrupt %s for run '%s' at %s: %s (marking as corrupt)",
-            file_type, run_id, path, e
+            "Corrupt %s for run '%s' at %s: %s (marking as corrupt)", file_type, run_id, path, e
         )
         return None
     except (OSError, IOError) as e:
-        logger.warning(
-            "Failed to read %s for run '%s' at %s: %s",
-            file_type, run_id, path, e
-        )
+        logger.warning("Failed to read %s for run '%s' at %s: %s", file_type, run_id, path, e)
         return None
 
 
@@ -599,14 +592,16 @@ def read_events(run_id: RunId, runs_dir: Path = RUNS_DIR) -> List[RunEvent]:
 
 
 # Navigator event types for Wisdom analysis
-NAVIGATOR_EVENT_TYPES = frozenset({
-    "graph_patch_suggested",   # EXTEND_GRAPH - map gap detected
-    "detour_taken",            # Sidequest invoked
-    "navigation_decision",     # Navigator route choice
-    "sidequest_start",         # Sidequest execution started
-    "sidequest_complete",      # Sidequest finished
-    "loop_stall_detected",     # Progress signature unchanged across loops
-})
+NAVIGATOR_EVENT_TYPES = frozenset(
+    {
+        "graph_patch_suggested",  # EXTEND_GRAPH - map gap detected
+        "detour_taken",  # Sidequest invoked
+        "navigation_decision",  # Navigator route choice
+        "sidequest_start",  # Sidequest execution started
+        "sidequest_complete",  # Sidequest finished
+        "loop_stall_detected",  # Progress signature unchanged across loops
+    }
+)
 
 
 def query_navigator_events(
@@ -677,33 +672,39 @@ def summarize_navigator_events(
         payload = event.payload or {}
 
         if event.event_type == "graph_patch_suggested":
-            summary["map_gaps"].append({
-                "flow_key": event.flow_key,
-                "step_id": event.step_id,
-                "from_node": payload.get("from_node"),
-                "to_node": payload.get("to_node"),
-                "reason": payload.get("reason"),
-                "patch": payload.get("patch"),
-            })
+            summary["map_gaps"].append(
+                {
+                    "flow_key": event.flow_key,
+                    "step_id": event.step_id,
+                    "from_node": payload.get("from_node"),
+                    "to_node": payload.get("to_node"),
+                    "reason": payload.get("reason"),
+                    "patch": payload.get("patch"),
+                }
+            )
 
         elif event.event_type in ("detour_taken", "sidequest_start"):
             sidequest_id = payload.get("sidequest_id", "unknown")
             sidequest_counts[sidequest_id] = sidequest_counts.get(sidequest_id, 0) + 1
 
         elif event.event_type == "loop_stall_detected":
-            summary["stalls"].append({
-                "flow_key": event.flow_key,
-                "step_id": event.step_id,
-                "consecutive_loops": payload.get("consecutive_loops"),
-                "progress_signature": payload.get("progress_signature"),
-            })
+            summary["stalls"].append(
+                {
+                    "flow_key": event.flow_key,
+                    "step_id": event.step_id,
+                    "consecutive_loops": payload.get("consecutive_loops"),
+                    "progress_signature": payload.get("progress_signature"),
+                }
+            )
 
     # Build detour summary with frequency
     for sidequest_id, count in sidequest_counts.items():
-        summary["detours"].append({
-            "sidequest_id": sidequest_id,
-            "invocation_count": count,
-        })
+        summary["detours"].append(
+            {
+                "sidequest_id": sidequest_id,
+                "invocation_count": count,
+            }
+        )
 
     # Preliminary tier classification
     # Tier 2: 3+ occurrences of same map gap pattern
@@ -770,9 +771,7 @@ def discover_legacy_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
             continue
 
         # Check if any flow subdirectory exists
-        has_flow_artifacts = any(
-            (entry / flow_key).is_dir() for flow_key in flow_keys
-        )
+        has_flow_artifacts = any((entry / flow_key).is_dir() for flow_key in flow_keys)
 
         if has_flow_artifacts:
             legacy_runs.append(entry.name)
@@ -801,9 +800,7 @@ def discover_example_runs() -> List[RunId]:
             continue
 
         # Check if any flow subdirectory exists
-        has_flow_artifacts = any(
-            (entry / flow_key).is_dir() for flow_key in flow_keys
-        )
+        has_flow_artifacts = any((entry / flow_key).is_dir() for flow_key in flow_keys)
 
         if has_flow_artifacts:
             example_runs.append(entry.name)
@@ -834,12 +831,14 @@ def list_all_runs(include_examples: bool = True) -> List[Dict[str, Any]]:
                 continue
             seen.add(run_id)
             run_path = EXAMPLES_DIR / run_id
-            results.append({
-                "run_id": run_id,
-                "run_type": "example",
-                "path": str(run_path),
-                "has_meta": (run_path / META_FILE).exists(),
-            })
+            results.append(
+                {
+                    "run_id": run_id,
+                    "run_type": "example",
+                    "path": str(run_path),
+                    "has_meta": (run_path / META_FILE).exists(),
+                }
+            )
 
     # New-style runs with meta.json
     for run_id in list_runs():
@@ -847,12 +846,14 @@ def list_all_runs(include_examples: bool = True) -> List[Dict[str, Any]]:
             continue
         seen.add(run_id)
         run_path = RUNS_DIR / run_id
-        results.append({
-            "run_id": run_id,
-            "run_type": "active",
-            "path": str(run_path),
-            "has_meta": True,
-        })
+        results.append(
+            {
+                "run_id": run_id,
+                "run_type": "active",
+                "path": str(run_path),
+                "has_meta": True,
+            }
+        )
 
     # Legacy runs without meta.json
     for run_id in discover_legacy_runs():
@@ -860,12 +861,14 @@ def list_all_runs(include_examples: bool = True) -> List[Dict[str, Any]]:
             continue
         seen.add(run_id)
         run_path = RUNS_DIR / run_id
-        results.append({
-            "run_id": run_id,
-            "run_type": "active",
-            "path": str(run_path),
-            "has_meta": False,
-        })
+        results.append(
+            {
+                "run_id": run_id,
+                "run_type": "active",
+                "path": str(run_path),
+                "has_meta": False,
+            }
+        )
 
     # Sort: examples first, then by run_id
     results.sort(key=lambda r: (0 if r["run_type"] == "example" else 1, r["run_id"]))
@@ -930,7 +933,9 @@ def read_run_state(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Optional[RunStat
             if disk_envelopes:
                 logger.info(
                     "Recovered %d envelope(s) from disk for run '%s' flow '%s'",
-                    len(disk_envelopes), run_id, state.flow_key
+                    len(disk_envelopes),
+                    run_id,
+                    state.flow_key,
                 )
                 state.handoff_envelopes.update(disk_envelopes)
 
@@ -1051,7 +1056,10 @@ def read_envelope(
     except (KeyError, TypeError) as e:
         logger.warning(
             "Invalid envelope data for run '%s', step '%s' at %s: %s",
-            run_id, step_id, envelope_path, e
+            run_id,
+            step_id,
+            envelope_path,
+            e,
         )
         return None
 
@@ -1168,7 +1176,9 @@ def commit_step_completion(
                 data[key] = value
 
         # Update timestamp (using datetime from .types module via run_state_from_dict)
-        from datetime import datetime as dt, timezone as tz
+        from datetime import datetime as dt
+        from datetime import timezone as tz
+
         data["timestamp"] = dt.now(tz.utc).isoformat() + "Z"
 
         # Step 4: Write updated run_state atomically

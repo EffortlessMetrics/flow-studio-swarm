@@ -14,9 +14,8 @@ These are pure data structures with no dependencies on engine implementations.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from swarm.config.flow_registry import TeachingNotes
 from swarm.runtime.types import HandoffEnvelope, RunEvent, RunSpec

@@ -56,7 +56,7 @@ import string
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional
 
 # Event ID generation: prefer ulid for time-ordered IDs, fall back to uuid4
 try:
@@ -71,6 +71,7 @@ except ImportError:
     def _generate_event_id() -> str:
         """Generate a globally unique event ID using UUID4."""
         return str(uuid.uuid4())
+
 
 # Type aliases
 RunId = str
@@ -93,6 +94,10 @@ class RunStatus(str, Enum):
     FAILED = "failed"
     CANCELED = "canceled"
     PARTIAL = "partial"  # Interrupted mid-run, resumable from saved cursor
+    STOPPING = "stopping"  # Graceful shutdown in progress
+    STOPPED = "stopped"  # Clean stop with savepoint (distinct from failed)
+    PAUSING = "pausing"  # Waiting for current step to complete before pause
+    PAUSED = "paused"  # Paused at a clean boundary, resumable
 
 
 class SDLCStatus(str, Enum):
@@ -137,8 +142,8 @@ class ConfidenceLevel(str, Enum):
 class AssumptionStatus(str, Enum):
     """Status of an assumption through its lifecycle."""
 
-    ACTIVE = "active"          # Assumption is currently in effect
-    RESOLVED = "resolved"      # Assumption was confirmed or clarified
+    ACTIVE = "active"  # Assumption is currently in effect
+    RESOLVED = "resolved"  # Assumption was confirmed or clarified
     INVALIDATED = "invalidated"  # Assumption was proven wrong
 
 
@@ -625,9 +630,7 @@ def generate_run_id() -> RunId:
     """
     now = datetime.now(timezone.utc)
     timestamp = now.strftime("%Y%m%d-%H%M%S")
-    suffix = "".join(
-        secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6)
-    )
+    suffix = "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6))
     return f"run-{timestamp}-{suffix}"
 
 
@@ -1085,8 +1088,12 @@ def assumption_entry_to_dict(entry: AssumptionEntry) -> Dict[str, Any]:
         "statement": entry.statement,
         "rationale": entry.rationale,
         "impact_if_wrong": entry.impact_if_wrong,
-        "confidence": entry.confidence.value if isinstance(entry.confidence, ConfidenceLevel) else entry.confidence,
-        "status": entry.status.value if isinstance(entry.status, AssumptionStatus) else entry.status,
+        "confidence": entry.confidence.value
+        if isinstance(entry.confidence, ConfidenceLevel)
+        else entry.confidence,
+        "status": entry.status.value
+        if isinstance(entry.status, AssumptionStatus)
+        else entry.status,
         "tags": list(entry.tags),
         "timestamp": _datetime_to_iso(entry.timestamp),
         "resolution_note": entry.resolution_note,
@@ -1104,17 +1111,11 @@ def assumption_entry_from_dict(data: Dict[str, Any]) -> AssumptionEntry:
     """
     confidence_value = data.get("confidence", "medium")
     confidence = (
-        ConfidenceLevel(confidence_value)
-        if isinstance(confidence_value, str)
-        else confidence_value
+        ConfidenceLevel(confidence_value) if isinstance(confidence_value, str) else confidence_value
     )
 
     status_value = data.get("status", "active")
-    status = (
-        AssumptionStatus(status_value)
-        if isinstance(status_value, str)
-        else status_value
-    )
+    status = AssumptionStatus(status_value) if isinstance(status_value, str) else status_value
 
     return AssumptionEntry(
         assumption_id=data.get("assumption_id", ""),
@@ -1192,7 +1193,9 @@ def routing_signal_to_dict(signal: RoutingSignal) -> Dict[str, Any]:
         Dictionary representation suitable for JSON/YAML serialization.
     """
     result = {
-        "decision": signal.decision.value if isinstance(signal.decision, RoutingDecision) else signal.decision,
+        "decision": signal.decision.value
+        if isinstance(signal.decision, RoutingDecision)
+        else signal.decision,
         "next_step_id": signal.next_step_id,
         "route": signal.route,
         "reason": signal.reason,
@@ -1223,7 +1226,9 @@ def routing_signal_from_dict(data: Dict[str, Any]) -> RoutingSignal:
         next_flow, loop_count, exit_condition_met, or explanation fields.
     """
     decision_value = data.get("decision", "advance")
-    decision = RoutingDecision(decision_value) if isinstance(decision_value, str) else decision_value
+    decision = (
+        RoutingDecision(decision_value) if isinstance(decision_value, str) else decision_value
+    )
 
     explanation = None
     if "explanation" in data:
@@ -1289,9 +1294,7 @@ def handoff_envelope_to_dict(envelope: HandoffEnvelope) -> Dict[str, Any]:
             assumption_entry_to_dict(a) for a in envelope.assumptions_made
         ]
     if envelope.decisions_made:
-        result["decisions_made"] = [
-            decision_log_entry_to_dict(d) for d in envelope.decisions_made
-        ]
+        result["decisions_made"] = [decision_log_entry_to_dict(d) for d in envelope.decisions_made]
 
     return result
 
@@ -1318,12 +1321,8 @@ def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
     routing_audit = data.get("routing_audit")
 
     # Parse assumptions and decisions if present (backward compatible)
-    assumptions_made = [
-        assumption_entry_from_dict(a) for a in data.get("assumptions_made", [])
-    ]
-    decisions_made = [
-        decision_log_entry_from_dict(d) for d in data.get("decisions_made", [])
-    ]
+    assumptions_made = [assumption_entry_from_dict(a) for a in data.get("assumptions_made", [])]
+    decisions_made = [decision_log_entry_from_dict(d) for d in data.get("decisions_made", [])]
 
     return HandoffEnvelope(
         step_id=data.get("step_id", ""),
@@ -1444,6 +1443,7 @@ class InjectedNodeSpec:
         sequence_index: For multi-step sidequests, the step index (0-based).
         total_in_sequence: Total steps in the sequence this belongs to.
     """
+
     node_id: str
     station_id: str
     template_id: Optional[str] = None
@@ -1849,13 +1849,9 @@ def run_state_to_dict(state: RunState) -> Dict[str, Any]:
         "flow_transition_history": list(state.flow_transition_history),
         # Detour support fields
         "interruption_stack": [
-            interruption_frame_to_dict(frame)
-            for frame in state.interruption_stack
+            interruption_frame_to_dict(frame) for frame in state.interruption_stack
         ],
-        "resume_stack": [
-            resume_point_to_dict(point)
-            for point in state.resume_stack
-        ],
+        "resume_stack": [resume_point_to_dict(point) for point in state.resume_stack],
         "injected_nodes": list(state.injected_nodes),
         "injected_node_specs": {
             node_id: injected_node_spec_to_dict(spec)
@@ -1864,7 +1860,7 @@ def run_state_to_dict(state: RunState) -> Dict[str, Any]:
         "completed_nodes": list(state.completed_nodes),
         # Schema-compatible aliases
         "artifacts": {
-            step_id: env.artifacts if hasattr(env, 'artifacts') else {}
+            step_id: env.artifacts if hasattr(env, "artifacts") else {}
             for step_id, env in state.handoff_envelopes.items()
         },
     }
@@ -1892,16 +1888,12 @@ def run_state_from_dict(data: Dict[str, Any]) -> RunState:
     # Parse interruption stack
     interruption_stack_data = data.get("interruption_stack", [])
     interruption_stack = [
-        interruption_frame_from_dict(frame_data)
-        for frame_data in interruption_stack_data
+        interruption_frame_from_dict(frame_data) for frame_data in interruption_stack_data
     ]
 
     # Parse resume stack
     resume_stack_data = data.get("resume_stack", [])
-    resume_stack = [
-        resume_point_from_dict(point_data)
-        for point_data in resume_stack_data
-    ]
+    resume_stack = [resume_point_from_dict(point_data) for point_data in resume_stack_data]
 
     # Parse injected node specs
     injected_node_specs_data = data.get("injected_node_specs", {})
@@ -1947,12 +1939,12 @@ def run_state_from_dict(data: Dict[str, Any]) -> RunState:
 class MacroAction(str, Enum):
     """Action to take between flows."""
 
-    ADVANCE = "advance"      # Proceed to next flow in sequence
-    REPEAT = "repeat"        # Re-run the same flow (e.g., after bounce)
-    GOTO = "goto"            # Jump to a specific flow (non-sequential)
-    SKIP = "skip"            # Skip a flow (e.g., skip deploy if not ready)
+    ADVANCE = "advance"  # Proceed to next flow in sequence
+    REPEAT = "repeat"  # Re-run the same flow (e.g., after bounce)
+    GOTO = "goto"  # Jump to a specific flow (non-sequential)
+    SKIP = "skip"  # Skip a flow (e.g., skip deploy if not ready)
     TERMINATE = "terminate"  # End the run (success or failure)
-    PAUSE = "pause"          # Pause for human intervention between flows
+    PAUSE = "pause"  # Pause for human intervention between flows
 
 
 class GateVerdict(str, Enum):
@@ -1961,22 +1953,22 @@ class GateVerdict(str, Enum):
     These map to the merge-decider agent's output in merge_decision.md.
     """
 
-    MERGE = "MERGE"                    # Approved for deployment
+    MERGE = "MERGE"  # Approved for deployment
     MERGE_WITH_CONDITIONS = "MERGE_WITH_CONDITIONS"  # Approved with monitoring
-    BOUNCE_BUILD = "BOUNCE_BUILD"      # Fixable issues, return to build
-    BOUNCE_PLAN = "BOUNCE_PLAN"        # Design issues, return to plan
-    ESCALATE = "ESCALATE"              # Needs human decision
-    BLOCK = "BLOCK"                    # Hard blocker, cannot proceed
+    BOUNCE_BUILD = "BOUNCE_BUILD"  # Fixable issues, return to build
+    BOUNCE_PLAN = "BOUNCE_PLAN"  # Design issues, return to plan
+    ESCALATE = "ESCALATE"  # Needs human decision
+    BLOCK = "BLOCK"  # Hard blocker, cannot proceed
 
 
 class FlowOutcome(str, Enum):
     """Outcome status of a completed flow."""
 
-    SUCCEEDED = "succeeded"            # Flow completed successfully
-    FAILED = "failed"                  # Flow failed with error
-    PARTIAL = "partial"                # Flow partially completed
-    BOUNCED = "bounced"                # Flow bounced to earlier flow
-    SKIPPED = "skipped"                # Flow was skipped
+    SUCCEEDED = "succeeded"  # Flow completed successfully
+    FAILED = "failed"  # Flow failed with error
+    PARTIAL = "partial"  # Flow partially completed
+    BOUNCED = "bounced"  # Flow bounced to earlier flow
+    SKIPPED = "skipped"  # Flow was skipped
 
 
 @dataclass
@@ -2048,11 +2040,7 @@ class MacroRoutingRule:
             "flow": flow_result.flow_key,
             "outcome": flow_result.outcome.value,
             "status": flow_result.status,
-            "gate.verdict": (
-                flow_result.gate_verdict.value
-                if flow_result.gate_verdict
-                else None
-            ),
+            "gate.verdict": (flow_result.gate_verdict.value if flow_result.gate_verdict else None),
             "bounce_target": flow_result.bounce_target,
             "has_error": flow_result.error is not None,
         }
@@ -2345,9 +2333,7 @@ def macro_policy_to_dict(policy: MacroPolicy) -> Dict[str, Any]:
     return {
         "allow_flow_repeat": policy.allow_flow_repeat,
         "max_repeats_per_flow": policy.max_repeats_per_flow,
-        "routing_rules": [
-            macro_routing_rule_to_dict(r) for r in policy.routing_rules
-        ],
+        "routing_rules": [macro_routing_rule_to_dict(r) for r in policy.routing_rules],
         "default_action": policy.default_action.value,
         "strict_gate": policy.strict_gate,
     }
@@ -2358,10 +2344,7 @@ def macro_policy_from_dict(data: Dict[str, Any]) -> MacroPolicy:
     return MacroPolicy(
         allow_flow_repeat=data.get("allow_flow_repeat", True),
         max_repeats_per_flow=data.get("max_repeats_per_flow", 3),
-        routing_rules=[
-            macro_routing_rule_from_dict(r)
-            for r in data.get("routing_rules", [])
-        ],
+        routing_rules=[macro_routing_rule_from_dict(r) for r in data.get("routing_rules", [])],
         default_action=MacroAction(data.get("default_action", "advance")),
         strict_gate=data.get("strict_gate", True),
     )

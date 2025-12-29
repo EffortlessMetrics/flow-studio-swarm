@@ -10,14 +10,11 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Header, Response
+from fastapi import APIRouter, Header, HTTPException, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -137,7 +134,9 @@ class StationCreateRequest(BaseModel):
     identity: Dict[str, Any] = Field(default_factory=dict, description="Identity config")
     io: Dict[str, Any] = Field(default_factory=dict, description="IO contract")
     handoff: Dict[str, Any] = Field(default_factory=dict, description="Handoff config")
-    runtime_prompt: Dict[str, Any] = Field(default_factory=dict, description="Runtime prompt config")
+    runtime_prompt: Dict[str, Any] = Field(
+        default_factory=dict, description="Runtime prompt config"
+    )
     invariants: List[str] = Field(default_factory=list, description="Invariants")
     routing_hints: Dict[str, Any] = Field(default_factory=dict, description="Routing hints")
     agent_key: Optional[str] = Field(None, description="Default agent key")
@@ -156,7 +155,9 @@ class StationUpdateRequest(BaseModel):
     identity: Dict[str, Any] = Field(default_factory=dict, description="Identity config")
     io: Dict[str, Any] = Field(default_factory=dict, description="IO contract")
     handoff: Dict[str, Any] = Field(default_factory=dict, description="Handoff config")
-    runtime_prompt: Dict[str, Any] = Field(default_factory=dict, description="Runtime prompt config")
+    runtime_prompt: Dict[str, Any] = Field(
+        default_factory=dict, description="Runtime prompt config"
+    )
     invariants: List[str] = Field(default_factory=list, description="Invariants")
     routing_hints: Dict[str, Any] = Field(default_factory=dict, description="Routing hints")
     agent_key: Optional[str] = Field(None, description="Default agent key")
@@ -365,9 +366,7 @@ async def update_flow(
         # Convert Pydantic models to dicts
         ops = [op.model_dump(exclude_none=True) for op in patch_ops]
 
-        updated_data, new_etag = manager.update_flow(
-            flow_id, ops, expected_etag
-        )
+        updated_data, new_etag = manager.update_flow(flow_id, ops, expected_etag)
 
         return JSONResponse(
             content=updated_data,
@@ -860,7 +859,9 @@ async def patch_station(
 @router.delete("/stations/{station_id}", status_code=204)
 async def delete_station(
     station_id: str,
-    if_match: Optional[str] = Header(None, alias="If-Match", description="Optional ETag for concurrency"),
+    if_match: Optional[str] = Header(
+        None, alias="If-Match", description="Optional ETag for concurrency"
+    ),
 ):
     """Delete a station.
 

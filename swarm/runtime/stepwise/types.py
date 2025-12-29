@@ -17,11 +17,10 @@ Types:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-from swarm.config.flow_registry import FlowDefinition, StepDefinition, TeachingNotes
+from swarm.config.flow_registry import FlowDefinition, StepDefinition
 from swarm.runtime.types import (
     HandoffEnvelope,
     RoutingSignal,

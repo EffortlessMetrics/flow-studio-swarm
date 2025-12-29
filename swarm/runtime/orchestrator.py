@@ -18,8 +18,8 @@ The stepwise package provides a modularized implementation with:
 """
 
 from swarm.runtime.stepwise import (
-    StepwiseOrchestrator,
     GeminiStepOrchestrator,
+    StepwiseOrchestrator,
     get_orchestrator,
 )
 

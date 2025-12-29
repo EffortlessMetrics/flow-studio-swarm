@@ -27,18 +27,17 @@ API Structure:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
-import os
 import time
-import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
-from fastapi import FastAPI, HTTPException, Header, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -55,6 +54,7 @@ logger = logging.getLogger(__name__)
 
 class FlowSummary(BaseModel):
     """Flow summary for list endpoint."""
+
     id: str
     title: str
     flow_number: Optional[int] = None
@@ -64,11 +64,13 @@ class FlowSummary(BaseModel):
 
 class FlowListResponse(BaseModel):
     """Response for list flows endpoint."""
+
     flows: List[FlowSummary]
 
 
 class TemplateSummary(BaseModel):
     """Template summary for list endpoint."""
+
     id: str
     title: str
     station_id: Optional[str] = None
@@ -79,11 +81,13 @@ class TemplateSummary(BaseModel):
 
 class TemplateListResponse(BaseModel):
     """Response for list templates endpoint."""
+
     templates: List[TemplateSummary]
 
 
 class ValidationRequest(BaseModel):
     """Request for validation endpoint."""
+
     id: Optional[str] = None
     version: Optional[int] = None
     title: Optional[str] = None
@@ -93,12 +97,14 @@ class ValidationRequest(BaseModel):
 
 class ValidationResponse(BaseModel):
     """Response for validation endpoint."""
+
     valid: bool
     errors: List[str]
 
 
 class CompileRequest(BaseModel):
     """Request for compile endpoint."""
+
     flow_id: str
     step_id: str
     run_id: Optional[str] = None
@@ -106,11 +112,13 @@ class CompileRequest(BaseModel):
 
 class CompileResponse(BaseModel):
     """Response for compile endpoint."""
+
     prompt_plan: Dict[str, Any]
 
 
 class RunSummary(BaseModel):
     """Run summary for list endpoint."""
+
     run_id: str
     flow_key: Optional[str] = None
     status: Optional[str] = None
@@ -119,18 +127,35 @@ class RunSummary(BaseModel):
 
 class RunListResponse(BaseModel):
     """Response for list runs endpoint."""
+
     runs: List[RunSummary]
+
+
+class DBHealthInfo(BaseModel):
+    """Database health information."""
+
+    healthy: bool = False
+    projection_version: int = 0
+    db_exists: bool = False
+    rebuild_count: int = 0
+    error_count: int = 0
+    last_error: Optional[str] = None
+    last_check: Optional[str] = None
+    last_rebuild: Optional[str] = None
 
 
 class HealthResponse(BaseModel):
     """Response for health check endpoint."""
+
     status: str
     timestamp: str
     repo_root: str
+    db: Optional[DBHealthInfo] = None
 
 
 class ErrorResponse(BaseModel):
     """Standard error response."""
+
     error: str
     message: str
     details: Dict[str, Any] = {}
@@ -227,13 +252,15 @@ class SpecManager:
             for yaml_file in flow_graphs_dir.glob("*.yaml"):
                 try:
                     flow_data = self._load_yaml(yaml_file)
-                    flows.append({
-                        "id": flow_data.get("id", yaml_file.stem),
-                        "title": flow_data.get("title", yaml_file.stem),
-                        "flow_number": flow_data.get("flow_number"),
-                        "version": flow_data.get("version", 1),
-                        "description": flow_data.get("description", ""),
-                    })
+                    flows.append(
+                        {
+                            "id": flow_data.get("id", yaml_file.stem),
+                            "title": flow_data.get("title", yaml_file.stem),
+                            "flow_number": flow_data.get("flow_number"),
+                            "version": flow_data.get("version", 1),
+                            "description": flow_data.get("description", ""),
+                        }
+                    )
                 except Exception as e:
                     logger.warning("Failed to load flow %s: %s", yaml_file, e)
 
@@ -246,13 +273,15 @@ class SpecManager:
                     continue
                 try:
                     flow_data = self._load_yaml(yaml_file)
-                    flows.append({
-                        "id": flow_id,
-                        "title": flow_data.get("name", flow_id),
-                        "flow_number": flow_data.get("flow_number"),
-                        "version": flow_data.get("version", 1),
-                        "description": flow_data.get("description", ""),
-                    })
+                    flows.append(
+                        {
+                            "id": flow_id,
+                            "title": flow_data.get("name", flow_id),
+                            "flow_number": flow_data.get("flow_number"),
+                            "version": flow_data.get("version", 1),
+                            "description": flow_data.get("description", ""),
+                        }
+                    )
                 except Exception as e:
                     logger.warning("Failed to load flow config %s: %s", yaml_file, e)
 
@@ -318,6 +347,7 @@ class SpecManager:
 
         # Apply JSON Patch operations
         import copy
+
         updated_data = copy.deepcopy(flow_data)
 
         for op in patch_operations:
@@ -417,14 +447,16 @@ class SpecManager:
             for yaml_file in templates_dir.glob("*.yaml"):
                 try:
                     template_data = self._load_yaml(yaml_file)
-                    templates.append({
-                        "id": template_data.get("id", yaml_file.stem),
-                        "title": template_data.get("title", yaml_file.stem),
-                        "station_id": template_data.get("station_id"),
-                        "category": template_data.get("category"),
-                        "tags": template_data.get("tags", []),
-                        "description": template_data.get("description", ""),
-                    })
+                    templates.append(
+                        {
+                            "id": template_data.get("id", yaml_file.stem),
+                            "title": template_data.get("title", yaml_file.stem),
+                            "station_id": template_data.get("station_id"),
+                            "category": template_data.get("category"),
+                            "tags": template_data.get("tags", []),
+                            "description": template_data.get("description", ""),
+                        }
+                    )
                 except Exception as e:
                     logger.warning("Failed to load template %s: %s", yaml_file, e)
 
@@ -438,14 +470,16 @@ class SpecManager:
                     continue
                 try:
                     station_data = self._load_yaml(yaml_file)
-                    templates.append({
-                        "id": station_id,
-                        "title": station_data.get("title", station_id),
-                        "station_id": station_id,
-                        "category": station_data.get("category", "custom"),
-                        "tags": [],
-                        "description": station_data.get("description", ""),
-                    })
+                    templates.append(
+                        {
+                            "id": station_id,
+                            "title": station_data.get("title", station_id),
+                            "station_id": station_id,
+                            "category": station_data.get("category", "custom"),
+                            "tags": [],
+                            "description": station_data.get("description", ""),
+                        }
+                    )
                 except Exception as e:
                     logger.warning("Failed to load station %s: %s", yaml_file, e)
 
@@ -528,8 +562,12 @@ class SpecManager:
                 "max_turns": plan.max_turns,
                 "sandbox_enabled": plan.sandbox_enabled,
                 "cwd": plan.cwd,
-                "system_append": plan.system_append[:500] + "..." if len(plan.system_append) > 500 else plan.system_append,
-                "user_prompt": plan.user_prompt[:500] + "..." if len(plan.user_prompt) > 500 else plan.user_prompt,
+                "system_append": plan.system_append[:500] + "..."
+                if len(plan.system_append) > 500
+                else plan.system_append,
+                "user_prompt": plan.user_prompt[:500] + "..."
+                if len(plan.user_prompt) > 500
+                else plan.user_prompt,
                 "compiled_at": plan.compiled_at,
             }
         except ImportError:
@@ -598,12 +636,14 @@ class SpecManager:
             if state_file.exists():
                 try:
                     state = json.loads(state_file.read_text(encoding="utf-8"))
-                    runs.append({
-                        "run_id": state.get("run_id", run_dir.name),
-                        "flow_key": state.get("flow_key"),
-                        "status": state.get("status"),
-                        "timestamp": state.get("timestamp"),
-                    })
+                    runs.append(
+                        {
+                            "run_id": state.get("run_id", run_dir.name),
+                            "flow_key": state.get("flow_key"),
+                            "status": state.get("status"),
+                            "timestamp": state.get("timestamp"),
+                        }
+                    )
                 except Exception as e:
                     logger.warning("Failed to load run state %s: %s", run_dir, e)
 
@@ -679,6 +719,7 @@ class SpecManager:
             Parsed YAML data.
         """
         import yaml
+
         with open(path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
 
@@ -690,6 +731,7 @@ class SpecManager:
             data: Data to save.
         """
         import yaml
+
         with open(path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
 
@@ -781,10 +823,43 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        """Application lifespan manager."""
+        """Application lifespan manager.
+
+        On startup:
+        - Initialize the resilient stats database
+        - Check DB schema version and rebuild from events.jsonl if needed
+
+        On shutdown:
+        - Close the database connection
+        """
         logger.info("Spec API server starting...")
+
+        # Initialize resilient database with auto-rebuild
+        try:
+            from swarm.runtime.resilient_db import close_resilient_db, get_resilient_db
+
+            db = get_resilient_db()
+            health = db.health
+            logger.info(
+                "Resilient DB initialized: healthy=%s, projection_version=%d, rebuild_count=%d",
+                health.healthy,
+                health.projection_version,
+                health.rebuild_count,
+            )
+            if health.last_error:
+                logger.warning("DB initialization had error: %s", health.last_error)
+        except Exception as e:
+            logger.warning("Could not initialize resilient DB (non-fatal): %s", e)
+
         yield
+
         logger.info("Spec API server shutting down...")
+        # Close the resilient database
+        try:
+            close_resilient_db()
+            logger.info("Resilient DB closed")
+        except Exception as e:
+            logger.warning("Error closing resilient DB: %s", e)
 
     app = FastAPI(
         title="Flow Studio API",
@@ -809,13 +884,15 @@ def create_app(
     # These routers provide the new API structure with full run control
     try:
         from .routes import (
-            specs_router,
-            runs_router,
-            events_router,
-            wisdom_router,
+            boundary_router,
             compile_router,
-            facts_router,
+            db_router,
+            events_router,
             evolution_router,
+            facts_router,
+            runs_router,
+            specs_router,
+            wisdom_router,
         )
 
         app.include_router(specs_router, prefix="/api")
@@ -825,6 +902,8 @@ def create_app(
         app.include_router(compile_router, prefix="/api")
         app.include_router(facts_router, prefix="/api")
         app.include_router(evolution_router, prefix="/api")
+        app.include_router(boundary_router, prefix="/api")
+        app.include_router(db_router, prefix="/api")
         logger.info("Loaded modular API routers")
     except ImportError as e:
         logger.warning("Could not load modular routers: %s", e)
@@ -893,9 +972,7 @@ def create_app(
     ):
         """Update a flow graph with JSON Patch operations."""
         try:
-            updated_data, new_etag = get_spec_manager().update_flow(
-                flow_id, patch_ops, if_match
-            )
+            updated_data, new_etag = get_spec_manager().update_flow(flow_id, patch_ops, if_match)
 
             return JSONResponse(
                 content=updated_data,
@@ -1057,11 +1134,37 @@ def create_app(
 
     @app.get("/api/health", response_model=HealthResponse)
     async def health_check():
-        """Health check endpoint."""
+        """Health check endpoint.
+
+        Returns overall API health including database status.
+        The API is considered healthy even if the DB has issues,
+        since DB operations fail gracefully.
+        """
+        # Get DB health info
+        db_info = None
+        try:
+            from swarm.runtime.resilient_db import check_db_health
+
+            health = check_db_health()
+            db_info = DBHealthInfo(
+                healthy=health.healthy,
+                projection_version=health.projection_version,
+                db_exists=health.db_exists,
+                rebuild_count=health.rebuild_count,
+                error_count=health.error_count,
+                last_error=health.last_error,
+                last_check=health.last_check.isoformat() if health.last_check else None,
+                last_rebuild=health.last_rebuild.isoformat() if health.last_rebuild else None,
+            )
+        except Exception as e:
+            logger.warning("Could not get DB health: %s", e)
+            db_info = DBHealthInfo(healthy=False, last_error=str(e))
+
         return HealthResponse(
             status="healthy",
             timestamp=datetime.now(timezone.utc).isoformat(),
             repo_root=str(get_spec_manager().repo_root),
+            db=db_info,
         )
 
     return app
@@ -1079,6 +1182,7 @@ app = create_app()
 def main():
     """Run the API server."""
     import argparse
+
     import uvicorn
 
     parser = argparse.ArgumentParser(description="Spec API Server")
