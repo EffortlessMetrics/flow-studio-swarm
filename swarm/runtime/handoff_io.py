@@ -312,3 +312,42 @@ def read_handoff_envelope(
             logger.warning("Failed to read committed envelope %s: %s", committed_path, e)
 
     return None
+
+
+def read_routing_from_envelope(
+    run_base: Path,
+    step_id: str,
+) -> Optional[Dict[str, Any]]:
+    """Read routing_signal from a committed envelope.
+
+    This is the A3 envelope-first routing helper. It reads the committed
+    envelope and returns the routing_signal if present.
+
+    Used by the orchestrator to implement envelope-first routing:
+    1. Read committed envelope
+    2. If routing_signal exists, use it for routing
+    3. If missing, fallback to engine.route_step() and persist result
+
+    Args:
+        run_base: The RUN_BASE path
+        step_id: Step identifier
+
+    Returns:
+        routing_signal dict if present, None otherwise.
+    """
+    envelope = read_handoff_envelope(run_base, step_id, prefer_draft=False)
+    if envelope is None:
+        logger.debug("No committed envelope found for step %s", step_id)
+        return None
+
+    routing_signal = envelope.get("routing_signal")
+    if routing_signal is None:
+        logger.debug("Envelope for step %s has no routing_signal", step_id)
+        return None
+
+    logger.debug(
+        "Read routing_signal from envelope for step %s: decision=%s",
+        step_id,
+        routing_signal.get("decision", "unknown"),
+    )
+    return routing_signal

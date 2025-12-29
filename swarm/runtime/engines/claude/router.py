@@ -20,6 +20,7 @@ from swarm.runtime.types import (
     DecisionType, EdgeOption, Elimination, LLMReasoning,
     MicroloopContext, DecisionMetrics, RoutingFactor,
 )
+from swarm.runtime.routing_utils import parse_routing_decision
 from swarm.spec.types import RoutingConfig, RoutingKind
 
 from ..models import RoutingContext, StepContext
@@ -406,19 +407,9 @@ current_iteration: {template_vars['current_iteration']}
 
         routing_data = json.loads(json_match)
 
-        # Map decision string to enum
-        decision_str = routing_data.get("decision", "advance").lower()
-        decision_map = {
-            "advance": RoutingDecision.ADVANCE,
-            "loop": RoutingDecision.LOOP,
-            "terminate": RoutingDecision.TERMINATE,
-            "branch": RoutingDecision.BRANCH,
-            "proceed": RoutingDecision.ADVANCE,
-            "rerun": RoutingDecision.LOOP,
-            "blocked": RoutingDecision.TERMINATE,
-            "route": RoutingDecision.BRANCH,
-        }
-        decision = decision_map.get(decision_str, RoutingDecision.ADVANCE)
+        # Map decision string to enum using centralized parsing
+        decision_str = routing_data.get("decision", "advance")
+        decision = parse_routing_decision(decision_str)
 
         # Build LLMReasoning from structured response if present
         llm_reasoning = None

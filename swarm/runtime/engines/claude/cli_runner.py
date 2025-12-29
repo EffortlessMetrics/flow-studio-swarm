@@ -197,6 +197,7 @@ def run_step_cli(
     receipt = {
         "engine": engine_id,
         "mode": "cli",
+        "execution_mode": "legacy",
         "provider": provider,
         "model": model_name,
         "step_id": ctx.step_id,

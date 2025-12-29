@@ -203,6 +203,7 @@ def finalize_step_stub(
     receipt = {
         "engine": engine_id,
         "mode": "stub",
+        "execution_mode": "legacy",
         "provider": provider or "none",
         "model": "claude-stub",
         "step_id": ctx.step_id,
@@ -411,6 +412,7 @@ def run_step_stub(
     receipt = {
         "engine": engine_id,
         "mode": "stub",
+        "execution_mode": "legacy",
         "provider": provider or "none",
         "model": "claude-stub",
         "step_id": ctx.step_id,

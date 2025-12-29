@@ -38,6 +38,7 @@ from swarm.runtime.types import (
     RoutingSignal,
     RunEvent,
 )
+from swarm.runtime.routing_utils import parse_routing_decision
 from swarm.runtime.claude_sdk import (
     ClaudeSDKClient,
     create_tool_policy_hook,
@@ -55,64 +56,6 @@ if TYPE_CHECKING:
     from .engine import ClaudeStepEngine
 
 logger = logging.getLogger(__name__)
-
-
-def parse_routing_decision(decision_str: str) -> RoutingDecision:
-    """Parse a routing decision string into a RoutingDecision enum.
-
-    Handles both canonical values (advance, loop, terminate, branch) and
-    common aliases from external sources (proceed, rerun, blocked, route).
-
-    Args:
-        decision_str: The routing decision string (case-insensitive).
-
-    Returns:
-        The corresponding RoutingDecision enum value.
-        Defaults to ADVANCE if unrecognized.
-    """
-    decision_lower = decision_str.lower().strip()
-
-    # Canonical mappings
-    canonical_map = {
-        "advance": RoutingDecision.ADVANCE,
-        "loop": RoutingDecision.LOOP,
-        "terminate": RoutingDecision.TERMINATE,
-        "branch": RoutingDecision.BRANCH,
-    }
-
-    if decision_lower in canonical_map:
-        return canonical_map[decision_lower]
-
-    # Common aliases
-    alias_map = {
-        "proceed": RoutingDecision.ADVANCE,
-        "continue": RoutingDecision.ADVANCE,
-        "next": RoutingDecision.ADVANCE,
-        "rerun": RoutingDecision.LOOP,
-        "retry": RoutingDecision.LOOP,
-        "repeat": RoutingDecision.LOOP,
-        "blocked": RoutingDecision.TERMINATE,
-        "stop": RoutingDecision.TERMINATE,
-        "end": RoutingDecision.TERMINATE,
-        "exit": RoutingDecision.TERMINATE,
-        "route": RoutingDecision.BRANCH,
-        "switch": RoutingDecision.BRANCH,
-        "redirect": RoutingDecision.BRANCH,
-    }
-
-    if decision_lower in alias_map:
-        logger.debug(
-            "Mapped routing decision alias '%s' -> %s",
-            decision_str,
-            alias_map[decision_lower].value,
-        )
-        return alias_map[decision_lower]
-
-    logger.warning(
-        "Unknown routing decision '%s', defaulting to ADVANCE",
-        decision_str,
-    )
-    return RoutingDecision.ADVANCE
 
 
 async def execute_step_session(
@@ -345,7 +288,8 @@ async def _execute_step_session_sdk(
     r_path = make_receipt_path(ctx.run_base, ctx.step_id, agent_key)
     receipt = {
         "engine": engine.engine_id,
-        "mode": "session",
+        "mode": engine._mode,
+        "execution_mode": "session",
         "session_id": session_result.session_id,
         "provider": engine._provider or "claude-sdk",
         "model": work_result.model,

@@ -31,6 +31,16 @@ Usage:
         interruption_frame_to_dict, interruption_frame_from_dict,
         resume_point_to_dict, resume_point_from_dict,
         injected_node_to_dict, injected_node_from_dict,
+        # Macro navigation types (between-flow routing)
+        MacroAction, GateVerdict, FlowOutcome, FlowResult,
+        MacroRoutingRule, MacroPolicy, HumanPolicy, RunPlanSpec,
+        MacroRoutingDecision,
+        flow_result_to_dict, flow_result_from_dict,
+        macro_routing_rule_to_dict, macro_routing_rule_from_dict,
+        macro_policy_to_dict, macro_policy_from_dict,
+        human_policy_to_dict, human_policy_from_dict,
+        run_plan_spec_to_dict, run_plan_spec_from_dict,
+        macro_routing_decision_to_dict, macro_routing_decision_from_dict,
     )
 """
 
@@ -1587,4 +1597,504 @@ def run_state_from_dict(data: Dict[str, Any]) -> RunState:
         resume_stack=resume_stack,
         injected_nodes=list(data.get("injected_nodes", [])),
         completed_nodes=list(data.get("completed_nodes", [])),
+    )
+
+
+# =============================================================================
+# Macro Navigation Types (Between-Flow Routing)
+# =============================================================================
+# These types support intelligent routing decisions BETWEEN flows, complementing
+# the within-flow micro-navigation handled by Navigator.
+
+
+class MacroAction(str, Enum):
+    """Action to take between flows."""
+
+    ADVANCE = "advance"      # Proceed to next flow in sequence
+    REPEAT = "repeat"        # Re-run the same flow (e.g., after bounce)
+    GOTO = "goto"            # Jump to a specific flow (non-sequential)
+    SKIP = "skip"            # Skip a flow (e.g., skip deploy if not ready)
+    TERMINATE = "terminate"  # End the run (success or failure)
+    PAUSE = "pause"          # Pause for human intervention between flows
+
+
+class GateVerdict(str, Enum):
+    """Gate (Flow 4) decision outcomes.
+
+    These map to the merge-decider agent's output in merge_decision.md.
+    """
+
+    MERGE = "MERGE"                    # Approved for deployment
+    MERGE_WITH_CONDITIONS = "MERGE_WITH_CONDITIONS"  # Approved with monitoring
+    BOUNCE_BUILD = "BOUNCE_BUILD"      # Fixable issues, return to build
+    BOUNCE_PLAN = "BOUNCE_PLAN"        # Design issues, return to plan
+    ESCALATE = "ESCALATE"              # Needs human decision
+    BLOCK = "BLOCK"                    # Hard blocker, cannot proceed
+
+
+class FlowOutcome(str, Enum):
+    """Outcome status of a completed flow."""
+
+    SUCCEEDED = "succeeded"            # Flow completed successfully
+    FAILED = "failed"                  # Flow failed with error
+    PARTIAL = "partial"                # Flow partially completed
+    BOUNCED = "bounced"                # Flow bounced to earlier flow
+    SKIPPED = "skipped"                # Flow was skipped
+
+
+@dataclass
+class FlowResult:
+    """Result of a completed flow for macro-routing decisions.
+
+    This captures the outcome of a flow in a structured way that the
+    MacroNavigator can use to decide between-flow routing.
+
+    Attributes:
+        flow_key: The flow that completed.
+        outcome: Overall outcome status.
+        status: Detailed status from the flow's receipt/envelope.
+        gate_verdict: For gate flow, the merge decision.
+        bounce_target: For bounced flows, where to bounce to.
+        error: Error message if the flow failed.
+        artifacts: Map of key artifacts produced.
+        duration_ms: Flow execution time.
+        issues: List of issues that may affect routing.
+        recommendations: Agent recommendations for next steps.
+    """
+
+    flow_key: str
+    outcome: FlowOutcome
+    status: str = ""  # VERIFIED, UNVERIFIED, BLOCKED, etc.
+    gate_verdict: Optional[GateVerdict] = None
+    bounce_target: Optional[str] = None  # "build", "plan", etc.
+    error: Optional[str] = None
+    artifacts: Dict[str, str] = field(default_factory=dict)
+    duration_ms: int = 0
+    issues: List[str] = field(default_factory=list)
+    recommendations: List[str] = field(default_factory=list)
+
+
+@dataclass
+class MacroRoutingRule:
+    """A single routing rule for macro-navigation.
+
+    Rules are evaluated in order; first matching rule is applied.
+
+    Attributes:
+        rule_id: Unique identifier for this rule.
+        condition: CEL-like condition, e.g., "gate.verdict == 'BOUNCE_BUILD'".
+        action: Action to take when condition matches.
+        target_flow: For "goto" action, the flow to jump to.
+        max_uses: Maximum times this rule can fire (prevents infinite loops).
+        uses: Current usage count (tracked at runtime).
+        description: Human-readable description of what this rule does.
+    """
+
+    rule_id: str
+    condition: str
+    action: MacroAction
+    target_flow: Optional[str] = None
+    max_uses: int = 3  # Safety limit to prevent infinite loops
+    uses: int = 0
+    description: str = ""
+
+    def matches(self, flow_result: "FlowResult") -> bool:
+        """Evaluate if this rule matches the flow result.
+
+        Simple condition evaluation - production would use proper CEL.
+        For now, supports patterns like:
+            - "outcome == 'failed'"
+            - "gate.verdict == 'BOUNCE_BUILD'"
+            - "flow == 'gate' and status == 'UNVERIFIED'"
+        """
+        ctx = {
+            "flow": flow_result.flow_key,
+            "outcome": flow_result.outcome.value,
+            "status": flow_result.status,
+            "gate.verdict": (
+                flow_result.gate_verdict.value
+                if flow_result.gate_verdict
+                else None
+            ),
+            "bounce_target": flow_result.bounce_target,
+            "has_error": flow_result.error is not None,
+        }
+
+        # Very simple condition parsing (would use CEL in production)
+        try:
+            # Handle simple equality conditions
+            condition = self.condition.strip()
+            if " == " in condition:
+                parts = condition.split(" == ")
+                if len(parts) == 2:
+                    key = parts[0].strip()
+                    value = parts[1].strip().strip("'\"")
+                    return str(ctx.get(key, "")) == value
+            if " and " in condition.lower():
+                # Handle simple AND conditions
+                sub_conditions = condition.lower().split(" and ")
+                results = []
+                for sub in sub_conditions:
+                    sub = sub.strip()
+                    if " == " in sub:
+                        parts = sub.split(" == ")
+                        if len(parts) == 2:
+                            key = parts[0].strip()
+                            value = parts[1].strip().strip("'\"")
+                            results.append(str(ctx.get(key, "")).lower() == value.lower())
+                return all(results)
+            return False
+        except Exception:
+            return False
+
+    def can_fire(self) -> bool:
+        """Check if this rule can still fire (hasn't exceeded max_uses)."""
+        return self.uses < self.max_uses
+
+    def record_use(self) -> None:
+        """Record that this rule was used."""
+        self.uses += 1
+
+
+@dataclass
+class MacroPolicy:
+    """Policy for between-flow routing decisions.
+
+    Defines rules for when to loop, skip, or retry flows based on
+    their outcomes. This is distinct from within-flow routing (Navigator).
+
+    Attributes:
+        allow_flow_repeat: Whether flows can be re-run.
+        max_repeats_per_flow: Maximum times a single flow can repeat.
+        routing_rules: Ordered list of condition-based routing rules.
+        default_action: Action when no rules match (usually advance).
+        strict_gate: If True, never skip gate even if other flows failed.
+    """
+
+    allow_flow_repeat: bool = True
+    max_repeats_per_flow: int = 3
+    routing_rules: List[MacroRoutingRule] = field(default_factory=list)
+    default_action: MacroAction = MacroAction.ADVANCE
+    strict_gate: bool = True  # Always run gate, never skip
+
+    @classmethod
+    def default(cls) -> "MacroPolicy":
+        """Create a default macro policy with standard SDLC rules."""
+        return cls(
+            allow_flow_repeat=True,
+            max_repeats_per_flow=3,
+            routing_rules=[
+                # Gate bounces go back to the target flow
+                MacroRoutingRule(
+                    rule_id="gate-bounce-build",
+                    condition="gate.verdict == 'BOUNCE_BUILD'",
+                    action=MacroAction.GOTO,
+                    target_flow="build",
+                    max_uses=2,
+                    description="Gate bounced to build for fixable issues",
+                ),
+                MacroRoutingRule(
+                    rule_id="gate-bounce-plan",
+                    condition="gate.verdict == 'BOUNCE_PLAN'",
+                    action=MacroAction.GOTO,
+                    target_flow="plan",
+                    max_uses=1,
+                    description="Gate bounced to plan for design issues",
+                ),
+                # Escalation pauses for human
+                MacroRoutingRule(
+                    rule_id="gate-escalate",
+                    condition="gate.verdict == 'ESCALATE'",
+                    action=MacroAction.PAUSE,
+                    description="Gate escalated to human for decision",
+                ),
+                # Hard block terminates
+                MacroRoutingRule(
+                    rule_id="gate-block",
+                    condition="gate.verdict == 'BLOCK'",
+                    action=MacroAction.TERMINATE,
+                    description="Gate blocked - cannot proceed",
+                ),
+                # Flow failures terminate by default
+                MacroRoutingRule(
+                    rule_id="flow-failed",
+                    condition="outcome == 'failed'",
+                    action=MacroAction.TERMINATE,
+                    description="Flow failed with error",
+                ),
+            ],
+            default_action=MacroAction.ADVANCE,
+            strict_gate=True,
+        )
+
+
+@dataclass
+class HumanPolicy:
+    """Policy for human interaction boundaries.
+
+    Controls when and how humans are involved in the flow execution.
+    Distinct from the no_human_mid_flow flag which is about within-flow
+    interaction; this is about between-flow interaction.
+
+    Attributes:
+        mode: "per_flow" (pause after each flow) or "run_end" (only at end).
+        allow_pause_mid_flow: Always False - mid-flow pause uses DETOUR.
+        allow_pause_between_flows: True for per_flow mode, enables review.
+        end_boundary: Where human review happens ("flow_end" or "run_end").
+        require_approval_flows: Flows that require explicit human approval.
+    """
+
+    mode: str = "run_end"  # "per_flow" or "run_end"
+    allow_pause_mid_flow: bool = False  # Always False - use DETOUR instead
+    allow_pause_between_flows: bool = False  # True for per_flow mode
+    end_boundary: str = "run_end"  # "flow_end" or "run_end"
+    require_approval_flows: List[str] = field(default_factory=list)
+
+    @classmethod
+    def autopilot(cls) -> "HumanPolicy":
+        """Autopilot mode: no human intervention until run end."""
+        return cls(
+            mode="run_end",
+            allow_pause_mid_flow=False,
+            allow_pause_between_flows=False,
+            end_boundary="run_end",
+            require_approval_flows=[],
+        )
+
+    @classmethod
+    def supervised(cls) -> "HumanPolicy":
+        """Supervised mode: pause after each flow for review."""
+        return cls(
+            mode="per_flow",
+            allow_pause_mid_flow=False,
+            allow_pause_between_flows=True,
+            end_boundary="flow_end",
+            require_approval_flows=["gate", "deploy"],
+        )
+
+
+@dataclass
+class RunPlanSpec:
+    """Macro orchestration policy for flow chaining.
+
+    This is the top-level specification for how flows should be chained
+    together during a run. It combines flow sequencing, routing policies,
+    and human interaction policies.
+
+    Attributes:
+        flow_sequence: Default chain of flows (signal -> wisdom).
+        macro_policy: Rules for between-flow routing (looping, retrying).
+        human_policy: When humans are involved.
+        constraints: Hard constraints that cannot be violated.
+        max_total_flows: Safety limit on total flow executions per run.
+    """
+
+    flow_sequence: List[str] = field(
+        default_factory=lambda: ["signal", "plan", "build", "gate", "deploy", "wisdom"]
+    )
+    macro_policy: MacroPolicy = field(default_factory=MacroPolicy.default)
+    human_policy: HumanPolicy = field(default_factory=HumanPolicy.autopilot)
+    constraints: List[str] = field(default_factory=list)
+    max_total_flows: int = 20  # Safety limit to prevent infinite loops
+
+    @classmethod
+    def default(cls) -> "RunPlanSpec":
+        """Create a default RunPlanSpec with standard SDLC configuration."""
+        return cls(
+            flow_sequence=["signal", "plan", "build", "gate", "deploy", "wisdom"],
+            macro_policy=MacroPolicy.default(),
+            human_policy=HumanPolicy.autopilot(),
+            constraints=[
+                "never deploy unless gate verdict is MERGE or MERGE_WITH_CONDITIONS",
+                "never skip gate flow",
+                "max 3 bounces between gate and build",
+            ],
+            max_total_flows=20,
+        )
+
+
+@dataclass
+class MacroRoutingDecision:
+    """Decision from MacroNavigator about between-flow routing.
+
+    Attributes:
+        action: The routing action to take.
+        next_flow: The flow to execute next (if advancing/goto).
+        reason: Human-readable explanation for the decision.
+        rule_applied: The routing rule that triggered this decision.
+        confidence: Confidence in this routing decision (0.0 to 1.0).
+        constraints_checked: Constraints that were verified.
+        warnings: Any warnings about this routing decision.
+    """
+
+    action: MacroAction
+    next_flow: Optional[str] = None
+    reason: str = ""
+    rule_applied: Optional[str] = None  # rule_id of the applied rule
+    confidence: float = 1.0
+    constraints_checked: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+
+
+# =============================================================================
+# Macro Types Serialization
+# =============================================================================
+
+
+def flow_result_to_dict(result: FlowResult) -> Dict[str, Any]:
+    """Convert FlowResult to dictionary for serialization."""
+    return {
+        "flow_key": result.flow_key,
+        "outcome": result.outcome.value,
+        "status": result.status,
+        "gate_verdict": result.gate_verdict.value if result.gate_verdict else None,
+        "bounce_target": result.bounce_target,
+        "error": result.error,
+        "artifacts": dict(result.artifacts),
+        "duration_ms": result.duration_ms,
+        "issues": list(result.issues),
+        "recommendations": list(result.recommendations),
+    }
+
+
+def flow_result_from_dict(data: Dict[str, Any]) -> FlowResult:
+    """Parse FlowResult from dictionary."""
+    gate_verdict = None
+    if data.get("gate_verdict"):
+        gate_verdict = GateVerdict(data["gate_verdict"])
+
+    return FlowResult(
+        flow_key=data.get("flow_key", ""),
+        outcome=FlowOutcome(data.get("outcome", "succeeded")),
+        status=data.get("status", ""),
+        gate_verdict=gate_verdict,
+        bounce_target=data.get("bounce_target"),
+        error=data.get("error"),
+        artifacts=dict(data.get("artifacts", {})),
+        duration_ms=data.get("duration_ms", 0),
+        issues=list(data.get("issues", [])),
+        recommendations=list(data.get("recommendations", [])),
+    )
+
+
+def macro_routing_rule_to_dict(rule: MacroRoutingRule) -> Dict[str, Any]:
+    """Convert MacroRoutingRule to dictionary."""
+    return {
+        "rule_id": rule.rule_id,
+        "condition": rule.condition,
+        "action": rule.action.value,
+        "target_flow": rule.target_flow,
+        "max_uses": rule.max_uses,
+        "uses": rule.uses,
+        "description": rule.description,
+    }
+
+
+def macro_routing_rule_from_dict(data: Dict[str, Any]) -> MacroRoutingRule:
+    """Parse MacroRoutingRule from dictionary."""
+    return MacroRoutingRule(
+        rule_id=data.get("rule_id", ""),
+        condition=data.get("condition", ""),
+        action=MacroAction(data.get("action", "advance")),
+        target_flow=data.get("target_flow"),
+        max_uses=data.get("max_uses", 3),
+        uses=data.get("uses", 0),
+        description=data.get("description", ""),
+    )
+
+
+def macro_policy_to_dict(policy: MacroPolicy) -> Dict[str, Any]:
+    """Convert MacroPolicy to dictionary."""
+    return {
+        "allow_flow_repeat": policy.allow_flow_repeat,
+        "max_repeats_per_flow": policy.max_repeats_per_flow,
+        "routing_rules": [
+            macro_routing_rule_to_dict(r) for r in policy.routing_rules
+        ],
+        "default_action": policy.default_action.value,
+        "strict_gate": policy.strict_gate,
+    }
+
+
+def macro_policy_from_dict(data: Dict[str, Any]) -> MacroPolicy:
+    """Parse MacroPolicy from dictionary."""
+    return MacroPolicy(
+        allow_flow_repeat=data.get("allow_flow_repeat", True),
+        max_repeats_per_flow=data.get("max_repeats_per_flow", 3),
+        routing_rules=[
+            macro_routing_rule_from_dict(r)
+            for r in data.get("routing_rules", [])
+        ],
+        default_action=MacroAction(data.get("default_action", "advance")),
+        strict_gate=data.get("strict_gate", True),
+    )
+
+
+def human_policy_to_dict(policy: HumanPolicy) -> Dict[str, Any]:
+    """Convert HumanPolicy to dictionary."""
+    return {
+        "mode": policy.mode,
+        "allow_pause_mid_flow": policy.allow_pause_mid_flow,
+        "allow_pause_between_flows": policy.allow_pause_between_flows,
+        "end_boundary": policy.end_boundary,
+        "require_approval_flows": list(policy.require_approval_flows),
+    }
+
+
+def human_policy_from_dict(data: Dict[str, Any]) -> HumanPolicy:
+    """Parse HumanPolicy from dictionary."""
+    return HumanPolicy(
+        mode=data.get("mode", "run_end"),
+        allow_pause_mid_flow=data.get("allow_pause_mid_flow", False),
+        allow_pause_between_flows=data.get("allow_pause_between_flows", False),
+        end_boundary=data.get("end_boundary", "run_end"),
+        require_approval_flows=list(data.get("require_approval_flows", [])),
+    )
+
+
+def run_plan_spec_to_dict(spec: RunPlanSpec) -> Dict[str, Any]:
+    """Convert RunPlanSpec to dictionary."""
+    return {
+        "flow_sequence": list(spec.flow_sequence),
+        "macro_policy": macro_policy_to_dict(spec.macro_policy),
+        "human_policy": human_policy_to_dict(spec.human_policy),
+        "constraints": list(spec.constraints),
+        "max_total_flows": spec.max_total_flows,
+    }
+
+
+def run_plan_spec_from_dict(data: Dict[str, Any]) -> RunPlanSpec:
+    """Parse RunPlanSpec from dictionary."""
+    return RunPlanSpec(
+        flow_sequence=list(data.get("flow_sequence", [])),
+        macro_policy=macro_policy_from_dict(data.get("macro_policy", {})),
+        human_policy=human_policy_from_dict(data.get("human_policy", {})),
+        constraints=list(data.get("constraints", [])),
+        max_total_flows=data.get("max_total_flows", 20),
+    )
+
+
+def macro_routing_decision_to_dict(decision: MacroRoutingDecision) -> Dict[str, Any]:
+    """Convert MacroRoutingDecision to dictionary."""
+    return {
+        "action": decision.action.value,
+        "next_flow": decision.next_flow,
+        "reason": decision.reason,
+        "rule_applied": decision.rule_applied,
+        "confidence": decision.confidence,
+        "constraints_checked": list(decision.constraints_checked),
+        "warnings": list(decision.warnings),
+    }
+
+
+def macro_routing_decision_from_dict(data: Dict[str, Any]) -> MacroRoutingDecision:
+    """Parse MacroRoutingDecision from dictionary."""
+    return MacroRoutingDecision(
+        action=MacroAction(data.get("action", "advance")),
+        next_flow=data.get("next_flow"),
+        reason=data.get("reason", ""),
+        rule_applied=data.get("rule_applied"),
+        confidence=data.get("confidence", 1.0),
+        constraints_checked=list(data.get("constraints_checked", [])),
+        warnings=list(data.get("warnings", [])),
     )

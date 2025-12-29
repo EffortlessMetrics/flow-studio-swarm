@@ -23,6 +23,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from swarm.config.runtime_config import (
     get_cli_path,
     get_context_budget_chars,
+    get_engine_execution,
     get_engine_mode,
     get_engine_provider,
     get_history_max_older_chars,
@@ -125,6 +126,7 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         self,
         repo_root: Optional[Path] = None,
         mode: Optional[str] = None,
+        execution: Optional[str] = None,
         profile_id: Optional[str] = None,
         enable_stats_db: bool = True,
     ):
@@ -133,6 +135,8 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         Args:
             repo_root: Repository root path.
             mode: Override mode selection ("stub", "sdk", or "cli").
+                  If None, reads from config/environment.
+            execution: Override execution pattern ("legacy" or "session").
                   If None, reads from config/environment.
             profile_id: Optional profile ID for flow-aware budget resolution.
             enable_stats_db: Whether to record stats to DuckDB. Default True.
@@ -145,6 +149,12 @@ class ClaudeStepEngine(LifecycleCapableEngine):
             self._mode = mode
         else:
             self._mode = get_engine_mode("claude")
+
+        # Determine execution pattern: override > config > default
+        if execution:
+            self._execution = execution
+        else:
+            self._execution = get_engine_execution("claude")
 
         self.stub_mode = self._mode == "stub"
         self._sdk_available: Optional[bool] = None
@@ -165,8 +175,9 @@ class ClaudeStepEngine(LifecycleCapableEngine):
                 logger.debug("StatsDB not available: %s", e)
 
         logger.debug(
-            "ClaudeStepEngine initialized: mode=%s, provider=%s, cli_cmd=%s, stats_db=%s",
+            "ClaudeStepEngine initialized: mode=%s, execution=%s, provider=%s, cli_cmd=%s, stats_db=%s",
             self._mode,
+            self._execution,
             self._provider,
             self._cli_cmd,
             self._stats_db is not None,
@@ -444,10 +455,41 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         2. Work execution
         3. Finalization (JIT handoff)
         4. Routing decision
+
+        Execution pattern is controlled by the `execution` config:
+        - legacy: Runs each phase separately (hydrate, work, finalize, route)
+        - session: Uses WP6 per-step session pattern (single session for all phases)
         """
         # Hydrate context before execution
         ctx = self._hydrate_context(ctx)
 
+        # Session execution dispatch: execution=session AND mode=sdk AND SDK available
+        if self._execution == "session" and self._mode == "sdk":
+            if self._check_sdk_available():
+                logger.debug(
+                    "ClaudeStepEngine using session execution for step %s",
+                    ctx.step_id,
+                )
+                try:
+                    result, events, routing_signal = self.execute_step_session_sync(ctx)
+                    # Session execution returns routing_signal separately;
+                    # for run_step() compatibility, we just return result and events
+                    return result, events
+                except Exception as e:
+                    logger.warning(
+                        "Session execution failed for step %s: %s, falling back to legacy",
+                        ctx.step_id,
+                        e,
+                    )
+                    # Fall through to legacy execution
+            else:
+                logger.info(
+                    "Session execution requested but SDK not available for step %s, "
+                    "falling back to legacy mode",
+                    ctx.step_id,
+                )
+
+        # Legacy execution modes
         if self._mode == "stub":
             logger.debug("ClaudeStepEngine using stub for step %s (explicit stub mode)", ctx.step_id)
             return run_step_stub(ctx, self.engine_id, self._provider, self._build_prompt)
