@@ -93,6 +93,11 @@ from swarm.runtime.types import (
     handoff_envelope_to_dict,
 )
 
+# Modular stepwise components
+from .envelope import ensure_step_envelope
+from .graph_bridge import build_flow_graph_from_definition
+from .models import FlowExecutionResult, FlowStepwiseSummary, ResolvedNode
+from .node_resolver import find_step_index, get_next_node_id, resolve_node
 from .receipt_compat import read_receipt_field, update_receipt_routing
 from .routing import build_routing_context, create_routing_signal, generate_routing_candidates
 from .spec_facade import SpecFacade
@@ -115,76 +120,7 @@ logger = logging.getLogger(__name__)
 MAX_DETOUR_DEPTH = 10
 
 
-@dataclass
-class FlowStepwiseSummary:
-    """Lightweight summary of a single flow's stepwise execution.
-
-    This is used internally by the orchestrator to capture essential
-    execution metrics without requiring the full RunSummary structure.
-
-    Attributes:
-        run_id: The run identifier.
-        status: The execution status.
-        sdlc_status: The SDLC quality/health outcome.
-        flow_key: The flow that was executed.
-        completed_steps: List of step IDs that were completed.
-        duration_ms: Total execution duration in milliseconds.
-    """
-
-    run_id: RunId
-    status: RunStatus
-    sdlc_status: SDLCStatus
-    flow_key: str
-    completed_steps: List[str]
-    duration_ms: int
-
-
-@dataclass
-class FlowExecutionResult:
-    """Result of a single flow execution including macro routing decision.
-
-    Returned by run_stepwise_flow() when a MacroNavigator is provided,
-    enabling callers to get routing guidance for the next flow.
-
-    Attributes:
-        run_id: The run identifier.
-        summary: The FlowStepwiseSummary with execution details.
-        macro_decision: Optional macro routing decision for next flow.
-        flow_result: Optional structured flow result for routing context.
-    """
-
-    run_id: RunId
-    summary: Optional["FlowStepwiseSummary"] = None
-    macro_decision: Optional[MacroRoutingDecision] = None
-    flow_result: Optional["FlowResult"] = None
-
-
-@dataclass
-class ResolvedNode:
-    """Resolved execution context for a node.
-
-    This is the unified representation for both regular flow nodes
-    and dynamically injected nodes.
-
-    Attributes:
-        node_id: The node identifier.
-        step_id: Step ID (same as node_id for compatibility).
-        role: The role/station to execute.
-        agents: List of agent keys to run.
-        index: Position in flow (or -1 for injected nodes).
-        is_injected: Whether this is a dynamically injected node.
-        injected_spec: Full spec if this is an injected node.
-        routing: Routing configuration if from flow definition.
-    """
-
-    node_id: str
-    step_id: str
-    role: str
-    agents: Tuple[str, ...]
-    index: int = -1
-    is_injected: bool = False
-    injected_spec: Optional[InjectedNodeSpec] = None
-    routing: Optional[Any] = None  # StepRouting from flow_registry
+# Note: FlowStepwiseSummary, FlowExecutionResult, ResolvedNode are now imported from .models
 
 
 class StepwiseOrchestrator:
@@ -1017,7 +953,7 @@ class StepwiseOrchestrator:
             )
 
         # Build FlowGraph for Navigator from flow definition
-        flow_graph = self._build_flow_graph_from_definition(flow_def)
+        flow_graph = build_flow_graph_from_definition(flow_def)
 
         # Use provided run_state or create new one for Navigator
         if run_state is None:
@@ -1060,7 +996,7 @@ class StepwiseOrchestrator:
 
             # For injected nodes, resolve via the node resolver
             current_node_id = run_state.current_step_id or step.id
-            resolved = self._resolve_node(current_node_id, flow_def, run_state)
+            resolved = resolve_node(current_node_id, flow_def, run_state)
 
             # If we resolved to an injected node, use its details
             if resolved and resolved.is_injected:
@@ -1209,54 +1145,15 @@ class StepwiseOrchestrator:
 
             run_base = self._repo_root / "swarm" / "runs" / run_id / flow_key
 
-            # =================================================================
             # ENVELOPE INVARIANT: Guarantee envelope exists after step execution
-            # =================================================================
-            # The orchestrator ensures an envelope exists for every completed step,
-            # regardless of engine type. This is critical because:
-            # 1. Non-lifecycle engines (GeminiStepEngine) don't call finalize_step()
-            # 2. Routing code (Navigator, deterministic) expects envelopes to exist
-            # 3. The envelope is the canonical ledger entry for the step
-            #
-            # If the engine didn't create an envelope (common in stub/non-lifecycle),
-            # the orchestrator creates a minimal one with essential fields.
-            # =================================================================
-            from swarm.runtime.handoff_io import write_handoff_envelope
-            from swarm.runtime.path_helpers import handoff_envelope_path
-
-            envelope_path = handoff_envelope_path(run_base, step.id)
-            if not envelope_path.exists():
-                # Create minimal envelope - the orchestrator is the "last resort"
-                minimal_envelope = {
-                    "step_id": step.id,
-                    "flow_key": flow_key,
-                    "run_id": run_id,
-                    "status": "VERIFIED" if step_result.status == "succeeded" else "UNVERIFIED",
-                    "summary": step_result.output[:500] if step_result.output else f"Step {step.id} completed",
-                    "duration_ms": step_result.duration_ms,
-                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
-                    "artifacts": [],
-                    # Mark as orchestrator-generated for debugging
-                    "_envelope_source": "orchestrator_fallback",
-                }
-                try:
-                    write_handoff_envelope(
-                        run_base=run_base,
-                        step_id=step.id,
-                        envelope_data=minimal_envelope,
-                        write_draft=True,
-                        validate=False,  # Skip validation for minimal envelopes
-                    )
-                    logger.debug(
-                        "Orchestrator created fallback envelope for step %s (engine didn't create one)",
-                        step.id,
-                    )
-                except Exception as env_err:
-                    logger.warning(
-                        "Failed to create fallback envelope for step %s: %s",
-                        step.id,
-                        env_err,
-                    )
+            # See envelope.py for detailed documentation of this invariant.
+            ensure_step_envelope(
+                run_base=run_base,
+                step_id=step.id,
+                step_result=step_result,
+                flow_key=flow_key,
+                run_id=run_id,
+            )
 
             # =================================================================
             # UTILITY FLOW INJECTION DETECTION
@@ -1540,177 +1437,8 @@ class StepwiseOrchestrator:
             duration_ms=sum(h.get("duration_ms", 0) for h in history),
         )
 
-    def _build_flow_graph_from_definition(self, flow_def: FlowDefinition) -> FlowGraph:
-        """Build a FlowGraph from FlowDefinition for Navigator context.
-
-        Converts the flow_registry FlowDefinition to the router.FlowGraph
-        format that NavigationOrchestrator expects.
-
-        Args:
-            flow_def: The flow definition from flow_registry.
-
-        Returns:
-            FlowGraph suitable for Navigator routing.
-        """
-        nodes: Dict[str, NodeConfig] = {}
-        edges: List[Edge] = []
-
-        for step in flow_def.steps:
-            # Create node config
-            node_config = NodeConfig(
-                node_id=step.id,
-                template_id=step.role or step.id,
-                max_iterations=step.routing.max_iterations if step.routing else None,
-            )
-            nodes[step.id] = node_config
-
-            # Create edges based on routing config
-            if step.routing:
-                # Add edge to next step
-                if step.routing.next:
-                    edges.append(
-                        Edge(
-                            edge_id=f"{step.id}->{step.routing.next}",
-                            from_node=step.id,
-                            to_node=step.routing.next,
-                            edge_type="sequence",
-                            priority=50,
-                        )
-                    )
-
-                # Add loop edge if configured
-                if step.routing.loop_target:
-                    edges.append(
-                        Edge(
-                            edge_id=f"{step.id}->{step.routing.loop_target}:loop",
-                            from_node=step.id,
-                            to_node=step.routing.loop_target,
-                            edge_type="loop",
-                            priority=40,
-                        )
-                    )
-
-        return FlowGraph(
-            graph_id=flow_def.title or "flow",
-            nodes=nodes,
-            edges=edges,
-            policy={"max_loop_iterations": 50},  # Safety fuse
-        )
-
-    def _resolve_node(
-        self,
-        node_id: str,
-        flow_def: FlowDefinition,
-        run_state: RunState,
-    ) -> Optional[ResolvedNode]:
-        """Resolve a node_id to an executable ResolvedNode.
-
-        This method handles both:
-        1. Regular flow graph nodes (from FlowDefinition)
-        2. Dynamically injected nodes (from run_state.injected_node_specs)
-
-        Injected nodes take precedence - if a node_id exists in both
-        the flow and as an injected node, the injected version is used.
-
-        Args:
-            node_id: The node ID to resolve.
-            flow_def: The flow definition containing regular steps.
-            run_state: RunState containing injected node specs.
-
-        Returns:
-            ResolvedNode if found, None otherwise.
-        """
-        # First, check injected nodes (they take precedence)
-        injected_spec = run_state.get_injected_node_spec(node_id)
-        if injected_spec is not None:
-            return ResolvedNode(
-                node_id=node_id,
-                step_id=node_id,
-                role=injected_spec.station_id,
-                agents=(injected_spec.agent_key or injected_spec.station_id,),
-                index=-1,  # Injected nodes don't have a flow index
-                is_injected=True,
-                injected_spec=injected_spec,
-                routing=None,
-            )
-
-        # Then check regular flow steps
-        for step in flow_def.steps:
-            if step.id == node_id:
-                return ResolvedNode(
-                    node_id=node_id,
-                    step_id=step.id,
-                    role=step.role or step.id,
-                    agents=tuple(step.agents) if step.agents else (),
-                    index=step.index,
-                    is_injected=False,
-                    injected_spec=None,
-                    routing=step.routing,
-                )
-
-        # Node not found
-        logger.warning("Could not resolve node_id: %s", node_id)
-        return None
-
-    def _get_next_node_id(
-        self,
-        current_node_id: str,
-        nav_result_node: Optional[str],
-        flow_def: FlowDefinition,
-        run_state: RunState,
-    ) -> Optional[str]:
-        """Determine the next node_id to execute.
-
-        Priority order:
-        1. Navigator-provided next node (if valid)
-        2. Resume from interruption stack (if sidequest complete)
-        3. Sequential next step in flow
-        4. None (flow complete)
-
-        Args:
-            current_node_id: The current node that just executed.
-            nav_result_node: Navigator's suggested next node.
-            flow_def: The flow definition.
-            run_state: Current run state.
-
-        Returns:
-            Next node_id to execute, or None if flow is complete.
-        """
-        # If navigator provided a target, validate and use it
-        if nav_result_node:
-            resolved = self._resolve_node(nav_result_node, flow_def, run_state)
-            if resolved is not None:
-                return nav_result_node
-            else:
-                logger.warning(
-                    "Navigator target %s could not be resolved, falling back",
-                    nav_result_node,
-                )
-
-        # Check if we're resuming from a sidequest
-        if run_state.peek_resume() is not None:
-            # There's a resume point - sidequest handling will pop it
-            # This is handled by check_and_handle_detour_completion in navigate()
-            pass
-
-        # For injected nodes, check if there's a next in sequence
-        if current_node_id.startswith("sq-"):
-            # This is a sidequest node - next node determined by sidequest cursor
-            # The navigate() call handles this via check_and_handle_detour_completion
-            return None
-
-        # For regular nodes, find sequential next
-        current_idx = None
-        for i, step in enumerate(flow_def.steps):
-            if step.id == current_node_id:
-                current_idx = i
-                break
-
-        if current_idx is not None and current_idx + 1 < len(flow_def.steps):
-            return flow_def.steps[current_idx + 1].id
-
-        # No next step - flow complete
-        return None
+    # Note: _build_flow_graph_from_definition, _resolve_node, _get_next_node_id
+    # have been extracted to graph_bridge.py and node_resolver.py
 
     def _route_via_navigator(
         self,

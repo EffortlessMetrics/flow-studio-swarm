@@ -6,16 +6,14 @@ extracted from the monolithic orchestrator.py. The package is organized into
 focused modules that can be tested and reasoned about independently.
 
 Package Structure:
+    models.py        - FlowStepwiseSummary, FlowExecutionResult, ResolvedNode, RoutingOutcome
+    graph_bridge.py  - FlowDefinition -> FlowGraph conversion for Navigator
+    node_resolver.py - Node resolution (regular + injected nodes)
+    envelope.py      - Envelope invariant enforcement
+    routing.py       - Fallback routing: spec + config-based (shim for _routing_legacy.py)
     types.py         - StepTxnInput/Output dataclasses, VerificationResult
     receipt_compat.py - Legacy receipt read/update (single source of truth)
     spec_facade.py   - FlowSpec/StationSpec caching + graph building
-    verification.py  - Station verify block → checks + events
-    routing.py       - Fallback routing: spec + config-based
-    macro_routing.py - Flow-to-flow transitions (on_complete/on_failure)
-    detours.py       - Interruption/resume stacks, depth limits
-    run_lifecycle.py - Create/resume runs, state management
-    step_executor.py - Hydrate + engine lifecycle + finalization
-    loop.py          - Canonical async loop + StopController
     orchestrator.py  - Thin StepwiseOrchestrator coordinator
 
 Usage:
@@ -32,8 +30,17 @@ Backwards Compatibility:
     backwards compatibility with existing code.
 """
 
-from .orchestrator import (
+# Modular components (new)
+from .envelope import ensure_step_envelope
+from .graph_bridge import build_flow_graph_from_definition
+from .models import (
     FlowExecutionResult,
+    FlowStepwiseSummary,
+    ResolvedNode,
+    RoutingOutcome,
+)
+from .node_resolver import find_step_index, get_next_node_id, resolve_node
+from .orchestrator import (
     StepwiseOrchestrator,
     get_orchestrator,
 )
@@ -71,6 +78,16 @@ from .types import (
 GeminiStepOrchestrator = StepwiseOrchestrator
 
 __all__ = [
+    # Modular components (new)
+    "build_flow_graph_from_definition",
+    "ensure_step_envelope",
+    "find_step_index",
+    "FlowExecutionResult",
+    "FlowStepwiseSummary",
+    "get_next_node_id",
+    "ResolvedNode",
+    "resolve_node",
+    "RoutingOutcome",
     # Core types
     "StepTxnInput",
     "StepTxnOutput",
@@ -97,7 +114,6 @@ __all__ = [
     # Candidate-set pattern
     "generate_routing_candidates",
     # Orchestrator
-    "FlowExecutionResult",  # Macro routing result with flow result + decision
     "StepwiseOrchestrator",
     "GeminiStepOrchestrator",  # Backwards compat alias
     "get_orchestrator",  # Factory function
