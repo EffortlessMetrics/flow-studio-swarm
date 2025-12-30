@@ -98,6 +98,14 @@ from .receipt_compat import read_receipt_field, update_receipt_routing
 from .routing import build_routing_context, create_routing_signal, generate_routing_candidates
 from .spec_facade import SpecFacade
 
+# Utility flow injection imports
+from swarm.runtime.utility_flow_injection import (
+    InjectionTriggerDetector,
+    TriggerDetectionResult,
+    UtilityFlowInjector,
+    UtilityFlowRegistry,
+)
+
 if TYPE_CHECKING:
     from swarm.runtime.navigator_integration import NavigationOrchestrator
     from swarm.runtime.preflight import PreflightResult
@@ -249,6 +257,11 @@ class StepwiseOrchestrator:
 
         # Stop request tracking for graceful interruption
         self._stop_requests: Dict[RunId, threading.Event] = {}
+
+        # Utility flow injection components
+        self._utility_flow_registry = UtilityFlowRegistry(self._repo_root)
+        self._injection_detector = InjectionTriggerDetector(self._utility_flow_registry)
+        self._utility_flow_injector = UtilityFlowInjector(self._utility_flow_registry)
 
     def request_stop(self, run_id: RunId) -> bool:
         """Request graceful stop of a running run.
@@ -1172,6 +1185,80 @@ class StepwiseOrchestrator:
             run_state.mark_node_completed(step.id)
 
             run_base = self._repo_root / "swarm" / "runs" / run_id / flow_key
+
+            # =================================================================
+            # UTILITY FLOW INJECTION DETECTION
+            # =================================================================
+            # After step completion, check if injection triggers fire.
+            # If a trigger is detected, inject the utility flow using
+            # stack-frame execution pattern.
+            # =================================================================
+            injection_result = self._check_and_inject_utility_flow(
+                run_id=run_id,
+                flow_key=flow_key,
+                step=step,
+                step_result=step_result,
+                run_state=run_state,
+            )
+
+            if injection_result is not None:
+                # Utility flow was injected - redirect to it
+                next_step_id = injection_result
+                reason = "utility_flow_injected"
+                routing_source = "utility_flow_injection"
+
+                # Emit injection event
+                storage_module.append_event(
+                    run_id,
+                    RunEvent(
+                        run_id=run_id,
+                        ts=datetime.now(timezone.utc),
+                        kind="utility_flow_injected",
+                        flow_key=flow_key,
+                        step_id=step.id,
+                        payload={
+                            "injected_node_id": next_step_id,
+                            "trigger_detected": True,
+                        },
+                    ),
+                )
+
+                # Skip normal routing - go directly to the injected utility flow
+                # Find the step index for the injected node (it's -1 for injected nodes)
+                # The node is resolved via _resolve_node in the next iteration
+                current_step_idx = 0  # Reset to allow re-iteration
+                run_state.current_step_id = next_step_id
+                continue
+
+            # Check if resuming from completed utility flow
+            resume_node = self._check_utility_flow_completion(run_state)
+            if resume_node is not None:
+                # Utility flow completed - resume at the interrupted node
+                next_step_id = resume_node
+                reason = "utility_flow_completed:return"
+                routing_source = "utility_flow_return"
+
+                # Emit resumption event
+                storage_module.append_event(
+                    run_id,
+                    RunEvent(
+                        run_id=run_id,
+                        ts=datetime.now(timezone.utc),
+                        kind="utility_flow_resumed",
+                        flow_key=flow_key,
+                        step_id=step.id,
+                        payload={
+                            "resume_node_id": next_step_id,
+                        },
+                    ),
+                )
+
+                # Find the step index for the resume node
+                for i, s in enumerate(steps):
+                    if s.id == next_step_id:
+                        current_step_idx = i
+                        break
+                continue
 
             # =================================================================
             # ROUTING DECISION: Candidate-Set Pattern with RoutingMode
@@ -2331,6 +2418,140 @@ class StepwiseOrchestrator:
 
         # No fast-path applies - let Navigator handle it
         return None
+
+    # =========================================================================
+    # Utility Flow Injection Methods
+    # =========================================================================
+
+    def _check_and_inject_utility_flow(
+        self,
+        run_id: RunId,
+        flow_key: str,
+        step: StepDefinition,
+        step_result: Any,
+        run_state: RunState,
+        git_status: Optional[Dict[str, Any]] = None,
+        verification_result: Optional[Dict[str, Any]] = None,
+        file_changes: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """Check for injection triggers and inject utility flow if triggered.
+
+        This method implements the utility flow injection detection:
+        1. Check all known injection triggers against current context
+        2. If a trigger fires, inject the corresponding utility flow
+        3. Return the first node ID of the injected flow to execute
+
+        The injection uses the stack-frame pattern:
+        - Current flow context is pushed to the interruption stack
+        - Utility flow nodes are registered for execution
+        - On utility flow completion, stack is popped and original flow resumes
+
+        Args:
+            run_id: The run identifier.
+            flow_key: Current flow key.
+            step: The step that just completed.
+            step_result: Result from step execution.
+            run_state: Current run state (modified in place).
+            git_status: Optional git status information.
+            verification_result: Optional verification check results.
+            file_changes: Optional file changes from diff scanner.
+
+        Returns:
+            First node ID of the injected utility flow, or None if no injection.
+        """
+        # Skip injection detection for utility flow nodes (prevent infinite loops)
+        current_node = run_state.current_step_id or step.id
+        if current_node.startswith("uf-") or current_node.startswith("sq-"):
+            return None
+
+        # Build step result dict for detector
+        step_result_dict = {
+            "status": step_result.status if hasattr(step_result, "status") else "",
+            "output": step_result.output if hasattr(step_result, "output") else "",
+        }
+
+        # Check injection triggers
+        trigger_result = self._injection_detector.check_triggers(
+            step_result=step_result_dict,
+            run_state=run_state,
+            git_status=git_status,
+            verification_result=verification_result,
+            file_changes=file_changes,
+        )
+
+        if not trigger_result.triggered:
+            return None
+
+        if trigger_result.flow_id is None:
+            logger.warning(
+                "Trigger '%s' fired but no flow_id provided, skipping injection",
+                trigger_result.trigger_type,
+            )
+            return None
+
+        logger.info(
+            "Injection trigger '%s' detected at step %s, injecting utility flow '%s'",
+            trigger_result.trigger_type,
+            step.id,
+            trigger_result.flow_id,
+        )
+
+        # Inject the utility flow
+        injection_result = self._utility_flow_injector.inject_utility_flow(
+            flow_id=trigger_result.flow_id,
+            run_state=run_state,
+            current_node=step.id,
+            injection_reason=trigger_result.reason,
+            injection_evidence=trigger_result.evidence,
+        )
+
+        if not injection_result.injected:
+            logger.warning(
+                "Failed to inject utility flow '%s': %s",
+                trigger_result.flow_id,
+                injection_result.error,
+            )
+            return None
+
+        logger.info(
+            "Utility flow '%s' injected: first_node=%s, total_steps=%d",
+            trigger_result.flow_id,
+            injection_result.first_node_id,
+            injection_result.total_steps,
+        )
+
+        return injection_result.first_node_id
+
+    def _check_utility_flow_completion(
+        self,
+        run_state: RunState,
+    ) -> Optional[str]:
+        """Check if a utility flow has completed and return resume node.
+
+        Implements "return" semantics - when a utility flow with
+        on_complete.next_flow="return" completes, this returns the
+        node to resume at from the interruption stack.
+
+        This is called after each step to check if:
+        1. We're currently executing a utility flow
+        2. All utility flow steps have completed
+        3. The utility flow specifies "return" behavior
+
+        Args:
+            run_state: Current run state.
+
+        Returns:
+            Node ID to resume at, or None if no utility flow completion.
+        """
+        return self._utility_flow_injector.check_utility_flow_completion(run_state)
+
+    def get_utility_flow_registry(self) -> UtilityFlowRegistry:
+        """Get the utility flow registry for inspection.
+
+        Returns:
+            The UtilityFlowRegistry instance.
+        """
+        return self._utility_flow_registry
 
 
 # Backwards compatibility alias

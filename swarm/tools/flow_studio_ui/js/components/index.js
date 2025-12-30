@@ -17,3 +17,9 @@ export { NodeInspector, createNodeInspector, } from "./NodeInspector.js";
 export { InventoryCounts, createInventoryCounts, } from "./InventoryCounts.js";
 // Boundary Review - flow completion summary for human review
 export { BoundaryReview, createBoundaryReview, extractBoundaryReviewData, } from "./BoundaryReview.js";
+// Forensic Verdict Card - displays forensic analysis results
+export { ForensicVerdictCard, createForensicVerdictCard, } from "./ForensicVerdictCard.js";
+// Routing Decision Card - routing choice visualization
+export { RoutingDecisionCard, createRoutingDecisionCard, } from "./RoutingDecisionCard.js";
+// Interruption Stack Panel - flow injection/detour stack visualization
+export { InterruptionStackPanel, createInterruptionStackPanel, createEmptyStack, parseStackFromApiResponse, renderInterruptionStackTab, } from "./InterruptionStackPanel.js";

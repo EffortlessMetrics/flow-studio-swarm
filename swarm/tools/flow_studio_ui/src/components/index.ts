@@ -81,3 +81,18 @@ export type {
   RoutingSource,
   ForensicVerdictFlags,
 } from "./RoutingDecisionCard.js";
+
+// Interruption Stack Panel - flow injection/detour stack visualization
+export {
+  InterruptionStackPanel,
+  createInterruptionStackPanel,
+  createEmptyStack,
+  parseStackFromApiResponse,
+  renderInterruptionStackTab,
+} from "./InterruptionStackPanel.js";
+export type {
+  InterruptionStack,
+  StackFrame,
+  InterruptionStackPanelOptions,
+  RoutingDecisionType,
+} from "./InterruptionStackPanel.js";

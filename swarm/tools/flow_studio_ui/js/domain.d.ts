@@ -335,6 +335,43 @@ export interface StepReceipt {
             LOW: number;
         };
     };
+    routing_decision?: {
+        chosen_candidate_id: string;
+        candidates: Array<{
+            candidate_id: string;
+            action: string;
+            target_node: string | null;
+            reason: string;
+            priority: number;
+            source: string;
+            evidence_pointers: string[];
+            is_default: boolean;
+        }>;
+        routing_source: string;
+        forensic_verdict?: {
+            claim_verified: boolean;
+            confidence: number;
+            recommendation: "TRUST" | "VERIFY" | "REJECT";
+            reward_hacking_flags: string[];
+            discrepancy_count?: number;
+            critical_issue?: string;
+        };
+        timestamp?: string;
+        iteration?: number;
+        flow_key?: string;
+        step_id?: string;
+    };
+    forensic_verdict?: {
+        verdict: "PASS" | "REJECT" | "INCONCLUSIVE";
+        discrepancy_count: number;
+        critical_issues: string[];
+        reward_hacking_flags: string[];
+        claim_vs_evidence: Array<{
+            claim: string;
+            evidence: string;
+            match: boolean;
+        }>;
+    };
 }
 /** Response from /api/runs/{run_id}/flows/{flow_key}/steps/{step_id}/receipt */
 export interface StepReceiptResponse {
@@ -844,6 +881,35 @@ export interface DetourSummary {
     evidence_path?: string;
     timestamp?: string;
 }
+/** Routing decision from V3 routing protocol */
+export interface RoutingDecisionRecord {
+    /** One of: CONTINUE, DETOUR, INJECT_FLOW, INJECT_NODES, EXTEND_GRAPH */
+    decision: string;
+    /** Target flow/node(s) for non-CONTINUE decisions */
+    target: string;
+    /** Human-readable explanation */
+    justification: string;
+    /** Links to artifacts supporting the decision */
+    evidence: string[];
+    /** Whether this deviates from the golden path */
+    offroad: boolean;
+    /** Alternative routes that were evaluated */
+    suggestions_considered?: string[];
+    /** When the decision was made */
+    timestamp: string;
+    /** Node where decision was made (e.g., "build.step-3") */
+    source_node: string;
+    /** Current depth in graph stack (0 = root flow) */
+    stack_depth: number;
+    /** Structured justification for off-road decisions */
+    why_now?: {
+        trigger: string;
+        analysis?: string;
+        relevance_to_charter?: string;
+        alternatives_considered?: string[];
+        expected_outcome?: string;
+    };
+}
 /** Verification result for a step */
 export interface VerificationSummary {
     step_id: string;
@@ -873,6 +939,12 @@ export interface BoundaryReviewResponse {
     decisions: DecisionSummary[];
     detours_count: number;
     detours: DetourSummary[];
+    /** V3 routing decisions from the routing protocol */
+    routing_decisions?: RoutingDecisionRecord[];
+    /** Current stack depth during execution */
+    stack_depth?: number;
+    /** Maximum stack depth reached */
+    max_stack_depth?: number;
     verification_passed: number;
     verification_failed: number;
     verifications: VerificationSummary[];

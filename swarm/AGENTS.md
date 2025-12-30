@@ -1,11 +1,11 @@
 # Swarm Agent Registry
 
-> Minimal viable swarm: 53 domain agents across 7 flows + 3 built-in infra.
+> Minimal viable swarm: 54 domain agents across 7 flows + 3 built-in infra.
 > Domain agents live under `.claude/agents/*.md`.
 > Built-in infra agents are native to Claude Code and have no `.claude/agents` files.
 
 <!-- META:AGENT_COUNTS -->
-**Total: 56 agents** (3 built-in + 53 domain)
+**Total: 57 agents** (3 built-in + 54 domain)
 <!-- /META:AGENT_COUNTS -->
 
 ---
@@ -56,6 +56,7 @@ For now: agents are pure tool-users. Only the orchestrator coordinates multiple 
 | clarifier | 1, 2, 3 | shaping | yellow | project/user | Detect ambiguities, draft clarification questions. |
 | risk-analyst | 1, 2, 4, 6 | analytics | orange | project/user | Identify risk patterns (security, compliance, data, performance). |
 | policy-analyst | 2, 4 | analytics | orange | project/user | Interpret policy docs vs change, assess policy implications. |
+| forensic-analyst | 3, 4, 5 | analytics | orange | project/user | Translate raw diffs and logs into semantic summaries for routing decisions. |
 | repo-operator | 3, 5 | implementation | green | project/user | Git workflows: branch, commit, merge, tag. Safe Bash only. |
 | gh-reporter | all | reporter | pink | project/user | Post summaries to GitHub issues/PRs at flow boundaries. |
 | swarm-ops | (utility) | infra | cyan | project/user | Guide for agent operations: model changes, adding agents, inspecting flows. |
@@ -112,7 +113,7 @@ For now: agents are pure tool-users. Only the orchestrator coordinates multiple 
 ## Summary
 
 <!-- META:AGENT_COUNTS -->
-**Total: 56 agents** (3 built-in + 53 domain)
+**Total: 57 agents** (3 built-in + 54 domain)
 <!-- /META:AGENT_COUNTS -->
 
 | Category | Count | Notes |

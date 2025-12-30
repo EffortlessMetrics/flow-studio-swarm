@@ -69,6 +69,7 @@ from .station_library import StationLibrary, load_station_library
 from .types import (
     HandoffEnvelope,
     InjectedNodeSpec,
+    RoutingCandidate,
     RoutingDecision,
     RoutingSignal,
     RunEvent,
@@ -364,20 +365,58 @@ def build_navigation_context(
 
 def navigator_to_routing_signal(
     nav_output: NavigatorOutput,
+    routing_candidates: Optional[List[RoutingCandidate]] = None,
 ) -> RoutingSignal:
     """Convert NavigatorOutput to RoutingSignal.
 
     This bridges the Navigator's decision format with the existing
     routing infrastructure. Includes chosen_candidate_id from the
     candidate-set pattern for full audit trail.
+
+    Args:
+        nav_output: The Navigator's output decision.
+        routing_candidates: Optional list of candidates that were presented to Navigator.
+            If not provided, a single candidate representing the chosen route is created.
     """
     intent = nav_output.route.intent
+    target_node = nav_output.route.target_node
+    reasoning = nav_output.route.reasoning
+    chosen_candidate_id = nav_output.chosen_candidate_id
+
+    # If no candidates provided, create one representing the chosen route
+    if routing_candidates is None:
+        # Generate a candidate_id if none provided by Navigator
+        if not chosen_candidate_id:
+            if intent == RouteIntent.TERMINATE:
+                chosen_candidate_id = "terminate"
+            elif intent == RouteIntent.LOOP:
+                chosen_candidate_id = f"loop:{target_node}"
+            elif intent == RouteIntent.PAUSE:
+                chosen_candidate_id = "pause"
+            elif intent == RouteIntent.DETOUR:
+                chosen_candidate_id = f"detour:{target_node}"
+            else:  # ADVANCE
+                chosen_candidate_id = f"advance:{target_node}"
+
+        # Create the implicit candidate
+        routing_candidates = [
+            RoutingCandidate(
+                candidate_id=chosen_candidate_id,
+                action=intent.value if intent != RouteIntent.PAUSE else "terminate",
+                target_node=target_node,
+                reason=reasoning,
+                priority=90,  # Navigator decisions have high priority
+                source="navigator",
+                is_default=False,
+            )
+        ]
 
     # Common fields for all routing decisions
     common_fields = {
         "confidence": nav_output.route.confidence,
         "needs_human": nav_output.signals.needs_human,
-        "chosen_candidate_id": nav_output.chosen_candidate_id,
+        "chosen_candidate_id": chosen_candidate_id,
+        "routing_candidates": routing_candidates,
         "routing_source": "navigator",
     }
 
@@ -385,24 +424,25 @@ def navigator_to_routing_signal(
         return RoutingSignal(
             decision=RoutingDecision.TERMINATE,
             next_step_id=None,
-            reason=nav_output.route.reasoning,
+            reason=reasoning,
             exit_condition_met=True,
             **common_fields,
         )
     elif intent == RouteIntent.LOOP:
         return RoutingSignal(
             decision=RoutingDecision.LOOP,
-            next_step_id=nav_output.route.target_node,
-            reason=nav_output.route.reasoning,
+            next_step_id=target_node,
+            reason=reasoning,
             **common_fields,
         )
     elif intent == RouteIntent.PAUSE:
         return RoutingSignal(
             decision=RoutingDecision.TERMINATE,  # Pause = terminate with needs_human
             next_step_id=None,
-            reason=nav_output.route.reasoning,
+            reason=reasoning,
             needs_human=True,  # Override common_fields
-            chosen_candidate_id=nav_output.chosen_candidate_id,
+            chosen_candidate_id=chosen_candidate_id,
+            routing_candidates=routing_candidates,
             routing_source="navigator",
             confidence=nav_output.route.confidence,
         )
@@ -410,15 +450,15 @@ def navigator_to_routing_signal(
         # Detour is handled separately; return advance to current position
         return RoutingSignal(
             decision=RoutingDecision.ADVANCE,
-            next_step_id=nav_output.route.target_node,
-            reason=f"Detour requested: {nav_output.route.reasoning}",
+            next_step_id=target_node,
+            reason=f"Detour requested: {reasoning}",
             **common_fields,
         )
     else:  # ADVANCE
         return RoutingSignal(
             decision=RoutingDecision.ADVANCE,
-            next_step_id=nav_output.route.target_node,
-            reason=nav_output.route.reasoning,
+            next_step_id=target_node,
+            reason=reasoning,
             **common_fields,
         )
 
@@ -1001,6 +1041,18 @@ class NavigationOrchestrator:
         # Check if resuming from a completed detour
         resume_node = check_and_handle_detour_completion(run_state, self._sidequest_catalog)
         if resume_node:
+            # Create audit trail for detour resume
+            candidate_id = f"detour_resume:{resume_node}"
+            chosen_candidate = RoutingCandidate(
+                candidate_id=candidate_id,
+                action="advance",
+                target_node=resume_node,
+                reason="Resuming from completed detour",
+                priority=100,  # Detour resume is deterministic
+                source="detour_resume",
+                is_default=True,
+            )
+
             # Return resume routing
             return NavigationResult(
                 next_node=resume_node,
@@ -1008,6 +1060,10 @@ class NavigationOrchestrator:
                     decision=RoutingDecision.ADVANCE,
                     next_step_id=resume_node,
                     reason="Resuming from completed detour",
+                    confidence=1.0,
+                    chosen_candidate_id=candidate_id,
+                    routing_candidates=[chosen_candidate],
+                    routing_source="detour_resume",
                 ),
                 brief_stored=False,
                 detour_injected=False,

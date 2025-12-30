@@ -22,11 +22,13 @@ Validates swarm spec/implementation alignment with two layers:
 ## What It Validates
 
 **FR-001: Bijection** — 1:1 mapping between swarm/AGENTS.md entries and .claude/agents/*.md files
+  - LEGACY: Skipped if .claude/agents/ directory does not exist (new architecture uses swarm/config/agents/)
   - Every registry entry has a corresponding file (case-sensitive)
   - Every file has a corresponding registry entry
   - Detects missing/extra files
 
 **FR-002: Frontmatter** — YAML frontmatter in agent definitions
+  - LEGACY: Skipped if .claude/agents/ directory does not exist (new architecture uses swarm/config/agents/)
   - Required fields: name, description, color, model
   - Name matches filename and registry key
   - Model is valid (inherit, haiku, sonnet, opus)
@@ -493,6 +495,9 @@ def validate_bijection(registry: Dict[str, Dict[str, Any]]) -> ValidationResult:
     """
     Validate 1:1 correspondence between AGENTS.md and .claude/agents/*.md files.
 
+    LEGACY: This check is skipped if .claude/agents/ directory does not exist.
+    The new architecture uses swarm/config/agents/ for agent configuration instead.
+
     Checks:
     - Every registry entry has a corresponding file
     - Every file has a corresponding registry entry
@@ -500,13 +505,9 @@ def validate_bijection(registry: Dict[str, Dict[str, Any]]) -> ValidationResult:
     """
     result = ValidationResult()
 
+    # LEGACY: Skip bijection check if .claude/agents/ doesn't exist
+    # The new architecture uses swarm/config/agents/ instead
     if not AGENTS_DIR.is_dir():
-        result.add_error(
-            "BIJECTION",
-            str(AGENTS_DIR),
-            "directory does not exist",
-            "Create .claude/agents/ directory"
-        )
         return result
 
     # Collect agent files
@@ -587,6 +588,9 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
     """
     Validate YAML frontmatter in all agent files.
 
+    LEGACY: This check is skipped if .claude/agents/ directory does not exist.
+    The new architecture uses swarm/config/agents/ for agent configuration instead.
+
     Checks:
     - YAML parses correctly
     - Required fields present (name, description, model)
@@ -601,6 +605,8 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
     """
     result = ValidationResult()
 
+    # LEGACY: Skip frontmatter check if .claude/agents/ doesn't exist
+    # The new architecture uses swarm/config/agents/ instead
     if not AGENTS_DIR.is_dir():
         return result
 
@@ -750,6 +756,9 @@ def validate_colors(registry: Dict[str, Dict[str, Any]]) -> ValidationResult:
     """
     Validate that agent colors match expected colors for their role_family.
 
+    LEGACY: This check is skipped if .claude/agents/ directory does not exist.
+    The new architecture uses swarm/config/agents/ for agent configuration instead.
+
     Checks:
     - Agent frontmatter has 'color' field
     - Color is valid (in VALID_COLORS)
@@ -757,6 +766,8 @@ def validate_colors(registry: Dict[str, Dict[str, Any]]) -> ValidationResult:
     """
     result = ValidationResult()
 
+    # LEGACY: Skip color check if .claude/agents/ doesn't exist
+    # The new architecture uses swarm/config/agents/ instead
     if not AGENTS_DIR.is_dir():
         return result
 
@@ -1169,6 +1180,9 @@ def validate_prompt_sections(registry: Dict[str, Dict[str, Any]], strict_mode: b
     """
     Validate that agent prompt bodies include required sections.
 
+    LEGACY: This check is skipped if .claude/agents/ directory does not exist.
+    The new architecture uses swarm/config/agents/ for agent configuration instead.
+
     FR-006: Agent Prompt Sections
     Checks for presence of these required headings after frontmatter:
     - ## Inputs (or ## Input)
@@ -1184,6 +1198,8 @@ def validate_prompt_sections(registry: Dict[str, Dict[str, Any]], strict_mode: b
     """
     result = ValidationResult()
 
+    # LEGACY: Skip prompt sections check if .claude/agents/ doesn't exist
+    # The new architecture uses swarm/config/agents/ instead
     if not AGENTS_DIR.is_dir():
         return result
 
@@ -2069,10 +2085,10 @@ class ValidatorRunner:
         Run agent-related validation checks.
 
         Includes:
-        - FR-CONF-001: Config coverage validation
-        - FR-001: Bijection validation
-        - FR-002: Frontmatter validation
-        - FR-002b: Color validation
+        - FR-CONF-001: Config coverage validation (new architecture)
+        - FR-001: Bijection validation (LEGACY: skipped if .claude/agents/ doesn't exist)
+        - FR-002: Frontmatter validation (LEGACY: skipped if .claude/agents/ doesn't exist)
+        - FR-002b: Color validation (LEGACY: skipped if .claude/agents/ doesn't exist)
 
         Returns:
             ValidationResult with agent-related errors and warnings
