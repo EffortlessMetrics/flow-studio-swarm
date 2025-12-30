@@ -117,6 +117,127 @@ class RoutingOutcome:
             "timestamp": self.timestamp.isoformat(),
         }
 
+    def to_event_payload(self) -> Dict[str, Any]:
+        """Convert to event payload for step_routed events.
+
+        Returns a dictionary suitable for use as the payload in a step_routed
+        RunEvent. This provides the canonical format for routing audit trail.
+        """
+        payload: Dict[str, Any] = {
+            "next_step_id": self.next_step_id,
+            "reason": self.reason,
+            "routing_source": self.routing_source,
+        }
+
+        if self.chosen_candidate_id:
+            payload["chosen_candidate_id"] = self.chosen_candidate_id
+
+        if self.candidates:
+            payload["candidate_count"] = len(self.candidates)
+            payload["candidate_ids"] = [c.candidate_id for c in self.candidates]
+
+        payload["decision"] = (
+            self.decision.value if hasattr(self.decision, "value") else str(self.decision)
+        )
+        payload["confidence"] = self.confidence
+        payload["loop_count"] = self.loop_iteration
+        payload["exit_condition_met"] = self.exit_condition_met
+
+        return payload
+
+    @classmethod
+    def from_signal(
+        cls,
+        signal: RoutingSignal,
+        routing_source: str = "signal",
+    ) -> "RoutingOutcome":
+        """Create RoutingOutcome from a RoutingSignal.
+
+        This is the preferred way to convert legacy RoutingSignal results
+        into the new RoutingOutcome format.
+        """
+        return cls(
+            decision=signal.decision,
+            next_step_id=signal.next_step_id,
+            reason=signal.reason,
+            confidence=signal.confidence,
+            needs_human=signal.needs_human,
+            routing_source=routing_source,
+            chosen_candidate_id=signal.chosen_candidate_id,
+            candidates=signal.routing_candidates or [],
+            loop_iteration=signal.loop_count,
+            exit_condition_met=signal.exit_condition_met,
+            signal=signal,
+        )
+
+    @classmethod
+    def from_tuple(
+        cls,
+        next_step_id: Optional[str],
+        reason: str,
+        routing_source: str,
+        signal: Optional[RoutingSignal] = None,
+        candidates: Optional[List[Dict[str, Any]]] = None,
+    ) -> "RoutingOutcome":
+        """Create RoutingOutcome from orchestrator tuple format.
+
+        Bridges the gap between the orchestrator's tuple returns and the
+        new RoutingOutcome type. This allows gradual migration.
+        """
+        # Infer decision from next_step_id
+        if next_step_id is None:
+            decision = RoutingDecision.TERMINATE
+        elif "loop" in reason.lower() or "retry" in reason.lower():
+            decision = RoutingDecision.LOOP
+        else:
+            decision = RoutingDecision.ADVANCE
+
+        # Extract fields from signal if available
+        confidence = 1.0
+        needs_human = False
+        chosen_candidate_id = None
+        loop_iteration = 0
+        exit_condition_met = False
+        routing_candidates: List[RoutingCandidate] = []
+
+        if signal is not None:
+            decision = signal.decision
+            confidence = signal.confidence
+            needs_human = signal.needs_human
+            chosen_candidate_id = signal.chosen_candidate_id
+            loop_iteration = signal.loop_count
+            exit_condition_met = signal.exit_condition_met
+            routing_candidates = signal.routing_candidates or []
+
+        # Convert dict candidates to RoutingCandidate if provided
+        if candidates and not routing_candidates:
+            for c in candidates:
+                routing_candidates.append(
+                    RoutingCandidate(
+                        candidate_id=c.get("candidate_id", ""),
+                        action=c.get("action", "advance"),
+                        target_node=c.get("target_node"),
+                        reason=c.get("reason", ""),
+                        priority=c.get("priority", 0),
+                        source=c.get("source", "unknown"),
+                        is_default=c.get("is_default", False),
+                    )
+                )
+
+        return cls(
+            decision=decision,
+            next_step_id=next_step_id,
+            reason=reason,
+            confidence=confidence,
+            needs_human=needs_human,
+            routing_source=routing_source,
+            chosen_candidate_id=chosen_candidate_id,
+            candidates=routing_candidates,
+            loop_iteration=loop_iteration,
+            exit_condition_met=exit_condition_met,
+            signal=signal,
+        )
+
 
 # =============================================================================
 # Fast-Path Routing

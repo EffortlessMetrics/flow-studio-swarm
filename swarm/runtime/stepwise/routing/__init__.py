@@ -79,6 +79,10 @@ from swarm.runtime.stepwise.routing.driver import (
     route_step as route_step_unified,
 )
 
+# Convenience re-exports for RoutingOutcome construction
+# These allow: from swarm.runtime.stepwise.routing import RoutingOutcome
+# Then: outcome = RoutingOutcome.from_signal(signal, "source")
+
 __all__ = [
     # ==========================================================================
     # Legacy exports (backwards compatibility with existing code)

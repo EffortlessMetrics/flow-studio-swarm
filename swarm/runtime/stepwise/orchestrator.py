@@ -46,9 +46,7 @@ from swarm.config.flow_registry import (
     StepDefinition,
 )
 from swarm.runtime import storage as storage_module
-from swarm.runtime.diff_scanner import scan_file_changes_sync
 from swarm.runtime.engines import StepContext, StepEngine
-from swarm.runtime.engines.base import LifecycleCapableEngine
 
 # A3: Envelope-first routing imports
 from swarm.runtime.handoff_io import (
@@ -94,12 +92,18 @@ from swarm.runtime.types import (
 )
 
 # Modular stepwise components
+from .engine_runner import emit_step_execution_events, run_step as run_step_via_engine
 from .envelope import ensure_step_envelope
 from .graph_bridge import build_flow_graph_from_definition
 from .models import FlowExecutionResult, FlowStepwiseSummary, ResolvedNode
 from .node_resolver import find_step_index, get_next_node_id, resolve_node
 from .receipt_compat import read_receipt_field, update_receipt_routing
-from .routing import build_routing_context, create_routing_signal, generate_routing_candidates
+from .routing import (
+    build_routing_context,
+    create_routing_signal,
+    generate_routing_candidates,
+    RoutingOutcome,
+)
 from .spec_facade import SpecFacade
 
 # Utility flow injection imports
@@ -1034,99 +1038,30 @@ class StepwiseOrchestrator:
                 routing=routing_ctx,
             )
 
-            # Start timing the step
-            step_start = time.monotonic()
-            step_start_time = datetime.now(timezone.utc)
-
-            # Execute step - use lifecycle phases if engine supports it
-            if isinstance(self._engine, LifecycleCapableEngine):
-                # Three-phase execution pattern (two-turn JIT finalization)
-
-                # Phase 1: Work (The Grind)
-                step_result, work_events, work_summary = self._engine.run_worker(ctx)
-
-                # Capture progress evidence after work, before finalize
-                # This creates a state snapshot for stall detection
-                file_changes = scan_file_changes_sync(self._repo_root)
-                progress_evidence = {
-                    "file_count": file_changes.file_count,
-                    "line_count": file_changes.total_insertions + file_changes.total_deletions,
-                    "files_summary": file_changes.summary,
-                    "has_changes": file_changes.has_changes,
-                }
-
-                # Emit file changes event for forensics
-                storage_module.append_event(
-                    run_id,
-                    RunEvent(
-                        run_id=run_id,
-                        ts=datetime.now(timezone.utc),
-                        kind="file_changes",
-                        flow_key=flow_key,
-                        step_id=step.id,
-                        payload={
-                            "progress_evidence": progress_evidence,
-                            "files": [
-                                {"path": f.path, "status": f.status}
-                                for f in file_changes.files[:20]  # Limit to 20 for payload size
-                            ],
-                        },
-                    ),
-                )
-
-                # Phase 2: Finalize (JIT extraction while context is hot)
-                fin_result = self._engine.finalize_step(ctx, step_result, work_summary)
-
-                # Phase 3: Route (fresh session for routing decision)
-                handoff_data = fin_result.handoff_data or {}
-                routing_signal = self._engine.route_step(ctx, handoff_data)
-
-                # Combine events from work and finalization phases
-                events = list(work_events) + fin_result.events
-
-                # Emit lifecycle event for observability
-                storage_module.append_event(
-                    run_id,
-                    RunEvent(
-                        run_id=run_id,
-                        ts=datetime.now(timezone.utc),
-                        kind="lifecycle_phases_completed",
-                        flow_key=flow_key,
-                        step_id=step.id,
-                        payload={
-                            "phases": ["work", "finalize", "route"],
-                            "has_routing_signal": routing_signal is not None,
-                            "has_handoff_data": bool(handoff_data),
-                        },
-                    ),
-                )
-            else:
-                # Fallback to single-phase execution for non-lifecycle engines
-                step_result, events = self._engine.run_step(ctx)
-
-            # Calculate step duration
-            step_duration_ms = int((time.monotonic() - step_start) * 1000)
-            step_result.duration_ms = step_duration_ms
-
-            # Emit step timing event
-            storage_module.append_event(
-                run_id,
-                RunEvent(
-                    run_id=run_id,
-                    ts=datetime.now(timezone.utc),
-                    kind="step_timing",
-                    flow_key=flow_key,
-                    step_id=step.id,
-                    payload={
-                        "duration_ms": step_duration_ms,
-                        "started_at": step_start_time.isoformat(),
-                        "step_index": current_step_idx,
-                        "iteration": current_iteration,
-                    },
-                ),
+            # Execute step via engine runner (handles lifecycle vs single-phase)
+            engine_result = run_step_via_engine(
+                ctx=ctx,
+                engine=self._engine,
+                repo_root=self._repo_root,
             )
 
-            # Persist events
+            # Extract results for downstream use
+            step_result = engine_result.step_result
+            events = engine_result.events
+
+            # Emit standard execution events (file_changes, lifecycle, timing)
+            execution_events = emit_step_execution_events(
+                run_id=run_id,
+                flow_key=flow_key,
+                step_id=step.id,
+                step_index=current_step_idx,
+                iteration=current_iteration,
+                result=engine_result,
+            )
+            for event in execution_events:
+                storage_module.append_event(run_id, event)
+
+            # Persist step-generated events
             for event in events:
                 storage_module.append_event(run_id, event)
 
@@ -1233,12 +1168,15 @@ class StepwiseOrchestrator:
             # ROUTING DECISION: Candidate-Set Pattern with RoutingMode
             # =================================================================
             # Python generates candidates, Navigator chooses, Python validates.
+            # All routing paths produce a RoutingOutcome for consistent audit trail.
             #
             # Routing modes:
             # - DETERMINISTIC_ONLY: Fast-path only, no LLM calls
             # - ASSIST: Fast-path + Navigator chooses among candidates
             # - AUTHORITATIVE: Navigator can propose EXTEND_GRAPH freely
             # =================================================================
+
+            routing_outcome: Optional[RoutingOutcome] = None
 
             # Step 1: Always try fast-path for obvious deterministic cases
             fast_path_result = self._try_fast_path_routing(
@@ -1249,36 +1187,20 @@ class StepwiseOrchestrator:
                 iteration=current_iteration,
             )
 
-            # Track routing candidates and signal for audit trail
-            routing_candidates_used: List[Dict[str, Any]] = []
-            routing_signal_used: Optional[RoutingSignal] = None
-            chosen_candidate_id: Optional[str] = None
-
             if fast_path_result is not None:
                 # Fast-path handled the routing deterministically
-                # Unpack the new 4-tuple return format with RoutingSignal
                 next_step_id, reason, routing_source, routing_signal_used = fast_path_result
-                if routing_signal_used is not None:
-                    chosen_candidate_id = routing_signal_used.chosen_candidate_id
-                    # Convert candidates to dicts for event payload
-                    routing_candidates_used = [
-                        {
-                            "candidate_id": c.candidate_id,
-                            "action": c.action,
-                            "target_node": c.target_node,
-                            "reason": c.reason,
-                            "priority": c.priority,
-                            "source": c.source,
-                            "is_default": c.is_default,
-                        }
-                        for c in routing_signal_used.routing_candidates
-                    ]
+                routing_outcome = RoutingOutcome.from_tuple(
+                    next_step_id=next_step_id,
+                    reason=reason,
+                    routing_source=routing_source,
+                    signal=routing_signal_used,
+                )
                 logger.debug(
-                    "Fast-path routing for step %s: next=%s, reason=%s, candidate=%s",
+                    "Fast-path routing for step %s: next=%s, reason=%s",
                     step.id,
-                    next_step_id,
-                    reason,
-                    chosen_candidate_id,
+                    routing_outcome.next_step_id,
+                    routing_outcome.reason,
                 )
             elif self._routing_mode == RoutingMode.DETERMINISTIC_ONLY:
                 # Deterministic mode: Fall back to config-based routing
@@ -1289,27 +1211,17 @@ class StepwiseOrchestrator:
                     flow_def=flow_def,
                     loop_state=loop_state,
                 )
-                if routing_signal_used is not None:
-                    chosen_candidate_id = routing_signal_used.chosen_candidate_id
-                    # Convert candidates to dicts for event payload
-                    routing_candidates_used = [
-                        {
-                            "candidate_id": c.candidate_id,
-                            "action": c.action,
-                            "target_node": c.target_node,
-                            "reason": c.reason,
-                            "priority": c.priority,
-                            "source": c.source,
-                            "is_default": c.is_default,
-                        }
-                        for c in routing_signal_used.routing_candidates
-                    ]
+                routing_outcome = RoutingOutcome.from_tuple(
+                    next_step_id=next_step_id,
+                    reason=reason,
+                    routing_source=routing_source,
+                    signal=routing_signal_used,
+                )
                 logger.debug(
-                    "Deterministic routing for step %s: next=%s, reason=%s, candidate=%s",
+                    "Deterministic routing for step %s: next=%s, reason=%s",
                     step.id,
-                    next_step_id,
-                    reason,
-                    chosen_candidate_id,
+                    routing_outcome.next_step_id,
+                    routing_outcome.reason,
                 )
             elif self._navigation_orchestrator is not None:
                 # Navigator-based routing (ASSIST or AUTHORITATIVE mode)
@@ -1327,6 +1239,12 @@ class StepwiseOrchestrator:
                     flow_def=flow_def,
                     loop_state=loop_state,
                 )
+                routing_outcome = RoutingOutcome.from_tuple(
+                    next_step_id=next_step_id,
+                    reason=reason,
+                    routing_source=routing_source,
+                    candidates=routing_candidates_used,
+                )
             else:
                 # Navigator required but not available - ESCALATE
                 # This is a hard failure in ASSIST/AUTHORITATIVE modes
@@ -1335,9 +1253,15 @@ class StepwiseOrchestrator:
                     step.id,
                     self._routing_mode.value,
                 )
-                next_step_id = None
-                reason = f"escalate:navigator_unavailable:{self._routing_mode.value}"
-                routing_source = "escalate"
+                routing_outcome = RoutingOutcome.from_tuple(
+                    next_step_id=None,
+                    reason=f"escalate:navigator_unavailable:{self._routing_mode.value}",
+                    routing_source="escalate",
+                )
+
+            # Extract next_step_id and reason from outcome for downstream use
+            next_step_id = routing_outcome.next_step_id
+            reason = routing_outcome.reason
 
             # Update routing context with decision
             routing_ctx.decision = "advance" if next_step_id else "terminate"
@@ -1349,44 +1273,7 @@ class StepwiseOrchestrator:
                     self._repo_root, run_id, flow_key, step.id, step.agents[0], routing_ctx
                 )
 
-            # Emit routing event with candidate-set audit trail
-            # IMPORTANT: Every routing decision must have chosen_candidate_id for audit trail
-            routing_payload = {
-                "next_step_id": next_step_id,
-                "reason": reason,
-                "routing_source": routing_source,
-            }
-
-            # Always include chosen_candidate_id if we have one (from any path)
-            if chosen_candidate_id:
-                routing_payload["chosen_candidate_id"] = chosen_candidate_id
-
-            # Include candidate info from any routing path
-            if routing_candidates_used:
-                routing_payload["candidate_count"] = len(routing_candidates_used)
-                routing_payload["candidate_ids"] = [
-                    c.get("candidate_id") for c in routing_candidates_used
-                ]
-                # If chosen_candidate_id wasn't already set, try to find it
-                if "chosen_candidate_id" not in routing_payload:
-                    chosen = next(
-                        (c for c in routing_candidates_used if c.get("target_node") == next_step_id),
-                        None,
-                    )
-                    if chosen:
-                        routing_payload["chosen_candidate_id"] = chosen.get("candidate_id")
-
-            # Include decision type from RoutingSignal if available
-            if routing_signal_used is not None:
-                routing_payload["decision"] = (
-                    routing_signal_used.decision.value
-                    if hasattr(routing_signal_used.decision, "value")
-                    else str(routing_signal_used.decision)
-                )
-                routing_payload["confidence"] = routing_signal_used.confidence
-                routing_payload["loop_count"] = routing_signal_used.loop_count
-                routing_payload["exit_condition_met"] = routing_signal_used.exit_condition_met
-
+            # Emit routing event with canonical payload from RoutingOutcome
             storage_module.append_event(
                 run_id,
                 RunEvent(
@@ -1395,7 +1282,7 @@ class StepwiseOrchestrator:
                     kind="step_routed",
                     flow_key=flow_key,
                     step_id=step.id,
-                    payload=routing_payload,
+                    payload=routing_outcome.to_event_payload(),
                 ),
             )
 
