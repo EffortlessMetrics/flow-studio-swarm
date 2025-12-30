@@ -44,6 +44,16 @@ from .receipt_compat import (
 from .routing import (
     create_routing_signal,
     route_step,
+    # Elephant Protocol: Stall detection
+    ProgressDelta,
+    ProgressEvidence,
+    StallAnalysis,
+    detect_stall,
+    record_progress_evidence,
+    create_stall_routing_signal,
+    compute_error_signature,
+    # Candidate-set pattern
+    generate_routing_candidates,
 )
 from .spec_facade import (
     SpecFacade,
@@ -76,6 +86,16 @@ __all__ = [
     # Routing
     "create_routing_signal",
     "route_step",
+    # Elephant Protocol: Stall detection
+    "ProgressDelta",
+    "ProgressEvidence",
+    "StallAnalysis",
+    "detect_stall",
+    "record_progress_evidence",
+    "create_stall_routing_signal",
+    "compute_error_signature",
+    # Candidate-set pattern
+    "generate_routing_candidates",
     # Orchestrator
     "FlowExecutionResult",  # Macro routing result with flow result + decision
     "StepwiseOrchestrator",

@@ -419,8 +419,15 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         self,
         ctx: StepContext,
         handoff_data: Dict[str, Any],
+        spec_model: Optional[str] = None,
     ) -> Optional[RoutingSignal]:
-        """Determine next step via routing resolver."""
+        """Determine next step via routing resolver.
+
+        Args:
+            ctx: Step execution context.
+            handoff_data: Parsed handoff data from finalization.
+            spec_model: Model from spec for consistent model usage across phases.
+        """
         if self.stub_mode or self._mode == "stub":
             return route_step_stub(ctx, handoff_data)
 
@@ -428,14 +435,21 @@ class ClaudeStepEngine(LifecycleCapableEngine):
             logger.warning("SDK not available for route_step, falling back to stub")
             return route_step_stub(ctx, handoff_data)
 
-        return run_async_safely(self._route_step_async(ctx, handoff_data))
+        return run_async_safely(self._route_step_async(ctx, handoff_data, spec_model=spec_model))
 
     async def route_step_async(
         self,
         ctx: StepContext,
         handoff_data: Dict[str, Any],
+        spec_model: Optional[str] = None,
     ) -> Optional[RoutingSignal]:
-        """Async version of route_step."""
+        """Async version of route_step.
+
+        Args:
+            ctx: Step execution context.
+            handoff_data: Parsed handoff data from finalization.
+            spec_model: Model from spec for consistent model usage across phases.
+        """
         if self.stub_mode or self._mode == "stub":
             return route_step_stub(ctx, handoff_data)
 
@@ -443,7 +457,7 @@ class ClaudeStepEngine(LifecycleCapableEngine):
             logger.warning("SDK not available for route_step_async, falling back to stub")
             return route_step_stub(ctx, handoff_data)
 
-        return await self._route_step_async(ctx, handoff_data)
+        return await self._route_step_async(ctx, handoff_data, spec_model=spec_model)
 
     def run_step(self, ctx: StepContext) -> Tuple[StepResult, Iterable[RunEvent]]:
         """Execute a step using Claude Agent SDK, CLI, or stub mode.
@@ -608,6 +622,7 @@ class ClaudeStepEngine(LifecycleCapableEngine):
         self,
         ctx: StepContext,
         handoff_data: Dict[str, Any],
+        spec_model: Optional[str] = None,
     ) -> Optional[RoutingSignal]:
         """Async implementation of route_step."""
         # Prefer self.repo_root but fall back to ctx.repo_root
@@ -616,6 +631,7 @@ class ClaudeStepEngine(LifecycleCapableEngine):
             ctx=ctx,
             handoff_data=handoff_data,
             repo_root=effective_repo_root,
+            spec_model=spec_model,
         )
 
     def _run_step_sdk(self, ctx: StepContext) -> Tuple[StepResult, Iterable[RunEvent]]:
@@ -671,7 +687,11 @@ class ClaudeStepEngine(LifecycleCapableEngine):
 
         # Route if we have handoff data
         if finalization.handoff_data:
-            routing_signal = await self.route_step_async(ctx, finalization.handoff_data)
+            # Extract spec model from work phase for consistent model usage in routing
+            spec_model = step_result.artifacts.get("spec_model") if step_result.artifacts else None
+            routing_signal = await self.route_step_async(
+                ctx, finalization.handoff_data, spec_model=spec_model
+            )
             if routing_signal and finalization.envelope:
                 # Update envelope with routing signal
                 finalization.envelope.routing_signal = routing_signal

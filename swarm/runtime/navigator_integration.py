@@ -73,6 +73,17 @@ from .types import (
     RoutingSignal,
     RunEvent,
     RunState,
+    handoff_envelope_to_dict,
+)
+
+# Forensic comparator imports for Semantic Handoff Injection
+from .forensic_comparator import (
+    compare_claim_vs_evidence,
+    forensic_verdict_to_dict,
+)
+from .forensic_types import (
+    DiffScanResult,
+    diff_scan_result_from_dict,
 )
 
 logger = logging.getLogger(__name__)
@@ -257,11 +268,30 @@ def build_navigation_context(
     context_digest: str,
     previous_envelope: Optional[HandoffEnvelope],
     sidequest_catalog: Optional[SidequestCatalog] = None,
+    routing_candidates: Optional[List[Dict[str, Any]]] = None,
+    forensic_verdict: Optional[Dict[str, Any]] = None,
 ) -> NavigatorInput:
     """Build NavigatorInput from step execution context.
 
     This function collects outputs from traditional tooling and
     packages them for the Navigator.
+
+    Args:
+        run_id: Run identifier.
+        flow_key: Flow key.
+        current_node: Current node/step ID.
+        iteration: Current iteration count.
+        flow_graph: The flow graph for edge candidates.
+        step_result: Step execution result.
+        verification_result: Verification check results.
+        file_changes: File changes from diff scanner.
+        stall_signals: Stall detection signals.
+        context_digest: Compressed context summary.
+        previous_envelope: Previous step's handoff envelope.
+        sidequest_catalog: Catalog to look up sidequests.
+        routing_candidates: Pre-computed routing candidates from kernel.
+        forensic_verdict: ForensicVerdict comparing claims vs evidence
+            (Semantic Handoff Injection). See forensic_comparator.py.
     """
     # Extract candidate edges from graph
     candidate_edges = extract_candidate_edges_from_graph(flow_graph, current_node)
@@ -322,6 +352,8 @@ def build_navigation_context(
         previous_step_summary=previous_envelope.summary if previous_envelope else "",
         previous_step_status=step_result.get("status", ""),
         worker_suggested_route=step_result.get("next_step_id"),
+        routing_candidates=routing_candidates or [],
+        forensic_verdict=forensic_verdict,
     )
 
 
@@ -336,34 +368,43 @@ def navigator_to_routing_signal(
     """Convert NavigatorOutput to RoutingSignal.
 
     This bridges the Navigator's decision format with the existing
-    routing infrastructure.
+    routing infrastructure. Includes chosen_candidate_id from the
+    candidate-set pattern for full audit trail.
     """
     intent = nav_output.route.intent
+
+    # Common fields for all routing decisions
+    common_fields = {
+        "confidence": nav_output.route.confidence,
+        "needs_human": nav_output.signals.needs_human,
+        "chosen_candidate_id": nav_output.chosen_candidate_id,
+        "routing_source": "navigator",
+    }
 
     if intent == RouteIntent.TERMINATE:
         return RoutingSignal(
             decision=RoutingDecision.TERMINATE,
             next_step_id=None,
             reason=nav_output.route.reasoning,
-            confidence=nav_output.route.confidence,
-            needs_human=nav_output.signals.needs_human,
             exit_condition_met=True,
+            **common_fields,
         )
     elif intent == RouteIntent.LOOP:
         return RoutingSignal(
             decision=RoutingDecision.LOOP,
             next_step_id=nav_output.route.target_node,
             reason=nav_output.route.reasoning,
-            confidence=nav_output.route.confidence,
-            needs_human=nav_output.signals.needs_human,
+            **common_fields,
         )
     elif intent == RouteIntent.PAUSE:
         return RoutingSignal(
             decision=RoutingDecision.TERMINATE,  # Pause = terminate with needs_human
             next_step_id=None,
             reason=nav_output.route.reasoning,
+            needs_human=True,  # Override common_fields
+            chosen_candidate_id=nav_output.chosen_candidate_id,
+            routing_source="navigator",
             confidence=nav_output.route.confidence,
-            needs_human=True,
         )
     elif intent == RouteIntent.DETOUR:
         # Detour is handled separately; return advance to current position
@@ -371,16 +412,14 @@ def navigator_to_routing_signal(
             decision=RoutingDecision.ADVANCE,
             next_step_id=nav_output.route.target_node,
             reason=f"Detour requested: {nav_output.route.reasoning}",
-            confidence=nav_output.route.confidence,
-            needs_human=nav_output.signals.needs_human,
+            **common_fields,
         )
     else:  # ADVANCE
         return RoutingSignal(
             decision=RoutingDecision.ADVANCE,
             next_step_id=nav_output.route.target_node,
             reason=nav_output.route.reasoning,
-            confidence=nav_output.route.confidence,
-            needs_human=nav_output.signals.needs_human,
+            **common_fields,
         )
 
 
@@ -933,6 +972,7 @@ class NavigationOrchestrator:
         context_digest: str = "",
         previous_envelope: Optional[HandoffEnvelope] = None,
         no_human_mid_flow: bool = False,
+        routing_candidates: Optional[List[Dict[str, Any]]] = None,
     ) -> NavigationResult:
         """Execute navigation decision.
 
@@ -951,6 +991,9 @@ class NavigationOrchestrator:
             no_human_mid_flow: If True, rewrite PAUSE intents to DETOUR
                 targeting the clarifier sidequest. This enables fully
                 autonomous flow execution without human intervention.
+            routing_candidates: Pre-computed routing candidates from the kernel.
+                Navigator chooses from these via chosen_candidate_id.
+                Each dict has: candidate_id, action, target_node, reason, priority.
 
         Returns:
             NavigationResult with routing decision and artifacts.
@@ -986,6 +1029,54 @@ class NavigationOrchestrator:
             step_output=step_result,
         )
 
+        # =================================================================
+        # SEMANTIC HANDOFF INJECTION: Compute forensic verdict
+        # =================================================================
+        # Compare worker claims (in handoff envelope) against actual evidence
+        # (diff scan, test results). This enables Navigator to detect
+        # "reward hacking" - e.g., deleted tests, fake progress claims.
+        forensic_verdict = None
+        if previous_envelope is not None:
+            try:
+                # Convert handoff envelope to dict for comparison
+                handoff_dict = handoff_envelope_to_dict(previous_envelope)
+
+                # Convert file_changes dict to DiffScanResult if available
+                diff_result = None
+                if file_changes:
+                    try:
+                        diff_result = diff_scan_result_from_dict(file_changes)
+                    except Exception as e:
+                        logger.debug(
+                            "Could not convert file_changes to DiffScanResult: %s",
+                            e,
+                        )
+
+                # Compute forensic verdict comparing claims vs evidence
+                verdict = compare_claim_vs_evidence(
+                    handoff=handoff_dict,
+                    diff_result=diff_result,
+                    test_summary=None,  # TODO: wire in test_summary when available
+                )
+
+                # Convert to dict for NavigatorInput
+                forensic_verdict = forensic_verdict_to_dict(verdict)
+
+                logger.debug(
+                    "Forensic verdict for step %s: recommendation=%s, confidence=%.2f, flags=%s",
+                    current_node,
+                    verdict.recommendation.value,
+                    verdict.confidence,
+                    [f.value for f in verdict.reward_hacking_flags],
+                )
+
+            except Exception as e:
+                logger.warning(
+                    "Failed to compute forensic verdict for step %s: %s",
+                    current_node,
+                    e,
+                )
+
         # Build navigation context
         nav_input = build_navigation_context(
             run_id=run_id,
@@ -1000,10 +1091,47 @@ class NavigationOrchestrator:
             context_digest=context_digest,
             previous_envelope=previous_envelope,
             sidequest_catalog=self._sidequest_catalog,
+            routing_candidates=routing_candidates,
+            forensic_verdict=forensic_verdict,
         )
 
         # Run Navigator
         nav_output = self._navigator.navigate(nav_input)
+
+        # =================================================================
+        # CANDIDATE VALIDATION: Verify chosen_candidate_id is valid
+        # =================================================================
+        # If routing candidates were provided, Navigator must choose one.
+        # EXTEND_GRAPH intent is exempt (it's proposing something new).
+        if routing_candidates and nav_output.chosen_candidate_id:
+            valid_ids = {c["candidate_id"] for c in routing_candidates}
+            chosen_id = nav_output.chosen_candidate_id
+
+            if chosen_id not in valid_ids:
+                # Allow "extend_graph" as a special value for EXTEND_GRAPH intent
+                if nav_output.route.intent == RouteIntent.EXTEND_GRAPH:
+                    logger.debug(
+                        "Navigator chose EXTEND_GRAPH (not in candidate set): %s",
+                        chosen_id,
+                    )
+                else:
+                    logger.warning(
+                        "Navigator chose invalid candidate_id '%s' (valid: %s). "
+                        "Falling back to default candidate.",
+                        chosen_id,
+                        list(valid_ids),
+                    )
+                    # Fall back to the default candidate
+                    default_candidate = next(
+                        (c for c in routing_candidates if c.get("is_default")),
+                        routing_candidates[0] if routing_candidates else None,
+                    )
+                    if default_candidate:
+                        nav_output.chosen_candidate_id = default_candidate["candidate_id"]
+                        nav_output.route.target_node = default_candidate.get("target_node")
+                        nav_output.route.reasoning = (
+                            f"Fallback to default: {default_candidate.get('reason', '')}"
+                        )
 
         # Apply no-human-mid-flow policy: rewrite PAUSE → DETOUR
         if no_human_mid_flow and nav_output.route.intent == RouteIntent.PAUSE:

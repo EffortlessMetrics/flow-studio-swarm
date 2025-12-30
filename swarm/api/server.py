@@ -144,6 +144,23 @@ class DBHealthInfo(BaseModel):
     last_rebuild: Optional[str] = None
 
 
+class TailerHealthInfo(BaseModel):
+    """RunTailer health information."""
+
+    enabled: bool = False
+    active_runs: int = 0
+    total_events_ingested: int = 0
+    last_ingest_at: Optional[str] = None
+    error: Optional[str] = None
+
+
+class TailerIngestResponse(BaseModel):
+    """Response for manual tailer ingest endpoint."""
+
+    run_id: str
+    events_ingested: int
+
+
 class HealthResponse(BaseModel):
     """Response for health check endpoint."""
 
@@ -151,6 +168,7 @@ class HealthResponse(BaseModel):
     timestamp: str
     repo_root: str
     db: Optional[DBHealthInfo] = None
+    tailer: Optional[TailerHealthInfo] = None
 
 
 class ErrorResponse(BaseModel):
@@ -828,13 +846,17 @@ def create_app(
         On startup:
         - Initialize the resilient stats database
         - Check DB schema version and rebuild from events.jsonl if needed
+        - Initialize RunTailer for incremental event ingestion
+        - Start background task to watch active runs
 
         On shutdown:
+        - Cancel the tailer background task
         - Close the database connection
         """
         logger.info("Spec API server starting...")
 
         # Initialize resilient database with auto-rebuild
+        db_available = False
         try:
             from swarm.runtime.resilient_db import close_resilient_db, get_resilient_db
 
@@ -848,12 +870,84 @@ def create_app(
             )
             if health.last_error:
                 logger.warning("DB initialization had error: %s", health.last_error)
+            db_available = True
         except Exception as e:
             logger.warning("Could not initialize resilient DB (non-fatal): %s", e)
+
+        # Initialize RunTailer for incremental event ingestion
+        tailer_task: Optional[asyncio.Task] = None
+        tailer_state: Dict[str, Any] = {
+            "enabled": False,
+            "total_events_ingested": 0,
+            "last_ingest_at": None,
+            "error": None,
+        }
+
+        if db_available:
+            try:
+                from swarm.runtime.db import get_stats_db
+                from swarm.runtime.run_tailer import RunTailer
+
+                # Get runs directory from spec manager
+                runs_dir = _spec_manager.runs_root if _spec_manager else Path("swarm/runs")
+
+                # Create tailer with the stats database
+                stats_db = get_stats_db()
+                tailer = RunTailer(db=stats_db, runs_dir=runs_dir)
+
+                # Store tailer in app state for access by endpoints
+                app.state.tailer = tailer
+                app.state.tailer_state = tailer_state
+
+                async def watch_active_runs():
+                    """Background task to watch active runs for new events."""
+                    try:
+                        async for results in tailer.watch_active_runs(poll_interval_ms=1000):
+                            total_ingested = sum(results.values())
+                            tailer_state["total_events_ingested"] += total_ingested
+                            tailer_state["last_ingest_at"] = datetime.now(
+                                timezone.utc
+                            ).isoformat()
+                            logger.debug(
+                                "Tailer ingested %d events from %d runs",
+                                total_ingested,
+                                len(results),
+                            )
+                    except asyncio.CancelledError:
+                        logger.info("RunTailer watch task cancelled")
+                        raise
+                    except Exception as e:
+                        tailer_state["error"] = str(e)
+                        logger.error("RunTailer watch task error: %s", e)
+
+                # Start background tailing task
+                tailer_task = asyncio.create_task(watch_active_runs())
+                tailer_state["enabled"] = True
+                logger.info("RunTailer initialized and watching for events")
+
+            except ImportError as e:
+                logger.warning("Could not initialize RunTailer (missing module): %s", e)
+                tailer_state["error"] = f"Import error: {e}"
+            except Exception as e:
+                logger.warning("Could not initialize RunTailer (non-fatal): %s", e)
+                tailer_state["error"] = str(e)
+        else:
+            tailer_state["error"] = "Database not available"
+            logger.info("RunTailer disabled (database not available)")
 
         yield
 
         logger.info("Spec API server shutting down...")
+
+        # Cancel the tailer background task
+        if tailer_task is not None:
+            tailer_task.cancel()
+            try:
+                await tailer_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("RunTailer task stopped")
+
         # Close the resilient database
         try:
             close_resilient_db()
@@ -890,7 +984,9 @@ def create_app(
             events_router,
             evolution_router,
             facts_router,
+            preview_router,
             runs_router,
+            settings_router,
             specs_router,
             wisdom_router,
         )
@@ -904,6 +1000,8 @@ def create_app(
         app.include_router(evolution_router, prefix="/api")
         app.include_router(boundary_router, prefix="/api")
         app.include_router(db_router, prefix="/api")
+        app.include_router(settings_router, prefix="/api")
+        app.include_router(preview_router, prefix="/api")
         logger.info("Loaded modular API routers")
     except ImportError as e:
         logger.warning("Could not load modular routers: %s", e)
@@ -1133,12 +1231,12 @@ def create_app(
     # -------------------------------------------------------------------------
 
     @app.get("/api/health", response_model=HealthResponse)
-    async def health_check():
+    async def health_check(request: Request):
         """Health check endpoint.
 
-        Returns overall API health including database status.
-        The API is considered healthy even if the DB has issues,
-        since DB operations fail gracefully.
+        Returns overall API health including database and tailer status.
+        The API is considered healthy even if the DB or tailer has issues,
+        since these operations fail gracefully.
         """
         # Get DB health info
         db_info = None
@@ -1160,12 +1258,127 @@ def create_app(
             logger.warning("Could not get DB health: %s", e)
             db_info = DBHealthInfo(healthy=False, last_error=str(e))
 
+        # Get tailer health info
+        tailer_info = None
+        try:
+            tailer_state = getattr(request.app.state, "tailer_state", None)
+            if tailer_state:
+                # Count active runs from the tailer if available
+                active_runs = 0
+                tailer = getattr(request.app.state, "tailer", None)
+                if tailer:
+                    try:
+                        from swarm.runtime.storage import list_runs
+
+                        active_runs = len(list(list_runs(tailer._runs_dir)))
+                    except Exception:
+                        pass
+
+                tailer_info = TailerHealthInfo(
+                    enabled=tailer_state.get("enabled", False),
+                    active_runs=active_runs,
+                    total_events_ingested=tailer_state.get("total_events_ingested", 0),
+                    last_ingest_at=tailer_state.get("last_ingest_at"),
+                    error=tailer_state.get("error"),
+                )
+            else:
+                tailer_info = TailerHealthInfo(enabled=False, error="Tailer state not available")
+        except Exception as e:
+            logger.warning("Could not get tailer health: %s", e)
+            tailer_info = TailerHealthInfo(enabled=False, error=str(e))
+
         return HealthResponse(
             status="healthy",
             timestamp=datetime.now(timezone.utc).isoformat(),
             repo_root=str(get_spec_manager().repo_root),
             db=db_info,
+            tailer=tailer_info,
         )
+
+    # -------------------------------------------------------------------------
+    # RunTailer Endpoints
+    # -------------------------------------------------------------------------
+
+    @app.get("/api/tailer/health", response_model=TailerHealthInfo)
+    async def tailer_health(request: Request):
+        """Check RunTailer health.
+
+        Returns detailed information about the RunTailer status including
+        whether it's enabled, active run count, and ingestion statistics.
+        """
+        tailer_state = getattr(request.app.state, "tailer_state", None)
+
+        if not tailer_state:
+            return TailerHealthInfo(enabled=False, error="Tailer not initialized")
+
+        # Count active runs
+        active_runs = 0
+        tailer = getattr(request.app.state, "tailer", None)
+        if tailer:
+            try:
+                from swarm.runtime.storage import list_runs
+
+                active_runs = len(list(list_runs(tailer._runs_dir)))
+            except Exception:
+                pass
+
+        return TailerHealthInfo(
+            enabled=tailer_state.get("enabled", False),
+            active_runs=active_runs,
+            total_events_ingested=tailer_state.get("total_events_ingested", 0),
+            last_ingest_at=tailer_state.get("last_ingest_at"),
+            error=tailer_state.get("error"),
+        )
+
+    @app.post("/api/tailer/ingest/{run_id}", response_model=TailerIngestResponse)
+    async def trigger_ingest(run_id: str, request: Request):
+        """Manually trigger ingestion for a specific run.
+
+        This endpoint allows explicit ingestion of events from a run's
+        events.jsonl file, useful for testing or forcing immediate updates.
+
+        Args:
+            run_id: The run identifier to ingest events from.
+
+        Returns:
+            The run_id and count of events ingested.
+
+        Raises:
+            HTTPException: If tailer is not available or ingestion fails.
+        """
+        tailer = getattr(request.app.state, "tailer", None)
+        tailer_state = getattr(request.app.state, "tailer_state", None)
+
+        if not tailer:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": "tailer_unavailable",
+                    "message": "RunTailer is not available",
+                    "details": {},
+                },
+            )
+
+        try:
+            events_ingested = tailer.tail_run(run_id)
+
+            # Update state tracking
+            if tailer_state and events_ingested > 0:
+                tailer_state["total_events_ingested"] += events_ingested
+                tailer_state["last_ingest_at"] = datetime.now(timezone.utc).isoformat()
+
+            return TailerIngestResponse(run_id=run_id, events_ingested=events_ingested)
+
+        except Exception as e:
+            logger.error("Failed to ingest events for run %s: %s", run_id, e)
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "ingestion_failed",
+                    "message": f"Failed to ingest events: {e}",
+                    "details": {"run_id": run_id},
+                },
+            )
 
     return app
 
@@ -1231,6 +1444,17 @@ def main():
     print("    GET    /api/runs                     - List runs (legacy)")
     print("    GET    /api/runs/{id}/state          - Get run state (legacy)")
     print("    GET    /api/health                   - Health check")
+    print("  Tailer:")
+    print("    GET    /api/tailer/health            - Check RunTailer health")
+    print("    POST   /api/tailer/ingest/{run_id}   - Manually trigger ingestion")
+    print("  Settings:")
+    print("    GET    /api/settings/model-policy    - Get model policy configuration")
+    print("    POST   /api/settings/model-policy    - Update model policy")
+    print("    POST   /api/settings/model-policy/reload - Force reload from disk")
+    print("  Preview:")
+    print("    POST   /api/preview/settings/model-policy - Preview model policy changes")
+    print("    POST   /api/preview/spec/stations/{id}    - Preview station configuration")
+    print("    POST   /api/preview/spec/flows/{id}/validate - Validate flow graph")
 
     uvicorn.run(app, host=args.host, port=args.port, reload=args.debug)
 

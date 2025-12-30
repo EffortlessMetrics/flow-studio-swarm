@@ -267,6 +267,7 @@ async def run_router_session(
     handoff_data: Dict[str, Any],
     ctx: StepContext,
     cwd: str,
+    model: Optional[str] = None,
 ) -> Optional[RoutingSignal]:
     """Run a lightweight router session to decide the next step.
 
@@ -280,6 +281,7 @@ async def run_router_session(
         handoff_data: The handoff JSON from JIT finalization.
         ctx: Step execution context with routing configuration.
         cwd: Working directory for the session.
+        model: Model to use for routing session (from spec).
 
     Returns:
         RoutingSignal if routing was determined, None if routing failed.
@@ -360,10 +362,11 @@ current_iteration: {template_vars["current_iteration"]}
         router_prompt = ROUTER_PROMPT_TEMPLATE.format(**template_vars)
         logger.debug("Using fallback ROUTER_PROMPT_TEMPLATE for routing")
 
-    # Router uses minimal options via adapter
+    # Router uses minimal options via adapter, with spec model for consistency
     options = create_high_trust_options(
         cwd=cwd,
         permission_mode="bypassPermissions",
+        model=model,  # Use spec model if available, otherwise SDK default
     )
 
     # Collect router response

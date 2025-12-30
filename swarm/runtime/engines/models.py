@@ -28,19 +28,28 @@ if TYPE_CHECKING:
 class RoutingContext:
     """Routing metadata for inclusion in receipts.
 
-    Captures microloop state and routing decisions for observability.
+    Captures microloop state, routing decisions, and parallel execution context
+    for observability.
 
     Attributes:
         loop_iteration: Current iteration count for the microloop (0-indexed).
         max_iterations: Maximum iterations allowed for the microloop.
-        decision: Routing decision made ("loop", "advance", "terminate", "pending").
+        decision: Routing decision made ("loop", "advance", "terminate", "pending", "fork", "join").
         reason: Human-readable reason for the routing decision.
+        kind: Routing kind ("linear", "microloop", "branch", "fork").
+        next_step_id: Target step for advance/branch decisions.
+        loop_target: Target step for loop decisions.
+        parallel_context: Context for parallel execution (fork/join patterns).
     """
 
     loop_iteration: int = 0
     max_iterations: Optional[int] = None
-    decision: str = "advance"  # "loop" | "advance" | "terminate" | "pending"
+    decision: str = "advance"  # "loop" | "advance" | "terminate" | "pending" | "fork" | "join"
     reason: str = ""
+    kind: str = "linear"  # "linear" | "microloop" | "branch" | "fork"
+    next_step_id: Optional[str] = None
+    loop_target: Optional[str] = None
+    parallel_context: Optional[Dict[str, Any]] = None
 
 
 @dataclass

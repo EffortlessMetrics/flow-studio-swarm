@@ -1,27 +1,40 @@
 """
-orchestrator.py - Thin StepwiseOrchestrator coordinator.
+orchestrator.py - Navigator-Mandatory Stepwise Orchestrator
 
-This module provides a thin orchestrator that delegates to the modular
-components in the stepwise package. It coordinates:
+This module provides the stepwise orchestrator that coordinates flow execution
+with the Navigator as the ONLY source of truth for routing decisions. The
+Python kernel is a "dumb executor" that interprets Navigator signals.
 
+Routing Priority:
+1. Fast-path heuristics (RETRY on PARTIAL, VERIFIED->advance, etc.)
+2. Navigator-based routing (intelligent decisions via NavigationOrchestrator)
+3. Envelope-first fallback (legacy path, only when Navigator explicitly disabled)
+
+Key Design Principles:
+- Navigator makes all intelligent routing decisions
+- Fast-path handles obvious deterministic cases without LLM calls
+- Python kernel enforces graph constraints and detour limits
+- All routing decisions are logged for auditability
+
+The orchestrator coordinates:
 1. Run lifecycle (create/resume)
-2. Step iteration loop
-3. Routing decisions
-4. Event persistence
+2. Step iteration loop with fast-path + Navigator routing
+3. Detour/INJECT_FLOW handling via interruption stack
+4. Event persistence for observability
 
 The heavy lifting is done by:
+- NavigationOrchestrator: Intelligent routing decisions
 - spec_facade: Loading and caching specs
-- routing: Creating routing signals and determining next steps
+- routing: Fallback routing signals
 - receipt_compat: Reading/writing receipt fields
-
-This orchestrator is designed to be ~200 lines (vs 2962 in the original)
-by delegating to focused modules.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,7 +46,9 @@ from swarm.config.flow_registry import (
     StepDefinition,
 )
 from swarm.runtime import storage as storage_module
+from swarm.runtime.diff_scanner import scan_file_changes_sync
 from swarm.runtime.engines import StepContext, StepEngine
+from swarm.runtime.engines.base import LifecycleCapableEngine
 
 # A3: Envelope-first routing imports
 from swarm.runtime.handoff_io import (
@@ -48,12 +63,25 @@ from swarm.runtime.macro_navigator import (
 )
 from swarm.runtime.router import Edge, FlowGraph, NodeConfig  # For Navigator integration
 from swarm.runtime.routing_utils import parse_routing_decision
+
+# Forensic comparator imports for candidate priority shaping
+from swarm.runtime.forensic_comparator import (
+    compare_claim_vs_evidence,
+    forensic_verdict_to_dict,
+)
+from swarm.runtime.forensic_types import (
+    diff_scan_result_from_dict,
+)
+
 from swarm.runtime.types import (
     FlowResult,
     InjectedNodeSpec,
     MacroAction,
     MacroRoutingDecision,
+    RoutingCandidate,
     RoutingDecision,
+    RoutingMode,
+    RoutingSignal,
     RunEvent,
     RunId,
     RunPlanSpec,
@@ -63,10 +91,11 @@ from swarm.runtime.types import (
     RunSummary,
     SDLCStatus,
     generate_run_id,
+    handoff_envelope_to_dict,
 )
 
 from .receipt_compat import read_receipt_field, update_receipt_routing
-from .routing import build_routing_context, create_routing_signal
+from .routing import build_routing_context, create_routing_signal, generate_routing_candidates
 from .spec_facade import SpecFacade
 
 if TYPE_CHECKING:
@@ -152,8 +181,29 @@ class StepwiseOrchestrator:
         use_pack_specs: bool = False,
         navigation_orchestrator: Optional["NavigationOrchestrator"] = None,
         skip_preflight: bool = False,
+        routing_mode: RoutingMode = RoutingMode.ASSIST,
     ):
         """Initialize the orchestrator.
+
+        Navigator-Mandatory Design:
+            The Navigator is the ONLY source of truth for routing decisions.
+            Python kernel is a "dumb executor" that interprets Navigator signals.
+
+            Routing modes control Navigator behavior:
+            - DETERMINISTIC_ONLY: No LLM routing calls (CI, debugging)
+            - ASSIST (default): Fast-path + Navigator for complex routing
+            - AUTHORITATIVE: Navigator has more latitude for innovation
+
+            Routing priority (in ASSIST/AUTHORITATIVE modes):
+            1. Fast-path heuristics (RETRY on PARTIAL, VERIFIED->advance, etc.)
+            2. Navigator-based routing (intelligent decisions via candidate-set)
+            3. ESCALATE if Navigator unavailable and mode requires it
+
+        Candidate-Set Pattern:
+            Python generates routing candidates from the graph and context.
+            Navigator intelligently chooses among candidates.
+            Python validates the choice and executes.
+            This keeps intelligence bounded while preserving graph constraints.
 
         Args:
             engine: StepEngine instance for executing steps.
@@ -161,11 +211,15 @@ class StepwiseOrchestrator:
             use_spec_bridge: If True, load flows from JSON specs (legacy path).
             use_pack_specs: If True, load flows from pack JSON specs (new path).
                 Takes precedence over use_spec_bridge when enabled.
-            navigation_orchestrator: Optional NavigationOrchestrator for intelligent
-                routing decisions. If not provided, creates a default one.
-                Set to None explicitly to use envelope-first fallback routing.
+            navigation_orchestrator: NavigationOrchestrator for intelligent
+                routing decisions. A default is created if not provided.
+                Only set to a custom instance for testing or specialized routing.
             skip_preflight: If True, skip preflight environment checks.
                 Useful for CI or when environment is known to be valid.
+            routing_mode: Controls Navigator behavior. Defaults to ASSIST.
+                - DETERMINISTIC_ONLY: No LLM calls, fast-path only
+                - ASSIST: Fast-path + Navigator chooses among candidates
+                - AUTHORITATIVE: Navigator can propose EXTEND_GRAPH freely
         """
         self._engine = engine
         self._repo_root = repo_root or Path(__file__).resolve().parents[3]
@@ -175,17 +229,23 @@ class StepwiseOrchestrator:
         self._spec_facade = SpecFacade(self._repo_root, use_pack_specs=use_pack_specs)
         self._lock = threading.Lock()
         self._skip_preflight = skip_preflight
+        self._routing_mode = routing_mode
 
         # Navigation orchestrator for intelligent routing
-        # Lazy import to avoid circular dependency
-        if navigation_orchestrator is None:
+        # Only create NavigationOrchestrator if routing mode requires it
+        if routing_mode == RoutingMode.DETERMINISTIC_ONLY:
+            # Deterministic mode - no Navigator, fast-path only
+            self._navigation_orchestrator: Optional["NavigationOrchestrator"] = None
+            logger.info("Orchestrator initialized in DETERMINISTIC_ONLY mode (no Navigator)")
+        elif navigation_orchestrator is None:
+            # Create default Navigator for ASSIST/AUTHORITATIVE modes
             from swarm.runtime.navigator_integration import NavigationOrchestrator
 
-            self._navigation_orchestrator: Optional["NavigationOrchestrator"] = (
-                NavigationOrchestrator(repo_root=self._repo_root)
-            )
+            self._navigation_orchestrator = NavigationOrchestrator(repo_root=self._repo_root)
+            logger.info("Orchestrator initialized in %s mode with Navigator", routing_mode.value)
         else:
             self._navigation_orchestrator = navigation_orchestrator
+            logger.info("Orchestrator initialized in %s mode with custom Navigator", routing_mode.value)
 
         # Stop request tracking for graceful interruption
         self._stop_requests: Dict[RunId, threading.Event] = {}
@@ -1002,8 +1062,97 @@ class StepwiseOrchestrator:
                 routing=routing_ctx,
             )
 
-            # Execute step
-            step_result, events = self._engine.run_step(ctx)
+            # Start timing the step
+            step_start = time.monotonic()
+            step_start_time = datetime.now(timezone.utc)
+
+            # Execute step - use lifecycle phases if engine supports it
+            if isinstance(self._engine, LifecycleCapableEngine):
+                # Three-phase execution pattern (two-turn JIT finalization)
+
+                # Phase 1: Work (The Grind)
+                step_result, work_events, work_summary = self._engine.run_worker(ctx)
+
+                # Capture progress evidence after work, before finalize
+                # This creates a state snapshot for stall detection
+                file_changes = scan_file_changes_sync(self._repo_root)
+                progress_evidence = {
+                    "file_count": file_changes.file_count,
+                    "line_count": file_changes.total_insertions + file_changes.total_deletions,
+                    "files_summary": file_changes.summary,
+                    "has_changes": file_changes.has_changes,
+                }
+
+                # Emit file changes event for forensics
+                storage_module.append_event(
+                    run_id,
+                    RunEvent(
+                        run_id=run_id,
+                        ts=datetime.now(timezone.utc),
+                        kind="file_changes",
+                        flow_key=flow_key,
+                        step_id=step.id,
+                        payload={
+                            "progress_evidence": progress_evidence,
+                            "files": [
+                                {"path": f.path, "status": f.status}
+                                for f in file_changes.files[:20]  # Limit to 20 for payload size
+                            ],
+                        },
+                    ),
+                )
+
+                # Phase 2: Finalize (JIT extraction while context is hot)
+                fin_result = self._engine.finalize_step(ctx, step_result, work_summary)
+
+                # Phase 3: Route (fresh session for routing decision)
+                handoff_data = fin_result.handoff_data or {}
+                routing_signal = self._engine.route_step(ctx, handoff_data)
+
+                # Combine events from work and finalization phases
+                events = list(work_events) + fin_result.events
+
+                # Emit lifecycle event for observability
+                storage_module.append_event(
+                    run_id,
+                    RunEvent(
+                        run_id=run_id,
+                        ts=datetime.now(timezone.utc),
+                        kind="lifecycle_phases_completed",
+                        flow_key=flow_key,
+                        step_id=step.id,
+                        payload={
+                            "phases": ["work", "finalize", "route"],
+                            "has_routing_signal": routing_signal is not None,
+                            "has_handoff_data": bool(handoff_data),
+                        },
+                    ),
+                )
+            else:
+                # Fallback to single-phase execution for non-lifecycle engines
+                step_result, events = self._engine.run_step(ctx)
+
+            # Calculate step duration
+            step_duration_ms = int((time.monotonic() - step_start) * 1000)
+            step_result.duration_ms = step_duration_ms
+
+            # Emit step timing event
+            storage_module.append_event(
+                run_id,
+                RunEvent(
+                    run_id=run_id,
+                    ts=datetime.now(timezone.utc),
+                    kind="step_timing",
+                    flow_key=flow_key,
+                    step_id=step.id,
+                    payload={
+                        "duration_ms": step_duration_ms,
+                        "started_at": step_start_time.isoformat(),
+                        "step_index": current_step_idx,
+                        "iteration": current_iteration,
+                    },
+                ),
+            )
 
             # Persist events
             for event in events:
@@ -1024,10 +1173,92 @@ class StepwiseOrchestrator:
 
             run_base = self._repo_root / "swarm" / "runs" / run_id / flow_key
 
-            # Use NavigationOrchestrator if available, otherwise fall back to envelope-first routing
-            if self._navigation_orchestrator is not None:
-                # Navigator-based routing
-                next_step_id, reason, routing_source = self._route_via_navigator(
+            # =================================================================
+            # ROUTING DECISION: Candidate-Set Pattern with RoutingMode
+            # =================================================================
+            # Python generates candidates, Navigator chooses, Python validates.
+            #
+            # Routing modes:
+            # - DETERMINISTIC_ONLY: Fast-path only, no LLM calls
+            # - ASSIST: Fast-path + Navigator chooses among candidates
+            # - AUTHORITATIVE: Navigator can propose EXTEND_GRAPH freely
+            # =================================================================
+
+            # Step 1: Always try fast-path for obvious deterministic cases
+            fast_path_result = self._try_fast_path_routing(
+                step=step,
+                step_result=step_result,
+                run_state=run_state,
+                loop_state=loop_state,
+                iteration=current_iteration,
+            )
+
+            # Track routing candidates and signal for audit trail
+            routing_candidates_used: List[Dict[str, Any]] = []
+            routing_signal_used: Optional[RoutingSignal] = None
+            chosen_candidate_id: Optional[str] = None
+
+            if fast_path_result is not None:
+                # Fast-path handled the routing deterministically
+                # Unpack the new 4-tuple return format with RoutingSignal
+                next_step_id, reason, routing_source, routing_signal_used = fast_path_result
+                if routing_signal_used is not None:
+                    chosen_candidate_id = routing_signal_used.chosen_candidate_id
+                    # Convert candidates to dicts for event payload
+                    routing_candidates_used = [
+                        {
+                            "candidate_id": c.candidate_id,
+                            "action": c.action,
+                            "target_node": c.target_node,
+                            "reason": c.reason,
+                            "priority": c.priority,
+                            "source": c.source,
+                            "is_default": c.is_default,
+                        }
+                        for c in routing_signal_used.routing_candidates
+                    ]
+                logger.debug(
+                    "Fast-path routing for step %s: next=%s, reason=%s, candidate=%s",
+                    step.id,
+                    next_step_id,
+                    reason,
+                    chosen_candidate_id,
+                )
+            elif self._routing_mode == RoutingMode.DETERMINISTIC_ONLY:
+                # Deterministic mode: Fall back to config-based routing
+                # No Navigator calls - used for CI and reproducibility
+                next_step_id, reason, routing_source, routing_signal_used = self._route_via_config_fallback(
+                    step=step,
+                    step_result=step_result,
+                    flow_def=flow_def,
+                    loop_state=loop_state,
+                )
+                if routing_signal_used is not None:
+                    chosen_candidate_id = routing_signal_used.chosen_candidate_id
+                    # Convert candidates to dicts for event payload
+                    routing_candidates_used = [
+                        {
+                            "candidate_id": c.candidate_id,
+                            "action": c.action,
+                            "target_node": c.target_node,
+                            "reason": c.reason,
+                            "priority": c.priority,
+                            "source": c.source,
+                            "is_default": c.is_default,
+                        }
+                        for c in routing_signal_used.routing_candidates
+                    ]
+                logger.debug(
+                    "Deterministic routing for step %s: next=%s, reason=%s, candidate=%s",
+                    step.id,
+                    next_step_id,
+                    reason,
+                    chosen_candidate_id,
+                )
+            elif self._navigation_orchestrator is not None:
+                # Navigator-based routing (ASSIST or AUTHORITATIVE mode)
+                # Generate candidates, let Navigator choose
+                next_step_id, reason, routing_source, routing_candidates_used = self._route_via_navigator(
                     run_id=run_id,
                     flow_key=flow_key,
                     step=step,
@@ -1037,18 +1268,20 @@ class StepwiseOrchestrator:
                     iteration=current_iteration,
                     spec=spec,
                     run_base=run_base,
-                )
-            else:
-                # Fallback: envelope-first routing (legacy path)
-                next_step_id, reason, routing_source = self._route_via_envelope_fallback(
-                    run_id=run_id,
-                    flow_key=flow_key,
-                    step=step,
-                    step_result=step_result,
                     flow_def=flow_def,
                     loop_state=loop_state,
-                    run_base=run_base,
                 )
+            else:
+                # Navigator required but not available - ESCALATE
+                # This is a hard failure in ASSIST/AUTHORITATIVE modes
+                logger.error(
+                    "Navigator unavailable for step %s in %s mode - ESCALATING",
+                    step.id,
+                    self._routing_mode.value,
+                )
+                next_step_id = None
+                reason = f"escalate:navigator_unavailable:{self._routing_mode.value}"
+                routing_source = "escalate"
 
             # Update routing context with decision
             routing_ctx.decision = "advance" if next_step_id else "terminate"
@@ -1060,7 +1293,44 @@ class StepwiseOrchestrator:
                     self._repo_root, run_id, flow_key, step.id, step.agents[0], routing_ctx
                 )
 
-            # Emit routing event
+            # Emit routing event with candidate-set audit trail
+            # IMPORTANT: Every routing decision must have chosen_candidate_id for audit trail
+            routing_payload = {
+                "next_step_id": next_step_id,
+                "reason": reason,
+                "routing_source": routing_source,
+            }
+
+            # Always include chosen_candidate_id if we have one (from any path)
+            if chosen_candidate_id:
+                routing_payload["chosen_candidate_id"] = chosen_candidate_id
+
+            # Include candidate info from any routing path
+            if routing_candidates_used:
+                routing_payload["candidate_count"] = len(routing_candidates_used)
+                routing_payload["candidate_ids"] = [
+                    c.get("candidate_id") for c in routing_candidates_used
+                ]
+                # If chosen_candidate_id wasn't already set, try to find it
+                if "chosen_candidate_id" not in routing_payload:
+                    chosen = next(
+                        (c for c in routing_candidates_used if c.get("target_node") == next_step_id),
+                        None,
+                    )
+                    if chosen:
+                        routing_payload["chosen_candidate_id"] = chosen.get("candidate_id")
+
+            # Include decision type from RoutingSignal if available
+            if routing_signal_used is not None:
+                routing_payload["decision"] = (
+                    routing_signal_used.decision.value
+                    if hasattr(routing_signal_used.decision, "value")
+                    else str(routing_signal_used.decision)
+                )
+                routing_payload["confidence"] = routing_signal_used.confidence
+                routing_payload["loop_count"] = routing_signal_used.loop_count
+                routing_payload["exit_condition_met"] = routing_signal_used.exit_condition_met
+
             storage_module.append_event(
                 run_id,
                 RunEvent(
@@ -1069,11 +1339,7 @@ class StepwiseOrchestrator:
                     kind="step_routed",
                     flow_key=flow_key,
                     step_id=step.id,
-                    payload={
-                        "next_step_id": next_step_id,
-                        "reason": reason,
-                        "routing_source": routing_source,
-                    },
+                    payload=routing_payload,
                 ),
             )
 
@@ -1298,11 +1564,14 @@ class StepwiseOrchestrator:
         iteration: int,
         spec: RunSpec,
         run_base: Path,
-    ) -> Tuple[Optional[str], str, str]:
-        """Route using NavigationOrchestrator.
+        flow_def: FlowDefinition,
+        loop_state: Dict[str, int],
+    ) -> Tuple[Optional[str], str, str, List[Dict[str, Any]]]:
+        """Route using NavigationOrchestrator with candidate-set pattern.
 
-        Calls NavigationOrchestrator.navigate() for intelligent routing decisions,
-        including PAUSE->DETOUR rewriting and EXTEND_GRAPH support.
+        Generates routing candidates from the graph, passes them to Navigator,
+        and validates the chosen candidate. This implements the candidate-set
+        pattern where Python generates options and Navigator intelligently chooses.
 
         Args:
             run_id: The run identifier.
@@ -1314,9 +1583,11 @@ class StepwiseOrchestrator:
             iteration: Current iteration count for this step.
             spec: The run specification.
             run_base: Path to the run base directory.
+            flow_def: The flow definition for candidate generation.
+            loop_state: Microloop iteration state.
 
         Returns:
-            Tuple of (next_step_id, reason, routing_source).
+            Tuple of (next_step_id, reason, routing_source, routing_candidates).
         """
         # Build step result dict for Navigator
         step_result_dict = {
@@ -1340,7 +1611,124 @@ class StepwiseOrchestrator:
         if step.id in run_state.handoff_envelopes:
             previous_envelope = run_state.handoff_envelopes[step.id]
 
-        # Call NavigationOrchestrator.navigate()
+        # =================================================================
+        # FORENSIC VERDICT COMPUTATION: Compare claims vs evidence
+        # =================================================================
+        # Compute forensic verdict BEFORE generating candidates so that
+        # priority shaping can be applied. This implements "forensics over
+        # narrative" - actual evidence (diff scan, test results) trumps
+        # claims in the handoff envelope.
+        #
+        # The verdict is used to:
+        # 1. Shape candidate priorities (demote ADVANCE, promote REPEAT/ESCALATE)
+        # 2. Provide evidence pointers for transparency
+        # 3. Inform Navigator's routing decision
+        forensic_verdict: Optional[Dict[str, Any]] = None
+        if previous_envelope is not None:
+            try:
+                # Convert handoff envelope to dict for comparison
+                handoff_dict = handoff_envelope_to_dict(previous_envelope)
+
+                # Convert file_changes dict to DiffScanResult if available
+                diff_result = None
+                if file_changes:
+                    try:
+                        diff_result = diff_scan_result_from_dict(file_changes)
+                    except Exception as e:
+                        logger.debug(
+                            "Could not convert file_changes to DiffScanResult: %s",
+                            e,
+                        )
+
+                # Compute forensic verdict comparing claims vs evidence
+                verdict = compare_claim_vs_evidence(
+                    handoff=handoff_dict,
+                    diff_result=diff_result,
+                    test_summary=None,  # TODO: wire in test_summary when available
+                )
+
+                # Convert to dict for candidate generation
+                forensic_verdict = forensic_verdict_to_dict(verdict)
+
+                logger.debug(
+                    "Forensic verdict for step %s: recommendation=%s, confidence=%.2f, flags=%s",
+                    step.id,
+                    verdict.recommendation.value,
+                    verdict.confidence,
+                    [f.value for f in verdict.reward_hacking_flags],
+                )
+
+            except Exception as e:
+                logger.warning(
+                    "Failed to compute forensic verdict for step %s: %s",
+                    step.id,
+                    e,
+                )
+
+        # =================================================================
+        # CANDIDATE-SET PATTERN: Generate routing candidates from graph
+        # =================================================================
+        # Python generates candidates, Navigator chooses, Python validates.
+        # This keeps intelligence bounded while preserving graph constraints.
+        #
+        # Forensic verdict is passed to enable priority shaping:
+        # - REJECT verdict: demote ADVANCE by 40, promote REPEAT/ESCALATE
+        # - VERIFY verdict: demote ADVANCE by 30, promote REPEAT/ESCALATE
+        # - reward_hacking_flags: trigger priority shaping
+
+        # Get sidequest options for detour candidates
+        sidequest_options = None
+        if self._navigation_orchestrator is not None:
+            catalog = self._navigation_orchestrator.sidequest_catalog
+            trigger_context = {
+                "verification_passed": verification_result.get("passed", True)
+                if verification_result
+                else True,
+                "iteration": iteration,
+            }
+            applicable = catalog.get_applicable_sidequests(trigger_context, run_id)
+            sidequest_options = [
+                {
+                    "sidequest_id": sq.sidequest_id,
+                    "name": sq.description,
+                    "priority": sq.priority,
+                }
+                for sq in applicable
+            ]
+
+        # Generate routing candidates with forensic priority shaping
+        candidates = generate_routing_candidates(
+            step=step,
+            step_result=step_result_dict,
+            flow_def=flow_def,
+            loop_state=loop_state,
+            run_state=run_state,
+            sidequest_options=sidequest_options,
+            forensic_verdict=forensic_verdict,
+        )
+
+        # Convert RoutingCandidate objects to dicts for Navigator
+        routing_candidates = [
+            {
+                "candidate_id": c.candidate_id,
+                "action": c.action,
+                "target_node": c.target_node,
+                "reason": c.reason,
+                "priority": c.priority,
+                "source": c.source,
+                "is_default": c.is_default,
+            }
+            for c in candidates
+        ]
+
+        logger.debug(
+            "Generated %d routing candidates for step %s: %s",
+            len(routing_candidates),
+            step.id,
+            [c["candidate_id"] for c in routing_candidates],
+        )
+
+        # Call NavigationOrchestrator.navigate() with candidates
         nav_result = self._navigation_orchestrator.navigate(
             run_id=run_id,
             flow_key=flow_key,
@@ -1354,6 +1742,7 @@ class StepwiseOrchestrator:
             context_digest="",  # TODO: Implement context digest
             previous_envelope=previous_envelope,
             no_human_mid_flow=spec.no_human_mid_flow,
+            routing_candidates=routing_candidates,
         )
 
         # Extract routing decision from NavigationResult
@@ -1372,6 +1761,44 @@ class StepwiseOrchestrator:
             reason = f"Extend graph: {reason}"
 
         # Persist routing decision to envelope for consistency
+        # Include candidate-set pattern audit trail
+        #
+        # CANDIDATE STORAGE PATTERN: To prevent journal bloat, full candidate
+        # lists are written to separate artifact files. Only summary info
+        # (count, IDs, path) is stored in the routing_dict for the envelope.
+        candidate_set_path: Optional[str] = None
+        if routing_candidates:
+            try:
+                # Ensure routing directory exists
+                routing_dir = run_base / "routing"
+                routing_dir.mkdir(parents=True, exist_ok=True)
+
+                # Write candidates to separate artifact file
+                candidate_file = routing_dir / f"candidates_step_{step.id}.json"
+                candidate_set_path = f"routing/candidates_step_{step.id}.json"
+
+                with open(candidate_file, "w", encoding="utf-8") as f:
+                    json.dump(
+                        {
+                            "step_id": step.id,
+                            "candidate_count": len(routing_candidates),
+                            "candidates": routing_candidates,
+                        },
+                        f,
+                        indent=2,
+                    )
+                logger.debug(
+                    "Wrote %d routing candidates to %s",
+                    len(routing_candidates),
+                    candidate_file,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to write routing candidates to artifact file: %s", e
+                )
+                # Fall back to not storing the path if write fails
+                candidate_set_path = None
+
         routing_dict = {
             "decision": routing_signal.decision.value
             if hasattr(routing_signal.decision, "value")
@@ -1380,6 +1807,12 @@ class StepwiseOrchestrator:
             "reason": reason,
             "confidence": routing_signal.confidence,
             "needs_human": routing_signal.needs_human,
+            # Candidate-set pattern audit trail (summary only, not full list)
+            "chosen_candidate_id": routing_signal.chosen_candidate_id,
+            "candidate_count": len(routing_candidates),
+            "candidate_ids": [c.get("candidate_id") for c in routing_candidates],
+            "candidate_set_path": candidate_set_path,
+            "routing_source": routing_source,
         }
         updated = update_envelope_routing(
             run_base=run_base,
@@ -1388,12 +1821,193 @@ class StepwiseOrchestrator:
         )
         if updated:
             logger.debug(
-                "Navigator: Persisted routing to envelope for step %s: next=%s",
+                "Navigator: Persisted routing to envelope for step %s: "
+                "next=%s, chosen_candidate=%s, candidates=%d",
                 step.id,
                 next_step_id,
+                routing_signal.chosen_candidate_id,
+                len(routing_candidates),
             )
 
-        return next_step_id, reason, routing_source
+        return next_step_id, reason, routing_source, routing_candidates
+
+    def _route_via_config_fallback(
+        self,
+        step: StepDefinition,
+        step_result: Any,
+        flow_def: FlowDefinition,
+        loop_state: Dict[str, int],
+    ) -> Tuple[Optional[str], str, str, Optional["RoutingSignal"]]:
+        """Route using config-based deterministic fallback.
+
+        This is the deterministic routing path used in DETERMINISTIC_ONLY mode.
+        It uses the flow definition's routing config without any LLM calls.
+
+        IMPORTANT: Creates a RoutingSignal with routing_source="deterministic_fallback"
+        to ensure complete audit trail coverage. No routing decision is "dark".
+
+        Routing logic:
+        1. If status is VERIFIED in microloop -> exit to next step
+        2. If status is PARTIAL/UNVERIFIED in microloop -> retry (if under max)
+        3. If max iterations reached -> advance to next
+        4. Linear routing -> advance to next step
+
+        Args:
+            step: The current step definition.
+            step_result: Result from step execution.
+            flow_def: The flow definition.
+            loop_state: Microloop iteration state.
+
+        Returns:
+            Tuple of (next_step_id, reason, routing_source, routing_signal).
+            The routing_signal contains the full audit trail with chosen_candidate_id.
+        """
+        from swarm.runtime.types import RoutingCandidate, RoutingDecision, RoutingSignal
+
+        routing = step.routing
+        status = step_result.status if hasattr(step_result, "status") else ""
+        routing_source = "deterministic_fallback"
+
+        def _create_deterministic_signal(
+            decision: RoutingDecision,
+            next_step_id: Optional[str],
+            reason: str,
+            loop_count: int = 0,
+            exit_condition_met: bool = False,
+        ) -> "RoutingSignal":
+            """Create a RoutingSignal for deterministic fallback with proper audit trail."""
+            # Generate deterministic candidate_id based on decision and target
+            if decision == RoutingDecision.LOOP:
+                candidate_id = f"loop:{next_step_id}:iter_{loop_count}"
+            elif decision == RoutingDecision.ADVANCE and next_step_id:
+                candidate_id = f"advance:{next_step_id}"
+            elif decision == RoutingDecision.TERMINATE:
+                candidate_id = "terminate"
+            else:
+                candidate_id = f"{decision.value}:{next_step_id or 'none'}"
+
+            # Create the routing candidate that was implicitly chosen
+            chosen_candidate = RoutingCandidate(
+                candidate_id=candidate_id,
+                action=decision.value,
+                target_node=next_step_id,
+                reason=reason,
+                priority=100,  # Deterministic decisions are highest priority
+                source="deterministic_fallback",
+                is_default=True,
+            )
+
+            return RoutingSignal(
+                decision=decision,
+                next_step_id=next_step_id,
+                reason=reason,
+                confidence=1.0,  # Deterministic decisions have full confidence
+                needs_human=False,
+                loop_count=loop_count,
+                exit_condition_met=exit_condition_met,
+                chosen_candidate_id=candidate_id,
+                routing_candidates=[chosen_candidate],
+                routing_source="deterministic_fallback",
+            )
+
+        # Handle microloop routing
+        if routing and routing.kind == "microloop" and routing.loop_target:
+            loop_key = f"{step.id}:{routing.loop_target}"
+            current_iter = loop_state.get(loop_key, 0)
+
+            # VERIFIED -> exit loop
+            if status in ("VERIFIED", "verified"):
+                reason = f"config_verified_exit:iter_{current_iter}"
+                signal = _create_deterministic_signal(
+                    decision=RoutingDecision.ADVANCE,
+                    next_step_id=routing.next,
+                    reason=reason,
+                    loop_count=current_iter,
+                    exit_condition_met=True,
+                )
+                return (routing.next, reason, routing_source, signal)
+
+            # PARTIAL/UNVERIFIED -> check if can iterate
+            can_iterate = True  # Default to true
+            if status in ("PARTIAL", "partial", "UNVERIFIED", "unverified"):
+                # Check can_further_iteration_help
+                if hasattr(step_result, "output") and isinstance(step_result.output, dict):
+                    can_iterate_val = step_result.output.get("can_further_iteration_help")
+                    if can_iterate_val is not None:
+                        can_iterate = str(can_iterate_val).lower() not in ("no", "false")
+
+                # Under max iterations and can iterate -> retry
+                if current_iter < routing.max_iterations and can_iterate:
+                    loop_state[loop_key] = current_iter + 1
+                    next_iter = current_iter + 1
+                    reason = f"config_loop_retry:iter_{next_iter}"
+                    signal = _create_deterministic_signal(
+                        decision=RoutingDecision.LOOP,
+                        next_step_id=routing.loop_target,
+                        reason=reason,
+                        loop_count=next_iter,
+                        exit_condition_met=False,
+                    )
+                    return (routing.loop_target, reason, routing_source, signal)
+
+            # Max iterations or can't iterate -> exit
+            if current_iter >= routing.max_iterations or not can_iterate:
+                reason = f"config_loop_exit:max_{routing.max_iterations}:iter_{current_iter}"
+                signal = _create_deterministic_signal(
+                    decision=RoutingDecision.ADVANCE,
+                    next_step_id=routing.next,
+                    reason=reason,
+                    loop_count=current_iter,
+                    exit_condition_met=True,
+                )
+                return (routing.next, reason, routing_source, signal)
+
+        # Handle linear routing
+        if routing and routing.kind == "linear":
+            if routing.next:
+                reason = "config_linear_advance"
+                signal = _create_deterministic_signal(
+                    decision=RoutingDecision.ADVANCE,
+                    next_step_id=routing.next,
+                    reason=reason,
+                )
+                return (routing.next, reason, routing_source, signal)
+            else:
+                reason = "config_flow_complete"
+                signal = _create_deterministic_signal(
+                    decision=RoutingDecision.TERMINATE,
+                    next_step_id=None,
+                    reason=reason,
+                    exit_condition_met=True,
+                )
+                return (None, reason, routing_source, signal)
+
+        # No routing config -> try sequential
+        current_idx = None
+        for i, s in enumerate(flow_def.steps):
+            if s.id == step.id:
+                current_idx = i
+                break
+
+        if current_idx is not None and current_idx + 1 < len(flow_def.steps):
+            next_step = flow_def.steps[current_idx + 1].id
+            reason = "config_sequential_advance"
+            signal = _create_deterministic_signal(
+                decision=RoutingDecision.ADVANCE,
+                next_step_id=next_step,
+                reason=reason,
+            )
+            return (next_step, reason, routing_source, signal)
+
+        # No next step -> flow complete
+        reason = "config_flow_complete"
+        signal = _create_deterministic_signal(
+            decision=RoutingDecision.TERMINATE,
+            next_step_id=None,
+            reason=reason,
+            exit_condition_met=True,
+        )
+        return (None, reason, routing_source, signal)
 
     def _route_via_envelope_fallback(
         self,
@@ -1526,6 +2140,198 @@ class StepwiseOrchestrator:
 
         return next_step_id, reason, routing_source
 
+    def _try_fast_path_routing(
+        self,
+        step: StepDefinition,
+        step_result: Any,
+        run_state: RunState,
+        loop_state: Dict[str, int],
+        iteration: int,
+    ) -> Optional[Tuple[Optional[str], str, str, Optional["RoutingSignal"]]]:
+        """Try fast-path routing for obvious cases without calling Navigator.
+
+        Fast-path handles deterministic routing decisions that don't need
+        Navigator intelligence. This saves LLM calls and latency.
+
+        Fast-path cases:
+        1. RETRY on PARTIAL/UNVERIFIED in microloop (before max iterations)
+        2. LINEAR advance when verification passed
+        3. TERMINATE when at terminal node with no next step
+
+        Returns None if fast-path doesn't apply (Navigator should handle).
+
+        IMPORTANT: Fast-path ALWAYS creates a RoutingSignal with routing_source="fast_path"
+        to ensure complete audit trail coverage. No routing decision is "dark".
+
+        Args:
+            step: The current step definition.
+            step_result: Result from step execution.
+            run_state: Current run state.
+            loop_state: Loop iteration tracking.
+            iteration: Current iteration count.
+
+        Returns:
+            Tuple of (next_step_id, reason, routing_source, routing_signal) or None.
+            The routing_signal contains the full audit trail with chosen_candidate_id.
+        """
+        from swarm.runtime.types import RoutingCandidate, RoutingDecision, RoutingSignal
+
+        routing = step.routing
+        status = step_result.status if hasattr(step_result, "status") else ""
+
+        def _create_fast_path_signal(
+            decision: RoutingDecision,
+            next_step_id: Optional[str],
+            reason: str,
+            loop_count: int = 0,
+            exit_condition_met: bool = False,
+        ) -> "RoutingSignal":
+            """Create a RoutingSignal for fast-path decisions with proper audit trail.
+
+            This ensures fast-path decisions are not "dark spots" in the audit trail.
+            The chosen_candidate_id is deterministically derived from the decision.
+            """
+            # Generate deterministic candidate_id based on decision and target
+            if decision == RoutingDecision.LOOP:
+                candidate_id = f"loop:{next_step_id}:iter_{loop_count}"
+            elif decision == RoutingDecision.ADVANCE and next_step_id:
+                candidate_id = f"advance:{next_step_id}"
+            elif decision == RoutingDecision.TERMINATE:
+                candidate_id = "terminate"
+            else:
+                candidate_id = f"{decision.value}:{next_step_id or 'none'}"
+
+            # Create the routing candidate that was implicitly chosen
+            chosen_candidate = RoutingCandidate(
+                candidate_id=candidate_id,
+                action=decision.value,
+                target_node=next_step_id,
+                reason=reason,
+                priority=100,  # Fast-path is highest priority (deterministic)
+                source="fast_path",
+                is_default=True,
+            )
+
+            return RoutingSignal(
+                decision=decision,
+                next_step_id=next_step_id,
+                reason=reason,
+                confidence=1.0,  # Fast-path decisions are deterministic
+                needs_human=False,
+                loop_count=loop_count,
+                exit_condition_met=exit_condition_met,
+                chosen_candidate_id=candidate_id,
+                routing_candidates=[chosen_candidate],
+                routing_source="fast_path",
+            )
+
+        # Case 1: RETRY in microloop when PARTIAL or UNVERIFIED
+        # This is the most common fast-path - no need to ask Navigator
+        if routing and routing.kind == "microloop" and routing.loop_target:
+            loop_key = f"{step.id}:{routing.loop_target}"
+            current_iter = loop_state.get(loop_key, 0)
+
+            # Check if we should retry (not at max iterations yet)
+            if current_iter < routing.max_iterations:
+                # PARTIAL or UNVERIFIED -> retry deterministically
+                if status in ("PARTIAL", "partial", "UNVERIFIED", "unverified"):
+                    # Check if there's a "can_further_iteration_help" in the output
+                    can_iterate = True
+                    if hasattr(step_result, "output") and isinstance(step_result.output, dict):
+                        can_iterate_val = step_result.output.get("can_further_iteration_help")
+                        if can_iterate_val is not None:
+                            can_iterate = str(can_iterate_val).lower() not in ("no", "false")
+
+                    if can_iterate:
+                        # Fast-path: retry the loop
+                        loop_state[loop_key] = current_iter + 1
+                        next_iter = current_iter + 1
+                        reason = f"fast_path_retry:{status}:iter_{next_iter}"
+                        signal = _create_fast_path_signal(
+                            decision=RoutingDecision.LOOP,
+                            next_step_id=routing.loop_target,
+                            reason=reason,
+                            loop_count=next_iter,
+                            exit_condition_met=False,
+                        )
+                        return (routing.loop_target, reason, "fast_path", signal)
+
+            # Max iterations reached -> advance to next
+            if current_iter >= routing.max_iterations:
+                if routing.next:
+                    reason = f"fast_path_max_iterations:{routing.max_iterations}"
+                    signal = _create_fast_path_signal(
+                        decision=RoutingDecision.ADVANCE,
+                        next_step_id=routing.next,
+                        reason=reason,
+                        loop_count=current_iter,
+                        exit_condition_met=True,
+                    )
+                    return (routing.next, reason, "fast_path", signal)
+                else:
+                    reason = "fast_path_terminate_max_iterations"
+                    signal = _create_fast_path_signal(
+                        decision=RoutingDecision.TERMINATE,
+                        next_step_id=None,
+                        reason=reason,
+                        loop_count=current_iter,
+                        exit_condition_met=True,
+                    )
+                    return (None, reason, "fast_path", signal)
+
+        # Case 2: VERIFIED in microloop -> exit to next step
+        if routing and routing.kind == "microloop" and routing.next:
+            if status in ("VERIFIED", "verified"):
+                reason = "fast_path_verified_exit"
+                loop_key = f"{step.id}:{routing.loop_target}" if routing.loop_target else step.id
+                current_iter = loop_state.get(loop_key, 0)
+                signal = _create_fast_path_signal(
+                    decision=RoutingDecision.ADVANCE,
+                    next_step_id=routing.next,
+                    reason=reason,
+                    loop_count=current_iter,
+                    exit_condition_met=True,
+                )
+                return (routing.next, reason, "fast_path", signal)
+
+        # Case 3: LINEAR routing with VERIFIED status
+        if routing and routing.kind == "linear" and routing.next:
+            if status in ("VERIFIED", "verified"):
+                reason = "fast_path_linear_advance"
+                signal = _create_fast_path_signal(
+                    decision=RoutingDecision.ADVANCE,
+                    next_step_id=routing.next,
+                    reason=reason,
+                )
+                return (routing.next, reason, "fast_path", signal)
+
+        # Case 4: Terminal step (no routing or no next step)
+        if routing is None or (routing.kind == "linear" and routing.next is None):
+            if status in ("VERIFIED", "verified"):
+                reason = "fast_path_flow_complete"
+                signal = _create_fast_path_signal(
+                    decision=RoutingDecision.TERMINATE,
+                    next_step_id=None,
+                    reason=reason,
+                    exit_condition_met=True,
+                )
+                return (None, reason, "fast_path", signal)
+
+        # Case 5: Resuming from detour - check interruption stack
+        if run_state.is_interrupted():
+            top_frame = run_state.peek_interruption()
+            if top_frame is not None:
+                # If this is a sidequest step completing, check if we should
+                # advance to next sidequest step or resume
+                current_node = run_state.current_step_id or step.id
+                if current_node.startswith("sq-"):
+                    # This is a sidequest node - let Navigator handle resumption
+                    # to properly manage multi-step sidequests
+                    return None
+
+        # No fast-path applies - let Navigator handle it
+        return None
+
 
 # Backwards compatibility alias
 GeminiStepOrchestrator = StepwiseOrchestrator
@@ -1536,6 +2342,7 @@ def get_orchestrator(
     repo_root: Optional[Path] = None,
     use_pack_specs: bool = False,
     skip_preflight: bool = False,
+    routing_mode: RoutingMode = RoutingMode.ASSIST,
 ) -> StepwiseOrchestrator:
     """Factory function to create a stepwise orchestrator.
 
@@ -1545,6 +2352,10 @@ def get_orchestrator(
         use_pack_specs: If True, use pack JSON specs instead of YAML registry.
         skip_preflight: If True, skip preflight environment checks.
             Useful for CI or when environment is known to be valid.
+        routing_mode: Controls Navigator behavior. Defaults to ASSIST.
+            - DETERMINISTIC_ONLY: No LLM calls, fast-path + config only
+            - ASSIST: Fast-path + Navigator chooses among candidates
+            - AUTHORITATIVE: Navigator can propose EXTEND_GRAPH freely
 
     Returns:
         Configured StepwiseOrchestrator instance.
@@ -1562,6 +2373,7 @@ def get_orchestrator(
         repo_root=repo_root,
         use_pack_specs=use_pack_specs,
         skip_preflight=skip_preflight,
+        routing_mode=routing_mode,
     )
 
 

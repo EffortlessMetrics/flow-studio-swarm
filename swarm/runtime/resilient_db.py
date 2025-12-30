@@ -33,6 +33,7 @@ from . import storage as storage_module
 from .db import (
     PROJECTION_VERSION,
     Fact,
+    RoutingDecisionRecord,
     RunStats,
     StatsDB,
     StepStats,
@@ -367,6 +368,48 @@ class ResilientStatsDB:
             lambda: self._db.get_facts_by_marker_type(run_id, marker_type) if self._db else [],
             f"get_facts_by_marker_type({run_id}, {marker_type})",
             [],
+        )
+
+    def get_routing_decisions_safe(self, run_id: str) -> List[RoutingDecisionRecord]:
+        """Get routing decisions for a run safely, returning empty list on error."""
+        return self._safe_operation(
+            lambda: self._db.get_routing_decisions(run_id) if self._db else [],
+            f"get_routing_decisions({run_id})",
+            [],
+        )
+
+    def get_routing_decisions_by_flow_safe(
+        self, run_id: str, flow_id: str
+    ) -> List[RoutingDecisionRecord]:
+        """Get routing decisions for a flow safely, returning empty list on error."""
+        return self._safe_operation(
+            lambda: self._db.get_routing_decisions_by_flow(run_id, flow_id) if self._db else [],
+            f"get_routing_decisions_by_flow({run_id}, {flow_id})",
+            [],
+        )
+
+    def get_routing_decision_summary_safe(self, run_id: str) -> Dict[str, Any]:
+        """Get routing decision summary safely, returning empty dict on error."""
+        return self._safe_operation(
+            lambda: self._db.get_routing_decision_summary(run_id)
+            if self._db
+            else {
+                "total_decisions": 0,
+                "by_decision": {},
+                "by_routing_mode": {},
+                "by_routing_source": {},
+                "needs_human_count": 0,
+                "terminations": 0,
+            },
+            f"get_routing_decision_summary({run_id})",
+            {
+                "total_decisions": 0,
+                "by_decision": {},
+                "by_routing_mode": {},
+                "by_routing_source": {},
+                "needs_human_count": 0,
+                "terminations": 0,
+            },
         )
 
     # =========================================================================

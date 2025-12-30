@@ -55,3 +55,29 @@ export type {
   FlowCompletionStatus,
   RoutingDecision,
 } from "./BoundaryReview.js";
+
+// Forensic Verdict Card - displays forensic analysis results
+export {
+  ForensicVerdictCard,
+  createForensicVerdictCard,
+} from "./ForensicVerdictCard.js";
+export type {
+  ForensicVerdict,
+  ForensicVerdictType,
+  ClaimEvidenceComparison,
+  ForensicVerdictCardOptions,
+} from "./ForensicVerdictCard.js";
+
+// Routing Decision Card - routing choice visualization
+export {
+  RoutingDecisionCard,
+  createRoutingDecisionCard,
+} from "./RoutingDecisionCard.js";
+export type {
+  RoutingCandidate,
+  RoutingDecisionData,
+  RoutingDecisionCardOptions,
+  RoutingAction,
+  RoutingSource,
+  ForensicVerdictFlags,
+} from "./RoutingDecisionCard.js";

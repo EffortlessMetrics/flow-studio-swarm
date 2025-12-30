@@ -19,6 +19,13 @@ Usage:
         wp4_routing_explanation_to_dict, wp4_routing_explanation_from_dict,
         # Assumption and decision logging types
         ConfidenceLevel, AssumptionStatus, AssumptionEntry, DecisionLogEntry,
+        # Observation and justification types (V3 routing)
+        ObservationType, ObservationPriority, ObservationEntry,
+        WhyNowJustification,
+        # Station opinion types (non-binding witness statements)
+        StationOpinionKind, StationOpinion,
+        # Skip justification for high-friction skip semantics
+        SkipJustification,
         assumption_entry_to_dict, assumption_entry_from_dict,
         decision_log_entry_to_dict, decision_log_entry_from_dict,
         HandoffEnvelope, RunState,
@@ -56,7 +63,7 @@ import string
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, TypedDict
 
 # Event ID generation: prefer ulid for time-ordered IDs, fall back to uuid4
 try:
@@ -117,6 +124,7 @@ class RoutingDecision(str, Enum):
     LOOP = "loop"
     TERMINATE = "terminate"
     BRANCH = "branch"
+    SKIP = "skip"
 
 
 class DecisionType(str, Enum):
@@ -129,6 +137,29 @@ class DecisionType(str, Enum):
     LLM_TIEBREAKER = "llm_tiebreaker"  # LLM chose among valid edges
     LLM_ANALYSIS = "llm_analysis"  # LLM performed deeper analysis
     ERROR = "error"  # Routing failed
+
+
+class RoutingMode(str, Enum):
+    """Routing mode controlling Navigator behavior in the orchestrator.
+
+    This enum controls the balance between deterministic Python routing
+    and intelligent Navigator-based routing:
+
+    - DETERMINISTIC_ONLY: No LLM routing calls. Used for CI, debugging,
+      and reproducibility. Python fast-path handles all routing.
+
+    - ASSIST (default): Python gates + candidates, Navigator chooses.
+      Fast-path handles obvious cases. Navigator handles complex routing.
+      Python can override only via hard gates.
+
+    - AUTHORITATIVE: Navigator can propose EXTEND_GRAPH and detours
+      more freely. Python still enforces invariants and stack rules,
+      but Navigator has more latitude to innovate.
+    """
+
+    DETERMINISTIC_ONLY = "deterministic_only"
+    ASSIST = "assist"
+    AUTHORITATIVE = "authoritative"
 
 
 class ConfidenceLevel(str, Enum):
@@ -145,6 +176,125 @@ class AssumptionStatus(str, Enum):
     ACTIVE = "active"  # Assumption is currently in effect
     RESOLVED = "resolved"  # Assumption was confirmed or clarified
     INVALIDATED = "invalidated"  # Assumption was proven wrong
+
+
+class ObservationType(str, Enum):
+    """Types of observations for the Wisdom Stream."""
+
+    ACTION_TAKEN = "action_taken"  # Logged for audit trail
+    ACTION_DEFERRED = "action_deferred"  # Noticed but didn't act (due to charter)
+    OPTIMIZATION_OPPORTUNITY = "optimization_opportunity"  # Suggestion for spec evolution
+    PATTERN_DETECTED = "pattern_detected"  # Recurring behavior worth codifying
+
+
+class ObservationPriority(str, Enum):
+    """Priority levels for observations."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+# Station Opinion types - non-binding witness statements for orchestrator corroboration
+StationOpinionKind = Literal[
+    "suggest_detour",
+    "suggest_repeat",
+    "suggest_subflow_injection",
+    "suggest_defer_to_wisdom",
+    "flag_concern",
+]
+
+
+class StationOpinion(TypedDict, total=False):
+    """A non-binding witness statement from a station about what it thinks should happen.
+
+    This is signal for the orchestrator to corroborate via forensics and charter
+    alignment, not executable intent. Stations express opinions; orchestrators decide.
+
+    Required keys:
+        kind: Type of opinion (suggest_detour, suggest_repeat, suggest_subflow_injection,
+              suggest_defer_to_wisdom, flag_concern).
+        suggested_action: What the station thinks should happen.
+        reason: Why the station thinks this action is appropriate.
+
+    Optional keys:
+        evidence_paths: File paths or artifact references supporting this opinion.
+        confidence: Confidence score (0-1) in this opinion.
+    """
+
+    kind: StationOpinionKind  # type: ignore[misc]
+    suggested_action: str
+    reason: str
+    evidence_paths: List[str]
+    confidence: float
+
+
+class SkipJustification(TypedDict):
+    """High-friction justification required when decision is 'skip'.
+
+    Skipping is subtractive (removing expected verification) and requires explicit
+    justification to create an audit trail. Detouring (additive) should be cheap;
+    skipping requires friction.
+
+    All fields are required to ensure proper accountability when nodes are skipped.
+
+    Attributes:
+        skip_reason: Why this node is being skipped.
+        why_not_needed_for_exit: Why this node is not needed to satisfy the
+            flow's exit criteria.
+        replacement_assurance: What replaces this node's verification (e.g., a
+            different step, pre-existing artifact, or external validation).
+    """
+
+    skip_reason: str
+    why_not_needed_for_exit: str
+    replacement_assurance: str
+
+
+@dataclass
+class WhyNowJustification:
+    """Structured justification for routing deviations (DETOUR, INJECT_FLOW, INJECT_NODES).
+
+    Required when routing goes off the golden path. Creates forensic trail for
+    Wisdom analysis and debugging.
+
+    Attributes:
+        trigger: What triggered this deviation (e.g., "Tests failed with Method Not Found").
+        relevance_to_charter: How this deviation serves the flow's charter goal.
+        analysis: Root cause analysis (optional but recommended).
+        alternatives_considered: Other options evaluated before choosing this deviation.
+        expected_outcome: What this deviation is expected to accomplish.
+    """
+
+    trigger: str
+    relevance_to_charter: str
+    analysis: Optional[str] = None
+    alternatives_considered: List[str] = field(default_factory=list)
+    expected_outcome: Optional[str] = None
+
+
+@dataclass
+class ObservationEntry:
+    """Something a station noticed during execution, part of the Wisdom Stream.
+
+    Observations capture things that may not have been acted upon but should be
+    considered by Flow 7 (Wisdom) for learning and spec evolution.
+
+    Attributes:
+        type: Type of observation (action_taken, action_deferred, optimization_opportunity, pattern_detected).
+        observation: What was observed.
+        reason: Why action was taken or deferred.
+        suggested_action: What Wisdom should consider doing with this observation.
+        target_flow: If applicable, which flow this observation is most relevant to.
+        priority: How urgently Wisdom should process this.
+    """
+
+    type: ObservationType
+    observation: str
+    reason: Optional[str] = None
+    suggested_action: Optional[str] = None
+    target_flow: Optional[str] = None
+    priority: ObservationPriority = ObservationPriority.LOW
 
 
 @dataclass
@@ -400,7 +550,7 @@ class RoutingSignal:
     field parsing.
 
     Attributes:
-        decision: The routing decision (advance, loop, terminate, branch).
+        decision: The routing decision (advance, loop, terminate, branch, skip).
         next_step_id: The ID of the next step to execute (for advance/branch).
         route: Named route identifier (for branch routing).
         reason: Human-readable explanation for the routing decision.
@@ -409,6 +559,11 @@ class RoutingSignal:
         next_flow: Flow key for macro-routing (flow transitions).
         loop_count: Current iteration count for microloop tracking.
         exit_condition_met: Whether the termination condition has been met.
+        chosen_candidate_id: ID of the candidate chosen by Navigator.
+        routing_candidates: Pre-computed candidates available for this decision.
+        routing_source: How this decision was made (navigator, fast_path, etc.).
+        skip_justification: High-friction justification required for SKIP decisions.
+            Skipping is subtractive and requires explicit audit trail.
     """
 
     decision: RoutingDecision
@@ -421,8 +576,74 @@ class RoutingSignal:
     next_flow: Optional[str] = None
     loop_count: int = 0
     exit_condition_met: bool = False
+    # Candidate-set pattern fields (audit trail for Navigator decisions)
+    chosen_candidate_id: Optional[str] = None  # ID of selected candidate
+    routing_candidates: List["RoutingCandidate"] = field(default_factory=list)  # Available candidates
+    routing_source: str = "navigator"  # "navigator" | "fast_path" | "deterministic_fallback" | "config_default"
     # Structured routing explanation (optional, for audit/debug)
     explanation: Optional[RoutingExplanation] = None
+    # Why-now justification for off-path routing (required for DETOUR/INJECT_*)
+    why_now: Optional[WhyNowJustification] = None
+    # High-friction skip justification (required for SKIP decisions)
+    skip_justification: Optional[SkipJustification] = None
+
+
+@dataclass
+class RoutingCandidate:
+    """A candidate routing decision for the Navigator to choose from.
+
+    The candidate-set pattern: Python generates candidates from the graph,
+    Navigator intelligently chooses among them, Python validates and executes.
+
+    This keeps intelligence bounded while preserving graph constraints.
+
+    Attributes:
+        candidate_id: Unique identifier for this candidate.
+        action: The routing action (advance, loop, detour, escalate, repeat).
+        target_node: Target node ID for advance/loop/detour.
+        reason: Human-readable explanation of why this is a candidate.
+        priority: Priority score (0-100, higher = more likely default).
+        source: Where this candidate came from (graph_edge, fast_path, detour_catalog).
+        evidence_pointers: References to evidence supporting this candidate.
+        is_default: Whether this is the default/suggested choice.
+    """
+
+    candidate_id: str
+    action: str  # "advance" | "loop" | "detour" | "escalate" | "repeat" | "terminate"
+    target_node: Optional[str] = None
+    reason: str = ""
+    priority: int = 50
+    source: str = "graph_edge"  # "graph_edge" | "fast_path" | "detour_catalog" | "extend_graph"
+    evidence_pointers: List[str] = field(default_factory=list)
+    is_default: bool = False
+
+
+def routing_candidate_to_dict(candidate: RoutingCandidate) -> Dict[str, Any]:
+    """Convert RoutingCandidate to dict for serialization."""
+    return {
+        "candidate_id": candidate.candidate_id,
+        "action": candidate.action,
+        "target_node": candidate.target_node,
+        "reason": candidate.reason,
+        "priority": candidate.priority,
+        "source": candidate.source,
+        "evidence_pointers": candidate.evidence_pointers,
+        "is_default": candidate.is_default,
+    }
+
+
+def routing_candidate_from_dict(data: Dict[str, Any]) -> RoutingCandidate:
+    """Create RoutingCandidate from dict."""
+    return RoutingCandidate(
+        candidate_id=data.get("candidate_id", ""),
+        action=data.get("action", "advance"),
+        target_node=data.get("target_node"),
+        reason=data.get("reason", ""),
+        priority=data.get("priority", 50),
+        source=data.get("source", "graph_edge"),
+        evidence_pointers=data.get("evidence_pointers", []),
+        is_default=data.get("is_default", False),
+    )
 
 
 @dataclass
@@ -452,6 +673,10 @@ class HandoffEnvelope:
         verification_details: Detailed verification results and diagnostics.
         assumptions_made: List of assumptions made during this step's execution.
         decisions_made: List of decisions logged during this step's execution.
+        observations: Shadow telemetry for Wisdom Stream analysis.
+        station_opinions: Non-binding witness statements from the station about what
+            should happen next. These are suggestions the orchestrator may corroborate
+            via forensics and charter alignment, not executable intent.
     """
 
     step_id: str
@@ -476,6 +701,12 @@ class HandoffEnvelope:
     # Assumption and decision logging (structured JSONL-compatible records)
     assumptions_made: List[AssumptionEntry] = field(default_factory=list)
     decisions_made: List[DecisionLogEntry] = field(default_factory=list)
+    # Observations for Wisdom Stream (shadow telemetry for learning)
+    observations: List[ObservationEntry] = field(default_factory=list)
+    # Station opinions: non-binding witness statements for orchestrator corroboration
+    # These are suggestions the station thinks should happen, but the orchestrator
+    # decides whether to act on them after forensic verification and charter alignment.
+    station_opinions: List[StationOpinion] = field(default_factory=list)
 
 
 @dataclass
@@ -1209,6 +1440,9 @@ def routing_signal_to_dict(signal: RoutingSignal) -> Dict[str, Any]:
     if signal.explanation:
         result["explanation"] = routing_explanation_to_dict(signal.explanation)
 
+    if signal.skip_justification:
+        result["skip_justification"] = dict(signal.skip_justification)
+
     return result
 
 
@@ -1223,7 +1457,8 @@ def routing_signal_from_dict(data: Dict[str, Any]) -> RoutingSignal:
 
     Note:
         Provides backwards compatibility for signals missing the new
-        next_flow, loop_count, exit_condition_met, or explanation fields.
+        next_flow, loop_count, exit_condition_met, explanation, or
+        skip_justification fields.
     """
     decision_value = data.get("decision", "advance")
     decision = (
@@ -1233,6 +1468,16 @@ def routing_signal_from_dict(data: Dict[str, Any]) -> RoutingSignal:
     explanation = None
     if "explanation" in data:
         explanation = routing_explanation_from_dict(data["explanation"])
+
+    # Parse skip_justification if present (TypedDict, so cast from dict)
+    skip_justification: Optional[SkipJustification] = None
+    if "skip_justification" in data:
+        sj = data["skip_justification"]
+        skip_justification = SkipJustification(
+            skip_reason=sj.get("skip_reason", ""),
+            why_not_needed_for_exit=sj.get("why_not_needed_for_exit", ""),
+            replacement_assurance=sj.get("replacement_assurance", ""),
+        )
 
     return RoutingSignal(
         decision=decision,
@@ -1245,6 +1490,7 @@ def routing_signal_from_dict(data: Dict[str, Any]) -> RoutingSignal:
         loop_count=data.get("loop_count", 0),
         exit_condition_met=data.get("exit_condition_met", False),
         explanation=explanation,
+        skip_justification=skip_justification,
     )
 
 
@@ -1296,6 +1542,10 @@ def handoff_envelope_to_dict(envelope: HandoffEnvelope) -> Dict[str, Any]:
     if envelope.decisions_made:
         result["decisions_made"] = [decision_log_entry_to_dict(d) for d in envelope.decisions_made]
 
+    # Include station opinions if present (non-binding witness statements)
+    if envelope.station_opinions:
+        result["station_opinions"] = list(envelope.station_opinions)
+
     return result
 
 
@@ -1324,6 +1574,10 @@ def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
     assumptions_made = [assumption_entry_from_dict(a) for a in data.get("assumptions_made", [])]
     decisions_made = [decision_log_entry_from_dict(d) for d in data.get("decisions_made", [])]
 
+    # Parse station opinions if present (backward compatible)
+    # StationOpinion is a TypedDict, so we just pass the dicts through
+    station_opinions: List[StationOpinion] = list(data.get("station_opinions", []))
+
     return HandoffEnvelope(
         step_id=data.get("step_id", ""),
         flow_key=data.get("flow_key", ""),
@@ -1346,6 +1600,8 @@ def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
         # Assumption and decision logging (backward compatible)
         assumptions_made=assumptions_made,
         decisions_made=decisions_made,
+        # Station opinions (backward compatible)
+        station_opinions=station_opinions,
     )
 
 

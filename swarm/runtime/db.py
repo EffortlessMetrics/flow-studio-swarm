@@ -291,7 +291,7 @@ SCHEMA_VERSION = 2
 # 2. A fresh DB is created with the new version
 # 3. Data is rebuilt from events.jsonl (empty projection if no events exist)
 
-PROJECTION_VERSION = 1
+PROJECTION_VERSION = 2
 
 CREATE_TABLES_SQL = """
 -- Schema version tracking
@@ -437,6 +437,32 @@ CREATE TABLE IF NOT EXISTS facts (
 CREATE INDEX IF NOT EXISTS idx_facts_run_id ON facts(run_id);
 CREATE INDEX IF NOT EXISTS idx_facts_marker_type ON facts(run_id, marker_type);
 CREATE INDEX IF NOT EXISTS idx_facts_marker_id ON facts(marker_id);
+
+-- Routing decisions table: one row per routing decision after each step
+CREATE SEQUENCE IF NOT EXISTS routing_decisions_id_seq;
+CREATE TABLE IF NOT EXISTS routing_decisions (
+    id INTEGER PRIMARY KEY DEFAULT nextval('routing_decisions_id_seq'),
+    run_id VARCHAR NOT NULL,
+    step_seq INTEGER NOT NULL,  -- Sequence number within the run
+    flow_id VARCHAR NOT NULL,
+    station_id VARCHAR NOT NULL,  -- Step/node that made the decision
+    routing_mode VARCHAR,  -- deterministic, llm_tiebreak, etc.
+    routing_source VARCHAR,  -- navigator/fast_path/deterministic_fallback
+    chosen_candidate_id VARCHAR,  -- Selected edge ID
+    candidate_count INTEGER DEFAULT 0,  -- Number of candidate edges evaluated
+    decision VARCHAR NOT NULL,  -- advance/loop/repeat/detour/terminate/escalate
+    target_node VARCHAR,  -- Next node to execute (nullable for terminate)
+    timestamp TIMESTAMP NOT NULL,
+    terminate BOOLEAN DEFAULT FALSE,  -- Whether flow should terminate
+    needs_human BOOLEAN DEFAULT FALSE,  -- Whether human review is recommended
+    explanation JSON,  -- Full structured explanation for audit trail
+    UNIQUE(run_id, step_seq, station_id, timestamp)
+);
+
+CREATE INDEX IF NOT EXISTS idx_routing_decisions_run_id ON routing_decisions(run_id);
+CREATE INDEX IF NOT EXISTS idx_routing_decisions_flow ON routing_decisions(run_id, flow_id);
+CREATE INDEX IF NOT EXISTS idx_routing_decisions_station ON routing_decisions(station_id);
+CREATE INDEX IF NOT EXISTS idx_routing_decisions_decision ON routing_decisions(decision);
 """
 
 
@@ -511,6 +537,30 @@ class Fact:
     created_at: Optional[datetime] = None
     extracted_at: Optional[datetime] = None
     metadata: Optional[Dict[str, Any]] = field(default_factory=dict)
+
+
+@dataclass
+class RoutingDecisionRecord:
+    """A routing decision record for UI queries.
+
+    Captures the routing decision made after each step execution,
+    including the method used, candidates evaluated, and the chosen path.
+    """
+
+    run_id: str
+    step_seq: int
+    flow_id: str
+    station_id: str
+    routing_mode: Optional[str]  # deterministic, llm_tiebreak, etc.
+    routing_source: Optional[str]  # navigator/fast_path/deterministic_fallback
+    chosen_candidate_id: Optional[str]  # Selected edge ID
+    candidate_count: int
+    decision: str  # advance/loop/repeat/detour/terminate/escalate
+    target_node: Optional[str]  # Next node to execute
+    timestamp: datetime
+    terminate: bool = False
+    needs_human: bool = False
+    explanation: Optional[Dict[str, Any]] = None
 
 
 # =============================================================================
@@ -1026,6 +1076,90 @@ class StatsDB:
                 [run_id, step_id, file_path, change_type, lines_added, lines_removed, change_ts],
             )
 
+    def record_routing_decision(
+        self,
+        run_id: str,
+        step_seq: int,
+        flow_id: str,
+        station_id: str,
+        decision: str,
+        routing_mode: Optional[str] = None,
+        routing_source: Optional[str] = None,
+        chosen_candidate_id: Optional[str] = None,
+        candidate_count: int = 0,
+        target_node: Optional[str] = None,
+        terminate: bool = False,
+        needs_human: bool = False,
+        explanation: Optional[Dict[str, Any]] = None,
+        ts: Optional[datetime] = None,
+    ):
+        """Record a routing decision.
+
+        Captures the routing decision made after a step execution for
+        audit trail and UI visualization.
+
+        Note: In projection-only mode, this is a no-op. Use event emission
+        + ingest_events() instead.
+
+        Args:
+            run_id: The run this decision belongs to.
+            step_seq: Sequence number of the step within the run.
+            flow_id: The flow key (signal, plan, build, etc.).
+            station_id: The step/node that made the decision.
+            decision: The routing decision (advance/loop/repeat/detour/terminate/escalate).
+            routing_mode: How the decision was made (deterministic, llm_tiebreak, etc.).
+            routing_source: Source of the routing (navigator/fast_path/deterministic_fallback).
+            chosen_candidate_id: The selected edge ID.
+            candidate_count: Number of candidate edges evaluated.
+            target_node: The next node to execute (None for terminate).
+            terminate: Whether the flow should terminate.
+            needs_human: Whether human review is recommended.
+            explanation: Full structured explanation for audit trail.
+            ts: Optional timestamp from event. If None, uses current time.
+        """
+        if self.connection is None:
+            return
+        if not self._projection_guard("record_routing_decision"):
+            return
+
+        decision_ts = ts if ts is not None else datetime.now(timezone.utc)
+        with self._transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO routing_decisions (
+                    run_id, step_seq, flow_id, station_id, routing_mode, routing_source,
+                    chosen_candidate_id, candidate_count, decision, target_node,
+                    timestamp, terminate, needs_human, explanation
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (run_id, step_seq, station_id, timestamp) DO UPDATE SET
+                    routing_mode = EXCLUDED.routing_mode,
+                    routing_source = EXCLUDED.routing_source,
+                    chosen_candidate_id = EXCLUDED.chosen_candidate_id,
+                    candidate_count = EXCLUDED.candidate_count,
+                    decision = EXCLUDED.decision,
+                    target_node = EXCLUDED.target_node,
+                    terminate = EXCLUDED.terminate,
+                    needs_human = EXCLUDED.needs_human,
+                    explanation = EXCLUDED.explanation
+                """,
+                [
+                    run_id,
+                    step_seq,
+                    flow_id,
+                    station_id,
+                    routing_mode,
+                    routing_source,
+                    chosen_candidate_id,
+                    candidate_count,
+                    decision,
+                    target_node,
+                    decision_ts,
+                    terminate,
+                    needs_human,
+                    json.dumps(explanation) if explanation else None,
+                ],
+            )
+
     def ingest_fact(
         self,
         run_id: str,
@@ -1265,6 +1399,55 @@ class StatsDB:
                         lines_removed=fc.get("deletions", 0),
                         ts=event_ts,
                     )
+
+            elif kind == "route_decision":
+                # Routing decisions from the router/navigator
+                # Extract explanation if present (may contain nested elimination_log, metrics)
+                explanation = payload.get("explanation")
+
+                # Map the method field to routing_mode
+                method = payload.get("method", "")
+                routing_mode = method if method else None
+
+                # Determine routing_source based on method
+                # - "deterministic" -> "fast_path" or "deterministic_fallback"
+                # - "llm_tiebreak" -> "navigator"
+                # - "no_candidates" -> "deterministic_fallback"
+                routing_source = None
+                if method == "deterministic":
+                    routing_source = "fast_path"
+                elif method == "llm_tiebreak":
+                    routing_source = "navigator"
+                elif method == "no_candidates":
+                    routing_source = "deterministic_fallback"
+
+                # Extract candidate count from explanation if available
+                candidate_count = 0
+                if explanation and isinstance(explanation, dict):
+                    candidate_count = explanation.get("candidates_evaluated", 0)
+
+                # Derive decision from method and terminate flag
+                terminate = payload.get("terminate", False)
+                decision = "terminate" if terminate else "advance"
+                if method == "llm_tiebreak":
+                    decision = "advance"  # LLM chose a path to advance
+
+                self.record_routing_decision(
+                    run_id=run_id,
+                    step_seq=event.get("seq", 0),
+                    flow_id=flow_key,
+                    station_id=step_id,
+                    decision=decision,
+                    routing_mode=routing_mode,
+                    routing_source=routing_source,
+                    chosen_candidate_id=payload.get("selected_edge"),
+                    candidate_count=candidate_count,
+                    target_node=payload.get("target_node"),
+                    terminate=terminate,
+                    needs_human=payload.get("needs_human", False),
+                    explanation=explanation,
+                    ts=event_ts,
+                )
 
             elif kind == "run_started":  # Canonical: run_start -> run_started
                 # Run initialization
@@ -1578,6 +1761,190 @@ class StatsDB:
                 )
                 for row in results
             ]
+
+    def get_routing_decisions(self, run_id: str) -> List[RoutingDecisionRecord]:
+        """Get all routing decisions for a run.
+
+        Args:
+            run_id: The run ID to query.
+
+        Returns:
+            List of RoutingDecisionRecord objects for the run, ordered by step_seq.
+        """
+        if self.connection is None:
+            return []
+
+        with self._lock:
+            results = self.connection.execute(
+                """
+                SELECT
+                    run_id, step_seq, flow_id, station_id, routing_mode, routing_source,
+                    chosen_candidate_id, candidate_count, decision, target_node,
+                    timestamp, terminate, needs_human, explanation
+                FROM routing_decisions
+                WHERE run_id = ?
+                ORDER BY step_seq, timestamp
+                """,
+                [run_id],
+            ).fetchall()
+
+            return [
+                RoutingDecisionRecord(
+                    run_id=row[0],
+                    step_seq=row[1],
+                    flow_id=row[2],
+                    station_id=row[3],
+                    routing_mode=row[4],
+                    routing_source=row[5],
+                    chosen_candidate_id=row[6],
+                    candidate_count=row[7] or 0,
+                    decision=row[8],
+                    target_node=row[9],
+                    timestamp=row[10],
+                    terminate=row[11] or False,
+                    needs_human=row[12] or False,
+                    explanation=json.loads(row[13]) if row[13] else None,
+                )
+                for row in results
+            ]
+
+    def get_routing_decisions_by_flow(
+        self, run_id: str, flow_id: str
+    ) -> List[RoutingDecisionRecord]:
+        """Get routing decisions for a specific flow within a run.
+
+        Args:
+            run_id: The run ID to query.
+            flow_id: The flow ID to filter by (signal, plan, build, etc.).
+
+        Returns:
+            List of RoutingDecisionRecord objects for the flow, ordered by step_seq.
+        """
+        if self.connection is None:
+            return []
+
+        with self._lock:
+            results = self.connection.execute(
+                """
+                SELECT
+                    run_id, step_seq, flow_id, station_id, routing_mode, routing_source,
+                    chosen_candidate_id, candidate_count, decision, target_node,
+                    timestamp, terminate, needs_human, explanation
+                FROM routing_decisions
+                WHERE run_id = ? AND flow_id = ?
+                ORDER BY step_seq, timestamp
+                """,
+                [run_id, flow_id],
+            ).fetchall()
+
+            return [
+                RoutingDecisionRecord(
+                    run_id=row[0],
+                    step_seq=row[1],
+                    flow_id=row[2],
+                    station_id=row[3],
+                    routing_mode=row[4],
+                    routing_source=row[5],
+                    chosen_candidate_id=row[6],
+                    candidate_count=row[7] or 0,
+                    decision=row[8],
+                    target_node=row[9],
+                    timestamp=row[10],
+                    terminate=row[11] or False,
+                    needs_human=row[12] or False,
+                    explanation=json.loads(row[13]) if row[13] else None,
+                )
+                for row in results
+            ]
+
+    def get_routing_decision_summary(self, run_id: str) -> Dict[str, Any]:
+        """Get a summary of routing decisions for a run.
+
+        Useful for UI dashboards to show routing statistics at a glance.
+
+        Args:
+            run_id: The run ID to query.
+
+        Returns:
+            Dict with summary statistics:
+            - total_decisions: Total number of routing decisions
+            - by_decision: Count by decision type (advance, loop, terminate, etc.)
+            - by_routing_mode: Count by routing mode (deterministic, llm_tiebreak, etc.)
+            - by_routing_source: Count by routing source (navigator, fast_path, etc.)
+            - needs_human_count: Number of decisions flagged for human review
+            - terminations: Number of terminate decisions
+        """
+        if self.connection is None:
+            return {
+                "total_decisions": 0,
+                "by_decision": {},
+                "by_routing_mode": {},
+                "by_routing_source": {},
+                "needs_human_count": 0,
+                "terminations": 0,
+            }
+
+        with self._lock:
+            # Get total and by-decision counts
+            total_result = self.connection.execute(
+                "SELECT COUNT(*) FROM routing_decisions WHERE run_id = ?",
+                [run_id],
+            ).fetchone()
+            total_decisions = total_result[0] if total_result else 0
+
+            decision_counts = self.connection.execute(
+                """
+                SELECT decision, COUNT(*) as count
+                FROM routing_decisions
+                WHERE run_id = ?
+                GROUP BY decision
+                """,
+                [run_id],
+            ).fetchall()
+            by_decision = {row[0]: row[1] for row in decision_counts}
+
+            mode_counts = self.connection.execute(
+                """
+                SELECT routing_mode, COUNT(*) as count
+                FROM routing_decisions
+                WHERE run_id = ? AND routing_mode IS NOT NULL
+                GROUP BY routing_mode
+                """,
+                [run_id],
+            ).fetchall()
+            by_routing_mode = {row[0]: row[1] for row in mode_counts}
+
+            source_counts = self.connection.execute(
+                """
+                SELECT routing_source, COUNT(*) as count
+                FROM routing_decisions
+                WHERE run_id = ? AND routing_source IS NOT NULL
+                GROUP BY routing_source
+                """,
+                [run_id],
+            ).fetchall()
+            by_routing_source = {row[0]: row[1] for row in source_counts}
+
+            needs_human_result = self.connection.execute(
+                "SELECT COUNT(*) FROM routing_decisions WHERE run_id = ? AND needs_human = TRUE",
+                [run_id],
+            ).fetchone()
+            needs_human_count = needs_human_result[0] if needs_human_result else 0
+
+            terminate_result = self.connection.execute(
+                "SELECT COUNT(*) FROM routing_decisions WHERE run_id = ? AND terminate = TRUE",
+                [run_id],
+            ).fetchone()
+            terminations = terminate_result[0] if terminate_result else 0
+
+            return {
+                "total_decisions": total_decisions,
+                "by_decision": by_decision,
+                "by_routing_mode": by_routing_mode,
+                "by_routing_source": by_routing_source,
+                "needs_human_count": needs_human_count,
+                "terminations": terminations,
+            }
 
     # =========================================================================
     # Schema Resilience: Rebuild from Events

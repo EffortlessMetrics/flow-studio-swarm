@@ -464,6 +464,7 @@ async def run_worker_async(
     # Add spec traceability if plan was used
     if plan:
         artifacts["spec_based"] = True
+        artifacts["spec_model"] = plan.model  # Preserve spec model for finalize/route phases
         artifacts["prompt_hash"] = plan.prompt_hash
         artifacts["station_id"] = plan.station_id
         artifacts["station_version"] = plan.station_version
@@ -520,9 +521,15 @@ async def finalize_step_async(
 
     cwd = str(repo_root) if repo_root else str(Path.cwd())
 
+    # Extract spec model from work phase artifacts for consistent model usage
+    spec_model = None
+    if step_result.artifacts:
+        spec_model = step_result.artifacts.get("spec_model")
+
     options = create_high_trust_options(
         cwd=cwd,
         permission_mode="bypassPermissions",
+        model=spec_model,  # Use spec model if available, otherwise SDK default
     )
 
     finalization_prompt = build_finalization_prompt(
@@ -668,6 +675,7 @@ async def route_step_async(
     ctx: StepContext,
     handoff_data: Dict[str, Any],
     repo_root: Optional[Path] = None,
+    spec_model: Optional[str] = None,
 ) -> Optional[RoutingSignal]:
     """Async implementation of route_step.
 
@@ -675,6 +683,7 @@ async def route_step_async(
         ctx: Step execution context.
         handoff_data: Parsed handoff data.
         repo_root: Repository root path.
+        spec_model: Model from spec to use for routing session.
 
     Returns:
         RoutingSignal if determined, None if routing failed.
@@ -686,6 +695,7 @@ async def route_step_async(
             handoff_data=handoff_data,
             ctx=ctx,
             cwd=cwd,
+            model=spec_model,
         )
         if routing_signal:
             logger.debug(
