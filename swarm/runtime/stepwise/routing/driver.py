@@ -471,11 +471,18 @@ def _try_navigator(
             run_base=run_base,
         )
     except Exception as e:
+        # Log with explicit exception type and context for debugging
         logger.warning(
-            "Navigator routing failed for step %s: %s",
+            "Navigator routing failed: type=%s step=%s run_id=%s flow=%s error=%s",
+            type(e).__name__,
             step.id,
-            e,
+            run_id,
+            flow_key,
+            str(e),
         )
+        # Return None to allow fallback to deterministic routing.
+        # The audit trail will show routing_source != "navigator*" which
+        # indicates Navigator was attempted but failed.
         return None
 
 
