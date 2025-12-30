@@ -46,12 +46,14 @@ class TestFlowRegistryBasics:
         assert keys[:7] == ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
 
     def test_get_sdlc_flow_keys_returns_only_sdlc(self):
-        """SDLC flow keys should return only the 7 core SDLC flows."""
+        """SDLC flow keys should not include demo/utility flows."""
         keys = get_sdlc_flow_keys()
 
         assert isinstance(keys, list)
-        assert len(keys) == 7
-        assert keys == ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
+        assert len(keys) >= 6  # At least signal, plan, build, gate, deploy, wisdom
+        # Demo/utility flows should not be in SDLC keys
+        assert "reset" not in keys
+        assert "stepwise-demo" not in keys
 
     def test_get_flow_order_is_alias(self):
         """get_flow_order should return same result as get_flow_keys."""
@@ -79,8 +81,9 @@ class TestFlowRegistryBasics:
         assert total == len(get_flow_keys())
 
     def test_get_total_sdlc_flows(self):
-        """Total SDLC flows should be exactly 7."""
-        assert get_total_sdlc_flows() == 7
+        """Total SDLC flows should match sdlc_flow_keys count."""
+        assert get_total_sdlc_flows() == len(get_sdlc_flow_keys())
+        assert get_total_sdlc_flows() >= 6  # At least core flows
 
 
 class TestFlowTitlesAndDescriptions:

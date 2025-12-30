@@ -24,13 +24,17 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from swarm.runtime.path_helpers import (
+    ensure_forensics_dir,
     ensure_handoff_dir,
-)
-from swarm.runtime.path_helpers import (
+    file_changes_path as make_file_changes_path,
     handoff_envelope_path as make_handoff_envelope_path,
 )
 
 logger = logging.getLogger(__name__)
+
+# Threshold for extracting file_changes to out-of-line storage (in bytes)
+# If serialized file_changes exceeds this size, it's moved to forensics directory
+FILE_CHANGES_EXTRACTION_THRESHOLD = 1000
 
 # Cached schemas to avoid repeated file reads
 _HANDOFF_SCHEMA: Optional[Dict[str, Any]] = None
@@ -237,6 +241,11 @@ def write_handoff_envelope(
     This is THE canonical function for all handoff envelope writes.
     All code paths that persist envelopes should call this function.
 
+    When file_changes data exceeds FILE_CHANGES_EXTRACTION_THRESHOLD bytes,
+    it is extracted to a separate file in the forensics directory to reduce
+    ledger bloat. The envelope then contains a file_changes_path reference
+    instead of the inline data.
+
     Args:
         run_base: The RUN_BASE path (e.g., swarm/runs/<run-id>/<flow-key>)
         step_id: Step identifier within the flow
@@ -258,7 +267,7 @@ def write_handoff_envelope(
     if "timestamp" not in envelope_data:
         envelope_data["timestamp"] = datetime.now(timezone.utc).isoformat() + "Z"
 
-    # Validate if requested
+    # Validate if requested (before extraction, so we validate the full envelope)
     if validate:
         validation_errors = validate_envelope(envelope_data)
         if validation_errors:
@@ -275,6 +284,33 @@ def write_handoff_envelope(
                     step_id,
                     validation_errors,
                 )
+
+    # Extract file_changes to out-of-line storage if it exceeds threshold
+    file_changes = envelope_data.get("file_changes")
+    extracted_file_changes_path: Optional[Path] = None
+
+    if file_changes:
+        file_changes_json = json.dumps(file_changes)
+        if len(file_changes_json) > FILE_CHANGES_EXTRACTION_THRESHOLD:
+            # Write file_changes to forensics directory
+            ensure_forensics_dir(run_base)
+            extracted_file_changes_path = make_file_changes_path(run_base, step_id)
+
+            with extracted_file_changes_path.open("w", encoding="utf-8") as f:
+                json.dump(file_changes, f, indent=2)
+
+            logger.debug(
+                "Extracted file_changes (%d bytes) to %s",
+                len(file_changes_json),
+                extracted_file_changes_path,
+            )
+
+            # Replace inline data with path reference in the envelope
+            # Store relative path with forward slashes for cross-platform portability
+            relative_path = extracted_file_changes_path.relative_to(run_base)
+            envelope_data["file_changes"] = None
+            # Use as_posix() to ensure forward slashes on all platforms
+            envelope_data["file_changes_path"] = relative_path.as_posix()
 
     # Write draft file for debugging (optional)
     if write_draft:
@@ -337,39 +373,99 @@ def update_envelope_routing(
         return None
 
 
+def _hydrate_file_changes(
+    envelope_data: Dict[str, Any],
+    run_base: Path,
+) -> Dict[str, Any]:
+    """Hydrate file_changes from external file if referenced by path.
+
+    If the envelope contains file_changes_path but no file_changes data,
+    this function loads the file_changes from the referenced path and
+    populates the file_changes field.
+
+    Args:
+        envelope_data: The envelope dictionary to hydrate.
+        run_base: The RUN_BASE path for resolving relative paths.
+
+    Returns:
+        The envelope_data dict with file_changes hydrated (if applicable).
+    """
+    file_changes_path_str = envelope_data.get("file_changes_path")
+    file_changes = envelope_data.get("file_changes")
+
+    # Only hydrate if we have a path reference but no inline data
+    if file_changes_path_str and not file_changes:
+        fc_path = run_base / file_changes_path_str
+        if fc_path.exists():
+            try:
+                with fc_path.open("r", encoding="utf-8") as f:
+                    envelope_data["file_changes"] = json.load(f)
+                logger.debug("Hydrated file_changes from %s", fc_path)
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning(
+                    "Failed to hydrate file_changes from %s: %s",
+                    fc_path,
+                    e,
+                )
+        else:
+            logger.warning(
+                "file_changes_path %s does not exist, cannot hydrate",
+                fc_path,
+            )
+
+    return envelope_data
+
+
 def read_handoff_envelope(
     run_base: Path,
     step_id: str,
     prefer_draft: bool = False,
+    hydrate_file_changes: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """Read a handoff envelope from disk.
+
+    When file_changes was extracted to an out-of-line file during write,
+    this function automatically hydrates it back into the envelope (unless
+    hydrate_file_changes=False).
 
     Args:
         run_base: The RUN_BASE path
         step_id: Step identifier
         prefer_draft: If True, read draft file if it exists (default False)
+        hydrate_file_changes: If True, load file_changes from external file
+            if referenced by file_changes_path (default True)
 
     Returns:
-        Parsed envelope dict, or None if not found.
+        Parsed envelope dict (with file_changes hydrated), or None if not found.
     """
+    envelope_data: Optional[Dict[str, Any]] = None
+
     if prefer_draft:
         draft_path = run_base / "handoff" / f"{step_id}.draft.json"
         if draft_path.exists():
             try:
                 with draft_path.open("r", encoding="utf-8") as f:
-                    return json.load(f)
+                    envelope_data = json.load(f)
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning("Failed to read draft envelope %s: %s", draft_path, e)
 
-    committed_path = make_handoff_envelope_path(run_base, step_id)
-    if committed_path.exists():
-        try:
-            with committed_path.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
-            logger.warning("Failed to read committed envelope %s: %s", committed_path, e)
+    if envelope_data is None:
+        committed_path = make_handoff_envelope_path(run_base, step_id)
+        if committed_path.exists():
+            try:
+                with committed_path.open("r", encoding="utf-8") as f:
+                    envelope_data = json.load(f)
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Failed to read committed envelope %s: %s", committed_path, e)
 
-    return None
+    if envelope_data is None:
+        return None
+
+    # Hydrate file_changes from external file if needed
+    if hydrate_file_changes:
+        envelope_data = _hydrate_file_changes(envelope_data, run_base)
+
+    return envelope_data
 
 
 def read_routing_from_envelope(

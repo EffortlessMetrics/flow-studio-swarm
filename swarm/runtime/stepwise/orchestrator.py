@@ -88,7 +88,6 @@ from swarm.runtime.types import (
     RunSpec,
     RunState,
     RunStatus,
-    RunSummary,
     SDLCStatus,
     generate_run_id,
     handoff_envelope_to_dict,
@@ -117,6 +116,30 @@ MAX_DETOUR_DEPTH = 10
 
 
 @dataclass
+class FlowStepwiseSummary:
+    """Lightweight summary of a single flow's stepwise execution.
+
+    This is used internally by the orchestrator to capture essential
+    execution metrics without requiring the full RunSummary structure.
+
+    Attributes:
+        run_id: The run identifier.
+        status: The execution status.
+        sdlc_status: The SDLC quality/health outcome.
+        flow_key: The flow that was executed.
+        completed_steps: List of step IDs that were completed.
+        duration_ms: Total execution duration in milliseconds.
+    """
+
+    run_id: RunId
+    status: RunStatus
+    sdlc_status: SDLCStatus
+    flow_key: str
+    completed_steps: List[str]
+    duration_ms: int
+
+
+@dataclass
 class FlowExecutionResult:
     """Result of a single flow execution including macro routing decision.
 
@@ -125,13 +148,13 @@ class FlowExecutionResult:
 
     Attributes:
         run_id: The run identifier.
-        summary: The RunSummary with execution details.
+        summary: The FlowStepwiseSummary with execution details.
         macro_decision: Optional macro routing decision for next flow.
         flow_result: Optional structured flow result for routing context.
     """
 
     run_id: RunId
-    summary: Optional["RunSummary"] = None
+    summary: Optional["FlowStepwiseSummary"] = None
     macro_decision: Optional[MacroRoutingDecision] = None
     flow_result: Optional["FlowResult"] = None
 
@@ -953,7 +976,7 @@ class StepwiseOrchestrator:
         run_state: Optional[RunState] = None,
         start_step: Optional[str] = None,
         end_step: Optional[str] = None,
-    ) -> RunSummary:
+    ) -> FlowStepwiseSummary:
         """Execute flow steps sequentially.
 
         Args:
@@ -967,7 +990,7 @@ class StepwiseOrchestrator:
             end_step: Optional step ID to stop at.
 
         Returns:
-            RunSummary with final status.
+            FlowStepwiseSummary with final status.
         """
         history: List[Dict[str, Any]] = []
         loop_state: Dict[str, int] = {}
@@ -984,7 +1007,7 @@ class StepwiseOrchestrator:
                     break
 
         if not steps:
-            return RunSummary(
+            return FlowStepwiseSummary(
                 run_id=run_id,
                 status=RunStatus.SUCCEEDED,
                 sdlc_status=SDLCStatus.OK,
@@ -1185,6 +1208,55 @@ class StepwiseOrchestrator:
             run_state.mark_node_completed(step.id)
 
             run_base = self._repo_root / "swarm" / "runs" / run_id / flow_key
+
+            # =================================================================
+            # ENVELOPE INVARIANT: Guarantee envelope exists after step execution
+            # =================================================================
+            # The orchestrator ensures an envelope exists for every completed step,
+            # regardless of engine type. This is critical because:
+            # 1. Non-lifecycle engines (GeminiStepEngine) don't call finalize_step()
+            # 2. Routing code (Navigator, deterministic) expects envelopes to exist
+            # 3. The envelope is the canonical ledger entry for the step
+            #
+            # If the engine didn't create an envelope (common in stub/non-lifecycle),
+            # the orchestrator creates a minimal one with essential fields.
+            # =================================================================
+            from swarm.runtime.handoff_io import write_handoff_envelope
+            from swarm.runtime.path_helpers import handoff_envelope_path
+
+            envelope_path = handoff_envelope_path(run_base, step.id)
+            if not envelope_path.exists():
+                # Create minimal envelope - the orchestrator is the "last resort"
+                minimal_envelope = {
+                    "step_id": step.id,
+                    "flow_key": flow_key,
+                    "run_id": run_id,
+                    "status": "VERIFIED" if step_result.status == "succeeded" else "UNVERIFIED",
+                    "summary": step_result.output[:500] if step_result.output else f"Step {step.id} completed",
+                    "duration_ms": step_result.duration_ms,
+                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                    "artifacts": [],
+                    # Mark as orchestrator-generated for debugging
+                    "_envelope_source": "orchestrator_fallback",
+                }
+                try:
+                    write_handoff_envelope(
+                        run_base=run_base,
+                        step_id=step.id,
+                        envelope_data=minimal_envelope,
+                        write_draft=True,
+                        validate=False,  # Skip validation for minimal envelopes
+                    )
+                    logger.debug(
+                        "Orchestrator created fallback envelope for step %s (engine didn't create one)",
+                        step.id,
+                    )
+                except Exception as env_err:
+                    logger.warning(
+                        "Failed to create fallback envelope for step %s: %s",
+                        step.id,
+                        env_err,
+                    )
 
             # =================================================================
             # UTILITY FLOW INJECTION DETECTION
@@ -1459,7 +1531,7 @@ class StepwiseOrchestrator:
             ),
         )
 
-        return RunSummary(
+        return FlowStepwiseSummary(
             run_id=run_id,
             status=RunStatus.SUCCEEDED,
             sdlc_status=SDLCStatus.OK,

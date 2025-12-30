@@ -440,6 +440,9 @@ def create_stall_routing_signal(
 
     reason = f"Elephant Protocol: {stall_analysis.reason}"
 
+    # Build deterministic candidate ID for audit trail
+    candidate_id = f"stall:{decision.value}:{next_step_id or 'none'}"
+
     return RoutingSignal(
         decision=decision,
         next_step_id=next_step_id,
@@ -447,6 +450,18 @@ def create_stall_routing_signal(
         confidence=stall_analysis.confidence,
         needs_human=stall_analysis.recommendation == "escalate_to_human",
         exit_condition_met=True,
+        routing_source="elephant_protocol_stall",
+        chosen_candidate_id=candidate_id,
+        routing_candidates=[
+            RoutingCandidate(
+                candidate_id=candidate_id,
+                action=decision.value,
+                target_node=next_step_id,
+                reason=reason,
+                priority=100,
+                source="stall_detection",
+            )
+        ],
     )
 
 
@@ -562,12 +577,27 @@ def _create_routing_signal_from_config(
             next_step_id = routing.next
             reason = "branch_fallback"
 
+    # Build deterministic candidate ID for audit trail
+    candidate_id = f"{decision.value}:{next_step_id or 'none'}"
+
     return RoutingSignal(
         decision=decision,
         next_step_id=next_step_id,
         reason=reason,
         confidence=confidence,
         needs_human=needs_human,
+        routing_source="config_routing",
+        chosen_candidate_id=candidate_id,
+        routing_candidates=[
+            RoutingCandidate(
+                candidate_id=candidate_id,
+                action=decision.value,
+                target_node=next_step_id,
+                reason=reason,
+                priority=50,
+                source="routing_config",
+            )
+        ],
     )
 
 
@@ -633,12 +663,23 @@ def _handle_microloop_routing(
         else:
             decision = RoutingDecision.TERMINATE
             reason = f"flow_complete_max_iterations:{routing.max_iterations}"
+        candidate_id = f"microloop:max_iter:{next_step_id or 'exit'}"
         return RoutingSignal(
             decision=decision,
             next_step_id=next_step_id,
             reason=reason,
             confidence=1.0,
             needs_human=False,
+            routing_source="microloop_routing",
+            chosen_candidate_id=candidate_id,
+            routing_candidates=[RoutingCandidate(
+                candidate_id=candidate_id,
+                action=decision.value if hasattr(decision, 'value') else str(decision),
+                target_node=next_step_id,
+                reason=reason,
+                priority=60,
+                source="microloop_state",
+            )],
         )
 
     # Check loop condition from receipt
@@ -659,12 +700,23 @@ def _handle_microloop_routing(
             else:
                 decision = RoutingDecision.TERMINATE
                 reason = f"flow_complete_condition_met:{field_value}"
+            candidate_id = f"microloop:exit:{next_step_id or 'complete'}"
             return RoutingSignal(
                 decision=decision,
                 next_step_id=next_step_id,
                 reason=reason,
                 confidence=1.0,
                 needs_human=False,
+                routing_source="microloop_routing",
+                chosen_candidate_id=candidate_id,
+                routing_candidates=[RoutingCandidate(
+                    candidate_id=candidate_id,
+                    action=decision.value if hasattr(decision, 'value') else str(decision),
+                    target_node=next_step_id,
+                    reason=reason,
+                    priority=60,
+                    source="microloop_state",
+                )],
             )
 
         # Check can_further_iteration_help field as fallback
@@ -679,12 +731,23 @@ def _handle_microloop_routing(
             else:
                 decision = RoutingDecision.TERMINATE
                 reason = "flow_complete_no_further_help"
+            candidate_id = f"microloop:no_help:{next_step_id or 'complete'}"
             return RoutingSignal(
                 decision=decision,
                 next_step_id=next_step_id,
                 reason=reason,
                 confidence=1.0,
                 needs_human=False,
+                routing_source="microloop_routing",
+                chosen_candidate_id=candidate_id,
+                routing_candidates=[RoutingCandidate(
+                    candidate_id=candidate_id,
+                    action=decision.value if hasattr(decision, 'value') else str(decision),
+                    target_node=next_step_id,
+                    reason=reason,
+                    priority=60,
+                    source="microloop_state",
+                )],
             )
 
     # Loop back to target
@@ -693,12 +756,26 @@ def _handle_microloop_routing(
         reason = f"loop_iteration:{current_iter + 1}"
         decision = RoutingDecision.LOOP
 
+    # Determine decision type for candidate ID
+    decision_type = "loop" if decision == RoutingDecision.LOOP else "advance"
+    candidate_id = f"microloop:{decision_type}:{next_step_id or 'exit'}"
+
     return RoutingSignal(
         decision=decision,
         next_step_id=next_step_id,
         reason=reason,
         confidence=1.0,
         needs_human=False,
+        routing_source="microloop_routing",
+        chosen_candidate_id=candidate_id,
+        routing_candidates=[RoutingCandidate(
+            candidate_id=candidate_id,
+            action=decision.value if hasattr(decision, 'value') else str(decision),
+            target_node=next_step_id,
+            reason=reason,
+            priority=60,
+            source="microloop_state",
+        )],
     )
 
 
@@ -739,12 +816,23 @@ def _create_routing_signal_from_spec(
     exit_condition_met = False
 
     if kind == "terminal":
+        candidate_id = "spec:terminate:terminal_step"
         return RoutingSignal(
             decision=RoutingDecision.TERMINATE,
             next_step_id=None,
             reason="terminal_step",
             confidence=confidence,
             needs_human=needs_human,
+            routing_source="spec_routing",
+            chosen_candidate_id=candidate_id,
+            routing_candidates=[RoutingCandidate(
+                candidate_id=candidate_id,
+                action="terminate",
+                target_node=None,
+                reason="terminal_step",
+                priority=70,
+                source="flow_spec",
+            )],
         )
 
     elif kind == "linear":
@@ -849,6 +937,10 @@ def _create_routing_signal_from_spec(
                 decision = RoutingDecision.TERMINATE
                 reason = "flow_complete_branch_via_spec"
 
+    # Build candidate ID based on decision type
+    decision_name = decision.value if hasattr(decision, "value") else str(decision)
+    candidate_id = f"spec:{decision_name}:{next_step_id or 'complete'}"
+
     return RoutingSignal(
         decision=decision,
         next_step_id=next_step_id,
@@ -857,6 +949,18 @@ def _create_routing_signal_from_spec(
         needs_human=needs_human,
         loop_count=loop_count,
         exit_condition_met=exit_condition_met,
+        routing_source="spec_routing",
+        chosen_candidate_id=candidate_id,
+        routing_candidates=[
+            RoutingCandidate(
+                candidate_id=candidate_id,
+                action=decision_name,
+                target_node=next_step_id,
+                reason=reason,
+                priority=70,
+                source="flow_spec",
+            )
+        ],
     )
 
 

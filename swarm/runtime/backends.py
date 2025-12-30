@@ -1093,7 +1093,19 @@ class GeminiStepwiseBackend(RunBackend):
                         "error": str(e),
                     },
                 )
-                break
+                return  # Exit on error
+
+        # All flows completed successfully - update status
+        now = datetime.now(timezone.utc)
+        storage.update_summary(
+            run_id,
+            {
+                "status": RunStatus.SUCCEEDED.value,
+                "sdlc_status": SDLCStatus.OK.value,
+                "completed_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            },
+        )
 
     def get_summary(self, run_id: RunId) -> Optional[RunSummary]:
         """Get summary from disk."""
@@ -1297,7 +1309,19 @@ class ClaudeStepwiseBackend(RunBackend):
                         "error": str(e),
                     },
                 )
-                break
+                return  # Exit on error
+
+        # All flows completed successfully - update status
+        now = datetime.now(timezone.utc)
+        storage.update_summary(
+            run_id,
+            {
+                "status": RunStatus.SUCCEEDED.value,
+                "sdlc_status": SDLCStatus.OK.value,
+                "completed_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            },
+        )
 
     def get_summary(self, run_id: RunId) -> Optional[RunSummary]:
         """Get summary from disk."""

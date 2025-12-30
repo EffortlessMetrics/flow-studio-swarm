@@ -212,6 +212,35 @@ async def run_worker_async(
         )
         truncation_info = None  # Spec compilation handles context management
 
+        # Write PromptReceipt for audit trail
+        from swarm.spec.types import create_prompt_receipt
+
+        receipt = create_prompt_receipt(plan)
+        receipt_path = ctx.run_base / "receipts" / f"prompt_receipt_{ctx.step_id}.json"
+        receipt_path.parent.mkdir(parents=True, exist_ok=True)
+
+        receipt_dict = {
+            "prompt_hash": receipt.prompt_hash,
+            "fragment_manifest": list(receipt.fragment_manifest),
+            "context_pack_hash": receipt.context_pack_hash,
+            "model_tier": receipt.model_tier,
+            "tool_profile": list(receipt.tool_profile),
+            "compiled_at": receipt.compiled_at,
+            "compiler_version": receipt.compiler_version,
+            "station_id": receipt.station_id,
+            "flow_id": receipt.flow_id,
+            "step_id": receipt.step_id,
+        }
+
+        with open(receipt_path, "w", encoding="utf-8") as f:
+            json.dump(receipt_dict, f, indent=2)
+
+        logger.debug(
+            "PromptReceipt written to %s for step %s",
+            receipt_path,
+            ctx.step_id,
+        )
+
         # Use create_options_from_plan to wire all PromptPlan SDK options
         cwd = str(repo_root) if repo_root else str(Path.cwd())
         options = create_options_from_plan(plan, cwd=cwd)

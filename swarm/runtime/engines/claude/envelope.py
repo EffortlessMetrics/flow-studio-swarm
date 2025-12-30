@@ -24,6 +24,7 @@ from swarm.runtime.handoff_io import (
 )
 from swarm.runtime.types import (
     HandoffEnvelope,
+    RoutingCandidate,
     RoutingDecision,
     RoutingSignal,
     handoff_envelope_to_dict,
@@ -55,16 +56,35 @@ def create_fallback_envelope(
     Returns:
         HandoffEnvelope with basic step information.
     """
+    # Create routing signal with proper audit fields for fallback path
+    if routing_signal is None:
+        fallback_reason = "Fallback envelope: template not found or parsing failed"
+        fallback_routing = RoutingSignal(
+            decision=RoutingDecision.ADVANCE,
+            reason=fallback_reason,
+            confidence=0.5,  # Lower confidence for fallback path
+            routing_source="fallback_envelope",
+            chosen_candidate_id="fallback:advance:auto",
+            routing_candidates=[
+                RoutingCandidate(
+                    candidate_id="fallback:advance:auto",
+                    action="advance",
+                    target_node=None,
+                    reason=fallback_reason,
+                    priority=10,
+                    source="envelope_fallback",
+                    is_default=True,
+                )
+            ],
+        )
+    else:
+        fallback_routing = routing_signal
+
     envelope = HandoffEnvelope(
         step_id=ctx.step_id,
         flow_key=ctx.flow_key,
         run_id=ctx.run_id,
-        routing_signal=routing_signal
-        or RoutingSignal(
-            decision=RoutingDecision.ADVANCE,
-            reason="default_advance",
-            confidence=0.7,
-        ),
+        routing_signal=fallback_routing,
         summary=work_summary[:2000]
         if work_summary
         else f"Step {ctx.step_id} completed with status {step_result.status}",
@@ -270,17 +290,36 @@ Error: {step_result.error or "None"}
 
         envelope_data = json.loads(json_match)
 
+        # Create routing signal with proper audit fields if not provided
+        if routing_signal is None:
+            parsed_routing_reason = "Parsed envelope with default advance routing"
+            parsed_routing_signal = RoutingSignal(
+                decision=RoutingDecision.ADVANCE,
+                reason=parsed_routing_reason,
+                confidence=0.7,
+                routing_source="envelope_writer_parsed",
+                chosen_candidate_id="parsed:advance:default",
+                routing_candidates=[
+                    RoutingCandidate(
+                        candidate_id="parsed:advance:default",
+                        action="advance",
+                        target_node=None,
+                        reason=parsed_routing_reason,
+                        priority=50,
+                        source="envelope_writer",
+                        is_default=True,
+                    )
+                ],
+            )
+        else:
+            parsed_routing_signal = routing_signal
+
         # Create HandoffEnvelope from parsed data
         envelope = HandoffEnvelope(
             step_id=envelope_data.get("step_id", ctx.step_id),
             flow_key=envelope_data.get("flow_key", ctx.flow_key),
             run_id=envelope_data.get("run_id", ctx.run_id),
-            routing_signal=routing_signal
-            or RoutingSignal(
-                decision=RoutingDecision.ADVANCE,
-                reason="default_advance",
-                confidence=0.7,
-            ),
+            routing_signal=parsed_routing_signal,
             summary=envelope_data.get("summary", work_summary[:2000] if work_summary else ""),
             artifacts=envelope_data.get("artifacts", {}),
             file_changes=file_changes or {},

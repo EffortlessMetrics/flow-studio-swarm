@@ -51,6 +51,7 @@ from swarm.config.flow_registry import (
 )
 from swarm.runtime.types import (
     HandoffEnvelope,
+    RoutingCandidate,
     RoutingDecision,
     RoutingSignal,
     routing_signal_from_dict,
@@ -360,10 +361,24 @@ def parse_envelope_response(
             logger.debug("Failed to parse routing_signal from response: %s", e)
 
     if routing_signal is None:
+        default_reason = "Default advance routing (no routing_signal in response)"
         routing_signal = RoutingSignal(
             decision=RoutingDecision.ADVANCE,
-            reason="default_advance",
+            reason=default_reason,
             confidence=0.7,
+            routing_source="resolver_default",
+            chosen_candidate_id="resolver:advance:default",
+            routing_candidates=[
+                RoutingCandidate(
+                    candidate_id="resolver:advance:default",
+                    action="advance",
+                    target_node=None,
+                    reason=default_reason,
+                    priority=50,
+                    source="resolver_fallback",
+                    is_default=True,
+                )
+            ],
         )
 
     # Parse timestamp
@@ -472,16 +487,35 @@ def _create_fallback_envelope(
     Returns:
         HandoffEnvelope with provided or default values.
     """
+    # Create routing signal with proper audit fields for fallback path
+    if routing_signal is None:
+        fallback_reason = "Fallback envelope: parsing failed or no response"
+        fallback_routing = RoutingSignal(
+            decision=RoutingDecision.ADVANCE,
+            reason=fallback_reason,
+            confidence=0.5,
+            routing_source="resolver_fallback",
+            chosen_candidate_id="resolver:advance:fallback",
+            routing_candidates=[
+                RoutingCandidate(
+                    candidate_id="resolver:advance:fallback",
+                    action="advance",
+                    target_node=None,
+                    reason=fallback_reason,
+                    priority=10,
+                    source="resolver_fallback",
+                    is_default=True,
+                )
+            ],
+        )
+    else:
+        fallback_routing = routing_signal
+
     return HandoffEnvelope(
         step_id=step_id,
         flow_key=flow_key,
         run_id=run_id,
-        routing_signal=routing_signal
-        or RoutingSignal(
-            decision=RoutingDecision.ADVANCE,
-            reason="fallback_advance",
-            confidence=0.5,
-        ),
+        routing_signal=fallback_routing,
         summary=summary[:2000] if summary else f"Step {step_id} completed with status {status}",
         artifacts={},
         status=status,

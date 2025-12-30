@@ -19,7 +19,7 @@ Usage:
         RUNS_DIR,
         get_run_path, run_exists, create_run_dir,
         write_spec, read_spec,
-        write_summary, read_summary, update_summary,
+        write_summary, read_summary, update_summary, finalize_run_success,
         append_event, read_events,
         query_navigator_events, summarize_navigator_events,  # For Wisdom analysis
         write_run_state, read_run_state, update_run_state,
@@ -498,6 +498,89 @@ def update_summary(run_id: RunId, updates: Dict[str, Any], runs_dir: Path = RUNS
         write_summary(run_id, updated_summary, runs_dir)
 
         return updated_summary
+
+
+def finalize_run_success(
+    run_id: RunId,
+    sdlc_status: str = "ok",
+    runs_dir: Path = RUNS_DIR,
+) -> RunSummary:
+    """Finalize a run as succeeded with consistent status updates.
+
+    This is the canonical way to mark a run as successfully completed.
+    It ensures that both meta.json and run_state.json are updated
+    consistently with the completion timestamp.
+
+    Use this function in backends after all flows complete successfully
+    to avoid duplicating status update logic.
+
+    Args:
+        run_id: The unique run identifier.
+        sdlc_status: The SDLC quality status (default: "ok").
+                     Valid values: "ok", "warning", "error", "unknown".
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        The updated RunSummary.
+
+    Raises:
+        FileNotFoundError: If the run's meta.json doesn't exist.
+
+    Example:
+        >>> from swarm.runtime import storage
+        >>> storage.finalize_run_success("run-123")
+        >>> summary = storage.read_summary("run-123")
+        >>> print(summary.status)  # "succeeded"
+    """
+    from datetime import datetime, timezone
+    from .types import RunStatus, SDLCStatus
+
+    now = datetime.now(timezone.utc)
+
+    # Map string to enum value
+    sdlc_enum = SDLCStatus.OK
+    if sdlc_status == "warning":
+        sdlc_enum = SDLCStatus.WARNING
+    elif sdlc_status == "error":
+        sdlc_enum = SDLCStatus.ERROR
+    elif sdlc_status == "unknown":
+        sdlc_enum = SDLCStatus.UNKNOWN
+
+    # Update summary with success status
+    updated_summary = update_summary(
+        run_id,
+        {
+            "status": RunStatus.SUCCEEDED.value,
+            "sdlc_status": sdlc_enum.value,
+            "completed_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        },
+        runs_dir,
+    )
+
+    # Also emit a run_completed event for observability
+    append_event(
+        run_id,
+        RunEvent(
+            run_id=run_id,
+            ts=now,
+            kind="run_completed",
+            flow_key="",
+            payload={
+                "status": RunStatus.SUCCEEDED.value,
+                "sdlc_status": sdlc_enum.value,
+            },
+        ),
+        runs_dir,
+    )
+
+    logger.debug(
+        "Finalized run %s as succeeded (sdlc_status=%s)",
+        run_id,
+        sdlc_status,
+    )
+
+    return updated_summary
 
 
 # -----------------------------------------------------------------------------
