@@ -1156,7 +1156,7 @@ def create_autopilot_navigator() -> MacroNavigator:
         MacroNavigator configured for autopilot mode.
     """
     run_plan = RunPlanSpec(
-        flow_sequence=["signal", "plan", "build", "gate", "deploy", "wisdom"],
+        flow_sequence=["signal", "plan", "build", "review", "gate", "deploy", "wisdom"],
         macro_policy=MacroPolicy.default(),
         human_policy=HumanPolicy.autopilot(),
         constraints=[
@@ -1175,7 +1175,7 @@ def create_supervised_navigator() -> MacroNavigator:
         MacroNavigator configured for supervised mode with pauses.
     """
     run_plan = RunPlanSpec(
-        flow_sequence=["signal", "plan", "build", "gate", "deploy", "wisdom"],
+        flow_sequence=["signal", "plan", "build", "review", "gate", "deploy", "wisdom"],
         macro_policy=MacroPolicy.default(),
         human_policy=HumanPolicy.supervised(),
         constraints=[

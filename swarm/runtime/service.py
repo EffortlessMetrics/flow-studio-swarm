@@ -246,7 +246,7 @@ class RunService:
 
         # Detect which flows have artifacts
         flow_keys = []
-        for flow_dir in ["signal", "plan", "build", "gate", "deploy", "wisdom"]:
+        for flow_dir in ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]:
             if (run_path / flow_dir).exists():
                 flow_keys.append(flow_dir)
 

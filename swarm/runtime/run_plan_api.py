@@ -178,7 +178,7 @@ def create_default_autopilot_plan() -> StoredPlan:
             is_default=True,
         ),
         spec=RunPlanSpec(
-            flow_sequence=["signal", "plan", "build", "gate", "deploy", "wisdom"],
+            flow_sequence=["signal", "plan", "build", "review", "gate", "deploy", "wisdom"],
             macro_policy=MacroPolicy.default(),
             human_policy=HumanPolicy.autopilot(),
             constraints=[
@@ -203,7 +203,7 @@ def create_default_supervised_plan() -> StoredPlan:
             is_default=True,
         ),
         spec=RunPlanSpec(
-            flow_sequence=["signal", "plan", "build", "gate", "deploy", "wisdom"],
+            flow_sequence=["signal", "plan", "build", "review", "gate", "deploy", "wisdom"],
             macro_policy=MacroPolicy.default(),
             human_policy=HumanPolicy.supervised(),
             constraints=[
@@ -253,7 +253,7 @@ def create_signal_to_gate_plan() -> StoredPlan:
             is_default=True,
         ),
         spec=RunPlanSpec(
-            flow_sequence=["signal", "plan", "build", "gate"],
+            flow_sequence=["signal", "plan", "build", "review", "gate"],
             macro_policy=MacroPolicy.default(),
             human_policy=HumanPolicy.autopilot(),
             constraints=[
@@ -399,7 +399,7 @@ class RunPlanAPI:
         hp = HumanPolicy.autopilot() if human_policy == "autopilot" else HumanPolicy.supervised()
 
         spec = RunPlanSpec(
-            flow_sequence=flow_sequence or ["signal", "plan", "build", "gate", "deploy", "wisdom"],
+            flow_sequence=flow_sequence or ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"],
             macro_policy=MacroPolicy.default(),
             human_policy=hp,
             constraints=constraints or [],

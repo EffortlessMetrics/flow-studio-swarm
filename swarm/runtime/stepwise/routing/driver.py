@@ -429,11 +429,54 @@ def _try_navigator(
         logger.debug("Navigator routing skipped: no orchestrator available")
         return None
 
-    # TODO: Implement Navigator-based routing
-    # This will call the navigation_orchestrator to get a routing decision
+    # Validate required parameters for Navigator routing
+    if run_id is None:
+        logger.debug("Navigator routing skipped: run_id required")
+        return None
+    if flow_key is None:
+        logger.debug("Navigator routing skipped: flow_key required")
+        return None
+    if flow_graph is None:
+        logger.debug("Navigator routing skipped: flow_graph required")
+        return None
+    if flow_def is None:
+        logger.debug("Navigator routing skipped: flow_def required")
+        return None
+    if spec is None:
+        logger.debug("Navigator routing skipped: spec required")
+        return None
+    if run_base is None:
+        logger.debug("Navigator routing skipped: run_base required")
+        return None
+
     logger.debug("Navigator routing: requesting intelligent routing decision")
 
-    return None
+    # Import here to avoid circular imports
+    from .navigator import route_via_navigator
+
+    try:
+        return route_via_navigator(
+            step=step,
+            step_result=step_result,
+            run_state=run_state,
+            loop_state=loop_state,
+            iteration=iteration,
+            routing_mode=routing_mode,
+            navigation_orchestrator=navigation_orchestrator,
+            run_id=run_id,
+            flow_key=flow_key,
+            flow_graph=flow_graph,
+            flow_def=flow_def,
+            spec=spec,
+            run_base=run_base,
+        )
+    except Exception as e:
+        logger.warning(
+            "Navigator routing failed for step %s: %s",
+            step.id,
+            e,
+        )
+        return None
 
 
 # =============================================================================

@@ -165,7 +165,7 @@ async def get_facts_summary(run_id: str):
             )
 
     # Build by_flow response
-    flow_order = ["signal", "plan", "build", "gate", "deploy", "wisdom"]
+    flow_order = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
     flow_counts = []
     for flow_key in flow_order:
         if flow_key in by_flow:

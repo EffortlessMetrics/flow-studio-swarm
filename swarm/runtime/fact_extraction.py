@@ -460,7 +460,7 @@ def extract_facts_from_run(
         return result
 
     # Known flow keys
-    flow_keys = ["signal", "plan", "build", "gate", "deploy", "wisdom"]
+    flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
 
     for flow_key in flow_keys:
         flow_path = run_base / flow_key

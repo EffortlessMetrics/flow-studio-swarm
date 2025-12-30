@@ -2450,8 +2450,8 @@ def build_detailed_json_output(
         from swarm.config.flow_registry import get_flow_keys
         flow_keys = get_flow_keys()
     except ImportError:
-        # Fallback: use canonical 6-flow keys if registry not available
-        flow_keys = ["signal", "plan", "build", "gate", "deploy", "wisdom"]
+        # Fallback: use canonical 7-flow keys if registry not available
+        flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
 
     for flow_id in flow_keys:
         flow_file = FLOW_SPECS_DIR / f"flow-{flow_id}.md"

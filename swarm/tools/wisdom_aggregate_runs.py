@@ -81,7 +81,7 @@ def aggregate_summaries(summaries: List[Dict[str, Any]]) -> Dict[str, Any]:
     # Initialize aggregation
     flow_success_counts: Dict[str, Dict[str, int]] = {
         flow: {"succeeded": 0, "failed": 0, "skipped": 0}
-        for flow in ["signal", "plan", "build", "gate", "deploy", "wisdom"]
+        for flow in ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
     }
 
     total_regressions = 0

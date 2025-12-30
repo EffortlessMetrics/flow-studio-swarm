@@ -86,7 +86,7 @@ class WisdomSummarizer:
     """
 
     # Standard flow keys in execution order
-    FLOW_KEYS = ["signal", "plan", "build", "gate", "deploy", "wisdom"]
+    FLOW_KEYS = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
 
     # Wisdom artifacts to look for
     WISDOM_ARTIFACTS = [

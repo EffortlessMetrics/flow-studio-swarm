@@ -326,7 +326,7 @@ def _read_all_envelopes(run_base: Path, flow_key: Optional[str] = None) -> List[
     envelopes = []
 
     # Flow order for iteration
-    flow_order = ["signal", "plan", "build", "gate", "deploy", "wisdom"]
+    flow_order = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
 
     if flow_key:
         flows_to_check = [flow_key]
