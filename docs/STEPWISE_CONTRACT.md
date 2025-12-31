@@ -94,10 +94,9 @@ Events are written to `RUN_BASE/events.jsonl` and provide observability into run
 
 | Kind | When Emitted | Payload |
 |------|--------------|---------|
-| `step_routed` | **Primary audit event.** After routing decision. | `{next_step_id, reason, routing_source, decision, confidence}` |
-| `route_decision` | Legacy event, may be emitted for internal transitions. | `{from_step, to_step, reason, loop_state, routing_source}` |
+| `route_decision` | **Primary audit event.** After routing decision. | `{from_step, to_step, reason, loop_state, routing_source}` |
 
-**Note:** `step_routed` is the canonical event operators should inspect. It includes the full `RoutingOutcome` payload with audit trail.
+**Note:** `route_decision` is the canonical event kind (see `db.py` `CANONICAL_EVENT_KINDS`). It includes the routing decision payload with audit trail.
 
 ### `routing_source` Field
 

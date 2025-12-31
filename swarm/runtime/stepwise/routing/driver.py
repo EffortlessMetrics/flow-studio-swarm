@@ -118,9 +118,9 @@ class RoutingOutcome:
         }
 
     def to_event_payload(self) -> Dict[str, Any]:
-        """Convert to event payload for step_routed events.
+        """Convert to event payload for route_decision events.
 
-        Returns a dictionary suitable for use as the payload in a step_routed
+        Returns a dictionary suitable for use as the payload in a route_decision
         RunEvent. This provides the canonical format for routing audit trail.
         """
         payload: Dict[str, Any] = {

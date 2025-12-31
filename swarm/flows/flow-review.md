@@ -1,9 +1,5 @@
 # Review — Draft → Ready
 
-> **Status:** Work in Progress (WIP)
->
-> The Review flow is defined but implementation is in progress. See `swarm/config/flows/review.yaml.draft` for the full step definitions.
-
 **Goal:** Harvest PR feedback, cluster into actionable items, apply fixes, transition Draft PR to Ready for merge.
 
 **Question:** Is this PR ready for gate review?
@@ -84,6 +80,7 @@ Flow 4 also reads from Flows 1-2 for context:
 
 ---
 
+<!-- FLOW AUTOGEN START -->
 ## Steps Overview
 
 | Step | Agent(s) | Purpose |
@@ -95,10 +92,11 @@ Flow 4 also reads from Flows 1-2 for context:
 | cluster | review-worklist-writer | Group feedback into work items |
 | worklist_loop | Multiple | **Microloop**: resolve work items |
 | close_pr | pr-commenter, pr-status-manager | Flip Draft to Ready |
-| cleanup | review-cleanup | Write review_receipt.json |
+| cleanup | review-cleanup, build-cleanup | Write review_receipt.json |
 | sanitize | secrets-sanitizer | Scan for secrets |
 | commit | repo-operator | Commit and push |
-| gh_update | gh-reporter | Update GitHub |
+| gh_update | gh-issue-manager, gh-reporter | Update GitHub |
+<!-- FLOW AUTOGEN END -->
 
 ### The Worklist Loop
 
@@ -151,4 +149,4 @@ Flow 5 (Gate) proceeds when Review completes with `pending_blocking == 0`.
 
 - [flow-build.md](./flow-build.md) — Upstream: creates the Draft PR
 - [flow-gate.md](./flow-gate.md) — Downstream: audits the Ready PR
-- `swarm/config/flows/review.yaml.draft` — Full step configuration
+- `swarm/config/flows/review.yaml` — Full step configuration

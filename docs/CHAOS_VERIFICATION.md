@@ -46,7 +46,7 @@ make stepwise-sdlc-stub routing_mode=AUTHORITATIVE
 |----------|----------|---------------|
 | Run state | `RUN_BASE/run_state.json` | `status: "succeeded"` |
 | Events | `RUN_BASE/events.jsonl` | All `step_end` events have `status: "succeeded"` |
-| Routing | `RUN_BASE/events.jsonl` | `step_routed` events show `routing_source` values |
+| Routing | `RUN_BASE/events.jsonl` | `route_decision` events show `routing_source` values |
 
 ### Success Criteria (Grep-able)
 
@@ -58,7 +58,7 @@ grep '"status": "succeeded"' RUN_BASE/run_state.json
 grep '"kind": "step_error"' RUN_BASE/events.jsonl && echo "FAIL: Errors found" || echo "PASS: No errors"
 
 # Count routing decisions by source
-grep '"step_routed"' RUN_BASE/events.jsonl | grep -o '"routing_source": "[^"]*"' | sort | uniq -c
+grep '"route_decision"' RUN_BASE/events.jsonl | grep -o '"routing_source": "[^"]*"' | sort | uniq -c
 ```
 
 ### Pass Condition
@@ -112,7 +112,7 @@ INJECT_STALL_FAULT="code-implementer:3" make stepwise-sdlc-stub
 grep -i "stall_detected.*true" RUN_BASE/events.jsonl && echo "PASS: Stall detected" || echo "FAIL: No stall detection"
 
 # Check routing responded to stall
-grep '"step_routed"' RUN_BASE/events.jsonl | grep -i "elephant\|stall"
+grep '"route_decision"' RUN_BASE/events.jsonl | grep -i "elephant\|stall"
 
 # Count loop iterations (should cap at 3-5, not infinite)
 grep '"loop_iteration"' RUN_BASE/events.jsonl | tail -5

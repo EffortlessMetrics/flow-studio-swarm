@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from swarm.config.flow_registry import get_flow_order
 from swarm.runtime.storage import find_run_path
 
 logger = logging.getLogger(__name__)
@@ -326,7 +327,7 @@ def _read_all_envelopes(run_base: Path, flow_key: Optional[str] = None) -> List[
     envelopes = []
 
     # Flow order for iteration
-    flow_order = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
+    flow_order = get_flow_order()
 
     if flow_key:
         flows_to_check = [flow_key]

@@ -1197,7 +1197,7 @@ class StepwiseOrchestrator:
                 RunEvent(
                     run_id=run_id,
                     ts=datetime.now(timezone.utc),
-                    kind="step_routed",
+                    kind="route_decision",
                     flow_key=flow_key,
                     step_id=step.id,
                     payload=routing_outcome.to_event_payload(),

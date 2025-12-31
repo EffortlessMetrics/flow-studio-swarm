@@ -103,7 +103,7 @@ The `routing_source` field documents how the routing decision was made:
 # Convert to dictionary for JSON serialization
 outcome.to_dict() -> Dict[str, Any]
 
-# Convert to event payload for step_routed events
+# Convert to event payload for route_decision events
 outcome.to_event_payload() -> Dict[str, Any]
 
 # Create from legacy RoutingSignal
@@ -193,7 +193,7 @@ else:
 
 # Emit routing event
 event_payload = outcome.to_event_payload()
-emit_event("step_routed", payload=event_payload)
+emit_event("route_decision", payload=event_payload)
 ```
 
 ---
