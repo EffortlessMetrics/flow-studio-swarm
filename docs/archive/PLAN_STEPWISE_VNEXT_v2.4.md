@@ -1,10 +1,12 @@
 # Stepwise vNext: Executable Graph IR Plan
 
+> **Archived:** This v2.4 planning document is superseded by [ARCHITECTURE.md](../ARCHITECTURE.md) and [ROUTING_PROTOCOL.md](./ROUTING_PROTOCOL.md). Kept for historical reference.
+
 > For: Core team driving spec system → production execution
 >
 > **Status:** Planning | **Owner:** TBD | **Target:** v2.4.0
 >
-> **Related:** [STEPWISE_BACKENDS.md](./STEPWISE_BACKENDS.md) | [RUNTIME_ENGINE_PLAN.md](./RUNTIME_ENGINE_PLAN.md)
+> **Related:** [STEPWISE_BACKENDS.md](../STEPWISE_BACKENDS.md) | [RUNTIME_ENGINE_PLAN.md](../RUNTIME_ENGINE_PLAN.md)
 
 ---
 

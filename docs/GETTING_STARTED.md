@@ -5,8 +5,8 @@
 > **Scope:** This guide is for running the **Flow Studio demo harness** in this repo.
 > For a portable `.claude` pack to use with Claude Code in your own repo, see [`EffortlessMetrics/demo-swarm`](https://github.com/EffortlessMetrics/demo-swarm).
 
-> **Version note:** This guide assumes mainline (`v2.3.0+`). If commands or UI differ,
-> check `CHANGELOG.md` or the release notes in `docs/RELEASE_NOTES_2_3_0.md`.
+> **Version note:** This guide assumes mainline (`v3.0+`). If commands or UI differ,
+> check `CHANGELOG.md` or the release notes.
 
 > **Status:** early re-implementation of a proven pattern. If what you see disagrees with this guide, trust the code and open an issue.
 
@@ -41,6 +41,33 @@ Both paths take about 10 minutes. You can do both.
 
 **Optional (for UI development / TypeScript checks):**
 - **Node.js 20+** (npm is fine; pnpm optional)
+
+---
+
+## Before You Begin: The Paradigm Shift
+
+> **This is a factory, not a chatbot.**
+
+Flow Studio operates differently from ChatGPT or Copilot. Understanding this upfront prevents frustration:
+
+| The Old Way (Chatbot) | The Swarm Way (Factory) |
+|----------------------|-------------------------|
+| Chat with the AI | Assign tickets, audit outputs |
+| Infinite context scroll | Curated context packs (scoped focus) |
+| Read chat logs for status | Check git diffs + test results (forensics) |
+| Intervene when stuck | Come back when it's ready |
+
+**Key principles to internalize:**
+
+- **Forensics > Narrative**: The AI may claim success. Trust the disk—git diffs, test logs, receipts.
+- **Scoped Focus**: Each step starts fresh—clearing irrelevant prior context so reasoning stays sharp.
+- **Compute-Attention Arbitrage**: Burn $5 in compute (adversarial loops, redundant checks) to save 15 minutes of your attention.
+
+> **Review the output, not the process.**
+> The system does prep work before it reaches you. It will make mistakes. It will also catch mistakes.
+> Treat it like a junior's drafts: you care about the final diff, tests, and receipts—not the messy iteration.
+
+For the full philosophy, read [AGOPS_MANIFESTO.md](./AGOPS_MANIFESTO.md).
 
 ---
 
@@ -139,7 +166,7 @@ This shows all 16 selftest steps without running them:
 make selftest
 ```
 
-Watch it run through all 16 steps. Notice:
+It runs through all 16 steps. When it completes, notice:
 
 - Each step is atomic and fast (< 0.2s each)
 - Steps are independent (no cascading failures)
