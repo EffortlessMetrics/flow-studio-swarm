@@ -37,13 +37,15 @@ Do not anthropomorphize the AI as a "Co-Pilot" or a "Partner." View the system a
 
 ## 3. The Operational Laws (The Physics)
 
-### Law 1: The Amnesia Protocol (Context Hygiene)
+### Law 1: Context Reset + Rehydration (Session Hygiene)
 
-**"Intelligence degrades as history grows."**
+**"Intelligence degrades as irrelevant history grows."**
 
 - **The Rule:** Never pass raw chat history between steps.
-- **The Fix:** Every step starts with a **Fresh Session**.
+- **The Fix:** Every step starts **fresh** (Context Reset), then receives only what's relevant (Rehydration).
 - **The Mechanism:** The **ContextPack**. The Kernel curates a specific "Briefing Case" (Summaries + File Pointers + Scent Trail) for the next agent. This ensures "Peak Reasoning Density" at every stage.
+
+> **Canonical terms:** See "Scoped Focus", "Session Boundary", "Context Reset", and "Rehydration" in [LEXICON.md](./LEXICON.md).
 
 ### Law 2: Forensics Over Narrative (Trust No One)
 
@@ -148,7 +150,7 @@ To operate this swarm, you must understand the psychology of the model (Claude) 
 
 | Weakness | Mitigation | Mechanism |
 |----------|------------|-----------|
-| Context Drunkenness | Amnesia Protocol | Session Amnesia + curated ContextPack |
+| Context Drunkenness | Context Reset + Rehydration | Fresh session + curated ContextPack |
 | Success Pressure | `PARTIAL` is a Win | Explicit prompt: "If stuck, write status PARTIAL. This is successful." |
 | Rabbit Holing | Navigator Agent | "Senior Architect" routes between sprints; junior only executes |
 
@@ -364,7 +366,7 @@ You have designed a system where **Time is on your side.** The longer you use Fl
 | Context Sharding | Steps own logic; subagents handle mechanics |
 | Suggested vs. Mandated | Detours are brochures, not walls; orchestrator can go off-road |
 | Structural Learning | Ad-hoc deviations evolve into SOP via Wisdom |
-| Session Hygiene | Amnesia Protocol + ContextPack |
+| Session Hygiene | Context Reset + Rehydration |
 | Trust with Verification | `bypassPermissions` + Forensic Scanners |
 | Isolation | Shadow Fork + orderly shutdown + resume |
 

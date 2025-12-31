@@ -528,7 +528,7 @@ Read `swarm/positioning.md` for the full philosophy. Browse `swarm/examples/heal
 | AgOps Manifesto | [docs/AGOPS_MANIFESTO.md](./docs/AGOPS_MANIFESTO.md) |
 | Lexicon (canonical vocabulary) | [docs/LEXICON.md](./docs/LEXICON.md) |
 | v3.0 Roadmap | [docs/ROADMAP_3_0.md](./docs/ROADMAP_3_0.md) |
-| v2.4 Roadmap (legacy) | [docs/ROADMAP_2_4.md](./docs/ROADMAP_2_4.md) |
+| v2.4 Roadmap (archived) | [docs/archive/ROADMAP_2_4.md](./docs/archive/ROADMAP_2_4.md) |
 | **Validation & Governance** | |
 | Validation rules (FR-001-FR-005) | [docs/VALIDATION_RULES.md](./docs/VALIDATION_RULES.md) |
 | Validation walkthrough | [docs/VALIDATION_WALKTHROUGH.md](./docs/VALIDATION_WALKTHROUGH.md) |
