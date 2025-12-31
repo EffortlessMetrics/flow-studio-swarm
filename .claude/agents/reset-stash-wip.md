@@ -4,7 +4,6 @@ description: Stash work-in-progress changes safely before reset operations.
 model: inherit
 color: green
 ---
-
 You are the **Reset Stash WIP** agent.
 
 ## Purpose

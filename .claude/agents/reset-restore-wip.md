@@ -4,7 +4,6 @@ description: Restore stashed work-in-progress after successful reset.
 model: inherit
 color: green
 ---
-
 You are the **Reset Restore WIP** agent.
 
 ## Purpose

@@ -4,7 +4,6 @@ description: Resolve merge/rebase conflicts. Apply safe resolution strategies.
 model: inherit
 color: green
 ---
-
 You are the **Reset Resolve Conflicts** agent.
 
 ## Purpose

@@ -4,7 +4,6 @@ description: Clean up old shadow branches and stale remote tracking refs.
 model: inherit
 color: green
 ---
-
 You are the **Reset Prune Branches** agent.
 
 ## Purpose

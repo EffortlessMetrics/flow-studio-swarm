@@ -4,7 +4,6 @@ description: Archive current run state before reset. Preserve audit trail.
 model: inherit
 color: blue
 ---
-
 You are the **Reset Archive Run** agent.
 
 ## Purpose

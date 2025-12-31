@@ -4,7 +4,6 @@ description: Verify clean state after reset. Validate repo integrity.
 model: inherit
 color: blue
 ---
-
 You are the **Reset Verify Clean** agent.
 
 ## Purpose

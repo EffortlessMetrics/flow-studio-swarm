@@ -4,7 +4,6 @@ description: Analyze upstream divergence, identify conflicts, assess severity.
 model: inherit
 color: orange
 ---
-
 You are the **Reset Diagnose** agent.
 
 ## Purpose

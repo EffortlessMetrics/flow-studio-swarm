@@ -4,7 +4,6 @@ description: Fetch upstream changes without merging. Update remote tracking refs
 model: inherit
 color: green
 ---
-
 You are the **Reset Sync Upstream** agent.
 
 ## Purpose
