@@ -56,6 +56,7 @@ from .navigator import (
     RouteIntent,
     RouteProposal,
     StallSignals,
+    UtilityFlowRequest,
     VerificationSummary,
     extract_candidate_edges_from_graph,
     navigator_output_to_dict,
@@ -65,6 +66,7 @@ from .sidequest_catalog import (
     SidequestCatalog,
     load_default_catalog,
 )
+from .spec_evolution import persist_routing_proposal
 from .station_library import StationLibrary, load_station_library
 from .types import (
     HandoffEnvelope,
@@ -85,6 +87,12 @@ from .forensic_comparator import (
 from .forensic_types import (
     DiffScanResult,
     diff_scan_result_from_dict,
+)
+# Utility flow injection imports for INJECT_FLOW handling
+from .utility_flow_injection import (
+    UtilityFlowRegistry,
+    UtilityFlowInjector,
+    FlowInjectionResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -859,6 +867,100 @@ def emit_graph_patch_suggested_event(
 
 
 # =============================================================================
+# Utility Flow Injection (INJECT_FLOW)
+# =============================================================================
+
+
+def apply_utility_flow_injection(
+    nav_output: NavigatorOutput,
+    run_state: "RunState",
+    run_id: str,
+    flow_key: str,
+    step_id: str,
+    repo_root: Path,
+    append_event_fn: Optional[Callable] = None,
+) -> Optional[str]:
+    """Apply utility flow injection if Navigator chose INJECT_FLOW.
+
+    When Navigator selects a utility flow (e.g., reset when diverged), this
+    function uses the stack-frame pattern to inject the utility flow. The
+    current flow is interrupted and will resume after the utility flow
+    completes.
+
+    This is similar to apply_detour_request but for whole flows rather
+    than single-step sidequests.
+
+    Args:
+        nav_output: Navigator output with utility_flow_request.
+        run_state: Current run state (will be mutated to push flow stack).
+        run_id: Run identifier.
+        flow_key: Current flow key.
+        step_id: Step that triggered injection.
+        repo_root: Repository root path.
+        append_event_fn: Function to append events (for testing).
+
+    Returns:
+        The utility flow ID if injection occurred, None otherwise.
+    """
+    if nav_output.utility_flow_request is None:
+        return None
+
+    request = nav_output.utility_flow_request
+
+    if append_event_fn is None:
+        from . import storage as storage_module
+
+        append_event_fn = storage_module.append_event
+
+    # Use the injector from utility_flow_injection module
+    registry = UtilityFlowRegistry(repo_root)
+    injector = UtilityFlowInjector(registry)
+
+    # Perform the injection
+    result = injector.inject_utility_flow(
+        flow_id=request.flow_id,
+        run_state=run_state,
+        current_node=step_id,
+        injection_reason=request.reason,
+    )
+
+    if not result.injected:
+        logger.warning(
+            "Utility flow injection failed: flow_id=%s, reason=%s",
+            request.flow_id,
+            result.error,
+        )
+        return None
+
+    # Emit utility_flow_injected event for audit trail
+    event = RunEvent(
+        run_id=run_id,
+        ts=datetime.now(timezone.utc),
+        kind="utility_flow_injected",
+        flow_key=flow_key,
+        step_id=step_id,
+        payload={
+            "utility_flow_id": request.flow_id,
+            "reason": request.reason,
+            "priority": request.priority,
+            "resume_at": request.resume_at or step_id,
+            "pass_artifacts": request.pass_artifacts,
+            "interruption_depth": run_state.get_interruption_depth(),
+        },
+    )
+    append_event_fn(run_id, event)
+
+    logger.info(
+        "INJECT_FLOW: Injected utility flow %s (reason: %s, resume_at: %s)",
+        request.flow_id,
+        request.reason,
+        request.resume_at or step_id,
+    )
+
+    return request.flow_id
+
+
+# =============================================================================
 # Brief Storage
 # =============================================================================
 
@@ -946,6 +1048,8 @@ class NavigationResult:
     detour_injected: bool
     nav_output: NavigatorOutput
     extend_graph_injected: bool = False
+    utility_flow_injected: bool = False
+    utility_flow_id: Optional[str] = None
 
 
 class NavigationOrchestrator:
@@ -1170,6 +1274,12 @@ class NavigationOrchestrator:
                         "Navigator chose EXTEND_GRAPH (not in candidate set): %s",
                         chosen_id,
                     )
+                # Allow inject_flow:* candidates for INJECT_FLOW intent
+                elif nav_output.route.intent == RouteIntent.INJECT_FLOW:
+                    logger.debug(
+                        "Navigator chose INJECT_FLOW (from utility flow candidates): %s",
+                        chosen_id,
+                    )
                 else:
                     logger.warning(
                         "Navigator chose invalid candidate_id '%s' (valid: %s). "
@@ -1232,6 +1342,49 @@ class NavigationOrchestrator:
                     proposed_edge=nav_output.proposed_edge,
                 )
 
+                # Persist proposal to disk for durable artifact
+                if self._repo_root and run_id:
+                    run_base = self._repo_root / "swarm" / "runs" / run_id
+                    try:
+                        proposal_path = persist_routing_proposal(
+                            run_base=run_base,
+                            flow_key=flow_key,
+                            step_id=current_node,
+                            proposed_edge=nav_output.proposed_edge,
+                            why_now=nav_output.route.why_now if hasattr(nav_output.route, "why_now") else None,
+                            routing_reason=nav_output.route.explanation or "",
+                        )
+                        logger.info("EXTEND_GRAPH proposal persisted to %s", proposal_path)
+                    except Exception as e:
+                        logger.warning("Failed to persist EXTEND_GRAPH proposal: %s", e)
+
+        # Handle utility flow injection (INJECT_FLOW)
+        utility_flow_injected = False
+        utility_flow_id = None
+
+        if nav_output.route.intent == RouteIntent.INJECT_FLOW and nav_output.utility_flow_request:
+            # Handle utility flow injection (e.g., reset when diverged)
+            utility_flow_id = apply_utility_flow_injection(
+                nav_output=nav_output,
+                run_state=run_state,
+                run_id=run_id,
+                flow_key=flow_key,
+                step_id=current_node,
+                repo_root=self._repo_root,
+            )
+            if utility_flow_id:
+                utility_flow_injected = True
+                # The next node is the first step of the utility flow
+                # which will be determined by the flow registry
+                # For now, we set target to None and let the orchestrator
+                # handle the flow switch
+                nav_output.route.target_node = None
+                logger.info(
+                    "INJECT_FLOW: Switching to utility flow '%s', current flow '%s' will resume later",
+                    utility_flow_id,
+                    flow_key,
+                )
+
         # Convert to routing signal
         routing_signal = navigator_to_routing_signal(nav_output)
 
@@ -1261,6 +1414,8 @@ class NavigationOrchestrator:
             detour_injected=detour_injected,
             nav_output=nav_output,
             extend_graph_injected=extend_graph_injected,
+            utility_flow_injected=utility_flow_injected,
+            utility_flow_id=utility_flow_id,
         )
 
     @property
