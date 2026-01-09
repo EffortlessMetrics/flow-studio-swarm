@@ -47,34 +47,32 @@ Both paths take about 10 minutes. You can do both.
 
 ## Before You Begin: The Paradigm Shift
 
-> **Code generation is fast and cheap now. The bottleneck is trust.**
+> **Code generation is faster than human review. The bottleneck is trust.**
+
+Open-weight models now produce junior-or-better code, faster than you can read it, cheap enough to run repeatedly. Just like programmers stopped reading assembly, developers stop grinding on first-draft implementation—the job moves up the stack.
 
 Flow Studio operates differently from ChatGPT or Copilot. Understanding this upfront prevents frustration:
 
-| The Old Way | The Flow Studio Way |
-|-------------|---------------------|
-| Spend a week implementing | System spends 4 hours iterating |
+| Traditional | Flow Studio |
+|-------------|-------------|
+| You spend time implementing | System iterates in the background |
 | Review by reading every line | Review via inspection report + hotspots |
 | Hope tests are meaningful | Mutation testing proves coverage depth |
 | Chat with the AI | Assign tickets, audit outputs |
 | Intervene when stuck | Come back when it's ready |
 
-**The time shift:**
-- The system researches, plans, builds, tests, reviews, improves, mutates, and fuzzes
-- You review a bounded change with an evidence pack in 30 minutes
-- The rest of your day goes to planning, architecture, and the decisions that actually need your judgment
+**The pattern:** hours of system iteration → one-sitting human review.
 
-**Key principles to internalize:**
+**Key principles:**
 
 - **Forensics > Narrative**: The AI may claim success. Trust the disk—git diffs, test logs, receipts.
 - **Scoped Focus**: Each step starts fresh—clearing irrelevant prior context so reasoning stays sharp.
 - **Developer Enabler**: This isn't "AI vs. developers." It's developers doing more, better.
 
 > **Review the output, not the process.**
-> The system does prep work before it reaches you. It will make mistakes. It will also catch mistakes.
-> Treat it like a junior's drafts: you care about the final diff, tests, and receipts—not the messy iteration.
+> You care about the final diff, tests, and receipts—not the messy iteration.
 
-For the full philosophy, read [AGOPS_MANIFESTO.md](./AGOPS_MANIFESTO.md).
+For the full philosophy, read [AGOPS_MANIFESTO.md](./AGOPS_MANIFESTO.md). For current data points, see [MARKET_SNAPSHOT.md](./MARKET_SNAPSHOT.md).
 
 ---
 

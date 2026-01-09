@@ -130,14 +130,11 @@ This pattern shifts the burden from "interrupt the agent chain to ask questions"
 
 ## The Demo Philosophy
 
-**Code generation is fast and cheap. The bottleneck is trust.**
+**Code generation is faster than human review. The bottleneck is trust.**
 
-Models now deliver Sonnet-level reasoning at 1,000+ tokens/second. The question isn't "can the LLM write code"—it's "can you review the output in 30 minutes instead of spending a week doing it yourself."
+Open-weight models now produce junior-or-better code, faster than you can read it, cheap enough to run repeatedly. Just like programmers stopped reading assembly, developers stop grinding on first-draft implementation—the job moves up the stack.
 
-**The time shift:**
-- The system spends 4 hours researching, planning, building, testing, reviewing, improving, mutating, and fuzzing
-- You spend 30 minutes reviewing a bounded change with an evidence pack
-- The rest of your day goes to planning, architecture, and the decisions that actually need your judgment
+When quality is already acceptable and generation outpaces review, **verification becomes the limiting reagent**. Flow Studio uses that leverage to run research, planning, multi-pass implementation, tests, and hardening loops—then publishes a PR cockpit (quality events + hotspots + evidence) so developers can spend their time on architecture and decisions, not grind.
 
 **How this works:**
 - Let agents iterate (microloops) until tests pass and critics approve
@@ -146,9 +143,7 @@ Models now deliver Sonnet-level reasoning at 1,000+ tokens/second. The question 
 - Agents never block; they document concerns and continue
 - Humans review **receipts** (structured outputs), not intermediate steps
 
-The result: **auditable, repeatable, traceable decisions**—the opposite of "vibes-based engineering."
-
-**This isn't "AI vs. developers."** It's developers doing more, better, by offloading the grind to systems that iterate tirelessly and produce proof.
+The result: **auditable, repeatable, traceable decisions**—the opposite of "vibes-based engineering." See [MARKET_SNAPSHOT.md](./MARKET_SNAPSHOT.md) for current data points.
 
 ---
 

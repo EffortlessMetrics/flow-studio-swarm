@@ -527,6 +527,7 @@ Read `swarm/positioning.md` for the full philosophy. Browse `swarm/examples/heal
 | v3.0 Architecture | [ARCHITECTURE.md](./ARCHITECTURE.md) |
 | Routing Protocol v3 | [docs/ROUTING_PROTOCOL.md](./docs/ROUTING_PROTOCOL.md) |
 | AgOps Manifesto | [docs/AGOPS_MANIFESTO.md](./docs/AGOPS_MANIFESTO.md) |
+| Market snapshot (economics context) | [docs/MARKET_SNAPSHOT.md](./docs/MARKET_SNAPSHOT.md) |
 | Lexicon (canonical vocabulary) | [docs/LEXICON.md](./docs/LEXICON.md) |
 | v3.0 Roadmap | [docs/ROADMAP_3_0.md](./docs/ROADMAP_3_0.md) |
 | v2.4 Roadmap (archived) | [docs/archive/ROADMAP_2_4.md](./docs/archive/ROADMAP_2_4.md) |

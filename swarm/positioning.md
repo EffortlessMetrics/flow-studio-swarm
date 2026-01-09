@@ -4,15 +4,13 @@ This repo implements agentic SDLC flows with receipts and tests. It's designed f
 
 ## The Economics Shift
 
-**Code generation got really good, really fast, and really cheap.**
+**Code generation is faster than human review. The bottleneck is trust.**
 
-Models now deliver Sonnet-level reasoning at 1,000+ tokens/second with reasonable pricing. The bottleneck isn't "can the LLM write code"—it's "can a human review and trust the output."
+Open-weight models now produce junior-or-better code, faster than you can read it, cheap enough to run repeatedly. Just like programmers stopped reading assembly, developers stop grinding on first-draft implementation—the job moves up the stack.
 
-**The old way**: You spend a week writing, testing, reviewing. Ship something imperfect.
+When quality is already acceptable and generation outpaces review, **verification becomes the limiting reagent**. Flow Studio uses that leverage: run many small, scoped iterations (research, plan, build, test, harden), then publish a PR cockpit—hotspots, quality events, evidence, and explicit "not measured"—that's reviewable in one sitting.
 
-**The new way**: The system spends 4 hours researching, planning, building, testing, reviewing, improving, mutating, and fuzzing. You spend 30 minutes reviewing a bounded change with an evidence pack. Ship something proven.
-
-**The result**: Developers stop grinding on implementation and start focusing on architecture, planning, and the decisions that actually matter.
+The system does the repetitions; humans do the decisions. See [docs/MARKET_SNAPSHOT.md](../docs/MARKET_SNAPSHOT.md) for current data points.
 
 ## The Core Trade
 
@@ -158,11 +156,13 @@ You still need judgment to set up the gravity well (what contracts? what tests? 
 
 ## The Time Shift
 
-| Metric | Old Way | With Flow Studio |
-|--------|---------|------------------|
-| **Implementation time** | 1 week (human grinding) | 4 hours (system iterating) |
-| **Review time** | 2-4 hours (reading code) | 30 min (reading inspection report) |
+The pattern is: **hours of system iteration → one-sitting human review**.
+
+| Metric | Traditional | With Flow Studio |
+|--------|-------------|------------------|
+| **System work** | Human grinding | System iterating (background) |
+| **Review surface** | Reading every line | Inspection report + hotspots |
 | **Evidence produced** | "Tests pass" | Receipts, diffs, quality events, mutation scores |
 | **Developer time spent** | Implementation | Planning, architecture, review |
 
-The rest of your day? Planning the next feature, designing the architecture, doing the work that actually requires human judgment.
+Concrete numbers vary by task complexity, but the pattern holds: the system does the repetitions; humans do the judgment. The rest of your day goes to planning the next feature, designing the architecture, and making the decisions that actually require your attention.
