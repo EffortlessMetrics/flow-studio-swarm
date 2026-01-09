@@ -2,8 +2,9 @@
 
 > For: Developers wanting to try the swarm in under 30 minutes.
 
-> **Scope:** This guide is for running the **Flow Studio demo harness** in this repo.
-> For a portable `.claude` pack to use with Claude Code in your own repo, see [`EffortlessMetrics/demo-swarm`](https://github.com/EffortlessMetrics/demo-swarm).
+> **Scope:** This guide is for running **Flow Studio** in this repo.
+> For a portable `.claude/` pack to use in your own repo, see our sister repo:
+> [`EffortlessMetrics/demo-swarm`](https://github.com/EffortlessMetrics/demo-swarm).
 
 > **Version note:** This guide assumes mainline (`v3.0+`). If commands or UI differ,
 > check `CHANGELOG.md` or the release notes.

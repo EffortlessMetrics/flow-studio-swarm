@@ -154,7 +154,7 @@ See the [ADOPTION_PLAYBOOK](docs/ADOPTION_PLAYBOOK.md) for the complete readines
 
 ## Related
 
-- [EffortlessMetrics/demo-swarm](https://github.com/EffortlessMetrics/demo-swarm) — Portable `.claude` pack for your own repo
+- [EffortlessMetrics/demo-swarm](https://github.com/EffortlessMetrics/demo-swarm) — Sister repo: portable `.claude/` pack for your own repo
 
 ---
 

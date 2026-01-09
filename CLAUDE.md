@@ -2,8 +2,9 @@
 
 This document is the top-level map for **Flow Studio**—the demo harness for visualizing agentic SDLC flows.
 
-> The `.claude/` directory defines the swarm used by this demo harness.
-> For a portable `.claude` pack intended to be copied into *your* repo, use [`EffortlessMetrics/demo-swarm`](https://github.com/EffortlessMetrics/demo-swarm).
+> The `.claude/` directory defines the swarm used by Flow Studio.
+> For a portable `.claude/` pack to use in your own repo, see our sister repo:
+> [`EffortlessMetrics/demo-swarm`](https://github.com/EffortlessMetrics/demo-swarm).
 
 This is not a complete manual; it points you to the right artifacts.
 
