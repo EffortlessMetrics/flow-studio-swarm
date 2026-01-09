@@ -871,6 +871,19 @@ def emit_graph_patch_suggested_event(
 # =============================================================================
 
 
+@dataclass
+class UtilityFlowInjectionResult:
+    """Result of utility flow injection.
+
+    Attributes:
+        flow_id: The injected utility flow ID.
+        first_node_id: The first node to execute in the utility flow.
+    """
+
+    flow_id: str
+    first_node_id: str
+
+
 def apply_utility_flow_injection(
     nav_output: NavigatorOutput,
     run_state: "RunState",
@@ -879,7 +892,7 @@ def apply_utility_flow_injection(
     step_id: str,
     repo_root: Path,
     append_event_fn: Optional[Callable] = None,
-) -> Optional[str]:
+) -> Optional[UtilityFlowInjectionResult]:
     """Apply utility flow injection if Navigator chose INJECT_FLOW.
 
     When Navigator selects a utility flow (e.g., reset when diverged), this
@@ -900,7 +913,8 @@ def apply_utility_flow_injection(
         append_event_fn: Function to append events (for testing).
 
     Returns:
-        The utility flow ID if injection occurred, None otherwise.
+        UtilityFlowInjectionResult with flow_id and first_node_id if injection
+        occurred, None otherwise.
     """
     if nav_output.utility_flow_request is None:
         return None
@@ -951,13 +965,17 @@ def apply_utility_flow_injection(
     append_event_fn(run_id, event)
 
     logger.info(
-        "INJECT_FLOW: Injected utility flow %s (reason: %s, resume_at: %s)",
+        "INJECT_FLOW: Injected utility flow %s (reason: %s, resume_at: %s, first_node: %s)",
         request.flow_id,
         request.reason,
         request.resume_at or step_id,
+        result.first_node_id,
     )
 
-    return request.flow_id
+    return UtilityFlowInjectionResult(
+        flow_id=request.flow_id,
+        first_node_id=result.first_node_id,
+    )
 
 
 # =============================================================================
@@ -1269,17 +1287,37 @@ class NavigationOrchestrator:
 
             if chosen_id not in valid_ids:
                 # Allow "extend_graph" as a special value for EXTEND_GRAPH intent
+                # EXTEND_GRAPH is special: Navigator is proposing something NEW that
+                # doesn't exist in the candidate set (that's the whole point).
                 if nav_output.route.intent == RouteIntent.EXTEND_GRAPH:
                     logger.debug(
                         "Navigator chose EXTEND_GRAPH (not in candidate set): %s",
                         chosen_id,
                     )
-                # Allow inject_flow:* candidates for INJECT_FLOW intent
+                # INJECT_FLOW must now be in candidate set - utility flow candidates
+                # are generated BEFORE Navigator sees them via route_via_navigator().
+                # If we reach this branch, it's a bug - utility candidates weren't generated.
                 elif nav_output.route.intent == RouteIntent.INJECT_FLOW:
-                    logger.debug(
-                        "Navigator chose INJECT_FLOW (from utility flow candidates): %s",
+                    logger.warning(
+                        "Navigator chose INJECT_FLOW candidate '%s' but it was not in "
+                        "the candidate set (valid: %s). This indicates utility flow "
+                        "candidates weren't generated - check git_status/repo_root params. "
+                        "Falling back to default candidate.",
                         chosen_id,
+                        list(valid_ids),
                     )
+                    # Fall back to the default candidate
+                    default_candidate = next(
+                        (c for c in routing_candidates if c.get("is_default")),
+                        routing_candidates[0] if routing_candidates else None,
+                    )
+                    if default_candidate:
+                        nav_output.chosen_candidate_id = default_candidate["candidate_id"]
+                        nav_output.route.target_node = default_candidate.get("target_node")
+                        nav_output.route.reasoning = (
+                            f"Fallback to default (INJECT_FLOW candidate missing): "
+                            f"{default_candidate.get('reason', '')}"
+                        )
                 else:
                     logger.warning(
                         "Navigator chose invalid candidate_id '%s' (valid: %s). "
@@ -1364,7 +1402,7 @@ class NavigationOrchestrator:
 
         if nav_output.route.intent == RouteIntent.INJECT_FLOW and nav_output.utility_flow_request:
             # Handle utility flow injection (e.g., reset when diverged)
-            utility_flow_id = apply_utility_flow_injection(
+            injection_result = apply_utility_flow_injection(
                 nav_output=nav_output,
                 run_state=run_state,
                 run_id=run_id,
@@ -1372,16 +1410,17 @@ class NavigationOrchestrator:
                 step_id=current_node,
                 repo_root=self._repo_root,
             )
-            if utility_flow_id:
+            if injection_result:
                 utility_flow_injected = True
-                # The next node is the first step of the utility flow
-                # which will be determined by the flow registry
-                # For now, we set target to None and let the orchestrator
-                # handle the flow switch
-                nav_output.route.target_node = None
+                utility_flow_id = injection_result.flow_id
+                # Set next node to the first step of the utility flow
+                # This is deterministic - we don't leave target_node as None
+                nav_output.route.target_node = injection_result.first_node_id
                 logger.info(
-                    "INJECT_FLOW: Switching to utility flow '%s', current flow '%s' will resume later",
+                    "INJECT_FLOW: Switching to utility flow '%s' (first_node: %s), "
+                    "current flow '%s' will resume later",
                     utility_flow_id,
+                    injection_result.first_node_id,
                     flow_key,
                 )
 

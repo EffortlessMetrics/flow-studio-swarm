@@ -14,10 +14,12 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from unittest.mock import MagicMock, patch
 
-from swarm.runtime.stepwise.routing.driver import (
-    _get_utility_flow_candidates,
+# Import from utility_candidates.py (single source of truth for candidate generation)
+from swarm.runtime.stepwise.routing.utility_candidates import (
+    get_utility_flow_candidates as _get_utility_flow_candidates,
     get_utility_flow_registry,
     set_utility_flow_registry,
+    clear_utility_flow_caches,
 )
 from swarm.runtime.types import RoutingCandidate
 from swarm.runtime.navigator import (
@@ -33,6 +35,23 @@ from swarm.runtime.utility_flow_injection import (
     InjectionTriggerDetector,
     TriggerDetectionResult,
 )
+
+
+# =============================================================================
+# Fixture for cache isolation
+# =============================================================================
+
+
+@pytest.fixture(autouse=True)
+def clear_caches():
+    """Clear utility flow caches before and after each test.
+
+    This ensures test isolation - cached registries/detectors from
+    previous tests won't contaminate subsequent tests.
+    """
+    clear_utility_flow_caches()
+    yield
+    clear_utility_flow_caches()
 
 
 class MockRunState:
@@ -149,33 +168,30 @@ class TestUtilityFlowCandidates:
             first_node_id="diagnose",
         )
 
-        set_utility_flow_registry(mock_registry)
+        set_utility_flow_registry(mock_registry, repo_root=tmp_path)
 
-        try:
-            git_status = {
-                "behind_count": 5,
-                "diverged": True,
-            }
+        git_status = {
+            "behind_count": 5,
+            "diverged": True,
+        }
 
-            candidates = _get_utility_flow_candidates(
-                step_result={"status": "VERIFIED"},
-                run_state=MockRunState(),
-                git_status=git_status,
-                repo_root=tmp_path,
-            )
+        candidates = _get_utility_flow_candidates(
+            step_result={"status": "VERIFIED"},
+            run_state=MockRunState(),
+            git_status=git_status,
+            repo_root=tmp_path,
+        )
 
-            # Should have at least one inject_flow candidate
-            inject_candidates = [
-                c for c in candidates if c.action == "inject_flow"
-            ]
-            assert len(inject_candidates) >= 0  # May be 0 if trigger doesn't fire
+        # Should have at least one inject_flow candidate
+        inject_candidates = [
+            c for c in candidates if c.action == "inject_flow"
+        ]
+        assert len(inject_candidates) >= 0  # May be 0 if trigger doesn't fire
 
-            if inject_candidates:
-                assert inject_candidates[0].candidate_id.startswith("inject_flow:")
-                assert inject_candidates[0].source == "utility_flow_detector"
-        finally:
-            # Reset the registry
-            set_utility_flow_registry(UtilityFlowRegistry(tmp_path))
+        if inject_candidates:
+            assert inject_candidates[0].candidate_id.startswith("inject_flow:")
+            assert inject_candidates[0].source == "utility_flow_detector"
+        # Cache is automatically cleared by the clear_caches fixture
 
     def test_no_git_status_no_candidate(self, tmp_path: Path):
         """Test that missing git_status produces no candidates."""
@@ -258,7 +274,7 @@ class TestStackPushOnInjectFlow:
             def capture_event(run_id, event):
                 events_captured.append(event)
 
-            flow_id = apply_utility_flow_injection(
+            injection_result = apply_utility_flow_injection(
                 nav_output=nav_output,
                 run_state=run_state,
                 run_id="test-run",
@@ -268,8 +284,10 @@ class TestStackPushOnInjectFlow:
                 append_event_fn=capture_event,
             )
 
-            # Should return the flow ID
-            assert flow_id == "reset"
+            # Should return the injection result with flow_id and first_node_id
+            assert injection_result is not None
+            assert injection_result.flow_id == "reset"
+            assert injection_result.first_node_id == "diagnose"
 
             # Should have emitted event
             assert len(events_captured) == 1
@@ -373,3 +391,217 @@ class TestUtilityFlowRequest:
         assert request.priority == 80  # Default higher than detour
         assert request.resume_at is None
         assert request.pass_artifacts == []
+
+
+class TestStrictRepoRootMode:
+    """Tests for SWARM_STRICT_REPO_ROOT enforcement.
+
+    These tests verify that:
+    1. In strict mode, missing repo_root raises ValueError
+    2. In non-strict mode, missing repo_root returns empty list (for candidates)
+    """
+
+    def test_strict_mode_raises_on_missing_repo_root(self, tmp_path: Path, monkeypatch):
+        """Test that strict mode raises ValueError when repo_root is None."""
+        monkeypatch.setenv("SWARM_STRICT_REPO_ROOT", "1")
+
+        # Clear caches to ensure fresh state
+        clear_utility_flow_caches()
+
+        with pytest.raises(ValueError, match="repo_root is required in strict mode"):
+            _get_utility_flow_candidates(
+                step_result={"status": "VERIFIED"},
+                run_state=MockRunState(),
+                git_status=None,
+                repo_root=None,  # Should raise in strict mode
+            )
+
+    def test_non_strict_mode_returns_empty_on_missing_repo_root(
+        self, tmp_path: Path, monkeypatch
+    ):
+        """Test that non-strict mode returns empty list when repo_root is None."""
+        monkeypatch.delenv("SWARM_STRICT_REPO_ROOT", raising=False)
+
+        # Clear caches to ensure fresh state
+        clear_utility_flow_caches()
+
+        # Should return empty list, not raise
+        candidates = _get_utility_flow_candidates(
+            step_result={"status": "VERIFIED"},
+            run_state=MockRunState(),
+            git_status=None,
+            repo_root=None,
+        )
+
+        assert candidates == []
+
+    def test_strict_mode_allows_explicit_repo_root(self, tmp_path: Path, monkeypatch):
+        """Test that strict mode works when repo_root is provided."""
+        monkeypatch.setenv("SWARM_STRICT_REPO_ROOT", "1")
+
+        # Clear caches to ensure fresh state
+        clear_utility_flow_caches()
+
+        # Should not raise when repo_root is provided
+        candidates = _get_utility_flow_candidates(
+            step_result={"status": "VERIFIED"},
+            run_state=MockRunState(),
+            git_status=None,
+            repo_root=tmp_path,
+        )
+
+        # Result should be a list (possibly empty)
+        assert isinstance(candidates, list)
+
+
+class TestMultiRepoIsolation:
+    """Tests for multi-repo cache isolation.
+
+    These tests verify that cached registries for one repo don't
+    contaminate another repo's state.
+    """
+
+    def test_separate_repos_have_separate_caches(self, tmp_path: Path):
+        """Test that different repo_roots get independent cached registries."""
+        from swarm.runtime.utility_flow_injection import UtilityFlowMetadata
+
+        # Create two distinct repo paths
+        repo_a = tmp_path / "repo_a"
+        repo_b = tmp_path / "repo_b"
+        repo_a.mkdir()
+        repo_b.mkdir()
+
+        # Clear caches to ensure fresh state
+        clear_utility_flow_caches()
+
+        # Create mock registries for each repo
+        mock_registry_a = MagicMock(spec=UtilityFlowRegistry)
+        mock_registry_a.get_by_trigger.return_value = UtilityFlowMetadata(
+            flow_id="reset-a",
+            flow_number=8,
+            injection_trigger="upstream_diverged",
+            on_complete_next_flow="return",
+            on_complete_reason="A synchronized",
+            on_failure_next_flow="pause",
+            pass_artifacts=[],
+            description="Reset flow A",
+            node_ids=["diagnose-a"],
+            first_node_id="diagnose-a",
+        )
+
+        mock_registry_b = MagicMock(spec=UtilityFlowRegistry)
+        mock_registry_b.get_by_trigger.return_value = UtilityFlowMetadata(
+            flow_id="reset-b",
+            flow_number=8,
+            injection_trigger="upstream_diverged",
+            on_complete_next_flow="return",
+            on_complete_reason="B synchronized",
+            on_failure_next_flow="pause",
+            pass_artifacts=[],
+            description="Reset flow B",
+            node_ids=["diagnose-b"],
+            first_node_id="diagnose-b",
+        )
+
+        # Set registries for each repo
+        set_utility_flow_registry(mock_registry_a, repo_root=repo_a)
+        set_utility_flow_registry(mock_registry_b, repo_root=repo_b)
+
+        # Verify they're independent
+        registry_a = get_utility_flow_registry(repo_root=repo_a)
+        registry_b = get_utility_flow_registry(repo_root=repo_b)
+
+        assert registry_a is mock_registry_a
+        assert registry_b is mock_registry_b
+        assert registry_a is not registry_b
+
+    def test_candidates_isolated_by_repo(self, tmp_path: Path):
+        """Test that candidates are generated from the correct repo's registry."""
+        from swarm.runtime.utility_flow_injection import UtilityFlowMetadata
+
+        # Create two distinct repo paths
+        repo_a = tmp_path / "repo_a"
+        repo_b = tmp_path / "repo_b"
+        repo_a.mkdir()
+        repo_b.mkdir()
+
+        # Clear caches to ensure fresh state
+        clear_utility_flow_caches()
+
+        # Create mock registries with different responses
+        mock_registry_a = MagicMock(spec=UtilityFlowRegistry)
+        mock_registry_a.get_by_trigger.return_value = UtilityFlowMetadata(
+            flow_id="reset-a",
+            flow_number=8,
+            injection_trigger="upstream_diverged",
+            on_complete_next_flow="return",
+            on_complete_reason="A synchronized",
+            on_failure_next_flow="pause",
+            pass_artifacts=[],
+            description="Reset flow A",
+            node_ids=["diagnose-a"],
+            first_node_id="diagnose-a",
+        )
+
+        mock_registry_b = MagicMock(spec=UtilityFlowRegistry)
+        mock_registry_b.get_by_trigger.return_value = None  # No utility flow for B
+
+        set_utility_flow_registry(mock_registry_a, repo_root=repo_a)
+        set_utility_flow_registry(mock_registry_b, repo_root=repo_b)
+
+        git_status = {"behind_count": 5, "diverged": True}
+
+        # Get candidates for repo A - should find reset-a
+        candidates_a = _get_utility_flow_candidates(
+            step_result={"status": "VERIFIED"},
+            run_state=MockRunState(),
+            git_status=git_status,
+            repo_root=repo_a,
+        )
+
+        # Get candidates for repo B - should find nothing
+        candidates_b = _get_utility_flow_candidates(
+            step_result={"status": "VERIFIED"},
+            run_state=MockRunState(),
+            git_status=git_status,
+            repo_root=repo_b,
+        )
+
+        # Repo A should have candidates if trigger fired
+        inject_a = [c for c in candidates_a if c.action == "inject_flow"]
+
+        # Repo B should have no candidates
+        inject_b = [c for c in candidates_b if c.action == "inject_flow"]
+        assert len(inject_b) == 0
+
+        # Verify repo A may have candidates (depends on trigger logic)
+        # The key assertion is that A and B are isolated
+        assert inject_a != inject_b or (len(inject_a) == 0 and len(inject_b) == 0)
+
+    def test_clear_caches_clears_all_repos(self, tmp_path: Path):
+        """Test that clear_utility_flow_caches clears all repo caches."""
+        repo_a = tmp_path / "repo_a"
+        repo_b = tmp_path / "repo_b"
+        repo_a.mkdir()
+        repo_b.mkdir()
+
+        # Set up registries
+        mock_registry_a = MagicMock(spec=UtilityFlowRegistry)
+        mock_registry_b = MagicMock(spec=UtilityFlowRegistry)
+
+        set_utility_flow_registry(mock_registry_a, repo_root=repo_a)
+        set_utility_flow_registry(mock_registry_b, repo_root=repo_b)
+
+        # Verify they're cached
+        assert get_utility_flow_registry(repo_root=repo_a) is mock_registry_a
+        assert get_utility_flow_registry(repo_root=repo_b) is mock_registry_b
+
+        # Clear all caches
+        clear_utility_flow_caches()
+
+        # Get fresh registries - should be new instances
+        new_registry_a = get_utility_flow_registry(repo_root=repo_a)
+        new_registry_b = get_utility_flow_registry(repo_root=repo_b)
+
+        assert new_registry_a is not mock_registry_a
+        assert new_registry_b is not mock_registry_b

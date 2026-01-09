@@ -40,11 +40,16 @@ from swarm.runtime.types import (
     RoutingSignal,
     RoutingCandidate,
 )
-from swarm.runtime.utility_flow_injection import (
-    UtilityFlowRegistry,
-    InjectionTriggerDetector,
-    TriggerDetectionResult,
-    create_injection_components,
+
+# Import from dedicated utility_candidates module to avoid circular imports
+# This module is the single source of truth for utility flow candidate generation
+from .utility_candidates import (
+    INJECT_PREFIX,
+    get_utility_flow_registry,
+    get_utility_flow_detector,
+    set_utility_flow_registry,
+    clear_utility_flow_caches,
+    get_utility_flow_candidates as _get_utility_flow_candidates,
 )
 
 if TYPE_CHECKING:
@@ -84,54 +89,6 @@ def set_sidequest_catalog(catalog: SidequestCatalog) -> None:
     _sidequest_catalog = catalog
 
 
-# =============================================================================
-# Module-level utility flow registry (lazy-loaded singleton)
-# =============================================================================
-
-_utility_flow_registry: Optional[UtilityFlowRegistry] = None
-_utility_flow_detector: Optional[InjectionTriggerDetector] = None
-
-
-def get_utility_flow_registry(repo_root: Optional[Path] = None) -> UtilityFlowRegistry:
-    """Get the module-level utility flow registry (lazy-loaded).
-
-    Args:
-        repo_root: Repository root path. If None, uses current directory.
-
-    Returns:
-        The UtilityFlowRegistry instance.
-    """
-    global _utility_flow_registry
-    if _utility_flow_registry is None:
-        _utility_flow_registry = UtilityFlowRegistry(repo_root or Path.cwd())
-    return _utility_flow_registry
-
-
-def get_utility_flow_detector(repo_root: Optional[Path] = None) -> InjectionTriggerDetector:
-    """Get the module-level utility flow detector (lazy-loaded).
-
-    Args:
-        repo_root: Repository root path. If None, uses current directory.
-
-    Returns:
-        The InjectionTriggerDetector instance.
-    """
-    global _utility_flow_detector
-    if _utility_flow_detector is None:
-        registry = get_utility_flow_registry(repo_root)
-        _utility_flow_detector = InjectionTriggerDetector(registry)
-    return _utility_flow_detector
-
-
-def set_utility_flow_registry(registry: UtilityFlowRegistry) -> None:
-    """Set a custom utility flow registry (for testing or custom configuration).
-
-    Args:
-        registry: The UtilityFlowRegistry to use.
-    """
-    global _utility_flow_registry, _utility_flow_detector
-    _utility_flow_registry = registry
-    _utility_flow_detector = InjectionTriggerDetector(registry)
 
 
 # =============================================================================
@@ -619,97 +576,13 @@ def record_sidequest_selection(
 # =============================================================================
 # Utility Flow Injection (INJECT_FLOW candidates)
 # =============================================================================
-
-
-def _get_utility_flow_candidates(
-    step_result: Any,
-    run_state: "RunState",
-    git_status: Optional[Dict[str, Any]] = None,
-    repo_root: Optional[Path] = None,
-) -> List[RoutingCandidate]:
-    """Get applicable utility flows as INJECT_FLOW candidates.
-
-    Evaluates utility flow triggers (e.g., upstream_diverged) against the
-    current context and returns matching utility flows as RoutingCandidate
-    objects with action="inject_flow".
-
-    This is parallel to _get_sidequest_candidates() but for whole-flow
-    injection rather than single-step detours.
-
-    Args:
-        step_result: The result from step execution.
-        run_state: Current run state.
-        git_status: Optional git status information with fields:
-            - behind_count: Number of commits behind upstream
-            - diverged: Whether branch has diverged
-            - has_conflicts: Whether there are merge conflicts
-        repo_root: Repository root path. If None, uses current directory.
-
-    Returns:
-        List of RoutingCandidate objects for applicable utility flows.
-    """
-    detector = get_utility_flow_detector(repo_root)
-
-    # Convert step_result to dict for trigger evaluation
-    result_dict = _step_result_to_dict(step_result)
-
-    # Check all triggers
-    trigger_result = detector.check_triggers(
-        step_result=result_dict,
-        run_state=run_state,
-        git_status=git_status,
-    )
-
-    candidates: List[RoutingCandidate] = []
-
-    if trigger_result.triggered and trigger_result.flow_id:
-        # Build evidence pointers from trigger evidence
-        evidence_pointers = [
-            f"{key}:{value}"
-            for key, value in trigger_result.evidence.items()
-        ]
-
-        candidates.append(
-            RoutingCandidate(
-                candidate_id=f"inject_flow:{trigger_result.flow_id}",
-                action="inject_flow",
-                target_node=trigger_result.flow_id,
-                reason=trigger_result.reason,
-                priority=trigger_result.priority,
-                source="utility_flow_detector",
-                evidence_pointers=evidence_pointers,
-                is_default=False,  # Never auto-select; Navigator must choose
-            )
-        )
-
-        logger.info(
-            "Utility flow detector: found trigger '%s' -> inject_flow:%s (priority=%d)",
-            trigger_result.trigger_type,
-            trigger_result.flow_id,
-            trigger_result.priority,
-        )
-
-    return candidates
-
-
-def record_utility_flow_selection(
-    flow_id: str,
-    run_id: Optional[str] = None,
-) -> None:
-    """Record that a utility flow was selected for injection.
-
-    Call this when an inject_flow candidate is chosen by the routing decision
-    to create an audit trail.
-
-    Args:
-        flow_id: The ID of the selected utility flow.
-        run_id: Optional run ID for tracking.
-    """
-    logger.info(
-        "Recorded utility flow injection: %s (run_id=%s)",
-        flow_id,
-        run_id,
-    )
+# Functions are imported from utility_candidates.py to avoid circular imports:
+# - INJECT_PREFIX (constant for inject_flow candidate ID prefix)
+# - _get_utility_flow_candidates (aliased from get_utility_flow_candidates)
+# - get_utility_flow_registry
+# - get_utility_flow_detector
+# - set_utility_flow_registry
+# - clear_utility_flow_caches
 
 
 # =============================================================================
@@ -800,6 +673,9 @@ def _try_navigator(
     spec: Optional["RunSpec"] = None,
     run_base: Optional[Path] = None,
     navigation_orchestrator: Optional[Any] = None,
+    # Utility flow detection
+    git_status: Optional[Dict[str, Any]] = None,
+    repo_root: Optional[Path] = None,
 ) -> Optional[RoutingOutcome]:
     """Try Navigator-based routing for intelligent decisions.
 
@@ -822,6 +698,8 @@ def _try_navigator(
         spec: The run specification.
         run_base: Base path for run artifacts.
         navigation_orchestrator: The Navigator orchestrator instance.
+        git_status: Git status for utility flow detection (behind_count, diverged).
+        repo_root: Repository root path for utility flow registry.
 
     Returns:
         RoutingOutcome if Navigator provides a decision, None otherwise.
@@ -875,6 +753,8 @@ def _try_navigator(
             flow_def=flow_def,
             spec=spec,
             run_base=run_base,
+            git_status=git_status,
+            repo_root=repo_root,
         )
     except Exception as e:
         # Log with explicit exception type and context for debugging
@@ -1164,17 +1044,22 @@ def _track_utility_flow_if_selected(
     """Track utility flow selection if one was selected.
 
     Checks if the chosen candidate is a utility flow (inject_flow:*) and
-    records the selection for audit trail purposes.
+    logs the selection. Audit trail is handled by the routing journal
+    (routing outcome already includes the chosen_candidate_id and candidates).
 
     Args:
         outcome: The routing outcome to check.
         run_id: Optional run ID for tracking.
     """
     chosen_id = outcome.chosen_candidate_id
-    if chosen_id and chosen_id.startswith("inject_flow:"):
+    if chosen_id and chosen_id.startswith(INJECT_PREFIX):
         # Extract flow ID from candidate ID (format: "inject_flow:<flow_id>")
-        flow_id = chosen_id[12:]  # Remove "inject_flow:" prefix
-        record_utility_flow_selection(flow_id, run_id=run_id)
+        flow_id = chosen_id[len(INJECT_PREFIX):]
+        logger.info(
+            "Utility flow injection selected: %s (run_id=%s)",
+            flow_id,
+            run_id,
+        )
 
 
 def _finalize_outcome(
@@ -1345,6 +1230,8 @@ def route_step(
             spec=spec,
             run_base=run_base,
             navigation_orchestrator=navigation_orchestrator,
+            git_status=git_status,
+            repo_root=repo_root,
         )
         if outcome:
             logger.debug("Routing via navigator: %s", outcome.reason)
