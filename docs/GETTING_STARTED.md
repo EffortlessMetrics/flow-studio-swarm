@@ -46,22 +46,28 @@ Both paths take about 10 minutes. You can do both.
 
 ## Before You Begin: The Paradigm Shift
 
-> **This is a factory, not a chatbot.**
+> **Code generation is fast and cheap now. The bottleneck is trust.**
 
 Flow Studio operates differently from ChatGPT or Copilot. Understanding this upfront prevents frustration:
 
-| The Old Way (Chatbot) | The Swarm Way (Factory) |
-|----------------------|-------------------------|
+| The Old Way | The Flow Studio Way |
+|-------------|---------------------|
+| Spend a week implementing | System spends 4 hours iterating |
+| Review by reading every line | Review via inspection report + hotspots |
+| Hope tests are meaningful | Mutation testing proves coverage depth |
 | Chat with the AI | Assign tickets, audit outputs |
-| Infinite context scroll | Curated context packs (scoped focus) |
-| Read chat logs for status | Check git diffs + test results (forensics) |
 | Intervene when stuck | Come back when it's ready |
+
+**The time shift:**
+- The system researches, plans, builds, tests, reviews, improves, mutates, and fuzzes
+- You review a bounded change with an evidence pack in 30 minutes
+- The rest of your day goes to planning, architecture, and the decisions that actually need your judgment
 
 **Key principles to internalize:**
 
 - **Forensics > Narrative**: The AI may claim success. Trust the disk—git diffs, test logs, receipts.
 - **Scoped Focus**: Each step starts fresh—clearing irrelevant prior context so reasoning stays sharp.
-- **Compute-Attention Arbitrage**: Burn $5 in compute (adversarial loops, redundant checks) to save 15 minutes of your attention.
+- **Developer Enabler**: This isn't "AI vs. developers." It's developers doing more, better.
 
 > **Review the output, not the process.**
 > The system does prep work before it reaches you. It will make mistakes. It will also catch mistakes.

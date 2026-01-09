@@ -130,10 +130,16 @@ This pattern shifts the burden from "interrupt the agent chain to ask questions"
 
 ## The Demo Philosophy
 
-**Spend tokens freely to save senior engineer attention.**
+**Code generation is fast and cheap. The bottleneck is trust.**
 
-This swarm trades compute for human time:
+Models now deliver Sonnet-level reasoning at 1,000+ tokens/second. The question isn't "can the LLM write code"—it's "can you review the output in 30 minutes instead of spending a week doing it yourself."
 
+**The time shift:**
+- The system spends 4 hours researching, planning, building, testing, reviewing, improving, mutating, and fuzzing
+- You spend 30 minutes reviewing a bounded change with an evidence pack
+- The rest of your day goes to planning, architecture, and the decisions that actually need your judgment
+
+**How this works:**
 - Let agents iterate (microloops) until tests pass and critics approve
 - Heavy upfront context loading (20–50k tokens) prevents downstream re-search
 - Harsh critics catch bugs before they reach Gate/Deploy
@@ -141,6 +147,8 @@ This swarm trades compute for human time:
 - Humans review **receipts** (structured outputs), not intermediate steps
 
 The result: **auditable, repeatable, traceable decisions**—the opposite of "vibes-based engineering."
+
+**This isn't "AI vs. developers."** It's developers doing more, better, by offloading the grind to systems that iterate tirelessly and produce proof.
 
 ---
 

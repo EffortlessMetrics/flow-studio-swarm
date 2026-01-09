@@ -8,6 +8,20 @@ This is not a chatbot. It's a system that executes structured flows, one step at
 
 ---
 
+## The Economics Shift
+
+**Code generation got really good, really fast, and really cheap.**
+
+Models now deliver Sonnet-level reasoning at 1,000+ tokens/second with reasonable pricing. The bottleneck isn't "can the LLM write code"—it's "can a human review and trust the output."
+
+**The old way**: You spend a week writing, testing, reviewing. Ship something imperfect.
+
+**The new way**: The system spends 4 hours researching, planning, building, testing, reviewing, improving, mutating, and fuzzing. You spend 30 minutes reviewing a bounded change with an evidence pack. Ship something proven.
+
+**The result**: Developers stop grinding on implementation and start focusing on architecture, planning, and the decisions that actually matter.
+
+---
+
 ## The Core Trade
 
 **Compute is cheap. Reviewer attention is scarce.**
