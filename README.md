@@ -130,6 +130,8 @@ Kill the process at any point. Resume with zero data loss.
 |-------|----------|
 | Flow Studio UI | [FLOW_STUDIO.md](docs/FLOW_STUDIO.md) |
 | Stepwise execution | [STEPWISE_BACKENDS.md](docs/STEPWISE_BACKENDS.md) |
+| Reviewing PRs | [REVIEWING_PRS.md](docs/REVIEWING_PRS.md) |
+| Quality event types | [QUALITY_EVENTS.md](docs/QUALITY_EVENTS.md) |
 | Adopt for your repo | [ADOPTION_PLAYBOOK.md](docs/ADOPTION_PLAYBOOK.md) |
 | Example runs | [GOLDEN_RUNS.md](docs/GOLDEN_RUNS.md) |
 | Full reference | [CLAUDE.md](CLAUDE.md) |

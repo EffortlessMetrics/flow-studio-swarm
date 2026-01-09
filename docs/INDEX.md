@@ -112,6 +112,8 @@ Quick reference for day-to-day operations:
 - [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) — Release preparation checklist
 - [CI_TROUBLESHOOTING.md](./CI_TROUBLESHOOTING.md) — Fixing CI failures
 - [CONTRIBUTING.md](../CONTRIBUTING.md) — How to contribute
+- [REVIEWING_PRS.md](./REVIEWING_PRS.md) — How to review Flow Studio PRs
+- [QUALITY_EVENTS.md](./QUALITY_EVENTS.md) — Quality event types specification
 
 ---
 

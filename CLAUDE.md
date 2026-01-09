@@ -536,6 +536,9 @@ Read `swarm/positioning.md` for the full philosophy. Browse `swarm/examples/heal
 | Validation walkthrough | [docs/VALIDATION_WALKTHROUGH.md](./docs/VALIDATION_WALKTHROUGH.md) |
 | Agent operations | [docs/AGENT_OPS.md](./docs/AGENT_OPS.md) |
 | Selftest system | [swarm/SELFTEST_SYSTEM.md](./swarm/SELFTEST_SYSTEM.md) |
+| **PR & Quality** | |
+| Reviewing PRs | [docs/REVIEWING_PRS.md](./docs/REVIEWING_PRS.md) |
+| Quality event types | [docs/QUALITY_EVENTS.md](./docs/QUALITY_EVENTS.md) |
 | **Flow Studio & UI** | |
 | Flow Studio | [docs/FLOW_STUDIO.md](./docs/FLOW_STUDIO.md) |
 | Flow profiles | [docs/FLOW_PROFILES.md](./docs/FLOW_PROFILES.md) |
