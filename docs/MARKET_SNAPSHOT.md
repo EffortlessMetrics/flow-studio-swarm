@@ -10,7 +10,7 @@
 
 Open-weight models now produce junior-or-better code, faster than you can read it, cheap enough to run repeatedly. Three things happened:
 
-1. **Quality crossed the bar.** Strong open-weight coding models routinely produce first-draft code that developers are willing to work with—often cleaner than what juniors have historically shipped, especially with tests and basic cleanup.
+1. **Quality crossed the bar.** Strong open-weight coding models routinely produce first-draft code that developers are willing to work with—often comparable to a solid junior first pass, especially with tests and basic cleanup.
 
 2. **Speed exceeds review.** Humans review code carefully at low single-digit tokens per second. Models generate at hundreds or thousands. You can't read as fast as they write.
 
@@ -35,7 +35,7 @@ When quality is already acceptable and generation outpaces review, the winning s
 
 These are representative examples, not endorsements:
 
-- **Quality baseline**: Open-weight coding models (Llama, DeepSeek, Qwen, etc.) produce code most developers would accept for one-shot development—with minor cleanup, it's often better than what juniors have been putting out for years
+- **Quality baseline**: Open-weight coding models (Llama, DeepSeek, Qwen, etc.) produce code most developers would accept for one-shot development—with minor cleanup, it's often comparable to a typical first-draft implementation
 - **Inference speed**: Some hosted stacks advertise ~1,000 tokens/sec; even slower options are still way faster than human review (~5 tokens/sec when reading carefully)
 - **Pricing**: Pay-as-you-go entry at reasonable price points (e.g., $10 dev tiers); self-hosting on commodity hardware is viable for many workloads
 
@@ -48,7 +48,7 @@ These are representative examples, not endorsements:
 - Generating test scaffolding (especially edge cases)
 - Refactoring mechanically (rename/move/split)
 - Running repetitive passes (lint, fix, rerun)
-- Producing code cleaner than sleep-deprived juniors
+- Producing code comparable to a typical first-draft implementation
 
 ## What Humans Are Still Uniquely Good At
 
