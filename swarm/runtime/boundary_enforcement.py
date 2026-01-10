@@ -467,7 +467,8 @@ def emit_violation_event(
         payload=violation.to_dict(),
     )
 
-    append_event_fn(event)
+    # storage.append_event signature: (run_id, event, runs_dir=RUNS_DIR)
+    append_event_fn(run_id, event)
 
 
 __all__ = [

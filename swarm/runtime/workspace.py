@@ -433,9 +433,13 @@ class ShadowForkWorkspace(Workspace):
         """Capture shadow workspace state for audit."""
         timestamp = datetime.now(timezone.utc).isoformat()
 
-        # Get diff from base
-        diff_result = self._fork.get_diff() if self._fork.shadow_branch else ("", "")
-        diff_stat, diff_content = diff_result if isinstance(diff_result, tuple) else ("", "")
+        # Get diff stat from base (get_diff() returns str, not tuple)
+        if self._fork.shadow_branch:
+            diff_stat = self._run_git([
+                "diff", "--stat", f"{self._base_branch}...{self._fork.shadow_branch}"
+            ])
+        else:
+            diff_stat = ""
 
         # Get upstream divergence
         divergence = self._get_divergence()
@@ -472,10 +476,10 @@ class ShadowForkWorkspace(Workspace):
             # Allow push
             self._fork.allow_push()
 
-            # Bridge to main
-            success, output, error = self._fork.bridge_to_main()
+            # Bridge to main (returns bool, not tuple)
+            bridge_success = self._fork.bridge_to_main()
 
-            if success:
+            if bridge_success:
                 # Get the resulting commit SHA
                 commit_sha = self._run_git(["rev-parse", "HEAD"])
                 return PromotionResult(
@@ -486,7 +490,7 @@ class ShadowForkWorkspace(Workspace):
             else:
                 return PromotionResult(
                     success=False,
-                    error=error or "Bridge failed",
+                    error="Bridge to main failed - check git logs for details",
                 )
 
         except Exception as e:
@@ -520,10 +524,14 @@ class ShadowForkWorkspace(Workspace):
             message: Checkpoint commit message.
 
         Returns:
-            Commit SHA of the checkpoint.
+            Commit SHA of the checkpoint (empty string on failure).
         """
-        success, sha, _ = self._fork.commit_checkpoint(message)
-        return sha if success else ""
+        # commit_checkpoint returns str (the SHA), raises on failure
+        try:
+            sha = self._fork.commit_checkpoint(message)
+            return sha
+        except Exception:
+            return ""
 
     def rollback(self, commit_sha: str) -> bool:
         """Rollback to a checkpoint.
@@ -534,8 +542,8 @@ class ShadowForkWorkspace(Workspace):
         Returns:
             True if rollback succeeded.
         """
-        success, _, _ = self._fork.rollback_to(commit_sha)
-        return success
+        # rollback_to returns bool directly
+        return self._fork.rollback_to(commit_sha)
 
     def record_boundary_violation(
         self,
