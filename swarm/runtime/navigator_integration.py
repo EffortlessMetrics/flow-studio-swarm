@@ -92,7 +92,6 @@ from .forensic_types import (
 from .utility_flow_injection import (
     UtilityFlowRegistry,
     UtilityFlowInjector,
-    FlowInjectionResult,
 )
 
 logger = logging.getLogger(__name__)

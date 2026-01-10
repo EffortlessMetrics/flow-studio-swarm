@@ -52,14 +52,13 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import logging
 import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from .shadow_fork import ShadowFork, load_shadow_state
 
@@ -366,7 +365,7 @@ class RealWorkspace(Workspace):
                             stats["deletions"] = int(part.split()[0])
                 return stats
         except Exception:
-            pass
+            pass  # Git diff stat parsing failed - return empty stats
         return {}
 
 
@@ -656,7 +655,7 @@ class ShadowForkWorkspace(Workspace):
                         "ahead": int(parts[1]),
                     }
         except Exception:
-            pass
+            pass  # Git divergence check failed - assume no divergence
         return {"behind": 0, "ahead": 0}
 
 

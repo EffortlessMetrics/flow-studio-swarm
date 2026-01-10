@@ -27,7 +27,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -38,7 +38,6 @@ from .storage import (
 )
 from .types import (
     HandoffEnvelope,
-    InjectedNodeSpec,
     InterruptionFrame,
     ResumePoint,
     RunEvent,

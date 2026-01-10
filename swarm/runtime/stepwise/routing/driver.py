@@ -45,7 +45,6 @@ from swarm.runtime.types import (
 # This module is the single source of truth for utility flow candidate generation
 from .utility_candidates import (
     INJECT_PREFIX,
-    get_utility_flow_registry,
     get_utility_flow_detector,
     set_utility_flow_registry,
     clear_utility_flow_caches,

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Optional
 from unittest.mock import MagicMock, patch
 
 # Import from utility_candidates.py (single source of truth for candidate generation)
@@ -21,7 +21,6 @@ from swarm.runtime.stepwise.routing.utility_candidates import (
     set_utility_flow_registry,
     clear_utility_flow_caches,
 )
-from swarm.runtime.types import RoutingCandidate
 from swarm.runtime.navigator import (
     NavigatorOutput,
     RouteIntent,
@@ -33,7 +32,6 @@ from swarm.runtime.navigator_integration import apply_utility_flow_injection
 from swarm.runtime.utility_flow_injection import (
     UtilityFlowRegistry,
     InjectionTriggerDetector,
-    TriggerDetectionResult,
 )
 
 
@@ -328,7 +326,7 @@ class TestFlowKeySwitchOnInjectFlow:
             first_node_id="diagnose",
         )
 
-        injector = UtilityFlowInjector(registry)
+        _injector = UtilityFlowInjector(registry)  # Verify instantiation works
 
         # The injector should call inject_utility_flow
         # but our MockRunState doesn't have all methods

@@ -7,7 +7,7 @@ and we're stalled. If they change, velocity is positive and we continue.
 """
 
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime
 
 from swarm.runtime.progress_tracker import (
     ProgressTracker,

@@ -4,9 +4,7 @@ test_workspace.py - Integration tests for workspace abstraction.
 Tests the Workspace abstraction, boundary enforcement, and StepContext integration.
 """
 
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -16,7 +14,6 @@ from swarm.runtime.workspace import (
     ForensicsSnapshot,
     PromotionResult,
     create_workspace,
-    recover_workspace,
 )
 from swarm.runtime.boundary_enforcement import (
     BoundaryScanner,
@@ -24,7 +21,6 @@ from swarm.runtime.boundary_enforcement import (
     Violation,
     ViolationType,
     ViolationSeverity,
-    scan_for_violations,
 )
 from swarm.runtime.engines.models import StepContext
 from swarm.runtime.types import RunSpec

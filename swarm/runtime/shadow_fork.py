@@ -407,7 +407,7 @@ class ShadowFork:
             try:
                 existing_content = hook_path.read_text()
             except IOError:
-                pass
+                pass  # Hook unreadable - will be recreated
 
         # Check if our guard is already installed
         if PRE_PUSH_HOOK_MARKER in existing_content:
@@ -485,7 +485,7 @@ fi
                 hook_path.unlink()
                 logger.debug("Removed empty push hook")
             except IOError:
-                pass
+                pass  # Hook deletion failed - not critical
         else:
             try:
                 hook_path.write_text(new_content)

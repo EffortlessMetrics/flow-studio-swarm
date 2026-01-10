@@ -10,7 +10,6 @@ Tests cover:
 """
 
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pytest
 
@@ -28,7 +27,6 @@ from swarm.runtime.types import (
     RunEvent,
     RunState,
     handoff_envelope_to_dict,
-    run_state_to_dict,
 )
 
 
@@ -647,7 +645,6 @@ class TestRecoverRunState:
     def test_recover_returns_stored_state_if_exists(self, tmp_path):
         """Should return stored state without force flag."""
         run_id = "test-recover-001"
-        now = datetime.now(timezone.utc)
 
         # Create stored state
         state = RunState(

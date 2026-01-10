@@ -56,7 +56,7 @@ from ..models import (
 from .cli_runner import run_step_cli
 
 # Import from specialized modules
-from .prompt_builder import build_prompt, build_prompt_auto
+from .prompt_builder import build_prompt_auto
 from .router import route_step_stub
 from .sdk_runner import (
     finalize_step_async,
