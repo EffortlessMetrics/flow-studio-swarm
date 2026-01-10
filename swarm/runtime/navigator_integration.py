@@ -1388,8 +1388,8 @@ class NavigationOrchestrator:
                             flow_key=flow_key,
                             step_id=current_node,
                             proposed_edge=nav_output.proposed_edge,
-                            why_now=nav_output.route.why_now if hasattr(nav_output.route, "why_now") else None,
-                            routing_reason=nav_output.route.explanation or "",
+                            why_now=getattr(nav_output.route, "why_now", None),
+                            routing_reason=getattr(nav_output.route, "explanation", None) or "",
                         )
                         logger.info("EXTEND_GRAPH proposal persisted to %s", proposal_path)
                     except Exception as e:

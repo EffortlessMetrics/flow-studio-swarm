@@ -148,10 +148,10 @@ class ShadowFork:
         """Generate a timestamped shadow branch name.
 
         Returns:
-            Branch name in format: shadow/YYYYMMDD-HHMMSS
+            Branch name in format: shadow/YYYYMMDD-HHMMSS-ffffff (with microseconds)
         """
         now = datetime.now(timezone.utc)
-        timestamp = now.strftime("%Y%m%d-%H%M%S")
+        timestamp = now.strftime("%Y%m%d-%H%M%S-%f")
         return f"{SHADOW_BRANCH_PREFIX}{timestamp}"
 
     def create(self, base_branch: str = "main") -> str:
@@ -379,6 +379,8 @@ class ShadowFork:
         )
         if not success:
             logger.error("Failed to merge shadow branch: %s", stderr)
+            # Abort merge to clear conflict state (best effort)
+            self._run_git(["merge", "--abort"], check=False)
             # Try to return to shadow branch
             self._run_git(["checkout", self.shadow_branch], check=False)
             return False
