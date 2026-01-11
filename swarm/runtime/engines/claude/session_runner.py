@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
 from swarm.runtime.claude_sdk import (
-    ClaudeSDKClient,
+    StepSessionClient,
     TelemetryData,
     create_dangerous_command_hook,
     create_telemetry_hook,
@@ -108,7 +108,7 @@ async def _execute_step_session_sdk(
 ) -> Tuple[StepResult, Iterable[RunEvent], Optional[RoutingSignal]]:
     """Internal SDK implementation of execute_step_session.
 
-    Uses ClaudeSDKClient for the per-step session pattern.
+    Uses StepSessionClient for the per-step session pattern.
     """
     start_time = datetime.now(timezone.utc)
     agent_key = ctx.step_agents[0] if ctx.step_agents else "unknown"
@@ -136,7 +136,7 @@ async def _execute_step_session_sdk(
     pre_hooks.append(telemetry_pre)
     post_hooks.append(telemetry_post)
 
-    client = ClaudeSDKClient(
+    client = StepSessionClient(
         repo_root=ctx.repo_root,
         model=None,  # Use default model
         tool_policy_hook=create_tool_policy_hook(),
