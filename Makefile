@@ -119,6 +119,17 @@ gen-doc-meta-check:
 	@echo "Checking if docs have up-to-date metadata..."
 	uv run python swarm/tools/generate_meta_docs.py --check
 
+# Capability registry documentation generator
+.PHONY: gen-capabilities-doc
+gen-capabilities-doc:
+	@echo "Generating CAPABILITIES.md from specs/capabilities.yaml..."
+	uv run swarm/tools/gen_capabilities_doc.py
+
+.PHONY: check-capabilities-doc
+check-capabilities-doc:
+	@echo "Checking if CAPABILITIES.md is up-to-date..."
+	uv run swarm/tools/gen_capabilities_doc.py --check
+
 .PHONY: show-meta
 show-meta:
 	@echo "Computed swarm metadata:"
@@ -942,6 +953,7 @@ dev-precheck:
 	@$(MAKE) check-flow-constants
 	@$(MAKE) check-index-html
 	@$(MAKE) validate-swarm
+	@$(MAKE) check-capabilities-doc
 	@$(MAKE) ts-check
 	@$(MAKE) docs-check
 	@echo ""

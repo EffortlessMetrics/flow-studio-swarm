@@ -36,6 +36,7 @@ from swarm.runtime.path_helpers import (
     ensure_llm_dir,
     ensure_receipts_dir,
 )
+from swarm.runtime.receipt_io import capture_git_info
 from swarm.runtime.path_helpers import (
     handoff_envelope_path as make_handoff_envelope_path,
 )
@@ -116,6 +117,10 @@ async def _execute_step_session_sdk(
 
     ensure_llm_dir(ctx.run_base)
     ensure_receipts_dir(ctx.run_base)
+
+    # Capture git info at step start (Wave 3: audit trail)
+    git_info = capture_git_info(ctx.repo_root)
+    workspace_root = str(ctx.repo_root.resolve())
 
     # Load agent persona for system prompt
     agent_persona = None
@@ -292,6 +297,18 @@ async def _execute_step_session_sdk(
 
     # Write receipt
     r_path = make_receipt_path(ctx.run_base, ctx.step_id, agent_key)
+
+    # Serialize tool calls for receipt (Wave 4: unified tool call capture)
+    serialized_tool_calls = []
+    for tc in work_result.tool_calls:
+        if hasattr(tc, "to_dict"):
+            serialized_tool_calls.append(tc.to_dict())
+        elif isinstance(tc, dict):
+            serialized_tool_calls.append(tc)
+        else:
+            # Fallback: convert to minimal dict
+            serialized_tool_calls.append({"tool_name": str(tc), "source": "sdk"})
+
     receipt = {
         "engine": engine.engine_id,
         "mode": engine._mode,
@@ -308,13 +325,18 @@ async def _execute_step_session_sdk(
         "duration_ms": duration_ms,
         "status": "succeeded" if work_result.success else "failed",
         "tokens": work_result.token_counts,
-        "tool_calls": len(work_result.tool_calls),
+        "tool_calls_count": len(work_result.tool_calls),
+        "tool_calls": serialized_tool_calls,  # Wave 4: full tool call data
         "phases": {
             "work": work_result.success,
             "finalize": finalize_result.success if finalize_result else False,
             "route": route_result.success if route_result else None,
         },
         "transcript_path": str(t_path.relative_to(ctx.run_base)),
+        # Wave 3: Audit trail fields
+        "git_sha": git_info.get("git_sha"),
+        "git_branch": git_info.get("git_branch"),
+        "workspace_root": workspace_root,
     }
 
     # Include telemetry data from session result
