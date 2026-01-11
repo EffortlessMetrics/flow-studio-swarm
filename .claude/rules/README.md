@@ -175,6 +175,7 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 | Rule | Status | Enforcement Point |
 |------|--------|-------------------|
 | `agent-behavioral-contracts.md` | Enforced | `validate_bijection()`, `validate_frontmatter()`, `validate_colors()` |
+| `agent-composition.md` | Designed | Composition patterns defined; spawn validation not automated |
 | `anti-patterns.md` | Designed | Reference catalog; patterns inform other rule enforcement |
 | `evidence-discipline.md` | Supported | `receipt_io.py` validates structure; freshness check not automated |
 | `fix-forward-vocabulary.md` | Designed | Semantic validation of BLOCKED usage not automated |
@@ -186,6 +187,7 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 | `testing-philosophy.md` | Supported | Gate agents check test evidence; mutation testing not automated |
 | `truth-hierarchy.md` | Supported | `receipt_io.py` structure; hierarchy not enforced |
 | `prompt-hygiene.md` | Designed | Banned patterns defined; automated validation pending |
+| `versioning-policy.md` | Designed | Version fields defined; version validation pending |
 
 #### Execution Rules
 
@@ -217,6 +219,7 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 | `sandbox-and-permissions.md` | Enforced | `.claude/settings.json` deny patterns |
 | `boundary-automation.md` | Designed | Secrets scan spec; automation pending |
 | `incident-response.md` | Designed | Protocol defined; automated escalation pending |
+| `secret-management.md` | Supported | Patterns defined; pre-commit hook + Flow 6 boundary scan |
 
 ### Adding New Rules
 
@@ -237,6 +240,7 @@ This creates an audit trail from spec to enforcement
 | Rule | Purpose |
 |------|---------|
 | `agent-behavioral-contracts.md` | PM/IC model, role families, status reporting |
+| `agent-composition.md` | When to use one vs multiple agents, composition patterns |
 | `anti-patterns.md` | Catalog of common mistakes to avoid |
 | `evidence-discipline.md` | Sheriff pattern, what counts as evidence |
 | `factory-model.md` | Mental model: kernel as foreman, agents as interns, disk as ledger |
@@ -250,6 +254,7 @@ This creates an audit trail from spec to enforcement
 | `reviewer-protocol.md` | The three questions, 90-second and 10-minute review protocols |
 | `testing-philosophy.md` | Tests as evidence, mutation testing, verification escalation |
 | `truth-hierarchy.md` | Evidence levels (physics > receipts > narrative) |
+| `versioning-policy.md` | Schema/flow/agent versioning, compatibility guarantees, migrations |
 
 ### Execution Rules
 | Rule | Purpose |
@@ -278,6 +283,7 @@ This creates an audit trail from spec to enforcement
 | `sandbox-and-permissions.md` | Containment checklist, boundary model |
 | `boundary-automation.md` | Publish gate enforcement, secrets scanning |
 | `incident-response.md` | Severity levels, response protocol, post-mortems |
+| `secret-management.md` | Full secret lifecycle: categories, storage, rotation, detection, response |
 
 ### Communication Rules
 | Rule | Purpose |
