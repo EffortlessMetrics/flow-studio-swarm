@@ -381,6 +381,62 @@ You have designed a system where **Time is on your side.** The longer you use Fl
 
 ---
 
+## 14. Meta-Learnings & Emergent Physics
+
+Building this system taught us lessons that weren't in the original design. These emergent truths are now documented:
+
+### The Trust Compiler Insight
+
+> **AgOps isn't a code generator. It's a trust compiler whose primary artifact is a trustworthy evidence surface.**
+
+The system's job isn't to produce code—it's to produce **reviewable trust bundles** that minimize attention cost. The verification stack—receipts, forensic scanners, evidence contracts—is the durable asset that outlasts any particular implementation. Code can be regenerated cheaply; evidence contracts and the discipline they encode cannot. This is why we invest heavily in the evidence surface: it's the only part that actually accumulates value over time. See [TRUST_COMPILER.md](./explanation/TRUST_COMPILER.md) for the full treatment.
+
+### The 12 Emergent Laws
+
+Through implementation, we discovered constraints that behave like physical laws:
+
+1. **Scarcity Inversion** - Generation is cheap; review attention is expensive. *Optimize for reviewer throughput, not generation speed.*
+2. **Mold-Stamping Risk** - Bad patterns replicate at machine speed. *One unreviewed defect becomes a thousand.*
+3. **Existence Over Claims** - Absence is the default failure mode. *If the file doesn't exist, the claim is false.*
+4. **Truth Hierarchy** - Physics > Receipts > Narrative. *Exit codes trump prose explanations.*
+5. **Session Amnesia** - Disk is memory; context resets. *Every step starts fresh; artifacts persist.*
+6. **Narrow Trust** - Scope × Evidence × Verification. *Small scope with strong evidence beats broad scope with weak evidence.*
+7. **Boundary Physics** - Autonomy inside; gates at exits. *Full freedom in the sandbox; strict checks at publish.*
+8. **Internal Gates Are Routing** - Only publish boundaries matter. *Mid-flow reviews are just navigation, not approval.*
+9. **Panel Defense** - Multi-metric panels resist gaming. *Optimizing one metric should hurt another in the same panel.*
+10. **Non-Determinism as Signal** - Variation reveals underconstrained specs. *If outputs differ across runs, requirements are ambiguous.*
+11. **Validator Supremacy** - Pack-check is the constitution. *What the validator rejects doesn't ship, regardless of narrative.*
+12. **Verification as Asset** - The verification stack is the crown jewel. *Tests, contracts, and evidence schemas are more valuable than code.*
+
+### The Three Questions
+
+Every reviewer should ask these questions before approving:
+
+1. **Does evidence exist and is it fresh?** — Receipts must exist and come from this commit, not a stale cache. If evidence is missing, the claim is unverified.
+2. **Does the panel of metrics agree?** — High coverage with low mutation score means weak tests. Fast review with no evidence means rubber-stamping. Contradictions within a panel reveal problems.
+3. **What would I spot-check if I only had 5 minutes?** — The hotspots list should guide you to 3-8 files maximum. If you can't identify what to check, the PR summary failed its job.
+
+These questions operationalize the "Forensics Over Narrative" principle. If you can't answer them from the PR body and receipts alone, the system hasn't done its job.
+
+### Further Reading
+
+For the complete treatment of meta-learnings and physics:
+
+| Document | Purpose |
+|----------|---------|
+| [META_LEARNINGS.md](./explanation/META_LEARNINGS.md) | 15 implementation lessons |
+| [EMERGENT_PHYSICS.md](./explanation/EMERGENT_PHYSICS.md) | 12 laws that emerged |
+| [PHYSICS_PRINCIPLES.md](./explanation/PHYSICS_PRINCIPLES.md) | Index with enforcement links |
+| [TRUST_COMPILER.md](./explanation/TRUST_COMPILER.md) | The synthesis |
+| [VALIDATOR_AS_LAW.md](./explanation/VALIDATOR_AS_LAW.md) | Why validators are the constitution |
+| [REVIEW_AS_PILOTING.md](./explanation/REVIEW_AS_PILOTING.md) | The new review skill |
+| [GOVERNANCE_EVOLUTION.md](./explanation/GOVERNANCE_EVOLUTION.md) | How rules improve |
+| [SCENT_TRAIL.md](./explanation/SCENT_TRAIL.md) | Decision breadcrumbs |
+| [NAVIGATOR_PROTOCOL.md](./explanation/NAVIGATOR_PROTOCOL.md) | Routing intelligence |
+| [CONTEXT_DISCIPLINE.md](./explanation/CONTEXT_DISCIPLINE.md) | Session amnesia |
+
+---
+
 ## Summary
 
 | Principle | Implementation |

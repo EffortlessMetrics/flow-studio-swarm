@@ -87,17 +87,19 @@ non_goals:
 
 ### Flow 4: Review
 ```yaml
-goal: Incorporate PR feedback and flip Draft to Ready
-key_question: Is feedback addressed and PR ready for gate?
+goal: Harvest feedback and apply fixes in the shadow fork
+key_question: Is feedback addressed and work ready for gate?
 exit_criteria:
   - All actionable feedback addressed
-  - Fixes verified
-  - PR status updated
+  - Fixes applied and verified
+  - Review receipt produced
 non_goals:
   - Implementing new features
   - Major refactoring
   - Scope expansion from feedback
 ```
+
+**Note:** PR status (Draft/Ready) is informational output, not a control point. Flow 4 completes when work items are resolved, regardless of PR status.
 
 ### Flow 5: Gate
 ```yaml

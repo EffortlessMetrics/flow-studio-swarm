@@ -95,19 +95,21 @@ Where verified work lands:
         (Merge)                   (Fix)
 ```
 
-## Draft PRs as Staging
+## PRs as Communication (Not Control)
 
-Flow 3 creates Draft PRs intentionally:
-- Signals "work in progress"
+Flow 3 may create Draft PRs:
 - Wakes CI bots for feedback
-- Prevents accidental merge
-- Enables review iteration
+- Signals "work in progress" to upstream
+- Enables external review iteration
 
-Flow 4 flips Draft to Ready:
-- Signals "ready for gate"
-- Work has been verified
-- Evidence is attached
-- Publication requested
+**Important:** PR status is **informational output**, not a control mechanism.
+
+Flow 4 completes when work items are resolved:
+- Work has been verified in the shadow fork
+- Evidence is captured in receipts
+- Flow 5 (Gate) can proceed
+
+PR status (Draft/Ready) may be updated as a **communication signal** to upstream, but it does not control flow progression. The shadow fork is the source of truth, not the PR.
 
 ## What Stays in the Lab
 

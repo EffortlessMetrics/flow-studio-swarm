@@ -1,37 +1,60 @@
 # Flow Studio
 
-> Stepwise orchestration for an industrialized SDLC.
+> A trust compiler for the industrialized SDLC.
 
-This is not a chatbot. It's a system that executes structured flows, one step at a time, with durable state and forensic receipts.
+**This is not a code generator. It's a verification infrastructure that happens to generate code.**
+
+The system's job isn't to write code—it's to produce reviewable trust bundles that minimize the attention cost of verification. Code is a side effect. Evidence is the product.
 
 **For:** Platform engineers, agent architects, and teams building agentic SDLC tooling at scale.
 
 ---
 
-## The Economics Shift
+## The Core Thesis
 
-**Code generation is faster than human review. The bottleneck is trust.**
+**Code generation is cheap. Trust is expensive.**
 
-Open-weight models now produce junior-or-better code, faster than you can read it, cheap enough to run repeatedly. Just like programmers stopped reading assembly, developers stop grinding on first-draft implementation—the job moves up the stack.
+Models write code at 1,000+ tokens/second. The bottleneck isn't "can it write code"—it's "can a human review and trust the output in 30 minutes instead of spending a week doing it themselves."
 
-**Verification becomes the limiting reagent.** When generation is cheap and fast, the constraint shifts to: *Can I trust this output?* Flow Studio addresses this directly—every step produces forensic receipts, not just artifacts.
+**The trade:** Spend $2.00 on compute that produces a reviewable PR with evidence. Don't spend 5 days of developer time producing something worse.
 
-Flow Studio uses that leverage: run many small, scoped iterations (research, plan, build, test, harden), then publish a PR cockpit—hotspots, quality events, evidence, and explicit "not measured"—that's reviewable in one sitting.
+**What this system produces:**
+- **Receipts** — Proof of what happened, with forensic evidence
+- **Evidence panels** — Multi-metric verification that resists gaming
+- **Bounded artifacts** — Changes with clear scope and audit trail
+- **Trust bundles** — The actual product; code is a side effect
+
+> The verification stack is the crown jewel, not the codebase.
 
 The system does the repetitions. Humans do the decisions.
+
+---
+
+## The Factory Mental Model
+
+Do not anthropomorphize AI agents as "copilots" or "partners." View the system as a manufacturing plant.
+
+| Component | Role | Behavior |
+|-----------|------|----------|
+| **Python Kernel** | Factory Foreman | Deterministic, strict. Manages time, disk, budget. Never guesses; enforces. |
+| **Agents** | Enthusiastic Interns | Brilliant and tireless. Prone to "hallucinating success" to please. Need boundaries. |
+| **Disk** | Ledger | If it isn't written to `RUN_BASE/`, it didn't happen. |
+| **Receipts** | Audit Trail | The product. Not the code. |
+
+**The foreman's job:** Don't ask interns if they succeeded—measure the bolt. Don't give them everything—curate what they need. Don't trust their prose—trust their receipts.
 
 ---
 
 ## What Flow Studio Is (and Isn't)
 
 **Flow Studio IS:**
+- A **trust compiler** that transforms intent into auditable evidence
 - A **flow orchestrator** that executes structured SDLC steps with durable state
 - A **PR cockpit generator** that produces reviewable evidence packages
-- A **trust-building system** that makes verification tractable through forensic receipts
 
 **Flow Studio is NOT:**
 - A code generator (it orchestrates agents that generate; it doesn't generate itself)
-- An IDE plugin (it's infrastructure that runs alongside your existing tools)
+- A chatbot (there's no conversation—assign tickets, audit outputs)
 - A CI replacement (it produces artifacts that CI consumes and validates)
 
 ---
@@ -141,9 +164,12 @@ Kill the process at any point. Resume with zero data loss.
 
 | Topic | Document |
 |-------|----------|
-| Why this design | [WHY_DEMO_SWARM.md](docs/WHY_DEMO_SWARM.md) |
-| Full positioning | [swarm/positioning.md](swarm/positioning.md) |
 | AgOps manifesto | [AGOPS_MANIFESTO.md](docs/AGOPS_MANIFESTO.md) |
+| What this system is | [TRUST_COMPILER.md](docs/explanation/TRUST_COMPILER.md) |
+| 15 implementation lessons | [META_LEARNINGS.md](docs/explanation/META_LEARNINGS.md) |
+| 12 emergent laws | [EMERGENT_PHYSICS.md](docs/explanation/EMERGENT_PHYSICS.md) |
+| Why this design | [WHY_DEMO_SWARM.md](docs/WHY_DEMO_SWARM.md) |
+| All explanation docs | [docs/explanation/](docs/explanation/README.md) |
 
 ---
 
@@ -155,6 +181,18 @@ These aren't suggestions—they're load-bearing walls:
 - **Atomic commits** — State moves only after the handoff envelope is durable
 - **DB-backed UI** — TypeScript queries DuckDB, not JSONL parsing—instant at any scale
 - **Agent-driven routing** — Next-step decisions come from agents who understand context, not regex
+
+---
+
+## The Three Questions
+
+Every reviewer should be able to answer these in under 5 minutes:
+
+1. **Does evidence exist and is it fresh?** — Receipts must exist and come from this commit
+2. **Does the panel of metrics agree?** — Contradictions reveal problems
+3. **What would I spot-check with 5 minutes?** — The hotspots list guides you to 3-8 files
+
+If you can answer these, you can review the PR. The system did the grinding; you do the judgment.
 
 ---
 
