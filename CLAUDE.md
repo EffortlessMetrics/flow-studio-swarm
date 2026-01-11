@@ -16,7 +16,7 @@ Code generation is cheap. Trust is expensive.
 
 Models write code at 1,000+ tokens/second. The bottleneck isn't "can it write code"—it's "can a human review and trust the output in 30 minutes instead of spending a week doing it themselves."
 
-**The trade:** Spend $2.00 on compute that produces a reviewable PR with evidence. Don't spend 5 days of developer time producing something worse.
+**The trade:** Spend ~$30 on compute that produces a reviewable PR with evidence. Don't spend 5 days of developer time producing something worse.
 
 **What this system produces:**
 - **Receipts** - Proof of what happened, when, with what evidence

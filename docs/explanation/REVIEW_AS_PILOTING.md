@@ -31,11 +31,13 @@ Panel conflicts are red flags:
 - "High coverage" + "Low mutation score" = weak tests
 - "Clean lint" + "No lint log" = unknown
 
-### 3. Risk-Calibrated Spot Checks
-Not every change needs deep inspection. Calibrate by:
+### 3. Risk-Calibrated Verification Escalation
+Not every change needs deep verification. Calibrate by:
 - **Risk of change** - Auth code vs. logging code
 - **Novelty** - New patterns vs. established patterns
-- **Evidence quality** - Strong evidence = less spot-checking
+- **Evidence quality** - Strong evidence = less escalation needed
+
+When doubt exists, the answer is deeper verification (mutation testing, fuzz testing, targeted tests), not manual code reading.
 
 ### 4. Hotspot Navigation
 Focus on high-risk areas:
@@ -58,10 +60,10 @@ If all pass → approve.
 ### 10-Minute Pass (Flagged PRs)
 1. 90-second pass first
 2. Read critic concerns in detail (2m)
-3. Spot-check 2-3 hotspots in the diff (5m)
+3. Escalate verification on 2-3 hotspots: request targeted tests, mutation analysis, or adversarial probes (5m)
 4. Verify evidence matches claims (2m)
 
-If concerns remain → request clarification.
+If concerns remain → request deeper verification, not manual reading.
 
 ## What "Not Measured" Means
 
@@ -108,7 +110,7 @@ Reading the cockpit without checking evidence freshness.
 
 ### Diff Regression
 Falling back to reading the whole diff "just in case."
-**Fix:** Trust the panel; spot-check hotspots only.
+**Fix:** Trust the panel; escalate verification on hotspots only.
 
 ### Panel Theater
 Approving because panels are green without checking they're real.
@@ -116,7 +118,7 @@ Approving because panels are green without checking they're real.
 
 ### Goodhart Optimization
 System gaming the panel metrics.
-**Fix:** Periodic spot-checks; canary failures.
+**Fix:** Periodic verification escalation (mutation tests, seeded faults); canary failures.
 
 ## The New Skill Stack
 
@@ -135,11 +137,11 @@ Evidence pilot skills:
 ## Trust Refresh Ritual
 
 To prevent rubber-stamping at scale:
-- Every N PRs: deeper hotspot review
+- Every N PRs: escalated verification on hotspots (mutation tests, fuzz tests, adversarial probes)
 - Every N PRs: seeded fault/canary to verify critics catch it
 - Track panel drift vs incident rate
 
-Not a gate. Not a ceremony. Just periodic recalibration.
+Not a gate. Not a ceremony. Just periodic recalibration through deeper verification, not manual reading.
 
 ---
 

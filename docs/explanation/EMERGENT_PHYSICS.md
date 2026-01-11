@@ -54,7 +54,7 @@ That's org design as code:
 The reviewer becomes a sensor fusion operator:
 - Evidence freshness
 - Panel synthesis
-- Risk-calibrated spot checks
+- Risk-calibrated verification escalation
 - Hotspot navigation
 
 **What This Means:**
@@ -93,9 +93,9 @@ The only *real* gates are publish boundaries (merge/push/secrets/destructive ops
 A panel is harder to game than a single metric.
 
 **What This Means:**
-But systems can optimize for "looks good on panel" unless humans keep spot-check authority.
+But systems can optimize for "looks good on panel" unless humans can escalate verification (more tests, mutation testing, adversarial probes).
 
-> Panels buy time; humans preserve judgment.
+> Panels buy time; escalated verification preserves judgment.
 
 ## Law 9: Non-Determinism is a Sensor
 

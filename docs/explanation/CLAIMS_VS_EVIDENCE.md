@@ -222,7 +222,7 @@ This is Steven Zimmerman's core insight:
 Evidence discipline is how you make trust cheap:
 - Spend compute on verification (cheap)
 - Save human attention for judgment (expensive)
-- Trade $2 in API calls for 5 days of debugging
+- Trade ~$30 in API calls for 5 days of debugging
 
 ## The Rule
 

@@ -116,7 +116,7 @@ The reviewer becomes a **sensor fusion operator**:
 
 - Evidence freshness
 - Panel synthesis
-- Risk-calibrated spot checks
+- Risk-calibrated verification escalation
 - Hotspot navigation
 
 ### The Implication
@@ -167,7 +167,7 @@ A panel is harder to game than a single metric. But systems can optimize for "lo
 
 ### The Implication
 
-Panels buy time; humans preserve judgment. Panel + periodic spot-checks is the equilibrium.
+Panels buy time; humans preserve judgment. Panel + escalated verification (mutation tests, fuzz tests, targeted probes) is the equilibrium.
 
 ---
 

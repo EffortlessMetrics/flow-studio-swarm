@@ -51,7 +51,7 @@ Both paths take about 10 minutes. You can do both.
 
 Open-weight models now produce junior-or-better code, faster than you can read it, cheap enough to run repeatedly. Just like programmers stopped reading assembly, developers stop grinding on first-draft implementation—the job moves up the stack.
 
-**The economic math:** Spending $2 on a background run that produces a reviewable PR with evidence beats spending 5 days of developer time producing something worse. The cost isn't compute—it's the senior attention required to trust the output.
+**The economic math:** Spending ~$30 on a background run that produces a reviewable PR with evidence beats spending 5 days of developer time producing something worse. The cost isn't compute—it's the senior attention required to trust the output.
 
 **The trust thesis:** The bottleneck isn't generation; it's review throughput. A developer can review a well-evidenced PR in 30 minutes. That same developer might spend a week implementing the same feature manually. Flow Studio's job is to produce *reviewable trust bundles*, not just code.
 

@@ -21,7 +21,7 @@ AgOps is an arbitrage: trade **cheap attention** (model tokens) for **expensive 
 | Senior dev *focused* hours | Priceless | Rare |
 
 The arbitrage:
-- Spend $2 on a background run with 50 agent calls
+- Spend ~$30 on a background run with 50 agent calls
 - Produce a PR with evidence, receipts, and hotspot analysis
 - Senior reviews in 30 minutes instead of building from scratch in 5 days
 
@@ -75,7 +75,7 @@ Traditional development:
 AgOps development:
 - Senior reviews PR cockpit: 10 minutes
 - Senior checks evidence/receipts: 10 minutes
-- Senior spot-checks hotspots: 10 minutes
+- Senior escalates verification on hotspots (requests targeted tests, not reads code): 10 minutes
 - **Total: 30 minutes**
 
 **10x reduction in senior attention** for the same (or better) confidence.
@@ -100,7 +100,7 @@ Convert compute into reviewable artifacts:
 Senior verifies by:
 - Checking receipts (not reading code)
 - Reviewing evidence (not re-running tests)
-- Spot-checking hotspots (not reviewing everything)
+- Escalating verification on hotspots when doubt exists (requesting targeted tests, mutation analysis, adversarial probes—not reading code)
 
 ## When the Arbitrage Fails
 

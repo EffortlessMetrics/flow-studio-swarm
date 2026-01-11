@@ -90,7 +90,7 @@ Mid-flow "quality controls" are traffic routing, not barricades.
 ### Law 9: Panel Defense
 **Multi-metric panels resist gaming.**
 
-Single metrics get Goodharted. Panels + spot-checks preserve judgment.
+Single metrics get Goodharted. Panels + escalated verification preserve judgment.
 
 | Aspect | Reference |
 |--------|-----------|

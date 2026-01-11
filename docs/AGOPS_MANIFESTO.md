@@ -24,7 +24,7 @@ Models now deliver Sonnet-level reasoning at 1,000+ tokens/second with reasonabl
 | "It works on my machine" | Receipts prove what happened and why |
 | Developer time = implementation | Developer time = planning + architecture + review |
 
-**The Math:** Spending $2.00 on a background run that produces a reviewable PR with evidence is infinitely better than spending 5 days of a developer's time producing something worse.
+**The Math:** Spending ~$30 on a background run that produces a reviewable PR with evidence is infinitely better than spending 5 days of a developer's time producing something worse.
 
 **The Posture:** This isn't "AI vs. developers." It's developers doing more, better, by offloading the grind to systems that iterate tirelessly and produce proof.
 
@@ -335,9 +335,9 @@ A reviewer should be able to answer these questions in 2-5 minutes:
 2. **What boundaries were enforced?** (interface lock / deps / layering)
 3. **What proof exists?** (tests, mutation, security, receipts)
 4. **What is not measured / still risky?** (explicit unknowns)
-5. **What should I spot-check?** (3-8 files max)
+5. **Where should I escalate verification if doubt exists?** (3-8 files max)
 
-The PR body is the "review cockpit." Receipts are the audit truth. The diff is the spot-check surface.
+The PR body is the "review cockpit." Receipts are the audit truth. When doubt exists, escalate verification (more tests, mutation testing, targeted scans)—not manual code reading.
 
 ---
 
@@ -414,7 +414,7 @@ Every reviewer should ask these questions before approving:
 
 1. **Does evidence exist and is it fresh?** — Receipts must exist and come from this commit, not a stale cache. If evidence is missing, the claim is unverified.
 2. **Does the panel of metrics agree?** — High coverage with low mutation score means weak tests. Fast review with no evidence means rubber-stamping. Contradictions within a panel reveal problems.
-3. **What would I spot-check if I only had 5 minutes?** — The hotspots list should guide you to 3-8 files maximum. If you can't identify what to check, the PR summary failed its job.
+3. **Where would I escalate verification if I had doubt?** — The hotspots list should guide you to 3-8 files maximum. When doubt exists, the answer is deeper verification (targeted tests, mutation testing, fuzz testing), not manual code reading. If you can't identify what to check, the PR summary failed its job.
 
 These questions operationalize the "Forensics Over Narrative" principle. If you can't answer them from the PR body and receipts alone, the system hasn't done its job.
 

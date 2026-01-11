@@ -61,12 +61,12 @@ When an agent does MANY things:
 
 | Scope | Evidence | Trust Level | Verification Needed |
 |-------|----------|-------------|---------------------|
-| Narrow | Strong | HIGH | Spot-check |
-| Narrow | Weak | MEDIUM | Focused review |
-| Broad | Strong | MEDIUM | Comprehensive review |
-| Broad | Weak | LOW | Full manual review |
+| Narrow | Strong | HIGH | Minimal escalation |
+| Narrow | Weak | MEDIUM | Targeted verification escalation |
+| Broad | Strong | MEDIUM | Comprehensive verification escalation |
+| Broad | Weak | LOW | Full verification escalation (mutation tests, fuzz tests, adversarial probes) |
 
-The same model in a narrow scope with strong evidence is more trusted than a "better" model in a broad scope without evidence.
+The same model in a narrow scope with strong evidence is more trusted than a "better" model in a broad scope without evidence. When doubt exists, escalate verification (more tests, scanners, adversarial pressure)—don't fall back to manual code reading.
 
 ## Narrow Trust in Practice
 

@@ -3,6 +3,8 @@
 This directory contains the governance rules for Flow Studio's agentic operations.
 These rules encode Steven Zimmerman's AI-native development philosophy: **trade compute for senior attention**.
 
+> Voice and communication style follows Steven Zimmerman's (@EffortlessSteven) approach. See `communication/voice-and-tone.md`.
+
 ## Rule Categories
 
 | Directory | Purpose | Enforcement |
@@ -11,6 +13,7 @@ These rules encode Steven Zimmerman's AI-native development philosophy: **trade 
 | `execution/` | Context budgets, routing decisions, microloop limits | Runtime kernel |
 | `artifacts/` | Receipt schemas, handoff protocols, audit trails | `receipt_io.py` + validation |
 | `safety/` | Git safety, branch protection, secrets, permissions | Hooks + boundary agents |
+| `communication/` | Documentation philosophy, messaging, voice | Human review |
 
 ## Core Principle
 
@@ -172,6 +175,7 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 | Rule | Status | Enforcement Point |
 |------|--------|-------------------|
 | `agent-behavioral-contracts.md` | Enforced | `validate_bijection()`, `validate_frontmatter()`, `validate_colors()` |
+| `anti-patterns.md` | Designed | Reference catalog; patterns inform other rule enforcement |
 | `evidence-discipline.md` | Supported | `receipt_io.py` validates structure; freshness check not automated |
 | `fix-forward-vocabulary.md` | Designed | Semantic validation of BLOCKED usage not automated |
 | `flow-charters.md` | Supported | Flow structure validated; goal-alignment not automated |
@@ -179,7 +183,9 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 | `narrow-trust.md` | Supported | Scope via role families; trust calculation not automated |
 | `pack-check-philosophy.md` | Enforced | This IS the validation philosophy |
 | `panel-thinking.md` | Designed | Gate agents implement; no automated panel checks |
+| `testing-philosophy.md` | Supported | Gate agents check test evidence; mutation testing not automated |
 | `truth-hierarchy.md` | Supported | `receipt_io.py` structure; hierarchy not enforced |
+| `prompt-hygiene.md` | Designed | Banned patterns defined; automated validation pending |
 
 #### Execution Rules
 
@@ -210,6 +216,7 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 | `git-safety.md` | Supported | Shadow fork model; boundary checks via Flow 6 |
 | `sandbox-and-permissions.md` | Enforced | `.claude/settings.json` deny patterns |
 | `boundary-automation.md` | Designed | Secrets scan spec; automation pending |
+| `incident-response.md` | Designed | Protocol defined; automated escalation pending |
 
 ### Adding New Rules
 
@@ -230,13 +237,18 @@ This creates an audit trail from spec to enforcement
 | Rule | Purpose |
 |------|---------|
 | `agent-behavioral-contracts.md` | PM/IC model, role families, status reporting |
+| `anti-patterns.md` | Catalog of common mistakes to avoid |
 | `evidence-discipline.md` | Sheriff pattern, what counts as evidence |
+| `factory-model.md` | Mental model: kernel as foreman, agents as interns, disk as ledger |
 | `fix-forward-vocabulary.md` | Valid outcomes, BLOCKED is rare |
 | `flow-charters.md` | Goals, exit criteria, non-goals per flow |
 | `model-policy.md` | Model allocation by role family |
 | `narrow-trust.md` | Trust equation: scope × evidence × verification |
 | `pack-check-philosophy.md` | Competence over compliance validation |
 | `panel-thinking.md` | Anti-Goodhart multi-metric panels |
+| `prompt-hygiene.md` | Banned patterns, required sections, evidence over narrative |
+| `reviewer-protocol.md` | The three questions, 90-second and 10-minute review protocols |
+| `testing-philosophy.md` | Tests as evidence, mutation testing, verification escalation |
 | `truth-hierarchy.md` | Evidence levels (physics > receipts > narrative) |
 
 ### Execution Rules
@@ -264,6 +276,16 @@ This creates an audit trail from spec to enforcement
 |------|---------|
 | `git-safety.md` | Prohibited operations, conflict resolution |
 | `sandbox-and-permissions.md` | Containment checklist, boundary model |
+| `boundary-automation.md` | Publish gate enforcement, secrets scanning |
+| `incident-response.md` | Severity levels, response protocol, post-mortems |
+
+### Communication Rules
+| Rule | Purpose |
+|------|---------|
+| `documentation-philosophy.md` | README structure, progressive disclosure, proof before philosophy |
+| `paradigm-messaging.md` | Historical framing, humans as architects, the transition narrative |
+| `trust-thesis.md` | The core insight: code is cheap, trust is expensive |
+| `voice-and-tone.md` | Industrial accountant voice, concrete over abstract, no marketing |
 
 ## Usage
 
