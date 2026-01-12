@@ -545,9 +545,14 @@ current_iteration: {template_vars["current_iteration"]}
 
         logger.debug("Router session complete, parsing response")
 
-        # NOTE: This fallback parsing is for backward compatibility.
-        # New code should use output_format for structured responses.
-        routing_data = _extract_json_from_response(router_response, logger)
+        # Use unified extraction for consistent JSON parsing across transports
+        from swarm.runtime.structured_output import extract_structured_output
+
+        routing_data, extraction_method = extract_structured_output(
+            response_text=router_response,
+            schema=None,  # Router has flexible output; let _extract handle formats
+            native_structured=None,  # Always parsing from text in this path
+        )
         if routing_data is None:
             logger.warning("Router response contained no parseable JSON")
             return None

@@ -71,6 +71,7 @@ markers = [
     "integration: CLI, file I/O, subprocess",
     "bdd: BDD scenario (executable spec)",
     "performance: Performance benchmark tests",
+    "contract: Contract tests verifying SDK/transport integration",
 ]
 filterwarnings = [
     # Suppress gherkin library deprecation warnings (maxsplit positional arg)

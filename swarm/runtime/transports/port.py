@@ -54,6 +54,15 @@ class TransportCapabilities:
     Used by the orchestrator to adapt its behavior based on transport features.
     Transports that don't support a feature should gracefully degrade.
 
+    Session Semantics:
+        Flow Studio operates with "session amnesia" - each step starts fresh and
+        rehydrates context from disk artifacts. This is intentional for auditability
+        and resumability. The distinction between within-step and across-step context
+        is important:
+
+        - Within-step (Work→Finalize→Route): Can share conversation state
+        - Across-steps (Step N→N+1): Always rehydrates from artifacts
+
     Attributes:
         supports_output_format: Whether transport supports structured JSON output
             via output_format parameter. If True, finalize/route can use schema
@@ -62,8 +71,17 @@ class TransportCapabilities:
             If True, sessions can be interrupted and partial results recovered.
         supports_hooks: Whether transport supports pre/post tool hooks.
             If True, hooks can be registered for foot-gun blocking and telemetry.
-        supports_hot_context: Whether transport preserves context across phases.
-            If True, work/finalize/route share conversation state.
+        supports_hot_context_within_step: Whether context is preserved across
+            Work -> Finalize -> Route phases within a single step. If True, the
+            finalize phase can reference work done in the work phase without
+            explicit context passing - the conversation state is shared. If False,
+            each phase is stateless; summaries must be injected into prompts.
+        supports_context_across_steps: Whether context is preserved across
+            different steps (Step N -> Step N+1). If True, Step N+1 automatically
+            has access to Step N's conversation context. If False, context must be
+            rehydrated from artifacts on disk (session amnesia). Note: Flow Studio
+            operates with session amnesia - each step starts fresh and rehydrates
+            from disk artifacts. This is intentional for auditability.
         supports_streaming: Whether transport supports event streaming.
             If True, events can be consumed as they arrive.
         supports_rewind: Whether transport supports rewinding to checkpoints.
@@ -92,9 +110,50 @@ class TransportCapabilities:
     supports_output_format: bool = False
     supports_interrupts: bool = False
     supports_hooks: bool = False
-    supports_hot_context: bool = True
+
+    # Hot context semantics (replaces ambiguous supports_hot_context)
+    supports_hot_context_within_step: bool = True
+    """Whether context is preserved across Work -> Finalize -> Route phases within a single step.
+
+    If True: The finalize phase can reference work done in the work phase without
+    explicit context passing - the conversation state is shared.
+    If False: Each phase is stateless; summaries must be injected into prompts.
+    """
+
+    supports_context_across_steps: bool = False
+    """Whether context is preserved across different steps (Step N -> Step N+1).
+
+    If True: Step N+1 automatically has access to Step N's conversation context.
+    If False: Context must be rehydrated from artifacts on disk (session amnesia).
+
+    Note: Flow Studio operates with session amnesia - each step starts fresh and
+    rehydrates from disk artifacts. This is intentional for auditability.
+    """
+
     supports_streaming: bool = True
     supports_rewind: bool = False
+    """Whether transport supports rewinding to previous checkpoints via SDK.
+
+    This maps to the Claude SDK's `enable_file_checkpointing` and `rewind_files()`
+    capabilities. Currently NOT SUPPORTED in Flow Studio for these reasons:
+
+    1. Session Amnesia Model: Flow Studio rehydrates context from disk artifacts
+       at each step boundary, making SDK-level checkpointing redundant.
+
+    2. Auditability: Disk-based receipts provide a complete audit trail that
+       is independent of SDK state.
+
+    3. Resumability: The existing checkpoint semantics (receipts + artifacts)
+       enable resumption from any completed step.
+
+    If SDK checkpointing is needed in the future, this would require:
+    - Passing enable_file_checkpointing=True to ClaudeAgentOptions
+    - Capturing user_message_uuid from SDK events
+    - Calling sdk.rewind_files(uuid) to restore file state
+
+    See: platform.claude.com/cookbook for SDK checkpointing docs.
+    See: docs/reference/SDK_CAPABILITIES.md for full capability matrix.
+    """
     max_context_tokens: int = 0
     provider_name: str = "unknown"
 
@@ -302,7 +361,8 @@ CLAUDE_SDK_CAPABILITIES = TransportCapabilities(
     supports_output_format=True,
     supports_interrupts=True,
     supports_hooks=True,
-    supports_hot_context=True,
+    supports_hot_context_within_step=True,   # Work/Finalize/Route share session
+    supports_context_across_steps=False,      # Each step starts fresh (intentional)
     supports_streaming=True,
     supports_rewind=False,
     max_context_tokens=200000,
@@ -321,7 +381,8 @@ CLAUDE_CLI_CAPABILITIES = TransportCapabilities(
     supports_output_format=False,  # CLI doesn't have output_format
     supports_interrupts=False,  # Subprocess can be killed but no graceful interrupt
     supports_hooks=False,  # No hook integration
-    supports_hot_context=False,  # Each CLI call is stateless
+    supports_hot_context_within_step=False,  # Each CLI call is stateless
+    supports_context_across_steps=False,      # Each step starts fresh
     supports_streaming=True,  # stream-json output
     supports_rewind=False,
     max_context_tokens=200000,
@@ -340,7 +401,8 @@ GEMINI_CLI_CAPABILITIES = TransportCapabilities(
     supports_output_format=False,  # Gemini CLI doesn't support this
     supports_interrupts=False,
     supports_hooks=False,
-    supports_hot_context=False,
+    supports_hot_context_within_step=False,  # Each CLI call is stateless
+    supports_context_across_steps=False,      # Each step starts fresh
     supports_streaming=True,  # JSON streaming
     supports_rewind=False,
     max_context_tokens=1000000,  # Gemini has larger context
@@ -359,7 +421,8 @@ STUB_CAPABILITIES = TransportCapabilities(
     supports_output_format=True,  # Stubs can simulate anything
     supports_interrupts=True,
     supports_hooks=True,
-    supports_hot_context=True,
+    supports_hot_context_within_step=True,   # Simulates full capability
+    supports_context_across_steps=False,      # Each step starts fresh (intentional)
     supports_streaming=True,
     supports_rewind=False,
     max_context_tokens=0,  # Unlimited for stubs

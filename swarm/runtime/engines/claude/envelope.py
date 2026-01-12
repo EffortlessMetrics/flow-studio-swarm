@@ -267,28 +267,20 @@ Error: {step_result.error or "None"}
 
         logger.debug("Envelope writer session complete for step %s", ctx.step_id)
 
-        # Parse JSON from response
-        json_match = None
-        if "```json" in envelope_response:
-            start = envelope_response.find("```json") + 7
-            end = envelope_response.find("```", start)
-            if end > start:
-                json_match = envelope_response[start:end].strip()
-        elif "```" in envelope_response:
-            start = envelope_response.find("```") + 3
-            end = envelope_response.find("```", start)
-            if end > start:
-                json_match = envelope_response[start:end].strip()
-        else:
-            json_match = envelope_response.strip()
+        # Parse JSON from response using unified extraction
+        from swarm.runtime.structured_output import extract_structured_output
 
-        if not json_match:
+        envelope_data, extraction_method = extract_structured_output(
+            response_text=envelope_response,
+            schema=None,  # Envelope writer has flexible output format
+            native_structured=None,  # Always parsing from text in this path
+        )
+
+        if envelope_data is None:
             logger.warning("Envelope writer response contained no parseable JSON")
             return create_fallback_envelope(
                 ctx, step_result, routing_signal, work_summary, file_changes
             )
-
-        envelope_data = json.loads(json_match)
 
         # Create routing signal with proper audit fields if not provided
         if routing_signal is None:

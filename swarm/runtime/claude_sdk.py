@@ -1,7 +1,10 @@
 """
 claude_sdk.py - Unified Claude SDK adapter with deterministic options.
 
-This module is the ONLY place that imports the Claude Code SDK package(s).
+This module is the ONLY place that imports the Claude SDK package(s).
+Supports both the official 'claude_agent_sdk' package and the legacy
+'claude_code_sdk' package for backward compatibility.
+
 It provides:
 1. Clean imports with fallback handling
 2. A single "options builder" that enforces High-Trust design
@@ -21,6 +24,8 @@ Usage:
         HANDOFF_ENVELOPE_SCHEMA,
         ROUTING_SIGNAL_SCHEMA,
         _dict_to_normalized_tool_call,  # Backward compatibility helper
+        ALL_STANDARD_TOOLS,  # Set of standard Claude Code tools
+        compute_disallowed_tools,  # Helper for deterministic tool restriction
     )
 
 Design Principles:
@@ -391,29 +396,36 @@ _sdk_module: Optional[Any] = None
 _sdk_import_error: Optional[str] = None
 
 try:
-    import claude_code_sdk
-
-    _sdk_module = claude_code_sdk
+    # Prefer official Anthropic Agent SDK
+    import claude_agent_sdk
+    _sdk_module = claude_agent_sdk
     SDK_AVAILABLE = True
-    logger.debug("claude_code_sdk imported successfully")
-except ImportError as e:
-    _sdk_import_error = str(e)
-    logger.debug("claude_code_sdk not available: %s", e)
+    logger.debug("claude_agent_sdk imported successfully")
+except ImportError:
+    try:
+        # Fallback to legacy package name
+        import claude_code_sdk
+        _sdk_module = claude_code_sdk
+        SDK_AVAILABLE = True
+        logger.debug("claude_code_sdk imported successfully (legacy)")
+    except ImportError as e:
+        _sdk_import_error = str(e)
+        logger.debug("Claude SDK not available: %s", e)
 
 
 def get_sdk_module() -> Any:
-    """Get the Claude Code SDK module.
+    """Get the Claude SDK module.
 
     Returns:
-        The claude_code_sdk module.
+        The claude_agent_sdk or claude_code_sdk module.
 
     Raises:
         ImportError: If SDK is not available.
     """
     if not SDK_AVAILABLE:
         raise ImportError(
-            f"Claude Code SDK is not available: {_sdk_import_error}. "
-            "Install with: pip install claude-code-sdk"
+            f"Claude SDK is not available: {_sdk_import_error}. "
+            "Install with: pip install claude-agent-sdk (or claude-code-sdk)"
         )
     return _sdk_module
 
@@ -461,10 +473,25 @@ def create_high_trust_options(
     - permission_mode: Controls file/command permissions
     - system_prompt preset: "claude_code" for consistent behavior
 
+    TOOL RESTRICTION SEMANTICS:
+    For deterministic tool restriction, the SDK requires BOTH allowed_tools AND
+    disallowed_tools to be set. allowed_tools alone may only affect permission
+    prompting, not actual enforcement. Use compute_disallowed_tools() to derive
+    the disallowed_tools list from an allowed_tools list.
+    See: platform.claude.com/cookbook/claude-agent-sdk-02
+
     SANDBOX BEHAVIOR:
     - If sandboxed is None, uses SWARM_SANDBOX_ENABLED env var (default True)
     - If sandboxed is False, requires SWARM_ALLOW_UNSANDBOXED=true
     - Sandbox limits command execution to a safe subset
+
+    CHECKPOINTING (NOT ENABLED):
+    The SDK supports file checkpointing via enable_file_checkpointing=True,
+    but Flow Studio does not use this. Resumability is handled via disk-based
+    receipts and artifacts at step boundaries. This aligns with the session
+    amnesia model where each step starts fresh and rehydrates from disk.
+    See: TransportCapabilities.supports_rewind docs in transports/port.py
+    See: docs/reference/SDK_CAPABILITIES.md for full capability matrix.
 
     Args:
         cwd: Working directory for the SDK session (REQUIRED for reliable execution).
@@ -638,18 +665,21 @@ def create_options_from_plan(
     if plan.max_turns:
         options_kwargs["max_turns"] = plan.max_turns
 
-    # NOTE: allowed_tools is informational in high-trust mode.
-    # The agent has full toolbox access via bypassPermissions.
-    # allowed_tools is preserved in the PromptPlan for:
-    # 1. Documentation of intended tool surface
-    # 2. Future SDK support for tool restrictions
-    # 3. Audit/compliance logging
+    # IMPORTANT: For deterministic tool restriction, both allowed_tools AND
+    # disallowed_tools must be set. allowed_tools alone may only affect
+    # permission prompting. See: platform.claude.com/cookbook/claude-agent-sdk-02
     #
-    # For now, we log the intended tools but don't restrict.
+    # When allowed_tools is specified in the PromptPlan, we compute the
+    # disallowed_tools to ensure deterministic behavior.
     if plan.allowed_tools:
+        options_kwargs["allowed_tools"] = plan.allowed_tools
+        disallowed = compute_disallowed_tools(plan.allowed_tools)
+        if disallowed:
+            options_kwargs["disallowed_tools"] = disallowed
         logger.debug(
-            "PromptPlan specifies allowed_tools=%s (informational only in high-trust mode)",
+            "PromptPlan specifies allowed_tools=%s, computed disallowed_tools=%s",
             plan.allowed_tools,
+            disallowed,
         )
 
     # NOTE: sandbox_enabled is prepared for future SDK support.
@@ -1123,6 +1153,54 @@ def create_tool_policy_hook(
         return True, None
 
     return tool_policy_hook
+
+
+# =============================================================================
+# Tool Restriction Helpers for Deterministic Behavior
+# =============================================================================
+
+# Standard Claude Code tools that can be explicitly blocked.
+# IMPORTANT: For deterministic tool restriction, the SDK requires BOTH
+# allowed_tools AND disallowed_tools to be set. allowed_tools alone may only
+# affect permission prompting, not actual enforcement.
+# See: platform.claude.com/cookbook/claude-agent-sdk-02
+ALL_STANDARD_TOOLS = frozenset([
+    "Read", "Write", "Edit", "MultiEdit",
+    "Bash", "Glob", "Grep",
+    "WebFetch", "WebSearch",
+    "TodoRead", "TodoWrite",
+    "Task", "Agent",
+    "NotebookEdit", "NotebookRead",
+])
+
+
+def compute_disallowed_tools(allowed_tools: Optional[List[str]]) -> Optional[List[str]]:
+    """Compute disallowed_tools for deterministic tool restriction.
+
+    The Claude SDK requires BOTH allowed_tools AND disallowed_tools to be set
+    for deterministic tool restriction. allowed_tools alone may only affect
+    permission prompting, not actual enforcement.
+
+    This function computes the complement of allowed_tools from the set of
+    all standard Claude Code tools, enabling proper tool restriction.
+
+    Args:
+        allowed_tools: List of tools to allow, or None for all tools.
+
+    Returns:
+        List of tools to explicitly disallow, or None if all tools allowed.
+
+    Example:
+        >>> allowed = ["Read", "Glob", "Grep"]
+        >>> disallowed = compute_disallowed_tools(allowed)
+        >>> # disallowed contains Write, Edit, Bash, etc.
+    """
+    if allowed_tools is None:
+        return None  # No restriction - all tools allowed
+
+    allowed_set = frozenset(allowed_tools)
+    disallowed = [t for t in ALL_STANDARD_TOOLS if t not in allowed_set]
+    return disallowed if disallowed else None
 
 
 # =============================================================================

@@ -1,5 +1,11 @@
 """
-structured_output.py - Structured output extraction with validation microloop.
+structured_output.py - Unified structured output extraction.
+
+This module provides a single source of truth for extracting structured output
+from LLM responses, whether using native output_format or parsing from markdown.
+
+The CONTRACT: Both paths MUST produce identical envelope shapes, validated
+against the same schema.
 
 For transports that don't support native output_format, this module provides
 a microloop that validates responses against JSON schemas and reprompts
@@ -16,6 +22,25 @@ This enables reliable structured output from CLI-based transports
 (Gemini CLI, Claude CLI) that lack native schema enforcement.
 
 Example usage:
+    # Unified extraction (works for both native and fallback paths)
+    from swarm.runtime.structured_output import extract_structured_output
+
+    result, method = extract_structured_output(
+        response_text=cli_output,
+        schema=HANDOFF_ENVELOPE_SCHEMA,
+        native_structured=None,  # No native support
+    )
+    # method == "fence" (fallback path used)
+
+    # Or with native support (Claude SDK)
+    result, method = extract_structured_output(
+        response_text="",
+        schema=HANDOFF_ENVELOPE_SCHEMA,
+        native_structured=sdk_response.structured_output,
+    )
+    # method == "native"
+
+    # Legacy microloop extraction
     from swarm.runtime.structured_output import extract_with_microloop
 
     schema = {
@@ -46,9 +71,22 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+)
 
 logger = logging.getLogger(__name__)
+
+# Type alias for extraction method results
+ExtractionMethod = Literal["native", "fence", "failed"]
 
 
 @dataclass
@@ -459,6 +497,166 @@ def validate_against_schema(
                 )
 
     return errors
+
+
+# =============================================================================
+# Unified Structured Output Extraction
+# =============================================================================
+
+
+def extract_structured_output(
+    response_text: str,
+    schema: Optional[Dict[str, Any]] = None,
+    native_structured: Optional[Dict[str, Any]] = None,
+) -> Tuple[Optional[Dict[str, Any]], ExtractionMethod]:
+    """Extract structured output from LLM response with schema validation.
+
+    This function provides a unified interface for structured output extraction
+    that works consistently regardless of whether the transport supports native
+    output_format or requires parsing from markdown fences.
+
+    The CONTRACT: Both paths produce identical envelope shapes when valid.
+
+    Args:
+        response_text: The raw LLM response text (for fence parsing fallback).
+        schema: Optional JSON schema for validation. If provided, output is
+            validated against it.
+        native_structured: If transport supports output_format and returned
+            structured data directly, pass it here to skip parsing.
+
+    Returns:
+        Tuple of (extracted_dict, extraction_method) where:
+        - extracted_dict: The parsed/validated dict, or None if extraction failed
+        - extraction_method: One of "native", "fence", or "failed"
+
+    Example:
+        # With native support (Claude SDK)
+        result, method = extract_structured_output(
+            response_text="",
+            schema=HANDOFF_ENVELOPE_SCHEMA,
+            native_structured=sdk_response.structured_output
+        )
+        # method == "native"
+
+        # Without native support (CLI fallback)
+        result, method = extract_structured_output(
+            response_text=cli_output,
+            schema=HANDOFF_ENVELOPE_SCHEMA,
+            native_structured=None
+        )
+        # method == "fence"
+    """
+    # Path 1: Native structured output (preferred)
+    if native_structured is not None:
+        if schema:
+            validation_errors = validate_against_schema(native_structured, schema)
+            if validation_errors:
+                logger.warning(
+                    "Native structured output failed schema validation: %s",
+                    "; ".join(str(e) for e in validation_errors[:3]),
+                )
+                return None, "failed"
+        return native_structured, "native"
+
+    # Path 2: Parse from JSON fences in response text
+    extracted, parse_error = extract_json_from_text(response_text)
+    if extracted is None:
+        logger.warning("Failed to extract JSON from response fences: %s", parse_error)
+        return None, "failed"
+
+    if schema:
+        validation_errors = validate_against_schema(extracted, schema)
+        if validation_errors:
+            logger.warning(
+                "Fence-extracted JSON failed schema validation: %s",
+                "; ".join(str(e) for e in validation_errors[:3]),
+            )
+            return None, "failed"
+
+    return extracted, "fence"
+
+
+def extract_structured_output_with_errors(
+    response_text: str,
+    schema: Optional[Dict[str, Any]] = None,
+    native_structured: Optional[Dict[str, Any]] = None,
+) -> Tuple[Optional[Dict[str, Any]], ExtractionMethod, List[ValidationError]]:
+    """Extract structured output with detailed error information.
+
+    Like extract_structured_output, but returns validation errors for debugging.
+
+    Args:
+        response_text: The raw LLM response text (for fence parsing fallback).
+        schema: Optional JSON schema for validation.
+        native_structured: Native structured data from transport if available.
+
+    Returns:
+        Tuple of (extracted_dict, extraction_method, errors) where:
+        - extracted_dict: The parsed/validated dict, or None if extraction failed
+        - extraction_method: One of "native", "fence", or "failed"
+        - errors: List of ValidationError instances (empty if successful)
+    """
+    # Path 1: Native structured output (preferred)
+    if native_structured is not None:
+        if schema:
+            validation_errors = validate_against_schema(native_structured, schema)
+            if validation_errors:
+                return None, "failed", validation_errors
+        return native_structured, "native", []
+
+    # Path 2: Parse from JSON fences in response text
+    extracted, parse_error = extract_json_from_text(response_text)
+    if extracted is None:
+        return None, "failed", [
+            ValidationError(path="$", message=parse_error or "Failed to extract JSON")
+        ]
+
+    if schema:
+        validation_errors = validate_against_schema(extracted, schema)
+        if validation_errors:
+            return None, "failed", validation_errors
+
+    return extracted, "fence", []
+
+
+# =============================================================================
+# Schema Access Helpers
+# =============================================================================
+
+
+def get_handoff_envelope_schema() -> Dict[str, Any]:
+    """Get the HandoffEnvelope JSON schema.
+
+    Returns the canonical schema for handoff envelopes used across all transports.
+    This ensures both native and fallback extraction paths validate against
+    the same schema.
+
+    Returns:
+        JSON schema dict for HandoffEnvelope validation.
+    """
+    from swarm.runtime.claude_sdk import HANDOFF_ENVELOPE_SCHEMA
+
+    return HANDOFF_ENVELOPE_SCHEMA
+
+
+def get_routing_signal_schema() -> Dict[str, Any]:
+    """Get the RoutingSignal JSON schema.
+
+    Returns the canonical schema for routing signals used across all transports.
+    This ensures both native and fallback extraction paths validate against
+    the same schema.
+
+    Returns:
+        JSON schema dict for RoutingSignal validation.
+    """
+    from swarm.runtime.claude_sdk import ROUTING_SIGNAL_SCHEMA
+
+    return ROUTING_SIGNAL_SCHEMA
+
+
+# =============================================================================
+# Reprompt and Microloop Support
+# =============================================================================
 
 
 def build_reprompt(
