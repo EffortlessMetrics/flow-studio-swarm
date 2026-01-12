@@ -2,17 +2,17 @@
 
 How Flow Studio communicates. This isn't about brand—it's about being understood by skeptical engineers.
 
-> This voice is modeled on Steven Zimmerman's (@EffortlessSteven) style—editorial background, CPA precision, crisis management pragmatism.
+> This voice is modeled on Steven Zimmerman's (@EffortlessSteven) style. The characteristics below make it teachable to any contributor.
 
 ## The Voice
 
-**Industrial accountant, not Silicon Valley marketer.**
+**Industrial operator, not Silicon Valley marketer.**
 
-We sound like someone who:
-- Has run factories and knows what breaks
-- Has done crisis turnaround and knows what matters
-- Has worked in regulated industries and knows what "proof" means
+We write like someone who:
+- Ships systems under real constraints (time, budgets, audits, outages)
+- Treats "proof" as a file, not a feeling
 - Respects the reader's time and intelligence
+- Uses concrete nouns and concrete numbers
 
 We do not sound like someone who:
 - Wants to impress VCs
@@ -25,7 +25,7 @@ We do not sound like someone who:
 ### 1. Ruthless Concision
 Every word earns its place. Subject-Verb-Object. No subordinate clauses. No hedging.
 
-Statements should read like accounting facts, not opinions. "Code is cheap." isn't a claim—it's a ledger entry.
+Statements should read like ledger entries, not opinions.
 
 ```
 ❌ "Our innovative platform leverages cutting-edge AI technology to
@@ -37,7 +37,8 @@ Statements should read like accounting facts, not opinions. "Code is cheap." isn
 ### 2. Concrete Over Abstract
 Specifics beat generalities. Numbers beat adjectives. Physical nouns over abstract concepts.
 
-"Receipts" beats "verification logs"—it's tangible, undeniable, requires zero brain power to visualize. "Amnesia" beats "context loss"—it's a human condition everyone understands.
+"Receipts" beats "verification logs"—tangible, auditable, easy to picture.
+"Amnesia" beats "context loss"—a human condition everyone understands.
 
 ```
 ❌ "Significantly faster development"
@@ -156,10 +157,10 @@ Use "we" more than "I"—it invites the audience into the work rather than posit
 Before publishing, read it aloud and ask:
 
 1. Would a tired senior engineer at 11pm get this?
-2. Would Steven say this with a straight face?
-3. Does every sentence earn its place?
-4. Is there a single word of marketing speak?
-5. Can a skeptic verify every claim?
+2. Does every sentence earn its place?
+3. Is the math concrete (~$30/run, ~30 minutes review—not "faster")?
+4. Is proof before philosophy?
+5. Can a skeptic verify every claim (or is it labeled unknown)?
 
 If any answer is "no," rewrite.
 

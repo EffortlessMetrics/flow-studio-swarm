@@ -1,5 +1,6 @@
 # AgOps Manifesto: Agentic Operations for Software Development
 
+> **Author:** Steven Zimmerman (@EffortlessSteven)
 > **Status:** Living document
 > **Version:** 3.0-preview
 > **Philosophy:** Intelligence handles variance; Physics enforces contracts.

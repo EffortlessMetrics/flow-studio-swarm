@@ -3,7 +3,7 @@
 This directory contains the governance rules for Flow Studio's agentic operations.
 These rules encode Steven Zimmerman's AI-native development philosophy: **trade compute for senior attention**.
 
-> Voice and communication style follows Steven Zimmerman's (@EffortlessSteven) approach. See `communication/voice-and-tone.md`.
+> Voice and communication style: see `communication/voice-and-tone.md`.
 
 ## Rule Categories
 
@@ -177,16 +177,24 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 | `agent-behavioral-contracts.md` | Enforced | `validate_bijection()`, `validate_frontmatter()`, `validate_colors()` |
 | `agent-composition.md` | Designed | Composition patterns defined; spawn validation not automated |
 | `anti-patterns.md` | Designed | Reference catalog; patterns inform other rule enforcement |
+| `budget-discipline.md` | Designed | Budget targets defined; cost tracking not automated |
+| `calibration-protocol.md` | Designed | Learning loop defined; Flow 7 implements manually |
+| `deprecation-protocol.md` | Designed | Sunset process defined; deprecation warnings not automated |
 | `evidence-discipline.md` | Supported | `receipt_io.py` validates structure; freshness check not automated |
+| `factory-model.md` | Designed | Mental model for documentation; no automated enforcement |
 | `fix-forward-vocabulary.md` | Designed | Semantic validation of BLOCKED usage not automated |
 | `flow-charters.md` | Supported | Flow structure validated; goal-alignment not automated |
+| `forensics-over-testimony.md` | Supported | Kernel uses forensics for routing; full validation not automated |
 | `model-policy.md` | Enforced | `validate_frontmatter()` checks model values |
 | `narrow-trust.md` | Supported | Scope via role families; trust calculation not automated |
 | `pack-check-philosophy.md` | Enforced | This IS the validation philosophy |
 | `panel-thinking.md` | Designed | Gate agents implement; no automated panel checks |
+| `prompt-hygiene.md` | Designed | Banned patterns defined; automated validation pending |
+| `reviewer-protocol.md` | Designed | Review process defined; no automated enforcement |
+| `runbook-standards.md` | Designed | Structure defined; runbook validation not automated |
+| `scarcity-enforcement.md` | Supported | Context budgets implemented; full enforcement partial |
 | `testing-philosophy.md` | Supported | Gate agents check test evidence; mutation testing not automated |
 | `truth-hierarchy.md` | Supported | `receipt_io.py` structure; hierarchy not enforced |
-| `prompt-hygiene.md` | Designed | Banned patterns defined; automated validation pending |
 | `versioning-policy.md` | Designed | Version fields defined; version validation pending |
 
 #### Execution Rules
@@ -194,19 +202,27 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 | Rule | Status | Enforcement Point |
 |------|--------|-------------------|
 | `context-discipline.md` | Supported | Kernel implements; no validation of context loading |
+| `context-handoff-patterns.md` | Designed | Patterns defined; sizing validation not automated |
 | `detour-catalog.md` | Designed | Detour patterns defined; matching not automated |
+| `error-taxonomy.md` | Supported | Classification used in kernel; full routing partial |
 | `microloop-rules.md` | Enforced | `validate_microloop_phrases()` bans old patterns |
 | `navigator-protocol.md` | Supported | Kernel routing exists; validation incomplete |
 | `resume-protocol.md` | Designed | Checkpoint spec exists; resume logic partial |
 | `routing-decisions.md` | Supported | Vocabulary defined; routing validation incomplete |
 | `subsumption-principle.md` | Supported | Transport capabilities declared; subsumption partial |
+| `timeout-retry-policy.md` | Supported | Timeouts implemented; circuit breakers partial |
+| `token-efficiency.md` | Designed | Guidelines defined; efficiency tracking not automated |
 
 #### Artifact Rules
 
 | Rule | Status | Enforcement Point |
 |------|--------|-------------------|
+| `artifact-naming.md` | Designed | Conventions defined; naming validation not automated |
 | `capability-registry.md` | Enforced | `validate_capability_registry()` |
+| `data-retention.md` | Designed | Retention policy defined; cleanup not automated |
 | `handoff-protocol.md` | Supported | Schema defined; envelope validation partial |
+| `observability-contract.md` | Supported | JSONL format used; schema validation partial |
+| `off-road-logging.md` | Supported | Routing logged; full audit trail partial |
 | `receipt-schema.md` | Enforced | `receipt_io.py` validates required fields |
 | `scent-trail.md` | Designed | Schema defined; trail generation not implemented |
 | `teaching-notes-contract.md` | Supported | `validate_prompt_sections()` checks some sections |
@@ -215,10 +231,13 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 
 | Rule | Status | Enforcement Point |
 |------|--------|-------------------|
-| `git-safety.md` | Supported | Shadow fork model; boundary checks via Flow 6 |
-| `sandbox-and-permissions.md` | Enforced | `.claude/settings.json` deny patterns |
 | `boundary-automation.md` | Designed | Secrets scan spec; automation pending |
+| `commit-standards.md` | Designed | Format defined; commit validation not automated |
+| `dependency-policy.md` | Designed | Policy defined; dependency audit not automated |
+| `git-safety.md` | Supported | Shadow fork model; boundary checks via Flow 6 |
 | `incident-response.md` | Designed | Protocol defined; automated escalation pending |
+| `rollback-procedures.md` | Designed | Procedures defined; rollback automation pending |
+| `sandbox-and-permissions.md` | Enforced | `.claude/settings.json` deny patterns |
 | `secret-management.md` | Supported | Patterns defined; pre-commit hook + Flow 6 boundary scan |
 
 ### Adding New Rules
@@ -242,16 +261,22 @@ This creates an audit trail from spec to enforcement
 | `agent-behavioral-contracts.md` | PM/IC model, role families, status reporting |
 | `agent-composition.md` | When to use one vs multiple agents, composition patterns |
 | `anti-patterns.md` | Catalog of common mistakes to avoid |
+| `budget-discipline.md` | The $30 run, cost allocation by flow |
+| `calibration-protocol.md` | Continuous improvement, learning loops from Flow 7 |
+| `deprecation-protocol.md` | How to sunset agents, flows, capabilities safely |
 | `evidence-discipline.md` | Sheriff pattern, what counts as evidence |
 | `factory-model.md` | Mental model: kernel as foreman, agents as interns, disk as ledger |
 | `fix-forward-vocabulary.md` | Valid outcomes, BLOCKED is rare |
 | `flow-charters.md` | Goals, exit criteria, non-goals per flow |
+| `forensics-over-testimony.md` | Routing based on physical evidence, not agent claims |
 | `model-policy.md` | Model allocation by role family |
 | `narrow-trust.md` | Trust equation: scope × evidence × verification |
 | `pack-check-philosophy.md` | Competence over compliance validation |
 | `panel-thinking.md` | Anti-Goodhart multi-metric panels |
 | `prompt-hygiene.md` | Banned patterns, required sections, evidence over narrative |
 | `reviewer-protocol.md` | The three questions, 90-second and 10-minute review protocols |
+| `runbook-standards.md` | Executable operational guides, required structure |
+| `scarcity-enforcement.md` | Token budgets as design, two-reasons spawning rule |
 | `testing-philosophy.md` | Tests as evidence, mutation testing, verification escalation |
 | `truth-hierarchy.md` | Evidence levels (physics > receipts > narrative) |
 | `versioning-policy.md` | Schema/flow/agent versioning, compatibility guarantees, migrations |
@@ -260,18 +285,26 @@ This creates an audit trail from spec to enforcement
 | Rule | Purpose |
 |------|---------|
 | `context-discipline.md` | Session amnesia, rehydration pattern |
+| `context-handoff-patterns.md` | Right-sizing context between steps |
 | `detour-catalog.md` | Known fix patterns (lint, import, type, etc.) |
+| `error-taxonomy.md` | Error classification and handling strategies |
 | `microloop-rules.md` | Exit conditions, fuse detection |
 | `navigator-protocol.md` | Routing brain: forensics → decision → validation |
 | `resume-protocol.md` | Checkpoint semantics, crash recovery |
 | `routing-decisions.md` | Decision vocabulary (CONTINUE, LOOP, DETOUR, etc.) |
 | `subsumption-principle.md` | Kernel compensates for backend gaps |
+| `timeout-retry-policy.md` | Timeouts, retries, circuit breakers |
+| `token-efficiency.md` | Token waste indicates design problems |
 
 ### Artifact Rules
 | Rule | Purpose |
 |------|---------|
+| `artifact-naming.md` | Predictable naming conventions |
 | `capability-registry.md` | Evidence binding for capability claims |
+| `data-retention.md` | Artifact lifecycle management |
 | `handoff-protocol.md` | Envelope structure for step transitions |
+| `observability-contract.md` | Structured logging, JSONL format |
+| `off-road-logging.md` | Routing decision audit trail |
 | `receipt-schema.md` | Required fields for audit trail |
 | `scent-trail.md` | Decision provenance breadcrumbs |
 | `teaching-notes-contract.md` | Required sections for step instructions |
@@ -279,10 +312,13 @@ This creates an audit trail from spec to enforcement
 ### Safety Rules
 | Rule | Purpose |
 |------|---------|
-| `git-safety.md` | Prohibited operations, conflict resolution |
-| `sandbox-and-permissions.md` | Containment checklist, boundary model |
 | `boundary-automation.md` | Publish gate enforcement, secrets scanning |
+| `commit-standards.md` | Atomic, traceable, bisectable commits |
+| `dependency-policy.md` | Every dependency is a liability |
+| `git-safety.md` | Prohibited operations, conflict resolution |
 | `incident-response.md` | Severity levels, response protocol, post-mortems |
+| `rollback-procedures.md` | Fast recovery, undo strategies |
+| `sandbox-and-permissions.md` | Containment checklist, boundary model |
 | `secret-management.md` | Full secret lifecycle: categories, storage, rotation, detection, response |
 
 ### Communication Rules

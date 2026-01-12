@@ -2,7 +2,7 @@
 
 How we write about Flow Studio. These aren't style preferences—they're the difference between being understood and being ignored.
 
-> Structure follows the inverted pyramid (Steven's editorial background): lead with conclusion, proof before philosophy.
+> Structure follows the inverted pyramid: lead with conclusion, proof before philosophy. Voice: see `voice-and-tone.md`.
 
 ## The Core Principle
 

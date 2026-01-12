@@ -19,7 +19,7 @@ Each transition followed the same pattern: what was once skilled craft becomes m
 
 **The shift:** Models write nearly-working code at 1,000+ tokens/second. The bottleneck isn't generation—it's *trust*. Can a human review and trust the output in 30 minutes instead of spending a week doing it themselves?
 
-**Flow Studio addresses that constraint.** It produces forensic evidence alongside code. You review the evidence, spot-check the hotspots, and ship—or bounce it back for another iteration.
+**Flow Studio addresses that constraint.** It produces forensic evidence alongside code. You audit the evidence, escalate verification at hotspots where doubt exists, and ship—or bounce it back for another iteration.
 
 The machine does the implementation. You do the architecture, the intent, the judgment.
 
@@ -114,7 +114,7 @@ A reviewer answers three questions in under 5 minutes:
 
 1. **Does evidence exist and is it fresh?**
 2. **Does the panel of metrics agree?**
-3. **What would I spot-check?**
+3. **Where would I escalate verification?**
 
 If yes, approve. If contradictions, investigate. The system did the grinding.
 
@@ -206,7 +206,7 @@ make help               # All commands
 ### Philosophy
 | Topic | Document |
 |-------|----------|
-| The full manifesto | [AGOPS_MANIFESTO.md](docs/AGOPS_MANIFESTO.md) |
+| The AgOps philosophy | [AGOPS_MANIFESTO.md](docs/AGOPS_MANIFESTO.md) — Steven Zimmerman |
 | What this system is | [TRUST_COMPILER.md](docs/explanation/TRUST_COMPILER.md) |
 | 15 lessons learned | [META_LEARNINGS.md](docs/explanation/META_LEARNINGS.md) |
 | 12 emergent laws | [EMERGENT_PHYSICS.md](docs/explanation/EMERGENT_PHYSICS.md) |
