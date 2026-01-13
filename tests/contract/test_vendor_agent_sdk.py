@@ -8,7 +8,9 @@ SDK to be installed.
 Run with: pytest tests/contract/test_vendor_agent_sdk.py -v
 """
 
+import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -16,11 +18,49 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VENDOR_DIR = REPO_ROOT / "docs" / "vendor" / "anthropic" / "agent-sdk" / "python"
+REFERENCE_MD = VENDOR_DIR / "REFERENCE.md"
+VERSION_JSON = VENDOR_DIR / "VERSION.json"
+TOOLS_MANIFEST_JSON = VENDOR_DIR / "TOOLS_MANIFEST.json"
+
+REFERENCE_VERSION_PATTERN = re.compile(r"^SDK version:\s*(.+)$", re.MULTILINE)
+REFERENCE_HEADER_SCAN_LINES = 60
 
 
 def _read_json(path: Path) -> dict:
     """Read and parse JSON file."""
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _read_text(path: Path) -> str:
+    """Read text content from file."""
+    return path.read_text(encoding="utf-8")
+
+
+def _sha256_text(text: str) -> str:
+    """Return SHA256 of text."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _parse_reference_version(reference_text: str) -> tuple[str | None, str | None]:
+    """Parse SDK distribution/version from REFERENCE header."""
+    header_text = "\n".join(reference_text.splitlines()[:REFERENCE_HEADER_SCAN_LINES])
+    match = REFERENCE_VERSION_PATTERN.search(header_text)
+    if not match:
+        return None, None
+
+    raw = match.group(1).strip()
+    if raw.startswith("`") and raw.endswith("`"):
+        raw = raw[1:-1].strip()
+
+    if "==" in raw:
+        dist, ver = [part.strip() for part in raw.split("==", 1)]
+        return dist, ver
+
+    parts = raw.split()
+    if len(parts) >= 2:
+        return parts[0].strip(), parts[1].strip()
+
+    return None, None
 
 
 # =============================================================================
@@ -38,7 +78,7 @@ class TestVendorFilesExist:
 
     def test_version_json_exists(self):
         """Verify VERSION.json exists."""
-        version_file = VENDOR_DIR / "VERSION.json"
+        version_file = VERSION_JSON
         if not version_file.exists():
             pytest.skip(
                 "VERSION.json not present. Run 'make vendor-agent-sdk' to generate."
@@ -54,7 +94,7 @@ class TestVendorFilesExist:
 
     def test_tools_manifest_exists(self):
         """Verify TOOLS_MANIFEST.json exists."""
-        tools_file = VENDOR_DIR / "TOOLS_MANIFEST.json"
+        tools_file = TOOLS_MANIFEST_JSON
         if not tools_file.exists():
             pytest.skip(
                 "TOOLS_MANIFEST.json not present. Run 'make vendor-agent-sdk' to generate."
@@ -292,10 +332,9 @@ class TestReferenceDocument:
     @pytest.fixture
     def reference_text(self) -> str:
         """Load REFERENCE.md, skip if not present."""
-        path = VENDOR_DIR / "REFERENCE.md"
-        if not path.exists():
+        if not REFERENCE_MD.exists():
             pytest.skip("REFERENCE.md not present (optional)")
-        return path.read_text(encoding="utf-8")
+        return _read_text(REFERENCE_MD)
 
     def test_reference_has_header(self, reference_text):
         """REFERENCE.md has a proper header."""
@@ -314,6 +353,48 @@ class TestReferenceDocument:
         # Look for markdown code blocks
         assert "```" in reference_text, (
             "REFERENCE.md should contain code examples (markdown code blocks)"
+        )
+
+
+# =============================================================================
+# P0: Reference Metadata Contracts
+# =============================================================================
+
+
+class TestReferenceMetadata:
+    """Verify REFERENCE.md metadata stays in sync."""
+
+    def test_reference_version_matches_version_json(self):
+        """REFERENCE.md SDK version header matches VERSION.json."""
+        if not REFERENCE_MD.exists() or not VERSION_JSON.exists():
+            pytest.skip("REFERENCE.md or VERSION.json not present")
+
+        reference_text = _read_text(REFERENCE_MD)
+        dist, ver = _parse_reference_version(reference_text)
+        if not dist or not ver:
+            pytest.fail("REFERENCE.md missing SDK version header")
+
+        version_data = _read_json(VERSION_JSON)
+        assert dist == version_data.get("distribution"), (
+            f"REFERENCE.md distribution mismatch: {dist} != {version_data.get('distribution')}"
+        )
+        assert ver == version_data.get("version"), (
+            f"REFERENCE.md version mismatch: {ver} != {version_data.get('version')}"
+        )
+
+    def test_tools_manifest_tracks_reference_hash(self):
+        """TOOLS_MANIFEST.json reference hash matches REFERENCE.md."""
+        if not REFERENCE_MD.exists() or not TOOLS_MANIFEST_JSON.exists():
+            pytest.skip("REFERENCE.md or TOOLS_MANIFEST.json not present")
+
+        reference_text = _read_text(REFERENCE_MD)
+        tools_data = _read_json(TOOLS_MANIFEST_JSON)
+        expected_hash = _sha256_text(reference_text)
+
+        actual_hash = tools_data.get("reference_sha256")
+        assert actual_hash == expected_hash, (
+            "TOOLS_MANIFEST.json reference_sha256 does not match REFERENCE.md. "
+            "Run make vendor-agent-sdk."
         )
 
 

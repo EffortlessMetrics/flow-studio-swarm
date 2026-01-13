@@ -14,6 +14,7 @@ Outputs (checked-in):
 Usage:
   uv run python swarm/tools/vendor_agent_sdk.py --write
   uv run python swarm/tools/vendor_agent_sdk.py --check
+  uv run python swarm/tools/vendor_agent_sdk.py --check --strict
   uv run python swarm/tools/vendor_agent_sdk.py --status
 
 Design:
@@ -27,8 +28,10 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import hashlib
 import inspect
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -56,10 +59,25 @@ TOOL_NAME_PATTERN = re.compile(r"\*\*Tool name:\*\*\s*`([^`]+)`")
 # Fallback: "Tool name: `X`" without bold
 TOOL_NAME_LOOSE = re.compile(r"Tool name:\s*`([^`]+)`")
 
+# Reference header metadata patterns (top of REFERENCE.md)
+REFERENCE_SOURCE_PATTERN = re.compile(r"^Vendored from:\s*(\S.+)$", re.MULTILINE)
+REFERENCE_VERSION_PATTERN = re.compile(r"^SDK version:\s*(.+)$", re.MULTILINE)
+REFERENCE_SNAPSHOT_PATTERN = re.compile(r"^Snapshot date:\s*(\d{4}-\d{2}-\d{2})$", re.MULTILINE)
+REFERENCE_HEADER_SCAN_LINES = 60
+
 
 def utc_now_iso() -> str:
     """Return current UTC time as ISO string."""
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def should_require_sdk(strict: bool = False) -> bool:
+    """Return True if missing SDK should fail checks."""
+    if strict:
+        return True
+    if os.getenv("SWARM_STRICT_SDK_CHECK", "").lower() in {"1", "true", "yes"}:
+        return True
+    return os.getenv("CI", "").lower() in {"1", "true", "yes"}
 
 
 def try_import_sdk() -> Tuple[Optional[str], Optional[str], Optional[Any]]:
@@ -190,6 +208,62 @@ def extract_tool_names_from_reference(reference_path: Path) -> List[str]:
     return cleaned
 
 
+def reference_sha256(text: str) -> str:
+    """Return SHA256 of reference text for drift detection."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _parse_reference_header(text: str) -> Dict[str, Optional[str]]:
+    """Parse header metadata from REFERENCE.md."""
+    header_text = "\n".join(text.splitlines()[:REFERENCE_HEADER_SCAN_LINES])
+
+    source_match = REFERENCE_SOURCE_PATTERN.search(header_text)
+    version_match = REFERENCE_VERSION_PATTERN.search(header_text)
+    snapshot_match = REFERENCE_SNAPSHOT_PATTERN.search(header_text)
+
+    sdk_distribution = None
+    sdk_version = None
+    sdk_version_raw = None
+
+    if version_match:
+        sdk_version_raw = version_match.group(1).strip()
+        if sdk_version_raw.startswith("`") and sdk_version_raw.endswith("`"):
+            sdk_version_raw = sdk_version_raw[1:-1].strip()
+        if "==" in sdk_version_raw:
+            sdk_distribution, sdk_version = [
+                part.strip() for part in sdk_version_raw.split("==", 1)
+            ]
+        else:
+            parts = sdk_version_raw.split()
+            if len(parts) >= 2:
+                sdk_distribution, sdk_version = parts[0].strip(), parts[1].strip()
+
+    return {
+        "reference_source": source_match.group(1).strip() if source_match else None,
+        "reference_snapshot_date": snapshot_match.group(1).strip() if snapshot_match else None,
+        "reference_sdk_distribution": sdk_distribution,
+        "reference_sdk_version": sdk_version,
+        "reference_sdk_version_raw": sdk_version_raw,
+    }
+
+
+def extract_reference_metadata(reference_path: Path) -> Dict[str, Optional[str]]:
+    """Extract header metadata and hash from REFERENCE.md."""
+    if not reference_path.exists():
+        return {
+            "reference_sha256": None,
+            "reference_source": None,
+            "reference_snapshot_date": None,
+            "reference_sdk_distribution": None,
+            "reference_sdk_version": None,
+        }
+
+    text = reference_path.read_text(encoding="utf-8")
+    meta = _parse_reference_header(text)
+    meta["reference_sha256"] = reference_sha256(text)
+    return meta
+
+
 def write_json(path: Path, data: Any) -> None:
     """Write JSON to file with consistent formatting."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -288,14 +362,26 @@ def cmd_write() -> int:
 
     api_payload = build_api_manifest(mod)
 
-    # Extract tool names from reference if it exists
+    # Extract tool names and reference metadata
     tool_names = extract_tool_names_from_reference(REFERENCE_MD)
+    reference_meta = extract_reference_metadata(REFERENCE_MD)
     tools_payload = {
         "generated_at": utc_now_iso(),
         "tool_names": tool_names,
         "count": len(tool_names),
         "source": str(REFERENCE_MD.relative_to(REPO_ROOT)) if REFERENCE_MD.exists() else None,
-        "note": "Extracted from REFERENCE.md" if tool_names else "No REFERENCE.md found",
+        "reference_sha256": reference_meta.get("reference_sha256"),
+        "reference_source": reference_meta.get("reference_source"),
+        "reference_snapshot_date": reference_meta.get("reference_snapshot_date"),
+        "reference_sdk_distribution": reference_meta.get("reference_sdk_distribution"),
+        "reference_sdk_version": reference_meta.get("reference_sdk_version"),
+        "note": (
+            "Extracted from REFERENCE.md"
+            if tool_names
+            else "No tool names found in REFERENCE.md"
+            if REFERENCE_MD.exists()
+            else "No REFERENCE.md found"
+        ),
     }
 
     # Write files
@@ -315,13 +401,17 @@ def cmd_write() -> int:
     return 0
 
 
-def cmd_check() -> int:
+def cmd_check(strict: bool = False) -> int:
     """Verify vendored artifacts match installed SDK."""
     print("Checking vendored Claude Agent SDK artifacts...")
 
     # Check SDK is installed
     module_name, dist_name, mod = try_import_sdk()
     if mod is None:
+        if should_require_sdk(strict=strict):
+            print("FAIL: SDK not installed, cannot verify.")
+            print("  Install with: pip install claude-agent-sdk")
+            return 3
         print("SKIP: SDK not installed, cannot verify.")
         return 0  # Not an error - SDK is optional
 
@@ -347,12 +437,24 @@ def cmd_check() -> int:
 
     api_payload = build_api_manifest(mod)
     tool_names = extract_tool_names_from_reference(REFERENCE_MD)
+    reference_meta = extract_reference_metadata(REFERENCE_MD)
     tools_payload = {
         "generated_at": utc_now_iso(),
         "tool_names": tool_names,
         "count": len(tool_names),
         "source": str(REFERENCE_MD.relative_to(REPO_ROOT)) if REFERENCE_MD.exists() else None,
-        "note": "Extracted from REFERENCE.md" if tool_names else "No REFERENCE.md found",
+        "reference_sha256": reference_meta.get("reference_sha256"),
+        "reference_source": reference_meta.get("reference_source"),
+        "reference_snapshot_date": reference_meta.get("reference_snapshot_date"),
+        "reference_sdk_distribution": reference_meta.get("reference_sdk_distribution"),
+        "reference_sdk_version": reference_meta.get("reference_sdk_version"),
+        "note": (
+            "Extracted from REFERENCE.md"
+            if tool_names
+            else "No tool names found in REFERENCE.md"
+            if REFERENCE_MD.exists()
+            else "No REFERENCE.md found"
+        ),
     }
 
     # Compare (ignoring generated_at timestamp)
@@ -368,6 +470,20 @@ def cmd_check() -> int:
         if cur_version.get("version") != version_payload.get("version"):
             print(f"  Vendored: {cur_version.get('version')}")
             print(f"  Installed: {version_payload.get('version')}")
+
+    # Reference header check (ties REFERENCE.md to VERSION.json)
+    if REFERENCE_MD.exists():
+        ref_dist = reference_meta.get("reference_sdk_distribution")
+        ref_ver = reference_meta.get("reference_sdk_version")
+        if not ref_dist or not ref_ver:
+            ok = False
+            print(f"FAIL: {REFERENCE_MD.relative_to(REPO_ROOT)} missing SDK version header")
+        else:
+            if ref_dist != cur_version.get("distribution") or ref_ver != cur_version.get("version"):
+                ok = False
+                print(f"FAIL: {REFERENCE_MD.relative_to(REPO_ROOT)} version mismatch")
+                print(f"  REFERENCE: {ref_dist} {ref_ver}")
+                print(f"  VERSION.json: {cur_version.get('distribution')} {cur_version.get('version')}")
 
     # API check (ignore generated_at)
     if not json_equal(cur_api, api_payload, ignore_keys=["generated_at"]):
@@ -429,6 +545,11 @@ The vendored artifacts enable:
         action="store_true",
         help="Verify vendor artifacts match installed SDK",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail check if SDK is not installed (also implied in CI)",
+    )
 
     args = parser.parse_args()
 
@@ -439,7 +560,7 @@ The vendored artifacts enable:
     if args.write:
         return cmd_write()
     elif args.check:
-        return cmd_check()
+        return cmd_check(strict=args.strict)
     else:
         return cmd_status()
 

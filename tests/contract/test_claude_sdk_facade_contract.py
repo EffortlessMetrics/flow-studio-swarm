@@ -6,8 +6,9 @@ depending on the upstream SDK being installed. Upstream drift checks live in
 test_upstream_sdk_drift.py.
 """
 
-from pathlib import Path
 import json
+import re
+from pathlib import Path
 
 import pytest
 
@@ -52,6 +53,80 @@ class TestAdapterAvailability:
         except ImportError:
             # Official package not installed; fallback is acceptable.
             pass
+
+
+# =============================================================================
+# P0: Facade Export Stability
+# =============================================================================
+
+
+class TestFacadeExports:
+    """Verify the facade exports stable aliases and helpers."""
+
+    def test_claude_sdk_client_alias(self):
+        """ClaudeSDKClient remains an alias of StepSessionClient."""
+        from swarm.runtime.claude_sdk import ClaudeSDKClient, StepSessionClient
+
+        assert ClaudeSDKClient is StepSessionClient
+
+    def test_claude_code_options_proxy(self):
+        """ClaudeCodeOptions exists and maps to SDK options when available."""
+        from swarm.runtime.claude_sdk import ClaudeCodeOptions, SDK_AVAILABLE, get_sdk_module
+
+        assert ClaudeCodeOptions is not None
+        if not SDK_AVAILABLE:
+            pytest.skip("SDK not available; cannot validate options proxy")
+
+        sdk = get_sdk_module()
+        if hasattr(sdk, "ClaudeAgentOptions"):
+            assert ClaudeCodeOptions.__class__ is sdk.ClaudeAgentOptions
+        elif hasattr(sdk, "ClaudeCodeOptions"):
+            assert ClaudeCodeOptions.__class__ is sdk.ClaudeCodeOptions
+        else:
+            pytest.skip("SDK does not expose an options class")
+
+    def test_facade_all_exports(self):
+        """Facade __all__ includes the stable public surface."""
+        import swarm.runtime.claude_sdk as claude_sdk
+
+        expected = {
+            "ClaudeCodeOptions",
+            "ClaudeSDKClient",
+            "StepSessionClient",
+            "query_with_options",
+            "query_simple",
+            "tool",
+            "create_sdk_mcp_server",
+            "HANDOFF_ENVELOPE_SCHEMA",
+            "ROUTING_SIGNAL_SCHEMA",
+        }
+        missing = expected - set(claude_sdk.__all__)
+        assert not missing, f"Facade __all__ missing: {missing}"
+
+
+# =============================================================================
+# P0: Import Boundary Contract
+# =============================================================================
+
+
+class TestImportBoundary:
+    """Verify the SDK is only imported in the designated shim."""
+
+    def test_single_sdk_import_point(self):
+        """Only sdk_import.py may import claude_agent_sdk/claude_code_sdk."""
+        runtime_dir = REPO_ROOT / "swarm" / "runtime"
+        allowed = {runtime_dir / "_claude_sdk" / "sdk_import.py"}
+        pattern = re.compile(r"^\s*(import|from)\s+claude_(agent|code)_sdk\b", re.MULTILINE)
+
+        offenders = []
+        for path in runtime_dir.rglob("*.py"):
+            if path in allowed:
+                continue
+            text = path.read_text(encoding="utf-8")
+            if pattern.search(text):
+                offenders.append(str(path))
+
+        assert not offenders, f"Direct SDK imports found outside sdk_import.py: {offenders}"
 
 
 # =============================================================================

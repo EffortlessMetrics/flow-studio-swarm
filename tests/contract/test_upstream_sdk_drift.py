@@ -18,6 +18,8 @@ def sdk_available():
     """Skip if SDK is not installed, otherwise return the module."""
     _, _, mod = vendor_agent_sdk.try_import_sdk()
     if mod is None:
+        if vendor_agent_sdk.should_require_sdk():
+            pytest.fail("Claude SDK not installed. Run: uv sync --extra dev")
         pytest.skip("Claude SDK not installed")
     return mod
 

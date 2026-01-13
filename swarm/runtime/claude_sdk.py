@@ -158,14 +158,20 @@ def _get_claude_code_options_class():
     """Get the ClaudeCodeOptions class from the SDK module.
     
     Returns:
-        The ClaudeAgentOptions class (renamed from ClaudeCodeOptions in newer SDK).
+        The ClaudeAgentOptions class (or ClaudeCodeOptions for legacy SDKs).
     
     Raises:
         ImportError: If SDK is not available.
     """
     sdk = get_sdk_module()
     # The SDK now exports ClaudeAgentOptions instead of ClaudeCodeOptions
-    return sdk.ClaudeAgentOptions
+    if hasattr(sdk, "ClaudeAgentOptions"):
+        return sdk.ClaudeAgentOptions
+    if hasattr(sdk, "ClaudeCodeOptions"):
+        return sdk.ClaudeCodeOptions
+    raise MissingSdkFeatureError(
+        "Claude SDK does not expose ClaudeAgentOptions or ClaudeCodeOptions."
+    )
 
 # For backward compatibility, provide ClaudeCodeOptions as a module-level attribute
 # that lazily resolves to the SDK's ClaudeAgentOptions class.

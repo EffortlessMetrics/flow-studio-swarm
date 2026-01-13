@@ -91,22 +91,22 @@
     },
     "OutputFormat": {
       "local_support": "not_supported",
-      "where": "docs/reference/FLOW_STUDIO_ADAPTER_CONTRACT.md",
+      "where": "docs/reference/CLAUDE_AGENT_SDK_ADAPTER_CONTRACT.md",
       "notes": "Use claude-agent-sdk directly when you need SDK-specific typing."
     },
     "SystemPromptPreset": {
       "local_support": "not_supported",
-      "where": "docs/reference/FLOW_STUDIO_ADAPTER_CONTRACT.md",
+      "where": "docs/reference/CLAUDE_AGENT_SDK_ADAPTER_CONTRACT.md",
       "notes": "Use claude-agent-sdk directly when you need SDK-specific typing."
     },
     "PermissionMode": {
       "local_support": "not_supported",
-      "where": "docs/reference/FLOW_STUDIO_ADAPTER_CONTRACT.md",
+      "where": "docs/reference/CLAUDE_AGENT_SDK_ADAPTER_CONTRACT.md",
       "notes": "Use claude-agent-sdk directly when you need SDK-specific typing."
     },
     "SandboxSettings": {
       "local_support": "not_supported",
-      "where": "docs/reference/FLOW_STUDIO_ADAPTER_CONTRACT.md",
+      "where": "docs/reference/CLAUDE_AGENT_SDK_ADAPTER_CONTRACT.md",
       "notes": "Sandbox enforcement is not guaranteed by the adapter."
     }
   }

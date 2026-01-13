@@ -1,5 +1,7 @@
 # Flow Studio Adapter Contract
 
+> NOTE: Canonical contract now lives in docs/reference/CLAUDE_AGENT_SDK_ADAPTER_CONTRACT.md. This file is kept for existing links.
+
 This document defines the stable contract for the Flow Studio Claude SDK
 adapter (`swarm.runtime.claude_sdk`). It is the canonical offline reference for
 what Flow Studio guarantees, independent of upstream SDK changes.

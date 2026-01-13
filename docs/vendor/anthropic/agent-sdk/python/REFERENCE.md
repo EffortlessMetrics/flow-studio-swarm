@@ -1,5 +1,11 @@
 # Agent SDK Reference - Python
 
+This is a vendored upstream reference. For Flow Studio's adapter API and supported subset, see docs/reference/CLAUDE_AGENT_SDK_ADAPTER_CONTRACT.md.
+
+Vendored from: https://docs.anthropic.com/en/docs/agent-sdk/python
+SDK version: `claude-agent-sdk 0.1.19`
+Snapshot date: 2026-01-13
+
 Complete API reference for the Python Agent SDK, including all functions, types, and classes exposed by `claude_agent_sdk`.
 
 ## Installation
