@@ -27,6 +27,7 @@ from swarm.runtime.claude_sdk import (
     create_dangerous_command_hook,
     create_telemetry_hook,
     create_tool_policy_hook,
+    get_sdk_module_name,
 )
 from swarm.runtime.handoff_io import (
     update_envelope_routing,
@@ -337,6 +338,8 @@ async def _execute_step_session_sdk(
         "git_sha": git_info.get("git_sha"),
         "git_branch": git_info.get("git_branch"),
         "workspace_root": workspace_root,
+        # SDK module info (for debugging which SDK package was loaded)
+        "sdk_module": get_sdk_module_name(),
     }
 
     # Include telemetry data from session result

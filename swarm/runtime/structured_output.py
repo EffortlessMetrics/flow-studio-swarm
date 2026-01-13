@@ -280,14 +280,36 @@ def validate_against_schema(
 
     Returns list of validation errors (empty if valid).
 
-    Note: This is a simplified validator for common cases:
-    - Required fields
-    - Type checking (string, number, integer, boolean, array, object, null)
-    - Enum validation
-    - Nested object validation
-    - Array item validation
+    SUPPORTED FEATURES (JSON Schema Draft-07 subset):
+    - required: Required field validation
+    - type: string, number, integer, boolean, array, object, null
+    - enum: Enumeration validation
+    - properties: Nested object validation
+    - items: Array item validation
+    - minLength/maxLength: String length constraints
+    - minimum/maximum: Numeric range constraints
+    - exclusiveMinimum/exclusiveMaximum: Exclusive numeric bounds
+    - pattern: Regex pattern matching for strings
+    - nullable: Explicit null allowance
+
+    NOT SUPPORTED (will pass without validation):
+    - $ref / definitions: Schema references
+    - oneOf / anyOf / allOf: Schema composition
+    - additionalProperties: Extra property restriction
+    - format: String format validation (date-time, email, uri, etc.)
+    - if/then/else: Conditional schemas
+    - const: Exact value matching
+    - dependencies: Property dependencies
+    - propertyNames: Property name validation
+    - contains: Array contains validation
+    - uniqueItems: Array uniqueness
+    - minItems/maxItems: Array length constraints
+    - minProperties/maxProperties: Object size constraints
+    - multipleOf: Numeric divisibility
 
     For full JSON Schema Draft-07 compliance, use the jsonschema library.
+    This simplified validator is optimized for the common cases in Flow Studio
+    handoff envelopes and routing signals.
 
     Args:
         data: The data to validate.

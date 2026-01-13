@@ -451,6 +451,182 @@ class TestBlockedCommandPatterns:
 
 
 # =============================================================================
+# P0: ALL_STANDARD_TOOLS Completeness
+# =============================================================================
+
+class TestToolListCompleteness:
+    """Verify ALL_STANDARD_TOOLS stays in sync with SDK."""
+
+    def test_all_standard_tools_covers_sdk_tools(self, sdk_available):
+        """Verify ALL_STANDARD_TOOLS is complete if SDK exposes tool list.
+
+        The ALL_STANDARD_TOOLS set in claude_sdk.py can drift from SDK reality
+        if new tools are added. This test checks if the SDK exposes a tool list
+        and verifies our set contains all SDK tools.
+
+        If the SDK does not expose a tool list, this test skips with a note
+        that manual verification is required.
+        """
+        from swarm.runtime.claude_sdk import ALL_STANDARD_TOOLS, get_sdk_module
+        sdk = get_sdk_module()
+
+        # Check common attribute names the SDK might use for tool list
+        sdk_tools = None
+        for attr in ['TOOLS', 'ALL_TOOLS', 'STANDARD_TOOLS', 'get_tools', 'available_tools']:
+            if hasattr(sdk, attr):
+                value = getattr(sdk, attr)
+                if callable(value):
+                    try:
+                        sdk_tools = set(value())
+                    except Exception:
+                        continue
+                elif isinstance(value, (list, set, tuple, frozenset)):
+                    sdk_tools = set(value)
+                break
+
+        if sdk_tools is None:
+            pytest.skip(
+                "SDK does not expose tool list via known attributes "
+                "(TOOLS, ALL_TOOLS, STANDARD_TOOLS, get_tools, available_tools). "
+                "Manual verification required when SDK updates."
+            )
+
+        missing = sdk_tools - ALL_STANDARD_TOOLS
+        assert not missing, (
+            f"ALL_STANDARD_TOOLS is missing SDK tools: {missing}. "
+            f"Update ALL_STANDARD_TOOLS in swarm/runtime/claude_sdk.py to include these tools."
+        )
+
+    def test_all_standard_tools_is_frozen(self):
+        """Verify ALL_STANDARD_TOOLS is immutable (frozenset)."""
+        from swarm.runtime.claude_sdk import ALL_STANDARD_TOOLS
+
+        assert isinstance(ALL_STANDARD_TOOLS, frozenset), (
+            "ALL_STANDARD_TOOLS should be a frozenset to prevent accidental mutation"
+        )
+
+    def test_all_standard_tools_contains_core_tools(self):
+        """Verify ALL_STANDARD_TOOLS contains known core Claude Code tools."""
+        from swarm.runtime.claude_sdk import ALL_STANDARD_TOOLS
+
+        # These are documented Claude Code tools that should always be present
+        core_tools = {"Read", "Write", "Edit", "Bash", "Glob", "Grep"}
+
+        missing = core_tools - ALL_STANDARD_TOOLS
+        assert not missing, f"ALL_STANDARD_TOOLS missing core tools: {missing}"
+
+
+# =============================================================================
+# P1: Disallowed Tools Enforcement Documentation
+# =============================================================================
+
+class TestDisallowedToolsEnforcement:
+    """Document enforcement behavior of disallowed_tools.
+
+    IMPORTANT: The SDK's disallowed_tools parameter may behave differently
+    than expected. This test class documents known limitations and verifies
+    basic functionality of our adapter's tool restriction helpers.
+    """
+
+    def test_disallowed_tools_enforcement_documented(self):
+        """Document that disallowed_tools enforcement depends on SDK behavior.
+
+        IMPORTANT: The SDK may treat disallowed_tools as:
+        - Hard block (raises error or refuses to execute)
+        - Soft block (prompts user for confirmation)
+        - Advisory only (logs warning but proceeds)
+
+        This test documents this is a known limitation requiring SDK-level
+        integration testing to verify actual enforcement behavior.
+
+        Our adapter computes disallowed_tools correctly, but whether the SDK
+        actually blocks those tools depends on SDK internals and may vary
+        across SDK versions.
+
+        See: docs/reference/SDK_CAPABILITIES.md for enforcement details
+        See: platform.claude.com/cookbook/claude-agent-sdk-02
+        """
+        from swarm.runtime.claude_sdk import compute_disallowed_tools, ALL_STANDARD_TOOLS
+
+        # Verify the function exists and works
+        disallowed = compute_disallowed_tools(["Read"])
+        assert disallowed is not None
+        assert "Read" not in disallowed
+
+        # Document the limitation in the assertion message
+        assert len(disallowed) > 0, (
+            "compute_disallowed_tools should return non-empty list when tools are restricted. "
+            "NOTE: Actual enforcement of disallowed_tools depends on SDK behavior at runtime. "
+            "The SDK may treat this as a hard block, soft block, or advisory only."
+        )
+
+    def test_disallowed_tools_complement_is_correct(self):
+        """Verify disallowed_tools is the exact complement of allowed_tools."""
+        from swarm.runtime.claude_sdk import compute_disallowed_tools, ALL_STANDARD_TOOLS
+
+        allowed = ["Read", "Write", "Glob"]
+        disallowed = compute_disallowed_tools(allowed)
+
+        # Disallowed should contain everything except allowed
+        expected_disallowed = ALL_STANDARD_TOOLS - set(allowed)
+        assert set(disallowed) == expected_disallowed, (
+            f"Disallowed tools should be complement of allowed. "
+            f"Expected: {expected_disallowed}, Got: {set(disallowed)}"
+        )
+
+    def test_all_tools_allowed_returns_none(self):
+        """Verify None allowed_tools means no restriction (returns None)."""
+        from swarm.runtime.claude_sdk import compute_disallowed_tools
+
+        result = compute_disallowed_tools(None)
+        assert result is None, (
+            "When allowed_tools is None (all tools allowed), "
+            "disallowed_tools should also be None (no restrictions)"
+        )
+
+    def test_sdk_options_accept_disallowed_tools(self, sdk_available):
+        """Verify SDK ClaudeCodeOptions accepts disallowed_tools parameter.
+
+        This test verifies the SDK accepts the disallowed_tools parameter.
+        It does NOT verify that the SDK actually enforces the restriction.
+        """
+        from swarm.runtime.claude_sdk import get_sdk_module
+
+        sdk = get_sdk_module()
+
+        # Check if ClaudeCodeOptions accepts disallowed_tools parameter
+        # by inspecting the constructor signature
+        import inspect
+        try:
+            sig = inspect.signature(sdk.ClaudeCodeOptions)
+            params = list(sig.parameters.keys())
+
+            # If disallowed_tools is a parameter, the SDK should accept it
+            if 'disallowed_tools' in params:
+                # Try to create options with disallowed_tools
+                try:
+                    options = sdk.ClaudeCodeOptions(
+                        cwd=".",
+                        permission_mode="bypassPermissions",
+                        disallowed_tools=["Bash"],
+                    )
+                    # If we get here, the SDK accepts the parameter
+                    assert options is not None
+                except Exception as e:
+                    # SDK accepted the parameter but something else failed
+                    pytest.fail(
+                        f"SDK accepts disallowed_tools parameter but failed to create options: {e}"
+                    )
+            else:
+                pytest.skip(
+                    "SDK ClaudeCodeOptions does not expose disallowed_tools parameter. "
+                    "Tool restriction may not be enforceable via this API."
+                )
+        except (ValueError, TypeError):
+            pytest.skip("Could not inspect SDK ClaudeCodeOptions signature")
+
+
+# =============================================================================
 # P1: Tool Call Normalization
 # =============================================================================
 

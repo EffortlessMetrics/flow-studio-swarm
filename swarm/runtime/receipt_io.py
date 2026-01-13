@@ -26,6 +26,7 @@ The receipt contract:
 - routing_signal: Routing decision dict (optional)
 - error: Error message (optional)
 - context_truncation: Truncation info (optional)
+- sdk_module: SDK module name for debugging (optional, e.g., "claude_agent_sdk")
 """
 
 from __future__ import annotations
@@ -102,6 +103,9 @@ class StepReceiptData:
     # Tool calls (Wave 4: unified tool call capture)
     tool_calls: Optional[list] = None  # List of NormalizedToolCall dicts
 
+    # SDK module info (for debugging which SDK package was loaded)
+    sdk_module: Optional[str] = None  # e.g., "claude_agent_sdk" or "claude_code_sdk"
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         result: Dict[str, Any] = {
@@ -150,6 +154,10 @@ class StepReceiptData:
         # Tool calls (Wave 4)
         if self.tool_calls:
             result["tool_calls"] = self.tool_calls
+
+        # SDK module info
+        if self.sdk_module:
+            result["sdk_module"] = self.sdk_module
 
         # Merge extra data
         if self.extra:
@@ -265,6 +273,8 @@ def make_receipt_data(
     workspace_root: Optional[str] = None,
     # Tool calls (Wave 4)
     tool_calls: Optional[list] = None,
+    # SDK module info
+    sdk_module: Optional[str] = None,
     **extra,
 ) -> StepReceiptData:
     """Factory function to create StepReceiptData with defaults.
@@ -302,6 +312,7 @@ def make_receipt_data(
         git_branch=git_branch,
         workspace_root=workspace_root,
         tool_calls=tool_calls,
+        sdk_module=sdk_module,
         extra=extra,
     )
 

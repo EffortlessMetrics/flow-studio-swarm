@@ -542,6 +542,15 @@ class GeminiStepEngine(StepEngine):
                         )
                     )
 
+        # Drain orphan tool_use events that never received a tool_result.
+        # This can happen if a tool call was interrupted, errored, or timed out.
+        # These incomplete calls should still appear in receipts for debugging.
+        for tool_use_id, tool_use_event in pending_tool_calls.items():
+            tool_call = from_gemini_events(tool_use_event, None)
+            # Mark as incomplete since we never got a result
+            tool_call.success = False
+            tool_calls.append(tool_call)
+
         _, stderr = process.communicate()
         end_time = datetime.now(timezone.utc)
         duration_ms = int((end_time - start_time).total_seconds() * 1000)

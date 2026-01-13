@@ -20,6 +20,7 @@ Usage:
         create_options_from_plan,
         query_with_options,
         get_sdk_module,
+        get_sdk_module_name,  # For receipts: returns "claude_agent_sdk" or "claude_code_sdk"
         StepSessionClient,  # Per-step session orchestrator (Work -> Finalize -> Route)
         HANDOFF_ENVELOPE_SCHEMA,
         ROUTING_SIGNAL_SCHEMA,
@@ -437,6 +438,23 @@ def check_sdk_available() -> bool:
         True if SDK can be imported, False otherwise.
     """
     return SDK_AVAILABLE
+
+
+def get_sdk_module_name() -> Optional[str]:
+    """Get the name of the loaded SDK module for debugging/receipts.
+
+    Returns:
+        The module name (e.g., "claude_agent_sdk" or "claude_code_sdk"),
+        or None if SDK is not available.
+
+    Example:
+        >>> from swarm.runtime.claude_sdk import get_sdk_module_name
+        >>> sdk_name = get_sdk_module_name()
+        >>> # Returns "claude_agent_sdk" or "claude_code_sdk" or None
+    """
+    if SDK_AVAILABLE and _sdk_module is not None:
+        return _sdk_module.__name__
+    return None
 
 
 # =============================================================================
