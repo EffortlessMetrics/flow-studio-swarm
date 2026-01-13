@@ -1,0 +1,995 @@
+{
+  "export_count": 57,
+  "exported": {
+    "AgentDefinition": {
+      "dataclass_fields": [
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "description",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "prompt",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "tools",
+          "type": "list[str] | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "model",
+          "type": "typing.Optional[typing.Literal['sonnet', 'opus', 'haiku', 'inherit']]"
+        }
+      ],
+      "doc_first_line": "Agent definition configuration.",
+      "kind": "class",
+      "methods": [],
+      "name": "AgentDefinition",
+      "signature": "(description: str, prompt: str, tools: list[str] | None = None, model: Optional[Literal['sonnet', 'opus', 'haiku', 'inherit']] = None) -> None"
+    },
+    "Any": {
+      "dataclass_fields": null,
+      "doc_first_line": "Special type indicating an unconstrained type.",
+      "kind": "class",
+      "methods": [],
+      "name": "Any",
+      "signature": "(*args, **kwargs)"
+    },
+    "AssistantMessage": {
+      "dataclass_fields": [
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "content",
+          "type": "list[claude_agent_sdk.types.TextBlock | claude_agent_sdk.types.ThinkingBlock | claude_agent_sdk.types.ToolUseBlock | claude_agent_sdk.types.ToolResultBlock]"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "model",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "parent_tool_use_id",
+          "type": "str | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "error",
+          "type": "typing.Optional[typing.Literal['authentication_failed', 'billing_error', 'rate_limit', 'invalid_request', 'server_error', 'unknown']]"
+        }
+      ],
+      "doc_first_line": "Assistant message with content blocks.",
+      "kind": "class",
+      "methods": [],
+      "name": "AssistantMessage",
+      "signature": "(content: list[claude_agent_sdk.types.TextBlock | claude_agent_sdk.types.ThinkingBlock | claude_agent_sdk.types.ToolUseBlock | claude_agent_sdk.types.ToolResultBlock], model: str, parent_tool_use_id: str | None = None, error: Optional[Literal['authentication_failed', 'billing_error', 'rate_limit', 'invalid_request', 'server_error', 'unknown']] = None) -> None"
+    },
+    "Awaitable": {
+      "dataclass_fields": null,
+      "doc_first_line": null,
+      "kind": "class",
+      "methods": [],
+      "name": "Awaitable",
+      "signature": "()"
+    },
+    "BaseHookInput": {
+      "dataclass_fields": null,
+      "doc_first_line": "Base hook input fields present across many hook events.",
+      "kind": "class",
+      "methods": [],
+      "name": "BaseHookInput",
+      "signature": null
+    },
+    "CLIConnectionError": {
+      "dataclass_fields": null,
+      "doc_first_line": "Raised when unable to connect to Claude Code.",
+      "kind": "class",
+      "methods": [],
+      "name": "CLIConnectionError",
+      "signature": null
+    },
+    "CLIJSONDecodeError": {
+      "dataclass_fields": null,
+      "doc_first_line": "Raised when unable to decode JSON from CLI output.",
+      "kind": "class",
+      "methods": [],
+      "name": "CLIJSONDecodeError",
+      "signature": "(line: str, original_error: Exception)"
+    },
+    "CLINotFoundError": {
+      "dataclass_fields": null,
+      "doc_first_line": "Raised when Claude Code is not found or not installed.",
+      "kind": "class",
+      "methods": [],
+      "name": "CLINotFoundError",
+      "signature": "(message: str = 'Claude Code not found', cli_path: str | None = None)"
+    },
+    "Callable": {
+      "dataclass_fields": null,
+      "doc_first_line": null,
+      "kind": "class",
+      "methods": [],
+      "name": "Callable",
+      "signature": "()"
+    },
+    "CanUseTool": {
+      "doc_first_line": null,
+      "kind": "callable",
+      "name": "CanUseTool",
+      "signature": "(*args, **kwargs)"
+    },
+    "ClaudeAgentOptions": {
+      "dataclass_fields": [
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "tools",
+          "type": "list[str] | claude_agent_sdk.types.ToolsPreset | None"
+        },
+        {
+          "default": null,
+          "default_factory": "<class 'list'>",
+          "name": "allowed_tools",
+          "type": "list[str]"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "system_prompt",
+          "type": "str | claude_agent_sdk.types.SystemPromptPreset | None"
+        },
+        {
+          "default": null,
+          "default_factory": "<class 'dict'>",
+          "name": "mcp_servers",
+          "type": "dict[str, claude_agent_sdk.types.McpStdioServerConfig | claude_agent_sdk.types.McpSSEServerConfig | claude_agent_sdk.types.McpHttpServerConfig | claude_agent_sdk.types.McpSdkServerConfig] | str | pathlib._local.Path"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "permission_mode",
+          "type": "typing.Optional[typing.Literal['default', 'acceptEdits', 'plan', 'bypassPermissions']]"
+        },
+        {
+          "default": "False",
+          "default_factory": null,
+          "name": "continue_conversation",
+          "type": "<class 'bool'>"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "resume",
+          "type": "str | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "max_turns",
+          "type": "int | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "max_budget_usd",
+          "type": "float | None"
+        },
+        {
+          "default": null,
+          "default_factory": "<class 'list'>",
+          "name": "disallowed_tools",
+          "type": "list[str]"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "model",
+          "type": "str | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "fallback_model",
+          "type": "str | None"
+        },
+        {
+          "default": null,
+          "default_factory": "<class 'list'>",
+          "name": "betas",
+          "type": "list[typing.Literal['context-1m-2025-08-07']]"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "permission_prompt_tool_name",
+          "type": "str | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "cwd",
+          "type": "str | pathlib._local.Path | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "cli_path",
+          "type": "str | pathlib._local.Path | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "settings",
+          "type": "str | None"
+        },
+        {
+          "default": null,
+          "default_factory": "<class 'list'>",
+          "name": "add_dirs",
+          "type": "list[str | pathlib._local.Path]"
+        },
+        {
+          "default": null,
+          "default_factory": "<class 'dict'>",
+          "name": "env",
+          "type": "dict[str, str]"
+        },
+        {
+          "default": null,
+          "default_factory": "<class 'dict'>",
+          "name": "extra_args",
+          "type": "dict[str, str | None]"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "max_buffer_size",
+          "type": "int | None"
+        },
+        {
+          "default": "<_io.TextIOWrapper name='<stderr>' mode='w' encoding='cp1252'>",
+          "default_factory": null,
+          "name": "debug_stderr",
+          "type": "typing.Any"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "stderr",
+          "type": "collections.abc.Callable[[str], None] | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "can_use_tool",
+          "type": "collections.abc.Callable[[str, dict[str, typing.Any], claude_agent_sdk.types.ToolPermissionContext], collections.abc.Awaitable[claude_agent_sdk.types.PermissionResultAllow | claude_agent_sdk.types.PermissionResultDeny]] | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "hooks",
+          "type": "dict[typing.Union[typing.Literal['PreToolUse'], typing.Literal['PostToolUse'], typing.Literal['UserPromptSubmit'], typing.Literal['Stop'], typing.Literal['SubagentStop'], typing.Literal['PreCompact']], list[claude_agent_sdk.types.HookMatcher]] | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "user",
+          "type": "str | None"
+        },
+        {
+          "default": "False",
+          "default_factory": null,
+          "name": "include_partial_messages",
+          "type": "<class 'bool'>"
+        },
+        {
+          "default": "False",
+          "default_factory": null,
+          "name": "fork_session",
+          "type": "<class 'bool'>"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "agents",
+          "type": "dict[str, claude_agent_sdk.types.AgentDefinition] | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "setting_sources",
+          "type": "list[typing.Literal['user', 'project', 'local']] | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "sandbox",
+          "type": "claude_agent_sdk.types.SandboxSettings | None"
+        },
+        {
+          "default": null,
+          "default_factory": "<class 'list'>",
+          "name": "plugins",
+          "type": "list[claude_agent_sdk.types.SdkPluginConfig]"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "max_thinking_tokens",
+          "type": "int | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "output_format",
+          "type": "dict[str, typing.Any] | None"
+        },
+        {
+          "default": "False",
+          "default_factory": null,
+          "name": "enable_file_checkpointing",
+          "type": "<class 'bool'>"
+        }
+      ],
+      "doc_first_line": "Query options for Claude SDK.",
+      "kind": "class",
+      "methods": [],
+      "name": "ClaudeAgentOptions",
+      "signature": "(tools: list[str] | claude_agent_sdk.types.ToolsPreset | None = None, allowed_tools: list[str] = <factory>, system_prompt: str | claude_agent_sdk.types.SystemPromptPreset | None = None, mcp_servers: dict[str, claude_agent_sdk.types.McpStdioServerConfig | claude_agent_sdk.types.McpSSEServerConfig | claude_agent_sdk.types.McpHttpServerConfig | claude_agent_sdk.types.McpSdkServerConfig] | str | pathlib._local.Path = <factory>, permission_mode: Optional[Literal['default', 'acceptEdits', 'plan', 'bypassPermissions']] = None, continue_conversation: bool = False, resume: str | None = None, max_turns: int | None = None, max_budget_usd: float | None = None, disallowed_tools: list[str] = <factory>, model: str | None = None, fallback_model: str | None = None, betas: list[typing.Literal['context-1m-2025-08-07']] = <factory>, permission_prompt_tool_name: str | None = None, cwd: str | pathlib._local.Path | None = None, cli_path: str | pathlib._local.Path | None = None, settings: str | None = None, add_dirs: list[str | pathlib._local.Path] = <factory>, env: dict[str, str] = <factory>, extra_args: dict[str, str | None] = <factory>, max_buffer_size: int | None = None, debug_stderr: Any = <_io.TextIOWrapper name='<stderr>' mode='w' encoding='cp1252'>, stderr: collections.abc.Callable[[str], None] | None = None, can_use_tool: collections.abc.Callable[[str, dict[str, typing.Any], claude_agent_sdk.types.ToolPermissionContext], collections.abc.Awaitable[claude_agent_sdk.types.PermissionResultAllow | claude_agent_sdk.types.PermissionResultDeny]] | None = None, hooks: dict[typing.Union[typing.Literal['PreToolUse'], typing.Literal['PostToolUse'], typing.Literal['UserPromptSubmit'], typing.Literal['Stop'], typing.Literal['SubagentStop'], typing.Literal['PreCompact']], list[claude_agent_sdk.types.HookMatcher]] | None = None, user: str | None = None, include_partial_messages: bool = False, fork_session: bool = False, agents: dict[str, claude_agent_sdk.types.AgentDefinition] | None = None, setting_sources: list[typing.Literal['user', 'project', 'local']] | None = None, sandbox: claude_agent_sdk.types.SandboxSettings | None = None, plugins: list[claude_agent_sdk.types.SdkPluginConfig] = <factory>, max_thinking_tokens: int | None = None, output_format: dict[str, typing.Any] | None = None, enable_file_checkpointing: bool = False) -> None"
+    },
+    "ClaudeSDKClient": {
+      "dataclass_fields": null,
+      "doc_first_line": "Client for bidirectional, interactive conversations with Claude Code.",
+      "kind": "class",
+      "methods": [
+        "connect",
+        "disconnect",
+        "get_server_info",
+        "interrupt",
+        "query",
+        "receive_messages",
+        "receive_response",
+        "rewind_files",
+        "set_model",
+        "set_permission_mode"
+      ],
+      "name": "ClaudeSDKClient",
+      "signature": "(options: claude_agent_sdk.types.ClaudeAgentOptions | None = None, transport: claude_agent_sdk._internal.transport.Transport | None = None)"
+    },
+    "ClaudeSDKError": {
+      "dataclass_fields": null,
+      "doc_first_line": "Base exception for all Claude SDK errors.",
+      "kind": "class",
+      "methods": [],
+      "name": "ClaudeSDKError",
+      "signature": null
+    },
+    "ContentBlock": {
+      "doc_first_line": "Represent a PEP 604 union type",
+      "kind": "unknown",
+      "name": "ContentBlock",
+      "signature": null
+    },
+    "Generic": {
+      "dataclass_fields": null,
+      "doc_first_line": "Abstract base class for generic types.",
+      "kind": "class",
+      "methods": [],
+      "name": "Generic",
+      "signature": "()"
+    },
+    "HookCallback": {
+      "doc_first_line": null,
+      "kind": "callable",
+      "name": "HookCallback",
+      "signature": "(*args, **kwargs)"
+    },
+    "HookContext": {
+      "dataclass_fields": null,
+      "doc_first_line": "Context information for hook callbacks.",
+      "kind": "class",
+      "methods": [],
+      "name": "HookContext",
+      "signature": null
+    },
+    "HookInput": {
+      "doc_first_line": "Represent a PEP 604 union type",
+      "kind": "unknown",
+      "name": "HookInput",
+      "signature": null
+    },
+    "HookJSONOutput": {
+      "doc_first_line": "Represent a PEP 604 union type",
+      "kind": "unknown",
+      "name": "HookJSONOutput",
+      "signature": null
+    },
+    "HookMatcher": {
+      "dataclass_fields": [
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "matcher",
+          "type": "str | None"
+        },
+        {
+          "default": null,
+          "default_factory": "<class 'list'>",
+          "name": "hooks",
+          "type": "list[collections.abc.Callable[[claude_agent_sdk.types.PreToolUseHookInput | claude_agent_sdk.types.PostToolUseHookInput | claude_agent_sdk.types.UserPromptSubmitHookInput | claude_agent_sdk.types.StopHookInput | claude_agent_sdk.types.SubagentStopHookInput | claude_agent_sdk.types.PreCompactHookInput, str | None, claude_agent_sdk.types.HookContext], collections.abc.Awaitable[claude_agent_sdk.types.AsyncHookJSONOutput | claude_agent_sdk.types.SyncHookJSONOutput]]]"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "timeout",
+          "type": "float | None"
+        }
+      ],
+      "doc_first_line": "Hook matcher configuration.",
+      "kind": "class",
+      "methods": [],
+      "name": "HookMatcher",
+      "signature": "(matcher: str | None = None, hooks: list[collections.abc.Callable[[claude_agent_sdk.types.PreToolUseHookInput | claude_agent_sdk.types.PostToolUseHookInput | claude_agent_sdk.types.UserPromptSubmitHookInput | claude_agent_sdk.types.StopHookInput | claude_agent_sdk.types.SubagentStopHookInput | claude_agent_sdk.types.PreCompactHookInput, str | None, claude_agent_sdk.types.HookContext], collections.abc.Awaitable[claude_agent_sdk.types.AsyncHookJSONOutput | claude_agent_sdk.types.SyncHookJSONOutput]]] = <factory>, timeout: float | None = None) -> None"
+    },
+    "McpSdkServerConfig": {
+      "dataclass_fields": null,
+      "doc_first_line": "SDK MCP server configuration.",
+      "kind": "class",
+      "methods": [],
+      "name": "McpSdkServerConfig",
+      "signature": null
+    },
+    "McpServerConfig": {
+      "doc_first_line": "Represent a PEP 604 union type",
+      "kind": "unknown",
+      "name": "McpServerConfig",
+      "signature": null
+    },
+    "Message": {
+      "doc_first_line": "Represent a PEP 604 union type",
+      "kind": "unknown",
+      "name": "Message",
+      "signature": null
+    },
+    "PermissionMode": {
+      "doc_first_line": null,
+      "kind": "callable",
+      "name": "PermissionMode",
+      "signature": "(*args, **kwargs)"
+    },
+    "PermissionResult": {
+      "doc_first_line": "Represent a PEP 604 union type",
+      "kind": "unknown",
+      "name": "PermissionResult",
+      "signature": null
+    },
+    "PermissionResultAllow": {
+      "dataclass_fields": [
+        {
+          "default": "'allow'",
+          "default_factory": null,
+          "name": "behavior",
+          "type": "typing.Literal['allow']"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "updated_input",
+          "type": "dict[str, typing.Any] | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "updated_permissions",
+          "type": "list[claude_agent_sdk.types.PermissionUpdate] | None"
+        }
+      ],
+      "doc_first_line": "Allow permission result.",
+      "kind": "class",
+      "methods": [],
+      "name": "PermissionResultAllow",
+      "signature": "(behavior: Literal['allow'] = 'allow', updated_input: dict[str, typing.Any] | None = None, updated_permissions: list[claude_agent_sdk.types.PermissionUpdate] | None = None) -> None"
+    },
+    "PermissionResultDeny": {
+      "dataclass_fields": [
+        {
+          "default": "'deny'",
+          "default_factory": null,
+          "name": "behavior",
+          "type": "typing.Literal['deny']"
+        },
+        {
+          "default": "''",
+          "default_factory": null,
+          "name": "message",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": "False",
+          "default_factory": null,
+          "name": "interrupt",
+          "type": "<class 'bool'>"
+        }
+      ],
+      "doc_first_line": "Deny permission result.",
+      "kind": "class",
+      "methods": [],
+      "name": "PermissionResultDeny",
+      "signature": "(behavior: Literal['deny'] = 'deny', message: str = '', interrupt: bool = False) -> None"
+    },
+    "PermissionUpdate": {
+      "dataclass_fields": [
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "type",
+          "type": "typing.Literal['addRules', 'replaceRules', 'removeRules', 'setMode', 'addDirectories', 'removeDirectories']"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "rules",
+          "type": "list[claude_agent_sdk.types.PermissionRuleValue] | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "behavior",
+          "type": "typing.Optional[typing.Literal['allow', 'deny', 'ask']]"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "mode",
+          "type": "typing.Optional[typing.Literal['default', 'acceptEdits', 'plan', 'bypassPermissions']]"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "directories",
+          "type": "list[str] | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "destination",
+          "type": "typing.Optional[typing.Literal['userSettings', 'projectSettings', 'localSettings', 'session']]"
+        }
+      ],
+      "doc_first_line": "Permission update configuration.",
+      "kind": "class",
+      "methods": [
+        "to_dict"
+      ],
+      "name": "PermissionUpdate",
+      "signature": "(type: Literal['addRules', 'replaceRules', 'removeRules', 'setMode', 'addDirectories', 'removeDirectories'], rules: list[claude_agent_sdk.types.PermissionRuleValue] | None = None, behavior: Optional[Literal['allow', 'deny', 'ask']] = None, mode: Optional[Literal['default', 'acceptEdits', 'plan', 'bypassPermissions']] = None, directories: list[str] | None = None, destination: Optional[Literal['userSettings', 'projectSettings', 'localSettings', 'session']] = None) -> None"
+    },
+    "PostToolUseHookInput": {
+      "dataclass_fields": null,
+      "doc_first_line": "Input data for PostToolUse hook events.",
+      "kind": "class",
+      "methods": [],
+      "name": "PostToolUseHookInput",
+      "signature": null
+    },
+    "PreCompactHookInput": {
+      "dataclass_fields": null,
+      "doc_first_line": "Input data for PreCompact hook events.",
+      "kind": "class",
+      "methods": [],
+      "name": "PreCompactHookInput",
+      "signature": null
+    },
+    "PreToolUseHookInput": {
+      "dataclass_fields": null,
+      "doc_first_line": "Input data for PreToolUse hook events.",
+      "kind": "class",
+      "methods": [],
+      "name": "PreToolUseHookInput",
+      "signature": null
+    },
+    "ProcessError": {
+      "dataclass_fields": null,
+      "doc_first_line": "Raised when the CLI process fails.",
+      "kind": "class",
+      "methods": [],
+      "name": "ProcessError",
+      "signature": "(message: str, exit_code: int | None = None, stderr: str | None = None)"
+    },
+    "ResultMessage": {
+      "dataclass_fields": [
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "subtype",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "duration_ms",
+          "type": "<class 'int'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "duration_api_ms",
+          "type": "<class 'int'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "is_error",
+          "type": "<class 'bool'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "num_turns",
+          "type": "<class 'int'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "session_id",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "total_cost_usd",
+          "type": "float | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "usage",
+          "type": "dict[str, typing.Any] | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "result",
+          "type": "str | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "structured_output",
+          "type": "typing.Any"
+        }
+      ],
+      "doc_first_line": "Result message with cost and usage information.",
+      "kind": "class",
+      "methods": [],
+      "name": "ResultMessage",
+      "signature": "(subtype: str, duration_ms: int, duration_api_ms: int, is_error: bool, num_turns: int, session_id: str, total_cost_usd: float | None = None, usage: dict[str, typing.Any] | None = None, result: str | None = None, structured_output: Any = None) -> None"
+    },
+    "SandboxIgnoreViolations": {
+      "dataclass_fields": null,
+      "doc_first_line": "Violations to ignore in sandbox.",
+      "kind": "class",
+      "methods": [],
+      "name": "SandboxIgnoreViolations",
+      "signature": null
+    },
+    "SandboxNetworkConfig": {
+      "dataclass_fields": null,
+      "doc_first_line": "Network configuration for sandbox.",
+      "kind": "class",
+      "methods": [],
+      "name": "SandboxNetworkConfig",
+      "signature": null
+    },
+    "SandboxSettings": {
+      "dataclass_fields": null,
+      "doc_first_line": "Sandbox settings configuration.",
+      "kind": "class",
+      "methods": [],
+      "name": "SandboxSettings",
+      "signature": null
+    },
+    "SdkBeta": {
+      "doc_first_line": null,
+      "kind": "callable",
+      "name": "SdkBeta",
+      "signature": "(*args, **kwargs)"
+    },
+    "SdkMcpTool": {
+      "dataclass_fields": [
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "name",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "description",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "input_schema",
+          "type": "type[~T] | dict[str, typing.Any]"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "handler",
+          "type": "collections.abc.Callable[[~T], collections.abc.Awaitable[dict[str, typing.Any]]]"
+        }
+      ],
+      "doc_first_line": "Definition for an SDK MCP tool.",
+      "kind": "class",
+      "methods": [],
+      "name": "SdkMcpTool",
+      "signature": "(name: str, description: str, input_schema: type[~T] | dict[str, typing.Any], handler: collections.abc.Callable[[~T], collections.abc.Awaitable[dict[str, typing.Any]]]) -> None"
+    },
+    "SdkPluginConfig": {
+      "dataclass_fields": null,
+      "doc_first_line": "SDK plugin configuration.",
+      "kind": "class",
+      "methods": [],
+      "name": "SdkPluginConfig",
+      "signature": null
+    },
+    "SettingSource": {
+      "doc_first_line": null,
+      "kind": "callable",
+      "name": "SettingSource",
+      "signature": "(*args, **kwargs)"
+    },
+    "StopHookInput": {
+      "dataclass_fields": null,
+      "doc_first_line": "Input data for Stop hook events.",
+      "kind": "class",
+      "methods": [],
+      "name": "StopHookInput",
+      "signature": null
+    },
+    "SubagentStopHookInput": {
+      "dataclass_fields": null,
+      "doc_first_line": "Input data for SubagentStop hook events.",
+      "kind": "class",
+      "methods": [],
+      "name": "SubagentStopHookInput",
+      "signature": null
+    },
+    "SystemMessage": {
+      "dataclass_fields": [
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "subtype",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "data",
+          "type": "dict[str, typing.Any]"
+        }
+      ],
+      "doc_first_line": "System message with metadata.",
+      "kind": "class",
+      "methods": [],
+      "name": "SystemMessage",
+      "signature": "(subtype: str, data: dict[str, typing.Any]) -> None"
+    },
+    "T": {
+      "doc_first_line": "Type variable.",
+      "kind": "unknown",
+      "name": "T",
+      "signature": null
+    },
+    "TextBlock": {
+      "dataclass_fields": [
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "text",
+          "type": "<class 'str'>"
+        }
+      ],
+      "doc_first_line": "Text content block.",
+      "kind": "class",
+      "methods": [],
+      "name": "TextBlock",
+      "signature": "(text: str) -> None"
+    },
+    "ThinkingBlock": {
+      "dataclass_fields": [
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "thinking",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "signature",
+          "type": "<class 'str'>"
+        }
+      ],
+      "doc_first_line": "Thinking content block.",
+      "kind": "class",
+      "methods": [],
+      "name": "ThinkingBlock",
+      "signature": "(thinking: str, signature: str) -> None"
+    },
+    "ToolPermissionContext": {
+      "dataclass_fields": [
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "signal",
+          "type": "typing.Any | None"
+        },
+        {
+          "default": null,
+          "default_factory": "<class 'list'>",
+          "name": "suggestions",
+          "type": "list[claude_agent_sdk.types.PermissionUpdate]"
+        }
+      ],
+      "doc_first_line": "Context information for tool permission callbacks.",
+      "kind": "class",
+      "methods": [],
+      "name": "ToolPermissionContext",
+      "signature": "(signal: typing.Any | None = None, suggestions: list[claude_agent_sdk.types.PermissionUpdate] = <factory>) -> None"
+    },
+    "ToolResultBlock": {
+      "dataclass_fields": [
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "tool_use_id",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "content",
+          "type": "str | list[dict[str, typing.Any]] | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "is_error",
+          "type": "bool | None"
+        }
+      ],
+      "doc_first_line": "Tool result content block.",
+      "kind": "class",
+      "methods": [],
+      "name": "ToolResultBlock",
+      "signature": "(tool_use_id: str, content: str | list[dict[str, typing.Any]] | None = None, is_error: bool | None = None) -> None"
+    },
+    "ToolUseBlock": {
+      "dataclass_fields": [
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "id",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "name",
+          "type": "<class 'str'>"
+        },
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "input",
+          "type": "dict[str, typing.Any]"
+        }
+      ],
+      "doc_first_line": "Tool use content block.",
+      "kind": "class",
+      "methods": [],
+      "name": "ToolUseBlock",
+      "signature": "(id: str, name: str, input: dict[str, typing.Any]) -> None"
+    },
+    "Transport": {
+      "dataclass_fields": null,
+      "doc_first_line": "Abstract transport for Claude communication.",
+      "kind": "class",
+      "methods": [
+        "close",
+        "connect",
+        "end_input",
+        "is_ready",
+        "read_messages",
+        "write"
+      ],
+      "name": "Transport",
+      "signature": "()"
+    },
+    "TypeVar": {
+      "dataclass_fields": null,
+      "doc_first_line": "Type variable.",
+      "kind": "class",
+      "methods": [],
+      "name": "TypeVar",
+      "signature": null
+    },
+    "UserMessage": {
+      "dataclass_fields": [
+        {
+          "default": null,
+          "default_factory": null,
+          "name": "content",
+          "type": "str | list[claude_agent_sdk.types.TextBlock | claude_agent_sdk.types.ThinkingBlock | claude_agent_sdk.types.ToolUseBlock | claude_agent_sdk.types.ToolResultBlock]"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "uuid",
+          "type": "str | None"
+        },
+        {
+          "default": "None",
+          "default_factory": null,
+          "name": "parent_tool_use_id",
+          "type": "str | None"
+        }
+      ],
+      "doc_first_line": "User message.",
+      "kind": "class",
+      "methods": [],
+      "name": "UserMessage",
+      "signature": "(content: str | list[claude_agent_sdk.types.TextBlock | claude_agent_sdk.types.ThinkingBlock | claude_agent_sdk.types.ToolUseBlock | claude_agent_sdk.types.ToolResultBlock], uuid: str | None = None, parent_tool_use_id: str | None = None) -> None"
+    },
+    "UserPromptSubmitHookInput": {
+      "dataclass_fields": null,
+      "doc_first_line": "Input data for UserPromptSubmit hook events.",
+      "kind": "class",
+      "methods": [],
+      "name": "UserPromptSubmitHookInput",
+      "signature": null
+    },
+    "create_sdk_mcp_server": {
+      "doc_first_line": "Create an in-process MCP server that runs within your Python application.",
+      "kind": "function",
+      "name": "create_sdk_mcp_server",
+      "signature": "(name: str, version: str = '1.0.0', tools: list[claude_agent_sdk.SdkMcpTool[typing.Any]] | None = None) -> claude_agent_sdk.types.McpSdkServerConfig"
+    },
+    "dataclass": {
+      "doc_first_line": "Add dunder methods based on the fields defined in the class.",
+      "kind": "function",
+      "name": "dataclass",
+      "signature": "(cls=None, /, *, init=True, repr=True, eq=True, order=False, unsafe_hash=False, frozen=False, match_args=True, kw_only=False, slots=False, weakref_slot=False)"
+    },
+    "query": {
+      "doc_first_line": "Query Claude Code for one-shot or unidirectional streaming interactions.",
+      "kind": "function",
+      "name": "query",
+      "signature": "(*, prompt: str | collections.abc.AsyncIterable[dict[str, typing.Any]], options: claude_agent_sdk.types.ClaudeAgentOptions | None = None, transport: claude_agent_sdk._internal.transport.Transport | None = None) -> collections.abc.AsyncIterator[claude_agent_sdk.types.UserMessage | claude_agent_sdk.types.AssistantMessage | claude_agent_sdk.types.SystemMessage | claude_agent_sdk.types.ResultMessage | claude_agent_sdk.types.StreamEvent]"
+    },
+    "tool": {
+      "doc_first_line": "Decorator for defining MCP tools with type safety.",
+      "kind": "function",
+      "name": "tool",
+      "signature": "(name: str, description: str, input_schema: type | dict[str, typing.Any]) -> collections.abc.Callable[[collections.abc.Callable[[typing.Any], collections.abc.Awaitable[dict[str, typing.Any]]]], claude_agent_sdk.SdkMcpTool[typing.Any]]"
+    }
+  },
+  "generated_at": "2026-01-13T04:05:46+00:00",
+  "module": "claude_agent_sdk"
+}
