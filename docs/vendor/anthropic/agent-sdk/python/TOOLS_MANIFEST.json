@@ -1,7 +1,25 @@
 {
-  "count": 0,
-  "generated_at": "2026-01-13T04:05:46+00:00",
-  "note": "No REFERENCE.md found",
-  "source": null,
-  "tool_names": []
+  "count": 17,
+  "generated_at": "2026-01-13T16:04:03+00:00",
+  "note": "Extracted from REFERENCE.md",
+  "source": "docs\\vendor\\anthropic\\agent-sdk\\python\\REFERENCE.md",
+  "tool_names": [
+    "AskUserQuestion",
+    "Bash",
+    "BashOutput",
+    "Edit",
+    "ExitPlanMode",
+    "Glob",
+    "Grep",
+    "KillBash",
+    "ListMcpResources",
+    "NotebookEdit",
+    "Read",
+    "ReadMcpResource",
+    "Task",
+    "TodoWrite",
+    "WebFetch",
+    "WebSearch",
+    "Write"
+  ]
 }

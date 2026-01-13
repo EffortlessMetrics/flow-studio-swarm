@@ -71,6 +71,8 @@ class TransportCapabilities:
             If True, sessions can be interrupted and partial results recovered.
         supports_hooks: Whether transport supports pre/post tool hooks.
             If True, hooks can be registered for foot-gun blocking and telemetry.
+        supports_sandbox: Whether transport enforces sandbox restrictions.
+            If False, sandbox settings are accepted but not enforced.
         supports_hot_context_within_step: Whether context is preserved across
             Work -> Finalize -> Route phases within a single step. If True, the
             finalize phase can reference work done in the work phase without
@@ -110,6 +112,7 @@ class TransportCapabilities:
     supports_output_format: bool = False
     supports_interrupts: bool = False
     supports_hooks: bool = False
+    supports_sandbox: bool = False
 
     # Hot context semantics (replaces ambiguous supports_hot_context)
     supports_hot_context_within_step: bool = True

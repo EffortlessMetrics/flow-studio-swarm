@@ -34,7 +34,9 @@ from swarm.config.runtime_config import (
 # Use the unified SDK adapter
 from swarm.runtime.claude_sdk import (
     check_sdk_available as check_claude_sdk_available,
+    get_sdk_distribution,
     get_sdk_module_name,
+    get_sdk_version,
 )
 
 # ContextPack support for hydration phase
@@ -688,6 +690,8 @@ class ClaudeStepEngine(LifecycleCapableEngine):
                 else None,
                 error=step_result.error,
                 sdk_module=get_sdk_module_name(),
+                sdk_distribution=get_sdk_distribution(),
+                sdk_version=get_sdk_version(),
             )
             write_step_receipt(ctx.run_base, receipt_data)
             return step_result, events
@@ -762,6 +766,8 @@ class ClaudeStepEngine(LifecycleCapableEngine):
             routing_signal=routing_signal_dict,
             error=step_result.error,
             sdk_module=get_sdk_module_name(),
+            sdk_distribution=get_sdk_distribution(),
+            sdk_version=get_sdk_version(),
         )
         r_path = write_step_receipt(ctx.run_base, receipt_data)
         step_result.artifacts["receipt_path"] = str(r_path)

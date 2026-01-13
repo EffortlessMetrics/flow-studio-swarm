@@ -147,8 +147,10 @@ def test_public_api_exports_stable():
     - Query helpers: query_with_options, query_simple
     - Structured output schemas: HANDOFF_ENVELOPE_SCHEMA, ROUTING_SIGNAL_SCHEMA
     - Tool policy: ALL_STANDARD_TOOLS, compute_disallowed_tools, is_blocked_command, create_tool_policy_hook
+    - Hooks: create_dangerous_command_hook, create_telemetry_hook
     - Session management: StepSessionClient
-    - Compatibility: _dict_to_normalized_tool_call, ClaudeSDKClient (backward compatibility alias)
+    - Compatibility: _dict_to_normalized_tool_call, ClaudeSDKClient, ClaudeCodeOptions
+    - SDK shims: tool, create_sdk_mcp_server, Message types, hook types
     """
     import swarm.runtime.claude_sdk as claude_sdk
 
@@ -159,6 +161,9 @@ def test_public_api_exports_stable():
         "check_sdk_available",
         "get_sdk_module",
         "get_sdk_module_name",
+        "get_sdk_distribution",
+        "get_sdk_version",
+        "_sdk_module",
         # Options builder
         "create_high_trust_options",
         "create_options_from_plan",
@@ -173,11 +178,45 @@ def test_public_api_exports_stable():
         "compute_disallowed_tools",
         "is_blocked_command",
         "create_tool_policy_hook",
+        # Hooks
+        "create_dangerous_command_hook",
+        "create_telemetry_hook",
         # Session management
         "StepSessionClient",
+        # Telemetry
+        "TelemetryData",
         # Compatibility
         "_dict_to_normalized_tool_call",
         "ClaudeSDKClient",  # Backward compatibility alias
+        "ClaudeCodeOptions",  # Backward compatibility proxy
+        # SDK shims
+        "MissingSdkFeatureError",
+        "tool",
+        "create_sdk_mcp_server",
+        "Message",
+        "UserMessage",
+        "AssistantMessage",
+        "SystemMessage",
+        "ResultMessage",
+        "StreamEvent",
+        "ContentBlock",
+        "TextBlock",
+        "ThinkingBlock",
+        "ToolUseBlock",
+        "ToolResultBlock",
+        "HookEvent",
+        "HookMatcher",
+        "HookCallback",
+        "HookContext",
+        "HookInput",
+        "HookJSONOutput",
+        "BaseHookInput",
+        "PreToolUseHookInput",
+        "PostToolUseHookInput",
+        "UserPromptSubmitHookInput",
+        "StopHookInput",
+        "SubagentStopHookInput",
+        "PreCompactHookInput",
     }
 
     # Check that all expected exports exist
@@ -209,6 +248,8 @@ def test_public_api_exports_stable():
         "check_sdk_available",
         "get_sdk_module",
         "get_sdk_module_name",
+        "get_sdk_distribution",
+        "get_sdk_version",
         "create_high_trust_options",
         "create_options_from_plan",
         "query_with_options",
@@ -216,8 +257,16 @@ def test_public_api_exports_stable():
         "compute_disallowed_tools",
         "is_blocked_command",
         "create_tool_policy_hook",
+        "create_dangerous_command_hook",
+        "create_telemetry_hook",
         "StepSessionClient",
         "_dict_to_normalized_tool_call",
+        "ClaudeSDKClient",
+        "ClaudeCodeOptions",
+        "TelemetryData",
+        "MissingSdkFeatureError",
+        "tool",
+        "create_sdk_mcp_server",
     }
 
     non_callable = []

@@ -27,6 +27,7 @@ Flow Studio integrates with the Claude SDK (both `claude_agent_sdk` and legacy `
 | File checkpointing (`enable_file_checkpointing`) | Not used | Session amnesia model handles resumability via disk artifacts |
 | Rewind (`rewind_files()`) | Not used | Same as above - disk-based checkpoints are preferred |
 | Context across steps | Not used | Steps rehydrate from artifacts for auditability |
+| Sandbox enforcement | Not used | Settings may be accepted but are not enforced by the adapter |
 
 ### Why No SDK Checkpointing?
 
@@ -62,14 +63,15 @@ The import handling is centralized in `swarm/runtime/claude_sdk.py`.
 
 The transport layer declares capabilities via `TransportCapabilities` in `swarm/runtime/transports/port.py`:
 
-| Transport | output_format | hooks | interrupts | hot_context | streaming | native_tools | tool_observation | rewind |
-|-----------|---------------|-------|------------|-------------|-----------|--------------|------------------|--------|
-| Claude SDK | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **No** |
-| Claude CLI | No | No | No | No | Yes | No | No | No |
-| Gemini CLI | No | No | No | No | Yes | No | Yes | No |
-| Stub | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No |
+| Transport | output_format | hooks | interrupts | hot_context | streaming | native_tools | tool_observation | rewind | sandbox |
+|-----------|---------------|-------|------------|-------------|-----------|--------------|------------------|--------|---------|
+| Claude SDK | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **No** | No |
+| Claude CLI | No | No | No | No | Yes | No | No | No | No |
+| Gemini CLI | No | No | No | No | Yes | No | Yes | No | No |
+| Stub | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No | No |
 
-Note: `supports_rewind=False` across all transports reflects the design decision to use disk-based checkpointing.
+Note: `supports_rewind=False` and `supports_sandbox=False` across all transports reflect
+the design decision to use disk-based checkpointing and to avoid claiming sandbox enforcement.
 
 ## Structured Output Fallback
 

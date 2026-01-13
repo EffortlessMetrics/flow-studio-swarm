@@ -27,6 +27,8 @@ The receipt contract:
 - error: Error message (optional)
 - context_truncation: Truncation info (optional)
 - sdk_module: SDK module name for debugging (optional, e.g., "claude_agent_sdk")
+- sdk_distribution: SDK distribution name (optional, e.g., "claude-agent-sdk")
+- sdk_version: SDK version string (optional, e.g., "0.1.19")
 """
 
 from __future__ import annotations
@@ -105,6 +107,8 @@ class StepReceiptData:
 
     # SDK module info (for debugging which SDK package was loaded)
     sdk_module: Optional[str] = None  # e.g., "claude_agent_sdk" or "claude_code_sdk"
+    sdk_distribution: Optional[str] = None  # e.g., "claude-agent-sdk"
+    sdk_version: Optional[str] = None  # e.g., "0.1.19"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
@@ -158,6 +162,10 @@ class StepReceiptData:
         # SDK module info
         if self.sdk_module:
             result["sdk_module"] = self.sdk_module
+        if self.sdk_distribution:
+            result["sdk_distribution"] = self.sdk_distribution
+        if self.sdk_version:
+            result["sdk_version"] = self.sdk_version
 
         # Merge extra data
         if self.extra:
@@ -275,6 +283,8 @@ def make_receipt_data(
     tool_calls: Optional[list] = None,
     # SDK module info
     sdk_module: Optional[str] = None,
+    sdk_distribution: Optional[str] = None,
+    sdk_version: Optional[str] = None,
     **extra,
 ) -> StepReceiptData:
     """Factory function to create StepReceiptData with defaults.
@@ -313,6 +323,8 @@ def make_receipt_data(
         workspace_root=workspace_root,
         tool_calls=tool_calls,
         sdk_module=sdk_module,
+        sdk_distribution=sdk_distribution,
+        sdk_version=sdk_version,
         extra=extra,
     )
 

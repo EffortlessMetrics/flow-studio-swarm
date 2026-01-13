@@ -1,79 +1,63 @@
 """
-Contract tests for Claude SDK integration.
+Facade contract tests for the Claude SDK adapter.
 
-These tests verify that the Flow Studio SDK adapter correctly implements
-the contract with the upstream Claude SDK package. They catch misalignments
-between our adapter assumptions and actual SDK behavior.
-
-Run with: pytest tests/contract/ -v
-Skip if SDK not installed: pytest tests/contract/ -v (auto-skips)
+These tests verify Flow Studio's adapter surface and runtime semantics without
+depending on the upstream SDK being installed. Upstream drift checks live in
+test_upstream_sdk_drift.py.
 """
 
+from pathlib import Path
+import json
+
 import pytest
-from typing import Dict, Any, List, Optional
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+VENDOR_DIR = REPO_ROOT / "docs" / "vendor" / "anthropic" / "agent-sdk" / "python"
+TOOLS_MANIFEST = VENDOR_DIR / "TOOLS_MANIFEST.json"
+
+
+def _load_vendor_tools() -> set[str]:
+    """Load tool names from the vendored tools manifest."""
+    if not TOOLS_MANIFEST.exists():
+        pytest.skip("TOOLS_MANIFEST.json not present. Run make vendor-agent-sdk.")
+    data = json.loads(TOOLS_MANIFEST.read_text(encoding="utf-8"))
+    tool_names = set(data.get("tool_names", []))
+    if not tool_names:
+        pytest.skip("TOOLS_MANIFEST.json has no tool names.")
+    return tool_names
 
 
 # =============================================================================
-# Fixtures and Helpers
+# Adapter Availability Contract
 # =============================================================================
 
-@pytest.fixture
-def sdk_available():
-    """Check if SDK is available, skip tests if not."""
-    try:
-        from swarm.runtime.claude_sdk import SDK_AVAILABLE
-        if not SDK_AVAILABLE:
-            pytest.skip("Claude SDK not installed")
-        return True
-    except ImportError:
-        pytest.skip("swarm.runtime.claude_sdk not importable")
 
+class TestAdapterAvailability:
+    """Verify adapter availability flags are consistent."""
 
-# =============================================================================
-# P0: SDK Import Contract
-# =============================================================================
+    def test_sdk_availability_flag_consistent(self):
+        """SDK_AVAILABLE matches check_sdk_available()."""
+        from swarm.runtime.claude_sdk import SDK_AVAILABLE, check_sdk_available
 
-class TestSDKImport:
-    """Verify SDK import and package availability."""
-
-    def test_sdk_import_succeeds(self, sdk_available):
-        """Confirm SDK can be imported via our adapter."""
-        from swarm.runtime.claude_sdk import get_sdk_module
-        sdk = get_sdk_module()
-        assert sdk is not None
-
-    def test_sdk_has_expected_exports(self, sdk_available):
-        """Verify SDK exports the types we depend on."""
-        from swarm.runtime.claude_sdk import get_sdk_module
-        sdk = get_sdk_module()
-
-        # These are the SDK exports we actually use
-        expected_attrs = [
-            'ClaudeCodeOptions',  # Options builder
-            'query',              # Stateless query function
-        ]
-
-        for attr in expected_attrs:
-            assert hasattr(sdk, attr), f"SDK missing expected export: {attr}"
+        assert check_sdk_available() == SDK_AVAILABLE
 
     def test_official_package_preferred(self):
         """Verify we try claude_agent_sdk before claude_code_sdk."""
-        # This test inspects the import logic indirectly
         from swarm.runtime import claude_sdk
 
-        # If claude_agent_sdk is installed, that's what should be loaded
         try:
             import claude_agent_sdk
-            # Official package available - should be what we're using
             assert claude_sdk._sdk_module is claude_agent_sdk
         except ImportError:
-            # Official not available - fallback is acceptable
+            # Official package not installed; fallback is acceptable.
             pass
 
 
 # =============================================================================
 # P0: Tool Permission Semantics
 # =============================================================================
+
 
 class TestToolPermissionSemantics:
     """Verify tool permission handling."""
@@ -121,6 +105,7 @@ class TestToolPermissionSemantics:
 # =============================================================================
 # P0: Structured Output Contract
 # =============================================================================
+
 
 class TestStructuredOutputContract:
     """Verify structured output extraction produces consistent results."""
@@ -235,6 +220,7 @@ That concludes my analysis.
 # P1: Session Semantics
 # =============================================================================
 
+
 class TestSessionSemantics:
     """Verify session capability declarations are explicit."""
 
@@ -251,6 +237,7 @@ class TestSessionSemantics:
         assert hasattr(caps, 'supports_output_format')
         assert hasattr(caps, 'supports_hooks')
         assert hasattr(caps, 'supports_interrupts')
+        assert hasattr(caps, 'supports_sandbox')
 
     def test_claude_sdk_capabilities_correct(self):
         """Verify Claude SDK capabilities are set correctly."""
@@ -282,6 +269,7 @@ class TestSessionSemantics:
 # P1: Rewind/Checkpointing
 # =============================================================================
 
+
 class TestRewindCapability:
     """Verify rewind capability is explicitly documented as unsupported."""
 
@@ -295,6 +283,7 @@ class TestRewindCapability:
 # =============================================================================
 # P1: Structured Output Fallback Strategies
 # =============================================================================
+
 
 class TestStructuredOutputFallback:
     """Verify fallback strategies are correctly declared."""
@@ -319,8 +308,32 @@ class TestStructuredOutputFallback:
 
 
 # =============================================================================
+# P1: Sandbox Capability
+# =============================================================================
+
+
+class TestSandboxCapability:
+    """Verify sandbox enforcement is not claimed."""
+
+    def test_sandbox_not_supported(self):
+        """All transports should report sandbox enforcement as unsupported."""
+        from swarm.runtime.transports.port import (
+            CLAUDE_SDK_CAPABILITIES,
+            CLAUDE_CLI_CAPABILITIES,
+            GEMINI_CLI_CAPABILITIES,
+            STUB_CAPABILITIES,
+        )
+
+        assert CLAUDE_SDK_CAPABILITIES.supports_sandbox is False
+        assert CLAUDE_CLI_CAPABILITIES.supports_sandbox is False
+        assert GEMINI_CLI_CAPABILITIES.supports_sandbox is False
+        assert STUB_CAPABILITIES.supports_sandbox is False
+
+
+# =============================================================================
 # Integration: Gemini Multi-Tool Handling
 # =============================================================================
+
 
 class TestGeminiMultiToolHandling:
     """Verify Gemini engine handles interleaved tool calls correctly."""
@@ -328,7 +341,6 @@ class TestGeminiMultiToolHandling:
     def test_engine_can_be_instantiated(self):
         """Verify the engine can be instantiated."""
         from swarm.runtime.engines.gemini import GeminiStepEngine
-        from pathlib import Path
 
         engine = GeminiStepEngine(repo_root=Path("."))
         assert engine.engine_id == "gemini-step"
@@ -351,6 +363,7 @@ class TestGeminiMultiToolHandling:
 # =============================================================================
 # P0: Handoff Envelope Schema Contract
 # =============================================================================
+
 
 class TestHandoffEnvelopeSchema:
     """Verify handoff envelope schema is correctly defined."""
@@ -386,6 +399,7 @@ class TestHandoffEnvelopeSchema:
 # P0: Routing Signal Schema Contract
 # =============================================================================
 
+
 class TestRoutingSignalSchema:
     """Verify routing signal schema is correctly defined."""
 
@@ -417,6 +431,7 @@ class TestRoutingSignalSchema:
 # =============================================================================
 # P1: Blocked Command Patterns
 # =============================================================================
+
 
 class TestBlockedCommandPatterns:
     """Verify dangerous command blocking works correctly."""
@@ -454,47 +469,19 @@ class TestBlockedCommandPatterns:
 # P0: ALL_STANDARD_TOOLS Completeness
 # =============================================================================
 
+
 class TestToolListCompleteness:
-    """Verify ALL_STANDARD_TOOLS stays in sync with SDK."""
+    """Verify ALL_STANDARD_TOOLS stays in sync with known tools."""
 
-    def test_all_standard_tools_covers_sdk_tools(self, sdk_available):
-        """Verify ALL_STANDARD_TOOLS is complete if SDK exposes tool list.
+    def test_all_standard_tools_covers_vendor_manifest(self):
+        """Verify ALL_STANDARD_TOOLS covers vendored tool names."""
+        from swarm.runtime.claude_sdk import ALL_STANDARD_TOOLS
 
-        The ALL_STANDARD_TOOLS set in claude_sdk.py can drift from SDK reality
-        if new tools are added. This test checks if the SDK exposes a tool list
-        and verifies our set contains all SDK tools.
-
-        If the SDK does not expose a tool list, this test skips with a note
-        that manual verification is required.
-        """
-        from swarm.runtime.claude_sdk import ALL_STANDARD_TOOLS, get_sdk_module
-        sdk = get_sdk_module()
-
-        # Check common attribute names the SDK might use for tool list
-        sdk_tools = None
-        for attr in ['TOOLS', 'ALL_TOOLS', 'STANDARD_TOOLS', 'get_tools', 'available_tools']:
-            if hasattr(sdk, attr):
-                value = getattr(sdk, attr)
-                if callable(value):
-                    try:
-                        sdk_tools = set(value())
-                    except Exception:
-                        continue
-                elif isinstance(value, (list, set, tuple, frozenset)):
-                    sdk_tools = set(value)
-                break
-
-        if sdk_tools is None:
-            pytest.skip(
-                "SDK does not expose tool list via known attributes "
-                "(TOOLS, ALL_TOOLS, STANDARD_TOOLS, get_tools, available_tools). "
-                "Manual verification required when SDK updates."
-            )
-
-        missing = sdk_tools - ALL_STANDARD_TOOLS
+        vendor_tools = _load_vendor_tools()
+        missing = vendor_tools - ALL_STANDARD_TOOLS
         assert not missing, (
-            f"ALL_STANDARD_TOOLS is missing SDK tools: {missing}. "
-            f"Update ALL_STANDARD_TOOLS in swarm/runtime/claude_sdk.py to include these tools."
+            f"ALL_STANDARD_TOOLS missing vendored tools: {missing}. "
+            "Update ALL_STANDARD_TOOLS in swarm/runtime/_claude_sdk/constants.py."
         )
 
     def test_all_standard_tools_is_frozen(self):
@@ -519,6 +506,7 @@ class TestToolListCompleteness:
 # =============================================================================
 # P1: Disallowed Tools Enforcement Documentation
 # =============================================================================
+
 
 class TestDisallowedToolsEnforcement:
     """Document enforcement behavior of disallowed_tools.
@@ -584,51 +572,11 @@ class TestDisallowedToolsEnforcement:
             "disallowed_tools should also be None (no restrictions)"
         )
 
-    def test_sdk_options_accept_disallowed_tools(self, sdk_available):
-        """Verify SDK ClaudeCodeOptions accepts disallowed_tools parameter.
-
-        This test verifies the SDK accepts the disallowed_tools parameter.
-        It does NOT verify that the SDK actually enforces the restriction.
-        """
-        from swarm.runtime.claude_sdk import get_sdk_module
-
-        sdk = get_sdk_module()
-
-        # Check if ClaudeCodeOptions accepts disallowed_tools parameter
-        # by inspecting the constructor signature
-        import inspect
-        try:
-            sig = inspect.signature(sdk.ClaudeCodeOptions)
-            params = list(sig.parameters.keys())
-
-            # If disallowed_tools is a parameter, the SDK should accept it
-            if 'disallowed_tools' in params:
-                # Try to create options with disallowed_tools
-                try:
-                    options = sdk.ClaudeCodeOptions(
-                        cwd=".",
-                        permission_mode="bypassPermissions",
-                        disallowed_tools=["Bash"],
-                    )
-                    # If we get here, the SDK accepts the parameter
-                    assert options is not None
-                except Exception as e:
-                    # SDK accepted the parameter but something else failed
-                    pytest.fail(
-                        f"SDK accepts disallowed_tools parameter but failed to create options: {e}"
-                    )
-            else:
-                pytest.skip(
-                    "SDK ClaudeCodeOptions does not expose disallowed_tools parameter. "
-                    "Tool restriction may not be enforceable via this API."
-                )
-        except (ValueError, TypeError):
-            pytest.skip("Could not inspect SDK ClaudeCodeOptions signature")
-
 
 # =============================================================================
 # P1: Tool Call Normalization
 # =============================================================================
+
 
 class TestToolCallNormalization:
     """Verify tool calls are normalized consistently across sources."""

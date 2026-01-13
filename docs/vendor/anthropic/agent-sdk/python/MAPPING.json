@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "symbols": {
+    "query": {
+      "local_support": "implemented",
+      "where": "swarm/runtime/_claude_sdk/query.py",
+      "notes": "Exposed via claude_sdk.query_with_options and claude_sdk.query_simple."
+    },
+    "ClaudeSDKClient": {
+      "local_support": "implemented",
+      "where": "swarm/runtime/claude_sdk.py",
+      "notes": "Alias to StepSessionClient."
+    },
+    "ClaudeAgentOptions": {
+      "local_support": "shim",
+      "where": "swarm/runtime/claude_sdk.py",
+      "notes": "Access via ClaudeCodeOptions proxy or import from SDK directly."
+    },
+    "ClaudeCodeOptions": {
+      "local_support": "shim",
+      "where": "swarm/runtime/claude_sdk.py",
+      "notes": "Proxy to SDK ClaudeAgentOptions for backward compatibility."
+    },
+    "tool": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "create_sdk_mcp_server": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "Message": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "UserMessage": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "AssistantMessage": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "SystemMessage": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "ResultMessage": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "StreamEvent": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "ContentBlock": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "TextBlock": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "ThinkingBlock": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "ToolUseBlock": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "ToolResultBlock": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "HookEvent": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "HookMatcher": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "HookCallback": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "HookContext": {
+      "local_support": "shim",
+      "where": "swarm/runtime/_claude_sdk/shims.py"
+    },
+    "OutputFormat": {
+      "local_support": "not_supported",
+      "where": "docs/reference/FLOW_STUDIO_ADAPTER_CONTRACT.md",
+      "notes": "Use claude-agent-sdk directly when you need SDK-specific typing."
+    },
+    "SystemPromptPreset": {
+      "local_support": "not_supported",
+      "where": "docs/reference/FLOW_STUDIO_ADAPTER_CONTRACT.md",
+      "notes": "Use claude-agent-sdk directly when you need SDK-specific typing."
+    },
+    "PermissionMode": {
+      "local_support": "not_supported",
+      "where": "docs/reference/FLOW_STUDIO_ADAPTER_CONTRACT.md",
+      "notes": "Use claude-agent-sdk directly when you need SDK-specific typing."
+    },
+    "SandboxSettings": {
+      "local_support": "not_supported",
+      "where": "docs/reference/FLOW_STUDIO_ADAPTER_CONTRACT.md",
+      "notes": "Sandbox enforcement is not guaranteed by the adapter."
+    }
+  }
+}

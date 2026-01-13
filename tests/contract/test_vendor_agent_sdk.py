@@ -60,6 +60,14 @@ class TestVendorFilesExist:
                 "TOOLS_MANIFEST.json not present. Run 'make vendor-agent-sdk' to generate."
             )
 
+    def test_mapping_json_exists(self):
+        """Verify MAPPING.json exists."""
+        mapping_file = VENDOR_DIR / "MAPPING.json"
+        if not mapping_file.exists():
+            pytest.skip(
+                "MAPPING.json not present. Add adapter mapping for SDK symbols."
+            )
+
 
 # =============================================================================
 # P0: Vendor Files Are Valid JSON
@@ -91,6 +99,14 @@ class TestVendorFilesValid:
         path = VENDOR_DIR / "TOOLS_MANIFEST.json"
         if not path.exists():
             pytest.skip("TOOLS_MANIFEST.json not present")
+        return _read_json(path)
+
+    @pytest.fixture
+    def mapping_data(self) -> dict:
+        """Load MAPPING.json, skip if not present."""
+        path = VENDOR_DIR / "MAPPING.json"
+        if not path.exists():
+            pytest.skip("MAPPING.json not present")
         return _read_json(path)
 
     def test_version_has_required_fields(self, version_data):
@@ -133,6 +149,17 @@ class TestVendorFilesValid:
         assert len(names) == count, (
             f"TOOLS_MANIFEST count mismatch: count={count}, actual={len(names)}"
         )
+
+    def test_mapping_has_structure(self, mapping_data):
+        """MAPPING.json has expected structure."""
+        assert "schema_version" in mapping_data
+        assert "symbols" in mapping_data
+        assert isinstance(mapping_data["symbols"], dict)
+
+        # Validate minimal per-symbol fields when present
+        for name, entry in mapping_data["symbols"].items():
+            assert "local_support" in entry, f"{name} missing local_support"
+            assert "where" in entry, f"{name} missing where"
 
 
 # =============================================================================

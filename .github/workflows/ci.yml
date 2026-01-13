@@ -90,6 +90,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --extra dev
 
+      - name: Check vendored SDK artifacts
+        run: make check-vendor-agent-sdk
+
       - name: Run gating tests
         run: |
           # Gating tests: all tests except performance benchmarks

@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+from importlib.metadata import PackageNotFoundError, version as dist_version
 from typing import Any, Optional
 
 # Module logger
@@ -27,11 +28,14 @@ logger = logging.getLogger(__name__)
 SDK_AVAILABLE: bool = False
 _sdk_module: Optional[Any] = None
 _sdk_import_error: Optional[str] = None
+_sdk_distribution: Optional[str] = None
+_sdk_version: Optional[str] = None
 
 try:
     # Prefer official Anthropic Agent SDK
     import claude_agent_sdk
     _sdk_module = claude_agent_sdk
+    _sdk_distribution = "claude-agent-sdk"
     SDK_AVAILABLE = True
     logger.debug("claude_agent_sdk imported successfully")
 except ImportError:
@@ -39,11 +43,18 @@ except ImportError:
         # Fallback to legacy package name
         import claude_code_sdk
         _sdk_module = claude_code_sdk
+        _sdk_distribution = "claude-code-sdk"
         SDK_AVAILABLE = True
         logger.debug("claude_code_sdk imported successfully (legacy)")
     except ImportError as e:
         _sdk_import_error = str(e)
         logger.debug("Claude SDK not available: %s", e)
+
+if SDK_AVAILABLE and _sdk_distribution:
+    try:
+        _sdk_version = dist_version(_sdk_distribution)
+    except PackageNotFoundError:
+        _sdk_version = None
 
 
 def get_sdk_module() -> Any:
@@ -87,3 +98,13 @@ def get_sdk_module_name() -> Optional[str]:
     if SDK_AVAILABLE and _sdk_module is not None:
         return _sdk_module.__name__
     return None
+
+
+def get_sdk_distribution() -> Optional[str]:
+    """Return the installed SDK distribution name, if available."""
+    return _sdk_distribution if SDK_AVAILABLE else None
+
+
+def get_sdk_version() -> Optional[str]:
+    """Return the installed SDK version, if available."""
+    return _sdk_version if SDK_AVAILABLE else None

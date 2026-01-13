@@ -100,8 +100,12 @@ BLOCKED_COMMAND_PATTERNS: List[str] = [
 ALL_STANDARD_TOOLS = frozenset([
     "Read", "Write", "Edit", "MultiEdit",
     "Bash", "Glob", "Grep",
+    "BashOutput", "KillBash",
     "WebFetch", "WebSearch",
     "TodoRead", "TodoWrite",
     "Task", "Agent",
     "NotebookEdit", "NotebookRead",
+    "AskUserQuestion",
+    "ExitPlanMode",
+    "ListMcpResources", "ReadMcpResource",
 ])

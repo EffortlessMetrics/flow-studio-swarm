@@ -57,6 +57,8 @@ from swarm.runtime._claude_sdk.sdk_import import (
     check_sdk_available,
     get_sdk_module,
     get_sdk_module_name,
+    get_sdk_distribution,
+    get_sdk_version,
 )
 
 # Options builder functions
@@ -104,6 +106,37 @@ from swarm.runtime._claude_sdk.telemetry import (
 # Compatibility helpers
 from swarm.runtime._claude_sdk.compat import (
     _dict_to_normalized_tool_call,
+)
+
+# SDK surface shims (optional exports)
+from swarm.runtime._claude_sdk.shims import (
+    BaseHookInput,
+    ContentBlock,
+    HookCallback,
+    HookContext,
+    HookEvent,
+    HookInput,
+    HookJSONOutput,
+    HookMatcher,
+    MissingSdkFeatureError,
+    PostToolUseHookInput,
+    PreCompactHookInput,
+    PreToolUseHookInput,
+    ResultMessage,
+    StreamEvent,
+    SystemMessage,
+    TextBlock,
+    ThinkingBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+    UserMessage,
+    AssistantMessage,
+    Message,
+    UserPromptSubmitHookInput,
+    StopHookInput,
+    SubagentStopHookInput,
+    create_sdk_mcp_server,
+    tool,
 )
 
 # =============================================================================
@@ -168,6 +201,8 @@ __all__ = [
     "check_sdk_available",
     "get_sdk_module",
     "get_sdk_module_name",
+    "get_sdk_distribution",
+    "get_sdk_version",
     # Options builder
     "create_high_trust_options",
     "create_options_from_plan",
@@ -193,4 +228,32 @@ __all__ = [
     "_dict_to_normalized_tool_call",
     "ClaudeSDKClient",  # Backward compatibility alias
     "ClaudeCodeOptions",  # Backward compatibility: proxy to ClaudeAgentOptions
+    # SDK shims
+    "MissingSdkFeatureError",
+    "tool",
+    "create_sdk_mcp_server",
+    "Message",
+    "UserMessage",
+    "AssistantMessage",
+    "SystemMessage",
+    "ResultMessage",
+    "StreamEvent",
+    "ContentBlock",
+    "TextBlock",
+    "ThinkingBlock",
+    "ToolUseBlock",
+    "ToolResultBlock",
+    "HookEvent",
+    "HookMatcher",
+    "HookCallback",
+    "HookContext",
+    "HookInput",
+    "HookJSONOutput",
+    "BaseHookInput",
+    "PreToolUseHookInput",
+    "PostToolUseHookInput",
+    "UserPromptSubmitHookInput",
+    "StopHookInput",
+    "SubagentStopHookInput",
+    "PreCompactHookInput",
 ]

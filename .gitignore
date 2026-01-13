@@ -38,6 +38,7 @@ swarm/tools/**/selftest_report.json
 
 # Run artifacts that may slip in
 /.runs/
+tmpclaude-*
 *.log
 !swarm/examples/**/*.log
 

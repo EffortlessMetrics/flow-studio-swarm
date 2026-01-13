@@ -58,6 +58,7 @@ help:
 	@echo "  make agent-sdk-ts-demo   # Run TypeScript Agent SDK example"
 	@echo "  make agent-sdk-py-demo   # Run Python Agent SDK example"
 	@echo "  make agent-sdk-help      # Agent SDK documentation"
+	@echo "  make check-agent-sdk     # Verify Claude Agent SDK is installed"
 	@echo "  make vendor-agent-sdk    # Vendor SDK API surface for offline use"
 	@echo "  make vendor-help         # SDK vendoring documentation"
 	@echo ""
@@ -946,6 +947,7 @@ agent-sdk-help:
 # Runs all validation before selftest (DRY: single place to maintain)
 .PHONY: dev-precheck
 dev-precheck:
+	@$(MAKE) check-agent-sdk
 	@$(MAKE) gen-adapters
 	@$(MAKE) gen-flows
 	@$(MAKE) gen-flow-constants
@@ -956,6 +958,7 @@ dev-precheck:
 	@$(MAKE) check-index-html
 	@$(MAKE) validate-swarm
 	@$(MAKE) check-capabilities-doc
+	@$(MAKE) check-vendor-agent-sdk
 	@$(MAKE) ts-check
 	@$(MAKE) docs-check
 	@echo ""
@@ -1141,19 +1144,31 @@ profiles-help:
 # Agent SDK Vendoring
 # ============================================================================
 
+.PHONY: check-agent-sdk
+check-agent-sdk:
+	@uv run --extra dev --group dev python - <<'PY'
+import sys
+try:
+    import claude_agent_sdk  # noqa: F401
+except Exception:
+    print("ERROR: claude-agent-sdk not installed. Run: uv sync --extra dev", file=sys.stderr)
+    sys.exit(1)
+print("OK: claude-agent-sdk installed.")
+PY
+
 .PHONY: vendor-agent-sdk
 vendor-agent-sdk:
 	@echo "Vendoring Claude Agent SDK API surface..."
-	uv run python swarm/tools/vendor_agent_sdk.py --write
+	uv run --extra dev --group dev python swarm/tools/vendor_agent_sdk.py --write
 
 .PHONY: check-vendor-agent-sdk
 check-vendor-agent-sdk:
 	@echo "Checking vendored Claude Agent SDK artifacts..."
-	uv run python swarm/tools/vendor_agent_sdk.py --check
+	uv run --extra dev --group dev python swarm/tools/vendor_agent_sdk.py --check
 
 .PHONY: vendor-agent-sdk-status
 vendor-agent-sdk-status:
-	@uv run python swarm/tools/vendor_agent_sdk.py --status
+	@uv run --extra dev --group dev python swarm/tools/vendor_agent_sdk.py --status
 
 .PHONY: vendor-help
 vendor-help:
@@ -1169,6 +1184,7 @@ vendor-help:
 	@echo "  API_MANIFEST.json - Introspected API surface"
 	@echo "  TOOLS_MANIFEST.json - Tool names from REFERENCE.md"
 	@echo "  REFERENCE.md      - Human-readable SDK reference (optional)"
+	@echo "  MAPPING.json      - Adapter mapping of upstream symbols"
 	@echo ""
 	@echo "Update workflow:"
 	@echo "  1. Update SDK: pip install -U claude-agent-sdk"

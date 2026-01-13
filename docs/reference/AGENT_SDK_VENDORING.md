@@ -10,6 +10,7 @@ docs/vendor/anthropic/agent-sdk/python/
   VERSION.json        # SDK package metadata (generated)
   API_MANIFEST.json   # Introspected API surface (generated)
   TOOLS_MANIFEST.json # Tool names from REFERENCE.md (generated)
+  MAPPING.json        # Adapter mapping of upstream symbols (hand-maintained)
 ```
 
 ### Artifact Descriptions
@@ -20,6 +21,7 @@ docs/vendor/anthropic/agent-sdk/python/
 | `API_MANIFEST.json` | Public exports, signatures, methods | SDK API change |
 | `TOOLS_MANIFEST.json` | Tool names from reference docs | REFERENCE.md change |
 | `REFERENCE.md` | Human-readable SDK documentation | Upstream doc change |
+| `MAPPING.json` | Adapter support mapping for upstream symbols | Adapter contract change |
 
 ## Update Procedure
 
@@ -29,7 +31,9 @@ After updating the SDK dependency:
 
 ```bash
 # Update SDK
-pip install -U claude-agent-sdk
+uv sync --extra dev
+# Or, if you use pip directly:
+# pip install -U claude-agent-sdk
 
 # Regenerate vendor artifacts
 make vendor-agent-sdk
@@ -127,12 +131,14 @@ The vendored artifacts are validated by contract tests:
 
 ```bash
 uv run pytest tests/contract/test_vendor_agent_sdk.py -v
+uv run pytest tests/contract/test_upstream_sdk_drift.py -v
 ```
 
 These tests verify:
 - Vendor files exist and are valid JSON
 - Required SDK symbols are in API_MANIFEST
 - Tool names are extractable from reference
+- Installed SDK matches vendored manifests (when SDK is available)
 
 ## The Philosophy
 
@@ -173,7 +179,9 @@ When drift is detected, update the vendor snapshot - don't edit it manually.
 
 ```bash
 # Install the official package
-pip install claude-agent-sdk
+uv sync --extra dev
+# Or:
+# pip install claude-agent-sdk
 
 # Or the legacy package
 pip install claude-code-sdk
@@ -204,6 +212,8 @@ REFERENCE.md is optional but enables tool name extraction. Create it by:
 ## See Also
 
 - [docs/AGENT_SDK_INTEGRATION.md](../AGENT_SDK_INTEGRATION.md) - SDK integration guide
+- [docs/reference/FLOW_STUDIO_ADAPTER_CONTRACT.md](FLOW_STUDIO_ADAPTER_CONTRACT.md) - Adapter contract
 - [docs/reference/SDK_CAPABILITIES.md](SDK_CAPABILITIES.md) - Capability matrix
-- [tests/contract/test_sdk_contract.py](../../tests/contract/test_sdk_contract.py) - SDK contract tests
+- [tests/contract/test_claude_sdk_facade_contract.py](../../tests/contract/test_claude_sdk_facade_contract.py) - Adapter contract tests
+- [tests/contract/test_upstream_sdk_drift.py](../../tests/contract/test_upstream_sdk_drift.py) - SDK drift checks
 - [tests/contract/test_vendor_agent_sdk.py](../../tests/contract/test_vendor_agent_sdk.py) - Vendor contract tests
