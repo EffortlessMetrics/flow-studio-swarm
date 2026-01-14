@@ -519,13 +519,6 @@ def cmd_check(strict: bool = False) -> int:
         ok = False
         print(f"FAIL: {API_MANIFEST_JSON.relative_to(REPO_ROOT)} is stale")
         
-        # DEBUG
-        import difflib
-        cur_s = json.dumps({k:v for k,v in cur_api.items() if k != "generated_at"}, indent=2, sort_keys=True)
-        pay_s = json.dumps({k:v for k,v in api_payload.items() if k != "generated_at"}, indent=2, sort_keys=True)
-        print("Diff:")
-        print("\n".join(difflib.unified_diff(cur_s.splitlines(), pay_s.splitlines())))
-
         # Show what changed
         cur_exports = set(cur_api.get("exported", {}).keys())
         new_exports = set(api_payload.get("exported", {}).keys())
