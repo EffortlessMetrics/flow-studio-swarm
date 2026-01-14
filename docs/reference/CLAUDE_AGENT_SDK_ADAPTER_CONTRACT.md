@@ -4,6 +4,14 @@ This document defines the stable contract for Flow Studio's Claude Agent SDK
 adapter. The upstream SDK reference is vendored separately and does not imply
 support for every upstream symbol.
 
+## What Flow Studio does with the SDK
+
+Flow Studio orchestrates repeated SDK calls across step-based flows. Each step
+is a discrete SDK session (Work -> Finalize -> Route), and flows are sequences
+of these steps managed by the orchestrator with persisted handoff artifacts.
+Each step is a full multi-turn SDK call scoped to the tools and context needed
+for that step.
+
 ## Upstream SDK reference (vendored snapshot)
 
 - Snapshot location: `docs/vendor/anthropic/agent-sdk/python/REFERENCE.md`
