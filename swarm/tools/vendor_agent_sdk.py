@@ -104,10 +104,31 @@ def safe_get_dist_version(dist_name: str) -> Optional[str]:
         return None
 
 
+def scrub_unstable_repr(s: Optional[str]) -> Optional[str]:
+    """Scrub unstable object representations (addresses, stream names)."""
+    if not s:
+        return s
+    # Scrub hex addresses
+    s = re.sub(r" at 0x[0-9a-fA-F]+", " at 0x...", s)
+    
+    # If the whole string is an unstable object repr (from dataclass field default)
+    if (s.startswith("<_io.TextIOWrapper") or 
+        s.startswith("<EncodedFile") or 
+        s.startswith("<tempfile._TemporaryFileWrapper")):
+        return "<stream>"
+
+    # If it's embedded in a signature (e.g. debug_stderr: Any = <...>)
+    # Signature version: matches until the next parameter or end of signature
+    s = re.sub(r"debug_stderr: Any = <[^,)]+>", "debug_stderr: Any = <stream>", s)
+    
+    return s
+
+
 def format_signature(obj: Any) -> Optional[str]:
     """Get string representation of function/method signature."""
     try:
-        return str(inspect.signature(obj))
+        sig = str(inspect.signature(obj))
+        return scrub_unstable_repr(sig)
     except Exception:
         return None
 
@@ -121,7 +142,7 @@ def dataclass_fields_manifest(cls: Any) -> Optional[List[Dict[str, Any]]]:
         out.append({
             "name": f.name,
             "type": repr(f.type),
-            "default": None if f.default is dataclasses.MISSING else repr(f.default),
+            "default": scrub_unstable_repr(None if f.default is dataclasses.MISSING else repr(f.default)),
             "default_factory": (
                 None if f.default_factory is dataclasses.MISSING
                 else repr(f.default_factory)
@@ -497,6 +518,14 @@ def cmd_check(strict: bool = False) -> int:
     if not json_equal(cur_api, api_payload, ignore_keys=["generated_at"]):
         ok = False
         print(f"FAIL: {API_MANIFEST_JSON.relative_to(REPO_ROOT)} is stale")
+        
+        # DEBUG
+        import difflib
+        cur_s = json.dumps({k:v for k,v in cur_api.items() if k != "generated_at"}, indent=2, sort_keys=True)
+        pay_s = json.dumps({k:v for k,v in api_payload.items() if k != "generated_at"}, indent=2, sort_keys=True)
+        print("Diff:")
+        print("\n".join(difflib.unified_diff(cur_s.splitlines(), pay_s.splitlines())))
+
         # Show what changed
         cur_exports = set(cur_api.get("exported", {}).keys())
         new_exports = set(api_payload.get("exported", {}).keys())
