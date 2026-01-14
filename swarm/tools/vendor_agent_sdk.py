@@ -402,7 +402,15 @@ def cmd_write() -> int:
 
 
 def cmd_check(strict: bool = False) -> int:
-    """Verify vendored artifacts match installed SDK."""
+    """
+    Verify vendored artifacts match installed SDK.
+
+    IMPORTANT: This is a pure read-only operation. It NEVER writes files.
+    All comparisons use json_equal() with ignore_keys=["generated_at"] to ensure
+    deterministic results regardless of when the check is run. The generated_at
+    timestamps in expected payloads are only used for structural completeness
+    and are stripped before comparison.
+    """
     print("Checking vendored Claude Agent SDK artifacts...")
 
     # Check SDK is installed
