@@ -108,6 +108,6 @@ swarm/runs/2024-01-01/  # Cannot parse receipts
 ## See Also
 - [versioning-schemes.md](./versioning-schemes.md) - What versioning scheme to use
 - [versioning-compatibility.md](./versioning-compatibility.md) - What breaks vs what's safe
-- [deprecation-protocol.md](./deprecation-protocol.md) - Full deprecation lifecycle
+- [deprecation-stages.md](./deprecation-stages.md) - Full deprecation lifecycle
 - [receipt-schema.md](../artifacts/receipt-schema.md) - Current receipt format
 - [handoff-protocol.md](../artifacts/handoff-protocol.md) - Envelope structure

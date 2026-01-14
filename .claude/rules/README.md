@@ -57,11 +57,11 @@ When physics conflict, higher principles win. See [Physics Enforcement Hierarchy
 | Rule | Purpose |
 |------|---------|
 | `agent-behavioral-contracts.md` | Role families, status reporting, PM/IC model |
-| `agent-composition.md` | When to use one vs multiple agents |
+| `agent-composition-*.md`, `agent-when-*.md` | Composition patterns, single vs multiple agent decisions |
 | `anti-patterns-*.md` | Anti-pattern catalogs (agent, flow, evidence, economic) |
 | `budget-discipline.md` | The $30 run, cost allocation |
 | `calibration-*.md` | Learning loop, signals, improvement process |
-| `deprecation-protocol.md` | Sunset process for agents/flows |
+| `deprecation-*.md` | Sunset stages, migration requirements |
 | `evidence-discipline.md` | Sheriff pattern, what counts as evidence |
 | `factory-model.md` | Kernel as foreman, agents as interns |
 | `fix-forward-vocabulary.md` | BLOCKED is rare, valid outcomes |
@@ -73,9 +73,9 @@ When physics conflict, higher principles win. See [Physics Enforcement Hierarchy
 | `panel-thinking.md` | Anti-Goodhart multi-metric panels |
 | `prompt-*.md` | Prompt structure, banned patterns, required patterns |
 | `reviewer-protocol.md` | Three questions, review protocols |
-| `runbook-standards.md` | Executable operational guides |
+| `runbook-*.md` | Runbook structure, validation, standards |
 | `scarcity-enforcement.md` | Token budgets, two-reasons spawning |
-| `testing-philosophy.md` | Tests as evidence |
+| `tests-*.md`, `test-*.md` | Tests as evidence, test anti-patterns |
 | `truth-hierarchy.md` | Evidence levels |
 | `versioning-*.md` | Schemes, compatibility, migration |
 
@@ -87,7 +87,7 @@ When physics conflict, higher principles win. See [Physics Enforcement Hierarchy
 | `context-discipline.md` | Session amnesia, rehydration |
 | `detour-catalog.md` | Known fix patterns |
 | `error-*.md` | Classification, handling, aggregation |
-| `handoff-*.md` | Patterns and examples |
+| `handoff-*.md` | Patterns, examples, protocol |
 | `microloop-rules.md` | Exit conditions, fuse detection |
 | `navigator-protocol.md` | Forensics → decision → validation |
 | `resume-protocol.md` | Checkpoint semantics |
@@ -95,7 +95,7 @@ When physics conflict, higher principles win. See [Physics Enforcement Hierarchy
 | `routing-decisions.md` | Decision vocabulary |
 | `subsumption-principle.md` | Kernel compensates for backend gaps |
 | `timeout-policy.md` | Timeout hierarchy |
-| `token-efficiency.md` | Token waste indicates design problems |
+| `token-*.md` | Token budgets, compression, waste patterns |
 
 ### Artifacts (`artifacts/`)
 
@@ -118,14 +118,12 @@ When physics conflict, higher principles win. See [Physics Enforcement Hierarchy
 | `boundary-automation.md` | Publish gate enforcement |
 | `commit-standards.md` | Atomic, traceable commits |
 | `pr-standards.md` | PR descriptions, evidence |
-| `dependency-policy.md` | Every dependency is a liability |
+| `dependency-*.md` | Dependency intake, patterns, policy |
 | `git-safety.md` | Shadow fork model |
-| `incident-response.md` | Severity levels, response protocol |
-| `incident-response-flowstudio.md` | Failed runs, stuck runs, wrong output |
-| `rollback-procedures.md` | Fast recovery |
+| `incident-*.md` | Response protocol, failed runs, stuck runs, wrong output |
+| `rollback-*.md` | Rollback types, prevention, recovery |
 | `sandbox-and-permissions.md` | Containment model |
-| `secret-management.md` | Categories, storage, rotation |
-| `secret-detection-response.md` | Detection patterns, exposure response |
+| `secret-*.md` | Categories, storage, rotation, detection, response |
 
 ### Communication (`communication/`)
 

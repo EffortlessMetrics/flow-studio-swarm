@@ -208,7 +208,8 @@ Restating prior decisions in each handoff.
 ---
 
 ## See Also
-- [handoff-examples.md](./handoff-examples.md) - Detailed examples of each handoff type
+- [handoff-minimal.md](./handoff-minimal.md) - Minimal handoff examples for microloops
+- [handoff-standard-heavy.md](./handoff-standard-heavy.md) - Standard and heavy handoff examples
 - [context-discipline.md](./context-discipline.md) - Session amnesia and loading rules
 - [handoff-protocol.md](../artifacts/handoff-protocol.md) - Envelope schema
 - [scent-trail.md](../artifacts/scent-trail.md) - Decision provenance

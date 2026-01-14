@@ -111,4 +111,4 @@ Evidence: (none)
 - [evidence-discipline.md](./evidence-discipline.md) - What counts as evidence
 - [truth-hierarchy.md](./truth-hierarchy.md) - Evidence levels
 - [panel-thinking.md](./panel-thinking.md) - Multi-metric verification
-- [testing-philosophy.md](./testing-philosophy.md) - Tests as evidence
+- [tests-as-evidence.md](./tests-as-evidence.md) - Tests as evidence

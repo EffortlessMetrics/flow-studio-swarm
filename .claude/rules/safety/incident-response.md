@@ -223,8 +223,16 @@ Use the "5 Whys" technique:
 ---
 
 ## See Also
-- [incident-response-flowstudio.md](./incident-response-flowstudio.md) - Flow Studio specific incident playbooks
+
+### Flow Studio Playbooks
+- [incident-failed-run.md](./incident-failed-run.md) - Failed run diagnostic playbook
+- [incident-stuck-wrong.md](./incident-stuck-wrong.md) - Stuck runs and wrong output playbooks
+
+### Security
+- [secret-detection-response.md](./secret-detection-response.md) - Secret exposure response protocol
 - [boundary-automation.md](./boundary-automation.md) - Publish gate enforcement
+
+### Related
 - [git-safety.md](./git-safety.md) - Git operations safety
 - [sandbox-and-permissions.md](./sandbox-and-permissions.md) - Containment model
 - [../governance/evidence-discipline.md](../governance/evidence-discipline.md) - Evidence requirements

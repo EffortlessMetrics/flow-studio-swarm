@@ -121,4 +121,4 @@ schema_version: 5.0.0  # Was 4.0.0, only added optional field
 ## See Also
 - [versioning-schemes.md](./versioning-schemes.md) - What versioning scheme to use
 - [versioning-migration.md](./versioning-migration.md) - How to migrate between versions
-- [deprecation-protocol.md](./deprecation-protocol.md) - Sunset process for agents and flows
+- [deprecation-stages.md](./deprecation-stages.md) - Sunset process for agents and flows
