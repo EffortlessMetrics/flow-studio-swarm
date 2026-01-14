@@ -189,13 +189,17 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 | `narrow-trust.md` | Supported | Scope via role families; trust calculation not automated |
 | `pack-check-philosophy.md` | Enforced | This IS the validation philosophy |
 | `panel-thinking.md` | Designed | Gate agents implement; no automated panel checks |
-| `prompt-hygiene.md` | Designed | Banned patterns defined; automated validation pending |
+| `prompt-structure.md` | Designed | Teaching notes format defined; validation checklist provided |
+| `prompt-banned-patterns.md` | Designed | Banned patterns defined; automated validation pending |
+| `prompt-required-patterns.md` | Designed | Required patterns defined; evidence binding guidance |
 | `reviewer-protocol.md` | Designed | Review process defined; no automated enforcement |
 | `runbook-standards.md` | Designed | Structure defined; runbook validation not automated |
 | `scarcity-enforcement.md` | Supported | Context budgets implemented; full enforcement partial |
 | `testing-philosophy.md` | Supported | Gate agents check test evidence; mutation testing not automated |
 | `truth-hierarchy.md` | Supported | `receipt_io.py` structure; hierarchy not enforced |
-| `versioning-policy.md` | Designed | Version fields defined; version validation pending |
+| `versioning-schemes.md` | Designed | Version schemes defined; version validation pending |
+| `versioning-compatibility.md` | Designed | Compatibility rules defined; breaking change detection pending |
+| `versioning-migration.md` | Designed | Migration process defined; automated migration pending |
 
 #### Execution Rules
 
@@ -210,7 +214,9 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 | `resume-protocol.md` | Designed | Checkpoint spec exists; resume logic partial |
 | `routing-decisions.md` | Supported | Vocabulary defined; routing validation incomplete |
 | `subsumption-principle.md` | Supported | Transport capabilities declared; subsumption partial |
-| `timeout-retry-policy.md` | Supported | Timeouts implemented; circuit breakers partial |
+| `timeout-policy.md` | Supported | Kernel enforces via asyncio |
+| `retry-policy.md` | Designed | Transports implement |
+| `circuit-breaker.md` | Designed | Kernel would implement |
 | `token-efficiency.md` | Designed | Guidelines defined; efficiency tracking not automated |
 
 #### Artifact Rules
@@ -238,7 +244,8 @@ Rules indicate their enforcement status. This prevents claiming capabilities tha
 | `incident-response.md` | Designed | Protocol defined; automated escalation pending |
 | `rollback-procedures.md` | Designed | Procedures defined; rollback automation pending |
 | `sandbox-and-permissions.md` | Enforced | `.claude/settings.json` deny patterns |
-| `secret-management.md` | Supported | Patterns defined; pre-commit hook + Flow 6 boundary scan |
+| `secret-management.md` | Supported | Categories, storage, rotation; pre-commit hook |
+| `secret-detection-response.md` | Supported | Detection patterns; Flow 6 boundary scan; redaction |
 
 ### Adding New Rules
 
@@ -260,9 +267,15 @@ This creates an audit trail from spec to enforcement
 |------|---------|
 | `agent-behavioral-contracts.md` | PM/IC model, role families, status reporting |
 | `agent-composition.md` | When to use one vs multiple agents, composition patterns |
-| `anti-patterns.md` | Catalog of common mistakes to avoid |
+| `anti-patterns-index.md` | Quick reference table linking to domain anti-patterns |
+| `anti-patterns-agent.md` | Self-evaluation, unbounded scope, role mixing, narrative trust |
+| `anti-patterns-flow.md` | Mid-flow blocking, scope creep, skipping gates |
+| `anti-patterns-evidence.md` | Hollow tests, stale receipts, single metric |
+| `anti-patterns-economic.md` | Premature abort, runaway spending, review theater |
 | `budget-discipline.md` | The $30 run, cost allocation by flow |
-| `calibration-protocol.md` | Continuous improvement, learning loops from Flow 7 |
+| `calibration-loop.md` | Learning loop, feedback loops, Flow 7 responsibilities |
+| `calibration-signals.md` | Primary/secondary metrics, signal collection |
+| `calibration-improvement.md` | Pattern detection, improvement process, cadence |
 | `deprecation-protocol.md` | How to sunset agents, flows, capabilities safely |
 | `evidence-discipline.md` | Sheriff pattern, what counts as evidence |
 | `factory-model.md` | Mental model: kernel as foreman, agents as interns, disk as ledger |
@@ -273,27 +286,36 @@ This creates an audit trail from spec to enforcement
 | `narrow-trust.md` | Trust equation: scope × evidence × verification |
 | `pack-check-philosophy.md` | Competence over compliance validation |
 | `panel-thinking.md` | Anti-Goodhart multi-metric panels |
-| `prompt-hygiene.md` | Banned patterns, required sections, evidence over narrative |
+| `prompt-structure.md` | Teaching notes format, context loading order, validation checklist |
+| `prompt-banned-patterns.md` | Vague instructions, unbounded scope, self-evaluation, hedging |
+| `prompt-required-patterns.md` | Success criteria, artifact paths, evidence requirements, escape hatches |
 | `reviewer-protocol.md` | The three questions, 90-second and 10-minute review protocols |
 | `runbook-standards.md` | Executable operational guides, required structure |
 | `scarcity-enforcement.md` | Token budgets as design, two-reasons spawning rule |
 | `testing-philosophy.md` | Tests as evidence, mutation testing, verification escalation |
 | `truth-hierarchy.md` | Evidence levels (physics > receipts > narrative) |
-| `versioning-policy.md` | Schema/flow/agent versioning, compatibility guarantees, migrations |
+| `versioning-schemes.md` | What versioning scheme to use for each artifact type |
+| `versioning-compatibility.md` | Breaking vs non-breaking changes, version in artifacts |
+| `versioning-migration.md` | Reading old artifacts, migration scripts, deprecation |
 
 ### Execution Rules
 | Rule | Purpose |
 |------|---------|
+| `circuit-breaker.md` | Cascade failure prevention, state machine |
 | `context-discipline.md` | Session amnesia, rehydration pattern |
-| `context-handoff-patterns.md` | Right-sizing context between steps |
 | `detour-catalog.md` | Known fix patterns (lint, import, type, etc.) |
-| `error-taxonomy.md` | Error classification and handling strategies |
+| `error-classification.md` | Error categories (transient, permanent, retriable, fatal) |
+| `error-handling.md` | Handling strategies, retry logic, escalation paths |
+| `error-aggregation.md` | Precedence order, multiple error resolution |
+| `handoff-patterns.md` | Sizing, compression, what to include/exclude |
+| `handoff-examples.md` | Minimal, standard, heavy handoff examples |
 | `microloop-rules.md` | Exit conditions, fuse detection |
 | `navigator-protocol.md` | Routing brain: forensics → decision → validation |
 | `resume-protocol.md` | Checkpoint semantics, crash recovery |
+| `retry-policy.md` | Retry strategies, backoff, rate limits |
 | `routing-decisions.md` | Decision vocabulary (CONTINUE, LOOP, DETOUR, etc.) |
 | `subsumption-principle.md` | Kernel compensates for backend gaps |
-| `timeout-retry-policy.md` | Timeouts, retries, circuit breakers |
+| `timeout-policy.md` | Timeout hierarchy, recovery, configuration |
 | `token-efficiency.md` | Token waste indicates design problems |
 
 ### Artifact Rules
@@ -301,9 +323,15 @@ This creates an audit trail from spec to enforcement
 |------|---------|
 | `artifact-naming.md` | Predictable naming conventions |
 | `capability-registry.md` | Evidence binding for capability claims |
-| `data-retention.md` | Artifact lifecycle management |
+| `data-retention.md` | Artifact lifecycle overview, storage costs |
+| `data-retention-lifecycle.md` | Retention periods, cleanup policies |
+| `data-retention-exceptions.md` | PR, incident, compliance hold exceptions |
+| `data-retention-privacy.md` | PII handling, deletion requests, anonymization |
 | `handoff-protocol.md` | Envelope structure for step transitions |
-| `observability-contract.md` | Structured logging, JSONL format |
+| `observability-contract.md` | Logging overview, validation, anti-patterns |
+| `observability-schema.md` | Required/optional fields, log levels |
+| `observability-content.md` | What to log, what never to log |
+| `observability-placement.md` | Trace correlation, log locations, rotation |
 | `off-road-logging.md` | Routing decision audit trail |
 | `receipt-schema.md` | Required fields for audit trail |
 | `scent-trail.md` | Decision provenance breadcrumbs |
@@ -317,9 +345,11 @@ This creates an audit trail from spec to enforcement
 | `dependency-policy.md` | Every dependency is a liability |
 | `git-safety.md` | Prohibited operations, conflict resolution |
 | `incident-response.md` | Severity levels, response protocol, post-mortems |
+| `incident-response-flowstudio.md` | Flow Studio specific: failed runs, stuck runs, wrong output |
 | `rollback-procedures.md` | Fast recovery, undo strategies |
 | `sandbox-and-permissions.md` | Containment checklist, boundary model |
-| `secret-management.md` | Full secret lifecycle: categories, storage, rotation, detection, response |
+| `secret-management.md` | Secret categories, storage rules, rotation policy |
+| `secret-detection-response.md` | Detection patterns, exposure response, redaction |
 
 ### Communication Rules
 | Rule | Purpose |

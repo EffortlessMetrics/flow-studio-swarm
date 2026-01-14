@@ -119,18 +119,6 @@ Confirm the fix works. Trust physics, not narrative.
 - [ ] Evidence shows fix is effective
 - [ ] No new issues introduced
 
-**For Flow Studio runs:**
-```bash
-# Re-run the failing flow
-make stepwise-<flow> RUN_ID=<new-run-id>
-
-# Verify receipt shows success
-cat RUN_BASE/<flow>/receipts/<step>-<agent>.json
-
-# Check evidence panel
-# All metrics should agree
-```
-
 ### 6. Document
 
 Create the post-mortem. This is mandatory for SEV1/SEV2.
@@ -226,112 +214,6 @@ Use the "5 Whys" technique:
 
 **Root cause:** Import validation missing from pre-commit hooks.
 
-## Flow Studio Specific Incidents
-
-### Failed Run
-
-```
-1. Check receipt for failing step
-   → RUN_BASE/<flow>/receipts/<step>-<agent>.json
-
-2. Check status field
-   → "succeeded" | "failed" | "interrupted"
-
-3. If failed, check error field
-   → Error message and stack trace
-
-4. Check transcript for context
-   → RUN_BASE/<flow>/llm/<step>-<agent>-<engine>.jsonl
-
-5. Check handoff envelope
-   → RUN_BASE/<flow>/handoffs/<step>-<agent>.json
-   → Look at concerns[] and routing.reason
-```
-
-### Stuck Run
-
-```
-1. Identify the stuck step
-   → Which step has no receipt or incomplete receipt?
-
-2. Check for BLOCKED status
-   → RUN_BASE/<flow>/handoffs/*.json
-   → Look for "status": "BLOCKED"
-
-3. Check for missing inputs
-   → Does previous step's output exist?
-   → Are required artifacts present?
-
-4. Check routing decisions
-   → RUN_BASE/<flow>/routing/decisions.jsonl
-   → Was there an ESCALATE that wasn't handled?
-
-5. Check iteration limits
-   → Microloop at max iterations?
-   → Same failure signature repeated?
-```
-
-### Wrong Output
-
-```
-1. Check evidence panel
-   → Do all metrics agree?
-   → Any "not measured" that should have been measured?
-
-2. Verify inputs were correct
-   → Check previous flow outputs
-   → Check teaching notes loaded correctly
-
-3. Check scent trail
-   → RUN_BASE/<flow>/scent_trail.json
-   → Were prior decisions correct?
-
-4. Check assumptions
-   → Handoff envelope assumptions[] field
-   → Were assumptions valid?
-
-5. Compare to spec
-   → Does output match requirements?
-   → Were requirements correctly interpreted?
-```
-
-### Security Incident
-
-```
-1. IMMEDIATE: Revoke any exposed credentials
-   → Rotate API keys, tokens, passwords
-
-2. Assess scope
-   → What was exposed?
-   → For how long?
-   → Who had access?
-
-3. Check boundary logs
-   → Did secrets scan run?
-   → What slipped through?
-
-4. Audit recent publishes
-   → git log of upstream pushes
-   → Any suspicious commits?
-
-5. Notify stakeholders
-   → Security team
-   → Affected users
-   → Legal if required
-```
-
-## Action Item Template
-
-Every action item must have:
-
-```markdown
-- [ ] **Action**: <specific action to take>
-  - **Owner**: <person responsible>
-  - **Deadline**: <date>
-  - **Verification**: <how we know it's done>
-  - **Status**: pending | in-progress | complete
-```
-
 ## The Rule
 
 > Detect fast. Contain immediately. Diagnose thoroughly.
@@ -341,6 +223,7 @@ Every action item must have:
 ---
 
 ## See Also
+- [incident-response-flowstudio.md](./incident-response-flowstudio.md) - Flow Studio specific incident playbooks
 - [boundary-automation.md](./boundary-automation.md) - Publish gate enforcement
 - [git-safety.md](./git-safety.md) - Git operations safety
 - [sandbox-and-permissions.md](./sandbox-and-permissions.md) - Containment model

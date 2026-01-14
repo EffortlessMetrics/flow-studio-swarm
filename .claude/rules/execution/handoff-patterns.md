@@ -1,4 +1,4 @@
-# Context Handoff Patterns
+# Handoff Patterns
 
 Effective patterns for passing context between steps. Right-size handoffs prevent confusion and waste.
 
@@ -135,11 +135,9 @@ When a step receives a handoff:
 - Unrelated artifacts
 - Stale context from earlier runs
 
-## The Scent Trail
+## Scent Trail vs Handoff
 
 The scent trail is NOT a handoff. It's the accumulated decision history across all steps.
-
-### Scent Trail vs Handoff
 
 | Aspect | Handoff | Scent Trail |
 |--------|---------|-------------|
@@ -163,156 +161,6 @@ Step 5: "Per scent trail, using OAuth (decided step 2). Implementing callback...
 Step 6: "Per scent trail, OAuth decided. Adding token refresh..."
 Step 7: "Per scent trail, OAuth decided. Testing integration..."
 ```
-
-## Handoff Examples
-
-### Good: Minimal Handoff (Critic -> Author)
-
-```json
-{
-  "status": "UNVERIFIED",
-  "summary": {
-    "what_i_found": "1 HIGH issue"
-  },
-  "concerns": [
-    {
-      "severity": "HIGH",
-      "description": "Missing input validation",
-      "location": "src/auth.py:42",
-      "recommendation": "Add validation before database query"
-    }
-  ],
-  "routing": {
-    "recommendation": "LOOP",
-    "can_further_iteration_help": true
-  }
-}
-```
-
-**Why it's good:** Focused on one issue. Clear location. Actionable recommendation. ~200 tokens.
-
-### Bad: Bloated Minimal Handoff
-
-```json
-{
-  "status": "UNVERIFIED",
-  "summary": {
-    "what_i_did": "I carefully reviewed the entire codebase looking for issues...",
-    "what_i_found": "After extensive analysis of the authentication module, I discovered that there are several concerns that need to be addressed. The first issue relates to input validation which is critically important for security. The second issue involves error handling which could be improved. The third issue..."
-  },
-  "concerns": [
-    {
-      "severity": "HIGH",
-      "description": "The validate_token function in the auth module does not properly validate user input before passing it to the database query, which could potentially lead to SQL injection vulnerabilities if an attacker were to craft malicious input...",
-      "location": "src/auth.py",
-      "recommendation": "You should add proper input validation by sanitizing the input, checking for malicious characters, and using parameterized queries..."
-    }
-  ]
-}
-```
-
-**Why it's bad:** Verbose prose. Missing line number. Over-explained. ~800 tokens for same information.
-
-### Good: Standard Handoff (Step N -> Step N+1)
-
-```json
-{
-  "meta": {
-    "step_id": "build-step-3",
-    "agent_key": "code-implementer"
-  },
-  "status": "UNVERIFIED",
-  "summary": {
-    "what_i_did": "Implemented REQ-001 through REQ-005",
-    "what_i_found": "REQ-003 has ambiguous edge case",
-    "key_decisions": [
-      "Used existing auth library (per ADR-005)",
-      "Assumed 24h session duration (not specified)"
-    ],
-    "evidence": {
-      "artifacts_produced": [
-        "src/auth.py",
-        "tests/test_auth.py"
-      ],
-      "commands_run": [
-        "pytest tests/test_auth.py -v"
-      ],
-      "measurements": {
-        "tests_passed": 12,
-        "tests_failed": 0,
-        "coverage": "78%"
-      }
-    }
-  },
-  "assumptions": [
-    {
-      "assumption": "Session duration is 24 hours",
-      "why": "Not specified in requirements",
-      "impact_if_wrong": "Would need config change"
-    }
-  ],
-  "routing": {
-    "recommendation": "CONTINUE",
-    "reason": "Ready for critic review"
-  }
-}
-```
-
-**Why it's good:** Complete but concise. Evidence pointers (not inline). Assumptions documented. ~800 tokens.
-
-### Good: Heavy Handoff (Flow 2 -> Flow 3)
-
-```json
-{
-  "meta": {
-    "step_id": "plan-final",
-    "flow_key": "plan",
-    "agent_key": "plan-synthesizer"
-  },
-  "status": "VERIFIED",
-  "summary": {
-    "what_i_did": "Completed architectural planning phase",
-    "what_i_found": "Feature is well-scoped, moderate complexity",
-    "key_decisions": [
-      "OAuth with PKCE flow (ADR-005)",
-      "Use existing auth library (ADR-005)",
-      "PostgreSQL session storage (ADR-006)",
-      "Rate limiting via Redis (ADR-007)"
-    ],
-    "evidence": {
-      "artifacts_produced": [
-        "RUN_BASE/plan/adr-005.md",
-        "RUN_BASE/plan/adr-006.md",
-        "RUN_BASE/plan/adr-007.md",
-        "RUN_BASE/plan/contracts.md",
-        "RUN_BASE/plan/work_plan.md",
-        "RUN_BASE/plan/test_plan.md"
-      ]
-    }
-  },
-  "plan_summary": {
-    "work_items": 8,
-    "estimated_complexity": "MEDIUM",
-    "key_interfaces": [
-      "AuthService.authenticate(credentials) -> Token",
-      "AuthService.refresh(token) -> Token",
-      "AuthService.revoke(token) -> void"
-    ],
-    "dependencies": [
-      "auth-library: ^2.0.0",
-      "redis: ^4.0.0"
-    ],
-    "test_strategy": "Unit tests for auth logic, integration tests for token flow"
-  },
-  "routing": {
-    "recommendation": "CONTINUE",
-    "next_step_suggestion": "build-step-0",
-    "reason": "Plan complete, ready for implementation"
-  }
-}
-```
-
-**Why it's good:** Comprehensive for flow boundary. Key interfaces defined. Dependencies listed. Still uses pointers for full content. ~1500 tokens.
 
 ## The Rule
 
@@ -360,6 +208,7 @@ Restating prior decisions in each handoff.
 ---
 
 ## See Also
+- [handoff-examples.md](./handoff-examples.md) - Detailed examples of each handoff type
 - [context-discipline.md](./context-discipline.md) - Session amnesia and loading rules
 - [handoff-protocol.md](../artifacts/handoff-protocol.md) - Envelope schema
 - [scent-trail.md](../artifacts/scent-trail.md) - Decision provenance
