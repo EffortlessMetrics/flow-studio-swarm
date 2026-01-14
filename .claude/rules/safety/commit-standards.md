@@ -1,4 +1,4 @@
-# Commit and PR Standards
+# Commit Standards
 
 Commits are audit artifacts. They must be atomic, traceable, and bisectable.
 
@@ -60,54 +60,6 @@ Fixes #234
 | `Relates to #456` | Links without closing | Partial work, related context |
 | `Part of #789` | Work toward larger issue | Incremental progress |
 
-## PR Description Format
-
-### Required Sections
-
-```markdown
-## Summary
-- What this PR accomplishes (1-3 bullets)
-- Key changes at a glance
-
-## Test Plan
-- How to verify this works
-- Commands to run
-- Expected outcomes
-
-## Evidence
-- Receipt paths: `RUN_BASE/build/receipts/...`
-- Test output: `RUN_BASE/build/test_output.log`
-- Coverage: X% (link to report)
-
-## Risks/Concerns (if any)
-- Known limitations
-- Areas needing extra review
-- Assumptions made
-```
-
-### Example PR Description
-
-```markdown
-## Summary
-- Add token refresh mechanism for OAuth2 flow
-- Handle refresh token expiration gracefully
-- Add retry logic for transient failures
-
-## Test Plan
-1. Run `pytest tests/test_auth.py -v`
-2. Verify all 12 new tests pass
-3. Manual test: login, wait 5 min, verify auto-refresh
-
-## Evidence
-- Test receipt: `swarm/runs/abc123/build/receipts/step-5-test-author.json`
-- Test output: 47 passed, 0 failed (see attached log)
-- Coverage: 94% on auth module
-
-## Risks/Concerns
-- Refresh token storage assumes secure cookie context
-- Rate limiting not yet implemented for refresh endpoint
-```
-
 ## What Commits Must NOT Contain
 
 ### Multiple Unrelated Changes
@@ -154,7 +106,6 @@ aws_secret_access_key: AKIA...
 ```bash
 # BAD: Large binaries in repo
 git add model.pkl  # 500MB
-git add dataset.zip  # 2GB
 
 # GOOD: Use Git LFS or external storage
 git lfs track "*.pkl"
@@ -178,7 +129,6 @@ git add .gitattributes
 # Bisectable history means:
 git checkout HEAD~5  # Tests should pass
 git checkout HEAD~3  # Tests should pass
-git checkout HEAD~1  # Tests should pass
 git checkout HEAD    # Tests should pass
 
 # BAD pattern:
@@ -239,12 +189,10 @@ Agent commits use standard types, NOT automation markers:
 ```bash
 # GOOD: Standard commit type
 git commit -m "feat: add rate limiting to API"
-git commit -m "fix: handle edge case in parser"
 
 # BAD: Automation markers in subject
 git commit -m "[AUTO] feat: add rate limiting"
 git commit -m "AI: add rate limiting to API"
-git commit -m "Generated: add rate limiting"
 ```
 
 Automation is evident from the receipt reference in the body, not the subject.
@@ -252,19 +200,16 @@ Automation is evident from the receipt reference in the body, not the subject.
 ## The Rule
 
 > Commits are audit artifacts. Atomic, traceable, bisectable.
-> PRs include evidence. Summary, test plan, receipts.
 > Agent commits reference receipts. No hook bypasses.
 
 ## Examples: Good vs Bad
-
-### Commit Messages
 
 ```bash
 # BAD: Vague
 git commit -m "fix stuff"
 
 # BAD: Too long subject
-git commit -m "fix: this commit fixes the bug where users couldn't log in when their session expired"
+git commit -m "fix: this commit fixes the bug where users couldn't log in"
 
 # BAD: Past tense
 git commit -m "fix: fixed the login bug"
@@ -276,36 +221,10 @@ git commit -m "add rate limiting"
 git commit -m "fix: prevent session timeout during active use"
 ```
 
-### PR Descriptions
-
-```markdown
-# BAD: No structure, no evidence
-This PR adds some auth stuff. Please review.
-
-# BAD: Implementation details, no test plan
-This PR changes line 45 of auth.py to use a different hash.
-Also updated line 102 to handle the new format.
-
-# GOOD: Structured with evidence
-## Summary
-- Add bcrypt password hashing (replaces MD5)
-- Migrate existing users on next login
-
-## Test Plan
-- Run `pytest tests/test_auth.py -v`
-- Verify password upgrade on login
-
-## Evidence
-- Receipt: swarm/runs/xyz/build/receipts/step-3.json
-- Tests: 23 passed
-
-## Risks
-- Migration is lazy (on login), not bulk
-```
-
 ---
 
 ## See Also
+- [pr-standards.md](./pr-standards.md) - PR description requirements
 - [git-safety.md](./git-safety.md) - Git operations by zone
 - [boundary-automation.md](./boundary-automation.md) - Publish gate checks
 - [receipt-schema.md](../artifacts/receipt-schema.md) - Receipt requirements

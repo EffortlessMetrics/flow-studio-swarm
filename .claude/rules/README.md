@@ -9,10 +9,10 @@ These rules encode Steven Zimmerman's AI-native development philosophy: **trade 
 
 | Directory | Purpose | Enforcement |
 |-----------|---------|-------------|
-| `governance/` | Agent behavioral contracts, state machines, error handling | Agent prompts + validation |
-| `execution/` | Context budgets, routing decisions, microloop limits | Runtime kernel |
-| `artifacts/` | Receipt schemas, handoff protocols, audit trails | `receipt_io.py` + validation |
-| `safety/` | Git safety, branch protection, secrets, permissions | Hooks + boundary agents |
+| `governance/` | Agent behavioral contracts, trust equations, calibration | Agent prompts + validation |
+| `execution/` | Context budgets, routing decisions, error handling | Runtime kernel |
+| `artifacts/` | Receipt schemas, handoff protocols, observability | `receipt_io.py` + validation |
+| `safety/` | Git safety, secrets, incident response, permissions | Hooks + boundary agents |
 | `communication/` | Documentation philosophy, messaging, voice | Human review |
 
 ## Core Principle
@@ -27,342 +27,129 @@ These rules encode Steven Zimmerman's AI-native development philosophy: **trade 
 
 Rules encode the "physics" that make autonomous operation safe:
 
-1. **Truth Hierarchy** - What counts as evidence (physics > receipts > narrative)
+1. **Truth Hierarchy** - Physics beats narrative (exit codes > claims)
 2. **Session Amnesia** - Each step starts fresh; disk is memory
 3. **Mechanical Truth** - Never ask models to judge success; measure it
-4. **Contained Blast Radius** - Work can be destructive inside the sandbox; publishing is gated
+4. **Contained Blast Radius** - Destructive inside sandbox; gated at boundary
 5. **Bounded Routing** - Kernel generates candidates; Navigator selects; kernel validates
 6. **Narrow Trust** - Scope narrowness × evidence quality × verification depth
-7. **Navigator Protocol** - Forensics-based routing with bounded decisions
+
+When physics conflict, higher principles win. See [Physics Enforcement Hierarchy](#physics-enforcement-hierarchy) below.
 
 ---
 
 ## Physics Enforcement Hierarchy
 
-When physics conflict, this is the resolution order. Higher principles override lower ones.
-
-### 1. Truth Hierarchy (Highest Priority)
-
-**Physics beats narrative. Always.**
-
-When an agent claims "tests passed" but pytest exit code is non-zero, trust the exit code.
-When a receipt says "clean" but git status shows uncommitted files, trust git.
-
-| Level | Source | Trust |
-|-------|--------|-------|
-| Physics | Exit codes, file hashes, git status | Absolute |
-| Receipts | Captured tool output, logs | High |
-| Artifacts | Generated files, diffs | Medium |
-| Narrative | Agent claims, prose | Lowest |
-
-**Enforcement**: `receipt_io.py` validates evidence pointers; Gate agents require evidence before merge recommendation.
-
-### 2. Boundary Physics
-
-**Publish gates are real; internal gates are routing.**
-
-Inside the shadow fork (Flows 1-5): full autonomy. Any git operation permitted.
-At publish boundary (Flow 6): strict controls. Secrets scan, evidence verification, no force push.
-
-This principle means:
-- Internal "failures" are routing signals, not hard stops
-- External publishing has hard stops (secrets, missing evidence)
-- BLOCKED inside a flow is exceptional; BLOCKED at boundary is enforced
-
-**Enforcement**: `boundary-automation.md` defines the gate; Flow 6 runs secrets scan before upstream push.
-
-### 3. Evidence Discipline
-
-**Existence + freshness required.**
-
-Evidence must:
-- Exist (file path resolves)
-- Be fresh (from this commit, not stale)
-- Be corroborated (multiple sources agree when possible)
-
-"Not measured" is honest and valid. False certainty is not.
-
-**Enforcement**: `receipt-schema.md` requires evidence paths; Gate agents verify freshness via commit SHA.
-
-### 4. Narrow Trust
-
-**Trust = Scope × Evidence × Verification**
-
-A narrow agent with strong evidence is more trustworthy than a broad agent with weak evidence.
-
-| Factor | High Value | Low Value |
-|--------|------------|-----------|
-| Scope | Single job, bounded blast radius | "Do everything" |
-| Evidence | Physics-level proof | Narrative claims |
-| Verification | Multiple independent checks | Self-reported |
-
-**Enforcement**: Agent behavioral contracts define single jobs; role families constrain scope.
-
-### 5. Session Amnesia (Lowest Priority)
-
-**Disk is memory; chat is ephemeral.**
-
-Each step starts fresh. Prior conversation is NOT a dependency. Continuity comes from:
-- Artifacts on disk
-- Handoff envelopes
-- Scent trail (decision breadcrumbs)
-
-This principle yields to the above when:
-- Evidence requires loading prior artifacts (truth hierarchy wins)
-- Context budgets constrain what can be loaded (scarcity enforcement)
-
-**Enforcement**: `context-discipline.md` defines rehydration from artifacts, not conversation.
-
-### Conflict Resolution Examples
-
-| Conflict | Resolution |
-|----------|------------|
-| Agent says "done" but tests fail | Truth hierarchy: tests fail = not done |
-| Internal step wants to block | Boundary physics: route forward, document concern |
-| Evidence exists but is stale | Evidence discipline: re-run or flag as unverified |
-| Broad agent claims success | Narrow trust: require more evidence for broad claims |
-| Need prior context but budget exceeded | Session amnesia + scarcity: load only critical items |
+| Priority | Principle | When Conflicts Arise |
+|----------|-----------|---------------------|
+| 1 | **Truth Hierarchy** | Physics beats narrative. Trust exit codes, not claims. |
+| 2 | **Boundary Physics** | Internal failures are routing signals; publish gates are hard stops. |
+| 3 | **Evidence Discipline** | Evidence must exist AND be fresh. "Not measured" is valid. |
+| 4 | **Narrow Trust** | Broad claims require more evidence than narrow claims. |
+| 5 | **Session Amnesia** | Disk is memory; chat is ephemeral. Load from artifacts, not history. |
 
 ---
-
-## FR-XXX to Rules Mapping
-
-Each FR validation rule implements or supports specific physics rules.
-
-| FR Rule | Primary Purpose | Implementing Rules | Status |
-|---------|-----------------|-------------------|--------|
-| **FR-001** | Agent registry bijection | `agent-behavioral-contracts.md` (single job), `narrow-trust.md` (scope) | Enforced |
-| **FR-002** | Frontmatter validity | `agent-behavioral-contracts.md` (role families), `model-policy.md` (model allocation) | Enforced |
-| **FR-002b** | Color semantics | `agent-behavioral-contracts.md` (role family colors) | Enforced |
-| **FR-003** | Flow reference validity | `flow-charters.md` (flow structure), `routing-decisions.md` (agent routing) | Enforced |
-| **FR-004** | Skill file validity | `teaching-notes-contract.md` (skill instructions) | Enforced |
-| **FR-005** | RUN_BASE path hygiene | `receipt-schema.md` (artifact placement), `handoff-protocol.md` (envelope paths) | Enforced |
-| **FR-006** | Prompt section completeness | `teaching-notes-contract.md` (required sections), `agent-behavioral-contracts.md` (handoff) | Supported |
-| **FR-006a** | Microloop phrase bans | `microloop-rules.md` (exit conditions), `fix-forward-vocabulary.md` (status semantics) | Enforced |
-| **FR-007** | Capability evidence | `capability-registry.md` (evidence binding), `evidence-discipline.md` (claim verification) | Enforced |
-| **FR-CONF** | Config coverage | `agent-behavioral-contracts.md` (role families), `model-policy.md` (model tiers) | Enforced |
-| **FR-FLOWS** | Flow invariants | `flow-charters.md` (flow structure), `routing-decisions.md` (step connectivity) | Enforced |
-
-### Physics Enforcement by FR Rule
-
-| FR Rule | Primary Physics Enforced |
-|---------|-------------------------|
-| FR-001, FR-002, FR-002b | Narrow Trust (scope definition) |
-| FR-003, FR-FLOWS | Bounded Routing (flow structure) |
-| FR-005 | Session Amnesia (artifact placement) |
-| FR-006, FR-006a | Mechanical Truth (exit conditions) |
-| FR-007 | Truth Hierarchy (evidence over claims) |
-| FR-CONF | Narrow Trust (role family constraints) |
-
----
-
-## Implementation Status Convention
-
-Rules indicate their enforcement status. This prevents claiming capabilities that aren't actually enforced.
-
-### Status Definitions
-
-| Status | Meaning | Indicator |
-|--------|---------|-----------|
-| **Enforced** | Automated validation exists and runs in CI | Cite: `validate_swarm.py` function or hook |
-| **Supported** | Code exists but validation is incomplete or optional | Cite: code path + what's missing |
-| **Designed** | Spec exists, implementation pending | Cite: design doc or rule file |
-
-### Current Rule Status
-
-#### Governance Rules
-
-| Rule | Status | Enforcement Point |
-|------|--------|-------------------|
-| `agent-behavioral-contracts.md` | Enforced | `validate_bijection()`, `validate_frontmatter()`, `validate_colors()` |
-| `agent-composition.md` | Designed | Composition patterns defined; spawn validation not automated |
-| `anti-patterns.md` | Designed | Reference catalog; patterns inform other rule enforcement |
-| `budget-discipline.md` | Designed | Budget targets defined; cost tracking not automated |
-| `calibration-protocol.md` | Designed | Learning loop defined; Flow 7 implements manually |
-| `deprecation-protocol.md` | Designed | Sunset process defined; deprecation warnings not automated |
-| `evidence-discipline.md` | Supported | `receipt_io.py` validates structure; freshness check not automated |
-| `factory-model.md` | Designed | Mental model for documentation; no automated enforcement |
-| `fix-forward-vocabulary.md` | Designed | Semantic validation of BLOCKED usage not automated |
-| `flow-charters.md` | Supported | Flow structure validated; goal-alignment not automated |
-| `forensics-over-testimony.md` | Supported | Kernel uses forensics for routing; full validation not automated |
-| `model-policy.md` | Enforced | `validate_frontmatter()` checks model values |
-| `narrow-trust.md` | Supported | Scope via role families; trust calculation not automated |
-| `pack-check-philosophy.md` | Enforced | This IS the validation philosophy |
-| `panel-thinking.md` | Designed | Gate agents implement; no automated panel checks |
-| `prompt-structure.md` | Designed | Teaching notes format defined; validation checklist provided |
-| `prompt-banned-patterns.md` | Designed | Banned patterns defined; automated validation pending |
-| `prompt-required-patterns.md` | Designed | Required patterns defined; evidence binding guidance |
-| `reviewer-protocol.md` | Designed | Review process defined; no automated enforcement |
-| `runbook-standards.md` | Designed | Structure defined; runbook validation not automated |
-| `scarcity-enforcement.md` | Supported | Context budgets implemented; full enforcement partial |
-| `testing-philosophy.md` | Supported | Gate agents check test evidence; mutation testing not automated |
-| `truth-hierarchy.md` | Supported | `receipt_io.py` structure; hierarchy not enforced |
-| `versioning-schemes.md` | Designed | Version schemes defined; version validation pending |
-| `versioning-compatibility.md` | Designed | Compatibility rules defined; breaking change detection pending |
-| `versioning-migration.md` | Designed | Migration process defined; automated migration pending |
-
-#### Execution Rules
-
-| Rule | Status | Enforcement Point |
-|------|--------|-------------------|
-| `context-discipline.md` | Supported | Kernel implements; no validation of context loading |
-| `context-handoff-patterns.md` | Designed | Patterns defined; sizing validation not automated |
-| `detour-catalog.md` | Designed | Detour patterns defined; matching not automated |
-| `error-taxonomy.md` | Supported | Classification used in kernel; full routing partial |
-| `microloop-rules.md` | Enforced | `validate_microloop_phrases()` bans old patterns |
-| `navigator-protocol.md` | Supported | Kernel routing exists; validation incomplete |
-| `resume-protocol.md` | Designed | Checkpoint spec exists; resume logic partial |
-| `routing-decisions.md` | Supported | Vocabulary defined; routing validation incomplete |
-| `subsumption-principle.md` | Supported | Transport capabilities declared; subsumption partial |
-| `timeout-policy.md` | Supported | Kernel enforces via asyncio |
-| `retry-policy.md` | Designed | Transports implement |
-| `circuit-breaker.md` | Designed | Kernel would implement |
-| `token-efficiency.md` | Designed | Guidelines defined; efficiency tracking not automated |
-
-#### Artifact Rules
-
-| Rule | Status | Enforcement Point |
-|------|--------|-------------------|
-| `artifact-naming.md` | Designed | Conventions defined; naming validation not automated |
-| `capability-registry.md` | Enforced | `validate_capability_registry()` |
-| `data-retention.md` | Designed | Retention policy defined; cleanup not automated |
-| `handoff-protocol.md` | Supported | Schema defined; envelope validation partial |
-| `observability-contract.md` | Supported | JSONL format used; schema validation partial |
-| `off-road-logging.md` | Supported | Routing logged; full audit trail partial |
-| `receipt-schema.md` | Enforced | `receipt_io.py` validates required fields |
-| `scent-trail.md` | Designed | Schema defined; trail generation not implemented |
-| `teaching-notes-contract.md` | Supported | `validate_prompt_sections()` checks some sections |
-
-#### Safety Rules
-
-| Rule | Status | Enforcement Point |
-|------|--------|-------------------|
-| `boundary-automation.md` | Designed | Secrets scan spec; automation pending |
-| `commit-standards.md` | Designed | Format defined; commit validation not automated |
-| `dependency-policy.md` | Designed | Policy defined; dependency audit not automated |
-| `git-safety.md` | Supported | Shadow fork model; boundary checks via Flow 6 |
-| `incident-response.md` | Designed | Protocol defined; automated escalation pending |
-| `rollback-procedures.md` | Designed | Procedures defined; rollback automation pending |
-| `sandbox-and-permissions.md` | Enforced | `.claude/settings.json` deny patterns |
-| `secret-management.md` | Supported | Categories, storage, rotation; pre-commit hook |
-| `secret-detection-response.md` | Supported | Detection patterns; Flow 6 boundary scan; redaction |
-
-### Adding New Rules
-
-When adding a new rule, include status frontmatter:
-
-```yaml
----
-status: designed | supported | enforced
-enforcement: <citation or "pending">
----
-```
-
-This creates an audit trail from spec to enforcement
 
 ## Rule Registry
 
-### Governance Rules
-| Rule | Purpose |
-|------|---------|
-| `agent-behavioral-contracts.md` | PM/IC model, role families, status reporting |
-| `agent-composition.md` | When to use one vs multiple agents, composition patterns |
-| `anti-patterns-index.md` | Quick reference table linking to domain anti-patterns |
-| `anti-patterns-agent.md` | Self-evaluation, unbounded scope, role mixing, narrative trust |
-| `anti-patterns-flow.md` | Mid-flow blocking, scope creep, skipping gates |
-| `anti-patterns-evidence.md` | Hollow tests, stale receipts, single metric |
-| `anti-patterns-economic.md` | Premature abort, runaway spending, review theater |
-| `budget-discipline.md` | The $30 run, cost allocation by flow |
-| `calibration-loop.md` | Learning loop, feedback loops, Flow 7 responsibilities |
-| `calibration-signals.md` | Primary/secondary metrics, signal collection |
-| `calibration-improvement.md` | Pattern detection, improvement process, cadence |
-| `deprecation-protocol.md` | How to sunset agents, flows, capabilities safely |
-| `evidence-discipline.md` | Sheriff pattern, what counts as evidence |
-| `factory-model.md` | Mental model: kernel as foreman, agents as interns, disk as ledger |
-| `fix-forward-vocabulary.md` | Valid outcomes, BLOCKED is rare |
-| `flow-charters.md` | Goals, exit criteria, non-goals per flow |
-| `forensics-over-testimony.md` | Routing based on physical evidence, not agent claims |
-| `model-policy.md` | Model allocation by role family |
-| `narrow-trust.md` | Trust equation: scope × evidence × verification |
-| `pack-check-philosophy.md` | Competence over compliance validation |
-| `panel-thinking.md` | Anti-Goodhart multi-metric panels |
-| `prompt-structure.md` | Teaching notes format, context loading order, validation checklist |
-| `prompt-banned-patterns.md` | Vague instructions, unbounded scope, self-evaluation, hedging |
-| `prompt-required-patterns.md` | Success criteria, artifact paths, evidence requirements, escape hatches |
-| `reviewer-protocol.md` | The three questions, 90-second and 10-minute review protocols |
-| `runbook-standards.md` | Executable operational guides, required structure |
-| `scarcity-enforcement.md` | Token budgets as design, two-reasons spawning rule |
-| `testing-philosophy.md` | Tests as evidence, mutation testing, verification escalation |
-| `truth-hierarchy.md` | Evidence levels (physics > receipts > narrative) |
-| `versioning-schemes.md` | What versioning scheme to use for each artifact type |
-| `versioning-compatibility.md` | Breaking vs non-breaking changes, version in artifacts |
-| `versioning-migration.md` | Reading old artifacts, migration scripts, deprecation |
+### Governance (`governance/`)
 
-### Execution Rules
 | Rule | Purpose |
 |------|---------|
-| `circuit-breaker.md` | Cascade failure prevention, state machine |
-| `context-discipline.md` | Session amnesia, rehydration pattern |
-| `detour-catalog.md` | Known fix patterns (lint, import, type, etc.) |
-| `error-classification.md` | Error categories (transient, permanent, retriable, fatal) |
-| `error-handling.md` | Handling strategies, retry logic, escalation paths |
-| `error-aggregation.md` | Precedence order, multiple error resolution |
-| `handoff-patterns.md` | Sizing, compression, what to include/exclude |
-| `handoff-examples.md` | Minimal, standard, heavy handoff examples |
+| `agent-behavioral-contracts.md` | Role families, status reporting, PM/IC model |
+| `agent-composition.md` | When to use one vs multiple agents |
+| `anti-patterns-*.md` | Anti-pattern catalogs (agent, flow, evidence, economic) |
+| `budget-discipline.md` | The $30 run, cost allocation |
+| `calibration-*.md` | Learning loop, signals, improvement process |
+| `deprecation-protocol.md` | Sunset process for agents/flows |
+| `evidence-discipline.md` | Sheriff pattern, what counts as evidence |
+| `factory-model.md` | Kernel as foreman, agents as interns |
+| `fix-forward-vocabulary.md` | BLOCKED is rare, valid outcomes |
+| `flow-charters.md` | Goals, exit criteria, non-goals per flow |
+| `forensics-over-testimony.md` | Routing on evidence, not claims |
+| `model-policy.md` | Model allocation by role family |
+| `narrow-trust.md` | Trust equation |
+| `pack-check-philosophy.md` | Competence over compliance |
+| `panel-thinking.md` | Anti-Goodhart multi-metric panels |
+| `prompt-*.md` | Prompt structure, banned patterns, required patterns |
+| `reviewer-protocol.md` | Three questions, review protocols |
+| `runbook-standards.md` | Executable operational guides |
+| `scarcity-enforcement.md` | Token budgets, two-reasons spawning |
+| `testing-philosophy.md` | Tests as evidence |
+| `truth-hierarchy.md` | Evidence levels |
+| `versioning-*.md` | Schemes, compatibility, migration |
+
+### Execution (`execution/`)
+
+| Rule | Purpose |
+|------|---------|
+| `circuit-breaker.md` | Cascade failure prevention |
+| `context-discipline.md` | Session amnesia, rehydration |
+| `detour-catalog.md` | Known fix patterns |
+| `error-*.md` | Classification, handling, aggregation |
+| `handoff-*.md` | Patterns and examples |
 | `microloop-rules.md` | Exit conditions, fuse detection |
-| `navigator-protocol.md` | Routing brain: forensics → decision → validation |
-| `resume-protocol.md` | Checkpoint semantics, crash recovery |
-| `retry-policy.md` | Retry strategies, backoff, rate limits |
-| `routing-decisions.md` | Decision vocabulary (CONTINUE, LOOP, DETOUR, etc.) |
+| `navigator-protocol.md` | Forensics → decision → validation |
+| `resume-protocol.md` | Checkpoint semantics |
+| `retry-policy.md` | Backoff strategies |
+| `routing-decisions.md` | Decision vocabulary |
 | `subsumption-principle.md` | Kernel compensates for backend gaps |
-| `timeout-policy.md` | Timeout hierarchy, recovery, configuration |
+| `timeout-policy.md` | Timeout hierarchy |
 | `token-efficiency.md` | Token waste indicates design problems |
 
-### Artifact Rules
+### Artifacts (`artifacts/`)
+
 | Rule | Purpose |
 |------|---------|
 | `artifact-naming.md` | Predictable naming conventions |
-| `capability-registry.md` | Evidence binding for capability claims |
-| `data-retention.md` | Artifact lifecycle overview, storage costs |
-| `data-retention-lifecycle.md` | Retention periods, cleanup policies |
-| `data-retention-exceptions.md` | PR, incident, compliance hold exceptions |
-| `data-retention-privacy.md` | PII handling, deletion requests, anonymization |
-| `handoff-protocol.md` | Envelope structure for step transitions |
-| `observability-contract.md` | Logging overview, validation, anti-patterns |
-| `observability-schema.md` | Required/optional fields, log levels |
-| `observability-content.md` | What to log, what never to log |
-| `observability-placement.md` | Trace correlation, log locations, rotation |
+| `capability-registry.md` | Evidence binding for capabilities |
+| `data-retention-*.md` | Lifecycle, exceptions, privacy |
+| `handoff-protocol.md` | Envelope structure |
+| `observability-*.md` | Schema, content, placement |
 | `off-road-logging.md` | Routing decision audit trail |
-| `receipt-schema.md` | Required fields for audit trail |
-| `scent-trail.md` | Decision provenance breadcrumbs |
-| `teaching-notes-contract.md` | Required sections for step instructions |
+| `receipt-schema.md` | Required fields for audit |
+| `scent-trail.md` | Decision provenance |
+| `teaching-notes-contract.md` | Required sections for instructions |
 
-### Safety Rules
+### Safety (`safety/`)
+
 | Rule | Purpose |
 |------|---------|
-| `boundary-automation.md` | Publish gate enforcement, secrets scanning |
-| `commit-standards.md` | Atomic, traceable, bisectable commits |
+| `boundary-automation.md` | Publish gate enforcement |
+| `commit-standards.md` | Atomic, traceable commits |
+| `pr-standards.md` | PR descriptions, evidence |
 | `dependency-policy.md` | Every dependency is a liability |
-| `git-safety.md` | Prohibited operations, conflict resolution |
-| `incident-response.md` | Severity levels, response protocol, post-mortems |
-| `incident-response-flowstudio.md` | Flow Studio specific: failed runs, stuck runs, wrong output |
-| `rollback-procedures.md` | Fast recovery, undo strategies |
-| `sandbox-and-permissions.md` | Containment checklist, boundary model |
-| `secret-management.md` | Secret categories, storage rules, rotation policy |
-| `secret-detection-response.md` | Detection patterns, exposure response, redaction |
+| `git-safety.md` | Shadow fork model |
+| `incident-response.md` | Severity levels, response protocol |
+| `incident-response-flowstudio.md` | Failed runs, stuck runs, wrong output |
+| `rollback-procedures.md` | Fast recovery |
+| `sandbox-and-permissions.md` | Containment model |
+| `secret-management.md` | Categories, storage, rotation |
+| `secret-detection-response.md` | Detection patterns, exposure response |
 
-### Communication Rules
+### Communication (`communication/`)
+
 | Rule | Purpose |
 |------|---------|
-| `documentation-philosophy.md` | README structure, progressive disclosure, proof before philosophy |
-| `paradigm-messaging.md` | Historical framing, humans as architects, the transition narrative |
-| `trust-thesis.md` | The core insight: code is cheap, trust is expensive |
-| `voice-and-tone.md` | Industrial accountant voice, concrete over abstract, no marketing |
+| `documentation-philosophy.md` | README structure, proof before philosophy |
+| `paradigm-messaging.md` | Historical framing, transition narrative |
+| `trust-thesis.md` | Code is cheap, trust is expensive |
+| `voice-and-tone.md` | Industrial voice, concrete over abstract |
 
-## Usage
+---
 
-Rules are automatically loaded by Claude Code from this directory.
-Path-specific rules use frontmatter to scope application.
+## FR-XXX Validation Mapping
+
+| FR Rule | Physics Enforced | Implementing Rules |
+|---------|------------------|-------------------|
+| FR-001 | Narrow Trust | `agent-behavioral-contracts.md`, `narrow-trust.md` |
+| FR-002, FR-002b | Narrow Trust | `agent-behavioral-contracts.md`, `model-policy.md` |
+| FR-003, FR-FLOWS | Bounded Routing | `flow-charters.md`, `routing-decisions.md` |
+| FR-005 | Session Amnesia | `receipt-schema.md`, `handoff-protocol.md` |
+| FR-006, FR-006a | Mechanical Truth | `microloop-rules.md`, `fix-forward-vocabulary.md` |
+| FR-007 | Truth Hierarchy | `capability-registry.md`, `evidence-discipline.md` |
+
+---
 
 ## Cross-References
 
@@ -383,4 +170,3 @@ Rules are the **enforcement layer**. Teaching docs explain the **why**.
 - [docs/explanation/META_LEARNINGS.md](../../docs/explanation/META_LEARNINGS.md) - What we learned building this
 - [docs/explanation/EMERGENT_PHYSICS.md](../../docs/explanation/EMERGENT_PHYSICS.md) - The 12 laws that emerged
 - [docs/explanation/TRUST_COMPILER.md](../../docs/explanation/TRUST_COMPILER.md) - What this system actually is
-- [docs/explanation/VALIDATOR_AS_LAW.md](../../docs/explanation/VALIDATOR_AS_LAW.md) - Why pack-check is the constitution
