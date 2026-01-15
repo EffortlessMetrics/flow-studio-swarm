@@ -121,7 +121,8 @@ The run completed but produced incorrect results. Tests may pass but behavior is
 
 ## See Also
 
-- [incident-response.md](./incident-response.md) - Core incident response protocol (severity levels, containment, post-mortems)
+- [incident-severity.md](./incident-severity.md) - Severity levels and classification
+- [incident-protocol.md](./incident-protocol.md) - The 6-step response protocol
 - [incident-failed-run.md](./incident-failed-run.md) - Failed run playbook
 - [../artifacts/handoff-protocol.md](../artifacts/handoff-protocol.md) - Envelope structure
 - [../artifacts/scent-trail.md](../artifacts/scent-trail.md) - Decision provenance

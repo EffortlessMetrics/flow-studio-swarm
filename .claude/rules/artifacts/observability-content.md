@@ -122,11 +122,13 @@ NEVER log:
 
 NEVER log file contents. Log paths instead:
 
+**Bad:**
 ```json
-// BAD
 { "file_content": "def auth():\n    password = 'secret123'\n..." }
+```
 
-// GOOD
+**Good:**
+```json
 { "artifact_path": "src/auth.py", "lines_modified": 45 }
 ```
 
@@ -143,11 +145,13 @@ NEVER log:
 
 NEVER log raw LLM output in structured logs. Write to transcript file instead:
 
+**Bad:**
 ```json
-// BAD
 { "llm_response": "Here is the implementation:\n\n```python\n..." }
+```
 
-// GOOD
+**Good:**
+```json
 { "transcript_path": "RUN_BASE/build/llm/step-3-code-implementer.jsonl" }
 ```
 

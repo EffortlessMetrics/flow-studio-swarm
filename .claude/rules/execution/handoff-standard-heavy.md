@@ -120,31 +120,37 @@ Used when crossing from one flow to another (e.g., Plan to Build).
 
 ### Transcribing Instead of Summarizing
 
+**Bad:**
 ```json
-// BAD
 { "test_output": "===== test session starts =====\n..." }
+```
 
-// GOOD
+**Good:**
+```json
 { "tests": { "passed": 47, "failed": 0, "evidence": "RUN_BASE/build/test_output.log" } }
 ```
 
 ### Re-explaining Prior Decisions
 
+**Bad** (redundant with scent trail):
 ```json
-// BAD - redundant with scent trail
 { "summary": { "background": "As you may recall, in step 2 we decided to use OAuth..." } }
+```
 
-// GOOD - reference scent trail
+**Good** (reference scent trail):
+```json
 { "summary": { "what_i_did": "Implemented OAuth callback (per scent trail decision)" } }
 ```
 
 ### Missing Evidence Pointers
 
+**Bad** (claims without evidence):
 ```json
-// BAD - claims without evidence
 { "summary": { "what_i_did": "Fixed all the bugs and tests pass" } }
+```
 
-// GOOD - evidence pointers
+**Good** (evidence pointers):
+```json
 {
   "summary": {
     "what_i_did": "Fixed validation bug in auth module",

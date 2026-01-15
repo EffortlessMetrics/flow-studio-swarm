@@ -225,6 +225,6 @@ git check-ignore .env  # Should output ".env"
 ## See Also
 
 - [secret-management.md](./secret-management.md) - Secret categories, storage, and rotation
-- [incident-response.md](./incident-response.md) - General incident response protocol
+- [incident-protocol.md](./incident-protocol.md) - General incident response protocol
 - [boundary-automation.md](./boundary-automation.md) - Publish gate checks
 - [sandbox-and-permissions.md](./sandbox-and-permissions.md) - Containment model

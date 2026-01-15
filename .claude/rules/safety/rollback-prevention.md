@@ -173,5 +173,5 @@ grep -i error /var/log/app/current.log | tail -20
 ## See Also
 - [rollback-types.md](./rollback-types.md) - The four rollback methods and when to use each
 - [git-safety.md](./git-safety.md) - Git operations by zone
-- [incident-response.md](./incident-response.md) - Incident response protocol
+- [incident-protocol.md](./incident-protocol.md) - Incident response protocol
 - [boundary-automation.md](./boundary-automation.md) - Publish gate checks

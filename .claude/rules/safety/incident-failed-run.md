@@ -65,7 +65,8 @@ cat RUN_BASE/<flow>/receipts/<step>-<agent>.json
 
 ## See Also
 
-- [incident-response.md](./incident-response.md) - Core incident response protocol (severity levels, containment, post-mortems)
+- [incident-severity.md](./incident-severity.md) - Severity levels and classification
+- [incident-protocol.md](./incident-protocol.md) - The 6-step response protocol
 - [incident-stuck-wrong.md](./incident-stuck-wrong.md) - Stuck runs and wrong output playbooks
 - [../artifacts/receipt-schema.md](../artifacts/receipt-schema.md) - Receipt structure
 - [../execution/resume-protocol.md](../execution/resume-protocol.md) - Resuming failed runs

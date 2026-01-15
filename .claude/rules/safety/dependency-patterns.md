@@ -71,15 +71,21 @@ If you need 2-3 lodash functions, import them individually or copy them.
 
 ### Pinned Versions Over Ranges
 
+**Preferred** (exact versions):
 ```json
-// PREFERRED: exact versions
-"dependencies": {
-  "express": "4.18.2"
+{
+  "dependencies": {
+    "express": "4.18.2"
+  }
 }
+```
 
-// RISKY: ranges
-"dependencies": {
-  "express": "^4.18.2"
+**Risky** (ranges):
+```json
+{
+  "dependencies": {
+    "express": "^4.18.2"
+  }
 }
 ```
 

@@ -68,13 +68,15 @@ Minimal handoffs are used in microloops where a critic returns focused feedback 
 
 ### Prose Instead of Structure
 
+**Bad** (hard to parse):
 ```json
-// BAD - hard to parse
 {
   "summary": "Well, I did a bunch of things today. First I looked at the code..."
 }
+```
 
-// GOOD - structured and scannable
+**Good** (structured and scannable):
+```json
 {
   "summary": { "what_i_found": "1 issue" },
   "concerns": [
@@ -85,11 +87,13 @@ Minimal handoffs are used in microloops where a critic returns focused feedback 
 
 ### Missing Location Details
 
+**Bad** (vague location):
 ```json
-// BAD - vague location
 { "location": "src/auth.py" }
+```
 
-// GOOD - precise location
+**Good** (precise location):
+```json
 { "location": "src/auth.py:42" }
 ```
 

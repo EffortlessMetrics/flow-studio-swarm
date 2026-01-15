@@ -47,16 +47,18 @@ Here's the implementation:
 
 ## Structured Over Prose
 
+**Good** (structured output):
 ```json
-// Good: Structured output
 {
   "status": "UNVERIFIED",
   "concerns": [
     { "severity": "HIGH", "file": "src/auth.py", "line": 42 }
   ]
 }
+```
 
-// Bad: Prose output
+**Bad** (prose output):
+```
 "I found an issue in the authentication module. Specifically,
 on line 42 of the src/auth.py file, there's a high severity
 concern that needs to be addressed..."

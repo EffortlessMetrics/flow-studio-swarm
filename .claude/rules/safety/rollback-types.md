@@ -176,4 +176,4 @@ Some actions are irreversible. Plan accordingly.
 - [rollback-prevention.md](./rollback-prevention.md) - Design for rollback from the start
 - [git-safety.md](./git-safety.md) - Git operations by zone
 - [boundary-automation.md](./boundary-automation.md) - Publish gate checks
-- [incident-response.md](./incident-response.md) - Incident response protocol
+- [incident-protocol.md](./incident-protocol.md) - Incident response protocol

@@ -47,38 +47,50 @@ Log validation checks:
 ## Anti-Patterns
 
 ### Unstructured Logs
-```
-// BAD
-console.log("Step 3 completed successfully!")
 
-// GOOD
+**Bad:**
+```javascript
+console.log("Step 3 completed successfully!")
+```
+
+**Good:**
+```javascript
 logger.info({ event: "step_end", step_id: "step-3", status: "succeeded" })
 ```
 
 ### Missing Correlation
-```json
-// BAD - no run_id or step_id
-{ "message": "Something happened" }
 
-// GOOD - fully correlated
+**Bad** (no run_id or step_id):
+```json
+{ "message": "Something happened" }
+```
+
+**Good** (fully correlated):
+```json
 { "run_id": "abc123", "step_id": "step-3", "message": "Something happened" }
 ```
 
 ### Secret Leakage
-```json
-// BAD
-{ "api_key": "sk-abc123..." }
 
-// GOOD
+**Bad:**
+```json
+{ "api_key": "sk-abc123..." }
+```
+
+**Good:**
+```json
 { "api_key_present": true }
 ```
 
 ### Content Dumping
-```json
-// BAD
-{ "file": { "path": "src/auth.py", "content": "..." } }
 
-// GOOD
+**Bad:**
+```json
+{ "file": { "path": "src/auth.py", "content": "..." } }
+```
+
+**Good:**
+```json
 { "artifact_path": "src/auth.py", "size_bytes": 1234 }
 ```
 

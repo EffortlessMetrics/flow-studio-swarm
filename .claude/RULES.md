@@ -3,7 +3,7 @@
 This directory contains the governance rules for Flow Studio's agentic operations.
 These rules encode Steven Zimmerman's AI-native development philosophy: **trade compute for senior attention**.
 
-> Voice and communication style: see `communication/voice-and-tone.md`.
+> Voice and communication style: see `communication/voice-core.md` (and related voice-*.md files).
 
 ## Rule Categories
 
@@ -116,8 +116,9 @@ When physics conflict, higher principles win. See [Physics Enforcement Hierarchy
 | Rule | Purpose |
 |------|---------|
 | `boundary-automation.md` | Publish gate enforcement |
-| `commit-standards.md` | Atomic, traceable commits |
-| `pr-standards.md` | PR descriptions, evidence |
+| `commit-message-format.md` | Subject and body conventions |
+| `commit-atomicity.md` | Atomic, bisectable commits |
+| `commit-agent-generated.md` | Agent commit requirements |
 | `dependency-*.md` | Dependency intake, patterns, policy |
 | `git-safety.md` | Shadow fork model |
 | `incident-*.md` | Response protocol, failed runs, stuck runs, wrong output |
@@ -132,7 +133,10 @@ When physics conflict, higher principles win. See [Physics Enforcement Hierarchy
 | `documentation-philosophy.md` | README structure, proof before philosophy |
 | `paradigm-messaging.md` | Historical framing, transition narrative |
 | `trust-thesis.md` | Code is cheap, trust is expensive |
-| `voice-and-tone.md` | Industrial voice, concrete over abstract |
+| `voice-core.md` | Fundamental voice characteristics |
+| `voice-structure.md` | Sentence structure, emotional register |
+| `voice-vocabulary.md` | Words we use and avoid |
+| `voice-checklist.md` | Pre-publish verification, examples |
 
 ---
 
