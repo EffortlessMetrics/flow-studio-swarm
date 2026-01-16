@@ -2,12 +2,6 @@
 
 Handoffs transfer state between steps. Right-size to purpose.
 
-## Status Values
-
-- **VERIFIED**: Complete, requirements met → advance
-- **UNVERIFIED**: Complete, concerns documented → critic decides
-- **BLOCKED**: Cannot proceed → human intervention (rare)
-
 ## Sizing
 
 | Type | Tokens | Use |

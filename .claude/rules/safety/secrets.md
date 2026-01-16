@@ -21,10 +21,7 @@ BLOCK the operation. Require removal. Never "fix later."
 
 ## On Exposure
 
-1. **Revoke immediately** (don't assess first)
-2. **Rotate** (new credentials, update all systems)
-3. **Audit** (check access logs)
-4. **Remediate** (remove from history if needed)
+Revoke immediately → Rotate → Audit → Remediate. Don't assess first—assume compromise.
 
 ## The Rule
 

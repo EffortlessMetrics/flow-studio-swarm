@@ -18,9 +18,8 @@ Teaching notes are the contract between kernel and agent.
 - **Evidence Requirements**: What evidence to capture
 
 ## Loading Order
-1. Flow-level defaults
-2. Step-specific overrides
-3. Runtime context (run_id, previous outputs)
+
+Flow-level defaults → step-specific overrides → runtime context (run_id, previous outputs).
 
 ## The Rule
 - Required sections ensure agents know what to do

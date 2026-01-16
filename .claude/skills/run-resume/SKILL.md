@@ -1,6 +1,6 @@
 ---
 name: run-resume
-description: Resume interrupted runs from last checkpoint. Use when continuing failed or interrupted flow execution.
+description: Resume interrupted runs from last checkpoint in RUN_BASE. Use when continuing failed or interrupted flow execution, restoring from receipts and handoffs.
 ---
 # Run Resume
 

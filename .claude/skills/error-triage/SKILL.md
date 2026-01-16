@@ -1,6 +1,6 @@
 ---
 name: error-triage
-description: Classify and route errors by category. Use when diagnosing failures and deciding retry vs escalate.
+description: Classify and route errors by category (transient, permanent, retriable, fatal). Use when diagnosing failures, deciding retry vs escalate, or triggering circuit breaker.
 ---
 # Error Triage
 

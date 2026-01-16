@@ -1,6 +1,6 @@
 ---
 name: calibration-review
-description: Review system calibration from run data. Use when analyzing patterns across runs for improvement opportunities.
+description: Review system calibration from run data in RUN_BASE. Use when analyzing patterns across runs for improvement opportunities, triggered by Wisdom flow or manual review.
 ---
 # Calibration Review
 

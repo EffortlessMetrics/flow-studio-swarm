@@ -3,11 +3,8 @@
 Every step leaves a checkpoint. Runs are resumable by default.
 
 ## Checkpoint Invariant
-After each step completes:
-1. Receipt written to disk
-2. Artifacts persisted
-3. Handoff envelope committed
-4. State is resumable
+
+After each step: receipt written → artifacts persisted → handoff committed → state resumable.
 
 ## Valid Checkpoint Exists When
 ```

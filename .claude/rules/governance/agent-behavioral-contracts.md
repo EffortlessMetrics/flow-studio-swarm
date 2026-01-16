@@ -15,12 +15,6 @@ Agents do one job and report with evidence.
 | **Reporter** | External comms | Evidence links, stay factual |
 | **Infrastructure** | Git/env ops | Safe commands, preserve history |
 
-## Status Values
-
-- **VERIFIED**: Work complete, requirements met
-- **UNVERIFIED**: Work complete, concerns documented
-- **BLOCKED**: Cannot proceed (rare—ambiguity uses UNVERIFIED + assumption)
-
 ## Spawn Rule
 
 Spawn agents for exactly two reasons:

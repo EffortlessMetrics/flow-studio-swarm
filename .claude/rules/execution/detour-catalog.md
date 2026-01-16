@@ -12,11 +12,8 @@ Known problems deserve known solutions.
 | `upstream_diverged` | Flow 8 (Reset) | Fetch, rebase, resolve |
 
 ## Detour Flow
-1. Failure detected
-2. Signature matched? → Route to detour
-3. Detour executes fix
-4. Verify fix
-5. Return to main path
+
+Failure → match signature → route to detour → verify fix → return to main path.
 
 ## Limits
 - Default: 2 attempts per detour type per step
