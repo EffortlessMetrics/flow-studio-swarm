@@ -1,105 +1,20 @@
 # Observability Contract
 
-Logs are the runtime audit trail. They capture what happened, when, and why.
+Logs are structured, correlated, and safe.
 
-## Overview
+## Required Fields
+- timestamp (ISO8601), level, run_id, flow_key, step_id, agent_key, message
 
-The observability contract is split into three focused documents:
+## Levels
+ERROR (failures) | WARN (concerns) | INFO (transitions) | DEBUG (details)
 
-| Document | Purpose |
-|----------|---------|
-| [observability-schema.md](./observability-schema.md) | Log format, required/optional fields, log levels |
-| [observability-content.md](./observability-content.md) | What to always log, what to never log |
-| [observability-placement.md](./observability-placement.md) | Trace correlation, log locations, rotation |
-
-## The Rule
-
-> Logs are structured, correlated, and safe.
-> Required fields enable querying. Forbidden content prevents leaks.
-> `run_id` ties everything together. Step logs are the primary unit.
-
-## Quick Reference
-
-### Required Fields
-- `timestamp`, `level`, `run_id`, `flow_key`, `step_id`, `agent_key`, `message`
-
-### Log Levels
-- **ERROR**: Failures needing attention
-- **WARN**: Concerns that don't block
-- **INFO**: Step transitions, key decisions
-- **DEBUG**: Detailed execution (off by default)
-
-### Never Log
-- Secrets (API keys, passwords, tokens)
+## Never Log
+- Secrets, API keys, passwords
 - Full file contents
-- PII (emails, names, addresses)
-- Raw LLM responses
+- PII (emails, names)
+- Raw LLM responses (write to transcript file)
 
-## Validation
+## Correlation
+`run_id` ties everything together. Step logs are primary.
 
-Log validation checks:
-1. Required fields present
-2. Timestamps are valid ISO8601
-3. Level is valid enum
-4. No forbidden patterns (secrets, PII)
-5. Paths resolve (when claimed)
-
-## Anti-Patterns
-
-### Unstructured Logs
-
-**Bad:**
-```javascript
-console.log("Step 3 completed successfully!")
-```
-
-**Good:**
-```javascript
-logger.info({ event: "step_end", step_id: "step-3", status: "succeeded" })
-```
-
-### Missing Correlation
-
-**Bad** (no run_id or step_id):
-```json
-{ "message": "Something happened" }
-```
-
-**Good** (fully correlated):
-```json
-{ "run_id": "abc123", "step_id": "step-3", "message": "Something happened" }
-```
-
-### Secret Leakage
-
-**Bad:**
-```json
-{ "api_key": "sk-abc123..." }
-```
-
-**Good:**
-```json
-{ "api_key_present": true }
-```
-
-### Content Dumping
-
-**Bad:**
-```json
-{ "file": { "path": "src/auth.py", "content": "..." } }
-```
-
-**Good:**
-```json
-{ "artifact_path": "src/auth.py", "size_bytes": 1234 }
-```
-
----
-
-## See Also
-- [observability-schema.md](./observability-schema.md) - Log format and fields
-- [observability-content.md](./observability-content.md) - What to log and what to never log
-- [observability-placement.md](./observability-placement.md) - Correlation and location
-- [receipt-schema.md](./receipt-schema.md) - Step-level proof of work
-- [handoff-protocol.md](./handoff-protocol.md) - Step transition protocol
-- [off-road-logging.md](./off-road-logging.md) - Routing decision audit trail
+> Docs: docs/artifacts/OBSERVABILITY.md

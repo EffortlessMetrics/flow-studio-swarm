@@ -1,29 +1,19 @@
 # Tests As Evidence
 
-Tests are evidence only if they would fail when the requirement isn't met.
-
-## What Makes Tests Trustworthy
-| Check | Purpose |
-|-------|---------|
-| **Mutation testing** | Tests that don't catch mutations are hollow |
-| **Coverage with assertions** | Executed ≠ tested |
-| **Failure modes tested** | Happy path only = incomplete |
-| **BDD traceability** | Specs trace to tests |
-
-## Evidence in Receipts
-```json
-{
-  "tests": { "measured": true, "passed": 42, "evidence": "test_output.log" },
-  "coverage": { "measured": true, "line_percent": 87 },
-  "mutation": { "measured": true, "score_percent": 78 }
-}
-```
-
-If not measured, say so: `"measured": false, "reason": "..."`
+Tests are evidence only if they would fail when the requirement is not met.
 
 ## The Rule
-- If you can't point to a test that would fail, requirement isn't tested
-- "Tests pass" without proof of effectiveness is narrative, not physics
-- Never evaluate on single metric (use panels)
+A "tests pass" claim requires:
+- **Command** run
+- **Exit code**
+- **Captured output path** (log)
+- **Scope**: what the tests cover (requirements / files / scenarios)
 
-> Docs: docs/governance/TESTS_AS_EVIDENCE.md
+If tests were not run: state **NOT MEASURED** and set **UNVERIFIED**.
+Coverage without assertions is not evidence.
+
+## Bad → Good
+- "Tests pass" → `pytest …` exit 0 + `RUN_BASE/build/test_output.log`
+
+> Skill: evidence-verification
+> Docs: docs/explanation/TESTS_AS_EVIDENCE.md

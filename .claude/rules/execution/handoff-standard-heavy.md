@@ -1,24 +1,18 @@
 # Standard and Heavy Handoffs
 
-Standard: step-to-step within flow. Heavy: flow boundaries.
+Standard (500-2000 tokens): step-to-step.
+Heavy (2000-5000 tokens): flow boundaries.
 
-## Standard Handoff (500-2000 tokens)
-Include:
-- meta: step_id, agent_key
-- summary: what_i_did, what_i_found, key_decisions, evidence
-- assumptions: explicit with rationale and impact
-- routing: recommendation + reason
+## Standard
+- meta, summary, assumptions, routing
+- Pointers, not content
 
-## Heavy Handoff (2000-5000 tokens)
-Standard fields plus:
-- plan_summary: work_items count, complexity, key_interfaces
-- dependencies: what to install before coding
-- test_strategy: approach for test authors
+## Heavy
+Standard plus:
+- plan_summary (work items, complexity)
+- dependencies
+- test_strategy
 
-## The Rule
-- Standard: between consecutive steps
-- Heavy: at flow boundaries (Plan→Build, Gate→Deploy)
-- Always use pointers, not inline content
-- Re-explaining prior decisions = bloat (use scent trail)
+Use scent trail for prior decisions; don't re-explain.
 
 > Docs: docs/execution/HANDOFF_PROTOCOL.md
