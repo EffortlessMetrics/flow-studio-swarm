@@ -23,5 +23,4 @@ Detect before escape. Respond immediately.
 - Exposure = immediate revoke + rotate
 - Redact secrets from all output (logs, receipts, transcripts)
 
-> Skill: secret-incident-response
 > Docs: docs/safety/SECRET_MANAGEMENT.md

@@ -24,5 +24,4 @@ Restricted:
 - Flow 8 (Rebase) bridges deliberately
 - Never force push to `upstream/*`
 
-> Skill: git-operations
 > Docs: docs/safety/GIT_SAFETY.md

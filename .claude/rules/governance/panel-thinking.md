@@ -12,5 +12,4 @@ Tests passing + line coverage + mutation score + complexity
 
 High coverage + low mutation score = weak tests.
 
-> Skill: evidence-verification
 > Docs: docs/governance/PANEL_THINKING.md

@@ -14,5 +14,4 @@ Microloops are adversarial iteration: author ↔ critic.
 - Rate severity
 - **Never fix, only report**
 
-> Skill: test-runner
 > Docs: docs/execution/MICROLOOPS.md

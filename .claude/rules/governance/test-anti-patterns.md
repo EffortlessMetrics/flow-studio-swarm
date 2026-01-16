@@ -11,5 +11,4 @@ Tests that don't catch mutations are hollow.
 ## Detection
 High coverage + low mutation score = weak tests.
 
-> Skill: evidence-verification
 > Docs: docs/governance/TEST_ANTI_PATTERNS.md

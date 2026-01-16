@@ -21,5 +21,4 @@ When something breaks, choose the right rollback method.
 - Revert first, investigate second
 - Git Reset = shadow fork ONLY, never upstream
 
-> Skill: rollback-execution
 > Docs: docs/safety/ROLLBACK_GUIDE.md

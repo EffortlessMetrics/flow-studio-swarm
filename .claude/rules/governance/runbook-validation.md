@@ -26,5 +26,4 @@ A runbook is valid only if someone unfamiliar can execute it successfully.
 - Every question becomes documentation
 - If running twice breaks things, add guards
 
-> Skill: runbook-validation
 > Docs: docs/runbooks/RUNBOOK_STRUCTURE.md

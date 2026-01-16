@@ -27,5 +27,4 @@ Known problems deserve known solutions.
 - Detours are cheap; re-discovery is expensive
 - If detour fails twice, escalate
 
-> Skill: detour-routing
 > Docs: docs/execution/DETOUR_CATALOG.md

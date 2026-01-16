@@ -21,5 +21,4 @@ If any answer is "no" or "unknown", stop and reconsider.
 - Pin versions, commit lock files
 - Every new dep needs justification in PR
 
-> Skill: dependency-review
 > Docs: docs/safety/DEPENDENCY_MANAGEMENT.md

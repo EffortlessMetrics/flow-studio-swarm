@@ -30,5 +30,4 @@ RUN_BASE/<flow>/handoffs/<step_id>-<agent>.json  # exists (if finalized)
 - Checkpoint after each step, not at flow end
 - Partial state is explicitly handled
 
-> Skill: run-resume
 > Docs: docs/execution/RESUME_PROTOCOL.md

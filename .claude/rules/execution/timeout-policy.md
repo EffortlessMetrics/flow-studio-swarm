@@ -26,5 +26,4 @@ Every operation has a hard limit.
 - Hard limits are non-negotiable
 - Always capture state for resume
 
-> Skill: timeout-configuration
 > Docs: docs/execution/TIMEOUT_POLICY.md

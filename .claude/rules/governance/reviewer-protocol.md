@@ -14,5 +14,4 @@ Reviewers route based on intent + evidence + risk. Never on author confidence.
 - Evidence present/missing (paths)
 - Hotspots / risks (file:line when possible)
 
-> Skill: pr-review
 > Docs: docs/runbooks/PR_REVIEW.md

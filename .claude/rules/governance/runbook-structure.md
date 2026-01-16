@@ -22,5 +22,4 @@ Runbooks are executable checklists.
 - Every step has expected output
 - Decision points are explicit
 
-> Skill: runbook-authoring
 > Docs: docs/runbooks/RUNBOOK_STRUCTURE.md

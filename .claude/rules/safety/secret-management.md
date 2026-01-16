@@ -18,5 +18,4 @@ Secrets are toxic waste. Handle accordingly.
 - Rotate before they become liabilities
 - Never log, never include in error messages
 
-> Skill: secret-rotation
 > Docs: docs/safety/SECRET_MANAGEMENT.md

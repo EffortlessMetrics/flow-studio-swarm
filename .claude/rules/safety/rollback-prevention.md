@@ -20,5 +20,4 @@ Design for rollback from the start.
 - Never deploy breaking migrations without expand-contract pattern
 - Build with the assumption rollback will be needed
 
-> Skill: deploy-safety
 > Docs: docs/safety/ROLLBACK_GUIDE.md
