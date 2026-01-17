@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import ast
 import datetime as dt
+import os
 import re
 import subprocess
 import sys
@@ -107,6 +108,12 @@ def _get_repo_root() -> Path:
 def _detect_base_ref(repo_root: Path, explicit: Optional[str]) -> Optional[str]:
     if explicit:
         return explicit
+
+    env_base = os.getenv("GITHUB_BASE_REF")
+    if env_base:
+        for ref in (f"origin/{env_base}", env_base):
+            if _run_git(repo_root, ["rev-parse", "--verify", ref]):
+                return ref
 
     candidates = [
         "origin/main",
