@@ -6,4 +6,4 @@ from .state import FlowStudioState
 
 
 def get_state(request: Request) -> FlowStudioState:
-    return request.app.state.fs
+    return request.app.state.flow_studio

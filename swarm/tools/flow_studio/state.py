@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -21,6 +22,7 @@ class FlowStudioState:
     flows_cache: Dict[str, Any] = field(default_factory=dict)
     agents_cache: Dict[str, Any] = field(default_factory=dict)
     tours_cache: Dict[str, Any] = field(default_factory=dict)
+    lock: threading.RLock = field(default_factory=threading.RLock)
 
     def reload_from_disk(self) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if self.core:

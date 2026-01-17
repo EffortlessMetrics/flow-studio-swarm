@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
     settings = FlowStudioSettings.from_env()
 
     state = create_state(repo_root)
-    app.state.fs = state
+    app.state.flow_studio = state
 
     app.include_router(health_router)
     app.include_router(profiles_router)
