@@ -52,6 +52,18 @@ from .models import HistoryTruncationInfo, StepContext, StepResult
 logger = logging.getLogger(__name__)
 
 
+def _terminate_process(process: subprocess.Popen) -> None:
+    """Terminate a subprocess, escalating to kill if needed."""
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
 class GeminiStepEngine(StepEngine):
     """Step engine using Gemini CLI.
 
@@ -560,13 +572,7 @@ class GeminiStepEngine(StepEngine):
                 raise RuntimeError(f"Gemini CLI failed: {error_msg}")
         finally:
             # Ensure process is properly terminated and resources are cleaned up
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait()
+            _terminate_process(process)
 
         # Write transcript JSONL to RUN_BASE/llm/<step_id>-gemini.jsonl
         self._write_transcript(ctx, raw_events)

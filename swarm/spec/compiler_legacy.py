@@ -59,6 +59,13 @@ from .compiler.prompt_parts import (
     build_system_append_v2,
     render_template,
 )
+from .compiler.facade import (
+    FlowNode,
+    MultiStepPromptPlan,
+    SpecCompiler,
+    StepTemplate,
+    extract_flow_key,
+)
 
 if TYPE_CHECKING:
     from swarm.runtime.context_pack import ContextPack
@@ -74,72 +81,6 @@ TOOL_PROFILES: Dict[str, Tuple[str, ...]] = {
     "critic": ("Read", "Grep", "Glob", "Write"),  # Critics can write critique files
     "reporter": ("Read", "Grep", "Glob", "Write"),  # Reporters write reports
 }
-
-
-# =============================================================================
-# FlowGraph Node Types (per flow_graph.schema.json)
-# =============================================================================
-
-
-@dataclass
-class FlowNode:
-    """A node in the FlowGraph (from flow_graph.schema.json)."""
-    node_id: str
-    template_id: str
-    params: Dict[str, Any] = field(default_factory=dict)
-    overrides: Dict[str, Any] = field(default_factory=dict)
-    ui: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class StepTemplate:
-    """A step template (from step_template.schema.json)."""
-    id: str
-    version: int
-    title: str
-    station_id: str
-    objective: Dict[str, Any]  # ParameterizedObjective
-    io_overrides: Dict[str, Any] = field(default_factory=dict)
-    routing_defaults: Dict[str, Any] = field(default_factory=dict)
-    ui_defaults: Dict[str, Any] = field(default_factory=dict)
-    constraints: Dict[str, Any] = field(default_factory=dict)
-    parameters: Dict[str, Any] = field(default_factory=dict)
-    tags: List[str] = field(default_factory=list)
-    category: str = "implementation"
-    deprecated: bool = False
-
-
-# =============================================================================
-# Flow Key Extraction
-# =============================================================================
-
-
-def extract_flow_key(flow_id: str) -> str:
-    """Extract the flow key from a flow ID.
-
-    Flow IDs are typically formatted as "<number>-<key>" (e.g., "3-build").
-    This function extracts the key portion for routing purposes.
-
-    Args:
-        flow_id: The full flow identifier (e.g., "3-build").
-
-    Returns:
-        The flow key (e.g., "build").
-
-    Examples:
-        >>> extract_flow_key("3-build")
-        'build'
-        >>> extract_flow_key("1-signal")
-        'signal'
-        >>> extract_flow_key("build")  # Already just the key
-        'build'
-    """
-    if "-" in flow_id:
-        # Split on first hyphen and take everything after
-        parts = flow_id.split("-", 1)
-        if len(parts) == 2 and parts[0].isdigit():
-            return parts[1]
-    return flow_id
 
 
 def build_user_prompt(
@@ -354,7 +295,7 @@ def resolve_handoff_contract(
     )
 
 
-class SpecCompiler:
+class _LegacySpecCompiler:
     """Compiler that produces PromptPlans from specs.
 
     Usage:
@@ -1163,7 +1104,7 @@ class SpecCompiler:
 
 
 @dataclass(frozen=True)
-class MultiStepPromptPlan:
+class _LegacyMultiStepPromptPlan:
     """Compiled plan for a complete flow with multiple steps.
 
     This represents the output of compile_flow() and contains all the

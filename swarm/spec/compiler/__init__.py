@@ -8,28 +8,30 @@ from importlib import import_module
 from typing import Any, Dict
 
 _LAZY_ATTRS: Dict[str, str] = {
-    # compiler_legacy exports
+    # prompt primitives
     "CLAUDE_CODE_PRESET": "swarm.spec.compiler.prompt_parts",
     "SYSTEM_PRESETS": "swarm.spec.compiler.prompt_parts",
-    "TOOL_PROFILES": "swarm.spec.compiler_legacy",
-    "ExpandedTemplate": "swarm.spec.compiler_legacy",
-    "FlowNode": "swarm.spec.compiler_legacy",
-    "MultiStepPromptPlan": "swarm.spec.compiler_legacy",
-    "SpecCompiler": "swarm.spec.compiler_legacy",
-    "StepTemplate": "swarm.spec.compiler_legacy",
-    "TemplateMetadata": "swarm.spec.compiler_legacy",
     "build_system_append": "swarm.spec.compiler.prompt_parts",
     "build_system_append_v2": "swarm.spec.compiler.prompt_parts",
+    "render_template": "swarm.spec.compiler.prompt_parts",
+    # compiler facade exports
+    "FlowNode": "swarm.spec.compiler.facade",
+    "MultiStepPromptPlan": "swarm.spec.compiler.facade",
+    "SpecCompiler": "swarm.spec.compiler.facade",
+    "StepTemplate": "swarm.spec.compiler.facade",
+    "extract_flow_key": "swarm.spec.compiler.facade",
+    # legacy utilities
+    "TOOL_PROFILES": "swarm.spec.compiler_legacy",
+    "ExpandedTemplate": "swarm.spec.compiler_legacy",
+    "TemplateMetadata": "swarm.spec.compiler_legacy",
     "build_user_prompt": "swarm.spec.compiler_legacy",
     "compile_prompt": "swarm.spec.compiler_legacy",
     "expand_flow_graph": "swarm.spec.compiler_legacy",
     "expand_template": "swarm.spec.compiler_legacy",
-    "extract_flow_key": "swarm.spec.compiler_legacy",
     "get_template_categories": "swarm.spec.compiler_legacy",
     "list_templates": "swarm.spec.compiler_legacy",
     "load_template": "swarm.spec.compiler_legacy",
     "merge_verification_requirements": "swarm.spec.compiler_legacy",
-    "render_template": "swarm.spec.compiler.prompt_parts",
     "resolve_handoff_contract": "swarm.spec.compiler_legacy",
     # models exports
     "COMPILER_VERSION": "swarm.spec.compiler.models",

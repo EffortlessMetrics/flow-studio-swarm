@@ -10,7 +10,7 @@ from ..types import FlowSpec, FlowStep, StationSpec
 from .models import CompileContext, StepIntent, _dedupe_preserve_order
 
 if TYPE_CHECKING:
-    from ..compiler_legacy import FlowNode, StepTemplate
+    from .facade import FlowNode, StepTemplate
 
 
 def intent_from_flow_step(

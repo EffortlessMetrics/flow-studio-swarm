@@ -41,6 +41,16 @@ class StepPlanBuilder:
     def __init__(self, repo_root: Optional[Path] = None):
         self.repo_root = repo_root
 
+    def _resolve_cwd(self, *, cwd: Optional[str], context: CompileContext) -> str:
+        """Resolve the effective working directory with consistent precedence."""
+        if cwd is not None and str(cwd).strip():
+            return str(cwd)
+        if context.cwd and str(context.cwd).strip():
+            return str(context.cwd)
+        if context.repo_root:
+            return str(context.repo_root)
+        return str(Path.cwd())
+
     def build(
         self,
         intent: StepIntent,
@@ -89,15 +99,7 @@ class StepPlanBuilder:
         handoff_path = render_template(intent.handoff_path_template, variables)
         verification = self._build_verification(intent, variables)
         sdk_options = self._merge_sdk_options(station, intent.sdk_overrides)
-
-        if cwd:
-            effective_cwd = str(cwd)
-        elif context.repo_root:
-            effective_cwd = str(context.repo_root)
-        elif context.cwd:
-            effective_cwd = str(context.cwd)
-        else:
-            effective_cwd = str(Path.cwd())
+        effective_cwd = self._resolve_cwd(cwd=cwd, context=context)
 
         return StepPlan(
             step_id=intent.step_id,

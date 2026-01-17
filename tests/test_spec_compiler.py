@@ -653,6 +653,38 @@ class TestStepPlanBuilder:
         assert expected_input in plan.user_prompt
         assert expected_output in plan.user_prompt
 
+    def test_builder_prefers_context_cwd_over_repo_root(self):
+        """Context cwd should take precedence over repo_root when no override is passed."""
+        repo_root = Path(__file__).parent.parent
+        builder = StepPlanBuilder(repo_root)
+        station = _create_test_station()
+        intent = StepIntent(
+            flow_id="test-flow",
+            flow_key="test",
+            flow_version=1,
+            step_id="test-step",
+            station_id=station.id,
+            objective="Test objective",
+            scope=None,
+            required_inputs=station.io.required_inputs,
+            required_outputs=station.io.required_outputs,
+            handoff_path_template=station.handoff.path_template,
+            required_fields=station.handoff.required_fields,
+            sdk_overrides={},
+            verification_overrides={},
+        )
+        context_cwd = "swarm/runs/test/custom-cwd"
+        context = CompileContext(
+            run_id="run-123",
+            run_base=Path("swarm/runs/test"),
+            repo_root=repo_root,
+            cwd=context_cwd,
+        )
+
+        plan = builder.build(intent=intent, station=station, context=context, cwd=None)
+
+        assert plan.cwd == context_cwd
+
 
 class TestStepPlanTraceability:
     """Tests for StepPlan traceability output."""
