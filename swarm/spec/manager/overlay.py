@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from .core import SpecManager
 from .errors import ConcurrencyError, SpecNotFoundError, SpecValidationError
 from .models import ValidationError
 
@@ -21,8 +22,6 @@ class FlowSpecManager:
         Args:
             repo_root: Repository root path. If None, attempts to auto-detect.
         """
-        from . import SpecManager
-
         self._manager = SpecManager(repo_root=repo_root)
         self._flows_dir = self._manager.specs_dir / "flows"
 
