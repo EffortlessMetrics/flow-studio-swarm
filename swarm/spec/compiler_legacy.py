@@ -194,6 +194,7 @@ class StepPlan:
     max_turns: int
     output_schema: Dict[str, Any]  # JSON schema for structured output
     prompt_hash: str  # Deterministic hash for reproducibility
+    prompt_hash_v2: str  # Deterministic hash for full prompt content
 
     # Extended fields for full schema compliance
     system_append: str = ""
@@ -229,6 +230,8 @@ class StepPlan:
             "compiled_at": self.compiled_at,
             "compiler_version": self.compiler_version,
         }
+        if self.prompt_hash_v2:
+            traceability["prompt_hash_v2"] = self.prompt_hash_v2
         if self.template_id:
             traceability["template_id"] = self.template_id
             traceability["template_version"] = self.template_version
@@ -314,6 +317,7 @@ class CompileContext:
     run_id: str = ""
     run_base: Path = field(default_factory=lambda: Path("swarm/runs/default"))
     repo_root: Optional[Path] = None
+    cwd: Optional[str] = None
     iteration: int = 1
     context_pack: Optional[Any] = None
     scent_trail: str = ""
@@ -790,17 +794,20 @@ class StepPlanBuilder:
         system_prompt = self._process_fragment_includes(system_prompt)
         user_prompt = self._process_fragment_includes(user_prompt)
 
-        fragments_used = self._collect_fragment_references(
-            station.runtime_prompt.fragments
-        )
+        fragment_paths = list(station.runtime_prompt.fragments)
+        if policy_invariants_ref:
+            fragment_paths.extend(policy_invariants_ref)
+        fragment_paths = _dedupe_preserve_order(fragment_paths)
+        fragments_used = self._collect_fragment_references(fragment_paths)
 
         prompt_hash = self._compute_prompt_hash(system_append, user_prompt)
+        prompt_hash_v2 = self._compute_prompt_hash_v2(system_prompt, user_prompt)
         output_schema = self._build_output_schema(station)
         handoff_path = render_template(intent.handoff_path_template, variables)
         verification = self._build_verification(intent, variables)
         sdk_options = self._merge_sdk_options(station, intent.sdk_overrides)
 
-        effective_cwd = cwd or (
+        effective_cwd = cwd or context.cwd or (
             str(context.repo_root) if context.repo_root else str(Path.cwd())
         )
 
@@ -814,6 +821,7 @@ class StepPlanBuilder:
             max_turns=sdk_options["max_turns"],
             output_schema=output_schema,
             prompt_hash=prompt_hash,
+            prompt_hash_v2=prompt_hash_v2,
             system_append=system_append,
             model=sdk_options["model"],
             model_tier=sdk_options["model_tier"],
@@ -992,14 +1000,16 @@ class StepPlanBuilder:
             parts.append("## Required Inputs\n")
             parts.append("These artifacts must exist and be read:")
             for inp in intent.required_inputs:
-                parts.append(f"- `{inp}`")
+                resolved = render_template(inp, variables)
+                parts.append(f"- `{resolved}`")
             parts.append("")
 
         if intent.required_outputs:
             parts.append("## Required Outputs\n")
             parts.append("You MUST produce these artifacts:")
             for out in intent.required_outputs:
-                parts.append(f"- `{out}`")
+                resolved = render_template(out, variables)
+                parts.append(f"- `{resolved}`")
             parts.append("")
 
         if station.runtime_prompt.template:
@@ -1135,7 +1145,7 @@ class StepPlanBuilder:
 
     def _collect_fragment_references(
         self,
-        fragment_paths: Tuple[str, ...],
+        fragment_paths: Iterable[str],
     ) -> List[FragmentReference]:
         """Collect fragment references for audit trail."""
         refs: List[FragmentReference] = []
@@ -1157,6 +1167,12 @@ class StepPlanBuilder:
     def _compute_prompt_hash(self, system_append: str, user_prompt: str) -> str:
         """Compute deterministic hash for system append + user prompt."""
         combined = system_append + user_prompt
+        full_hash = hashlib.sha256(combined.encode("utf-8")).hexdigest()
+        return full_hash[:16]
+
+    def _compute_prompt_hash_v2(self, system_prompt: str, user_prompt: str) -> str:
+        """Compute deterministic hash for the full system + user prompt."""
+        combined = system_prompt + "\n---\n" + user_prompt
         full_hash = hashlib.sha256(combined.encode("utf-8")).hexdigest()
         return full_hash[:16]
 
@@ -1216,8 +1232,12 @@ class SpecCompiler:
         flow_key: str,
     ) -> StepIntent:
         """Adapt a FlowSpec step into a StepIntent."""
-        required_inputs = list(station.io.required_inputs) + list(step.inputs)
-        required_outputs = list(station.io.required_outputs) + list(step.outputs)
+        required_inputs = _dedupe_preserve_order(
+            list(station.io.required_inputs) + list(step.inputs)
+        )
+        required_outputs = _dedupe_preserve_order(
+            list(station.io.required_outputs) + list(step.outputs)
+        )
 
         verification_overrides: Dict[str, Any] = {}
         commands = step.sdk_overrides.get("verification_commands")
@@ -1364,6 +1384,7 @@ class SpecCompiler:
         context = CompileContext(
             run_base=run_base,
             repo_root=self.repo_root,
+            cwd=cwd,
             context_pack=context_pack,
             scent_trail=scent_trail or "",
         )
@@ -1390,6 +1411,7 @@ class SpecCompiler:
             flow_version=flow.version,
             step_id=step.id,
             prompt_hash=step_plan.prompt_hash,
+            prompt_hash_v2=step_plan.prompt_hash_v2,
             model=step_plan.model,
             permission_mode=step_plan.permission_mode,
             allowed_tools=step_plan.allowed_tools,

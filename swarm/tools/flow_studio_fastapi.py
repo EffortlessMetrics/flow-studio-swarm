@@ -2061,6 +2061,7 @@ def create_fastapi_app() -> FastAPI:
                 },
                 "traceability": {
                     "prompt_hash": plan.prompt_hash,
+                    "prompt_hash_v2": plan.prompt_hash_v2,
                     "compiled_at": plan.compiled_at,
                     "compiler_version": COMPILER_VERSION,
                     "station_version": plan.station_version,

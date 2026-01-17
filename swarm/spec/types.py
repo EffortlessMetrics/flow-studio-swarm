@@ -268,6 +268,7 @@ class PromptPlan:
     flow_version: int
     step_id: str
     prompt_hash: str
+    prompt_hash_v2: str = ""
 
     # SDK Options (programmatic, not filesystem)
     model: str

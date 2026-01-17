@@ -1027,6 +1027,7 @@ class SpecManager:
             "flow_version": plan.flow_version,
             "step_id": plan.step_id,
             "prompt_hash": plan.prompt_hash,
+            "prompt_hash_v2": plan.prompt_hash_v2,
             "model": plan.model,
             "permission_mode": plan.permission_mode,
             "allowed_tools": list(plan.allowed_tools),
