@@ -157,6 +157,77 @@ engines:
 
             assert result.config.get("runtime.context_budget_chars") == 500000
 
+    def test_full_precedence_chain(self, tmp_path):
+        """Resolution should follow cli > env > repo > pin > baseline."""
+        swarm_dir = tmp_path / ".swarm"
+        swarm_dir.mkdir()
+
+        pack_file = swarm_dir / "pack.yaml"
+        pack_file.write_text(
+            """
+version: "1.0"
+engines:
+  claude:
+    mode: repo
+"""
+        )
+
+        lock_data = {
+            "version": "1.0",
+            "pack_hash": "test_hash",
+            "timestamp": "2025-01-01T00:00:00Z",
+            "pack_id": "pinned",
+            "pack_version": "1.0",
+            "resolved_config": {
+                "version": "1.0",
+                "id": "pinned",
+                "engines": {
+                    "claude": {
+                        "mode": "pin",
+                        "execution": None,
+                        "provider": None,
+                    }
+                },
+                "features": {},
+                "runtime": {},
+                "flows": {},
+            },
+        }
+        lock_path = swarm_dir / "pack.lock.json"
+        lock_path.write_text(json.dumps(lock_data))
+
+        with patch.dict(os.environ, {"SWARM_CLAUDE_MODE": "env"}, clear=True):
+            resolver = PackResolver(
+                repo_root=tmp_path,
+                cli_overrides={"engines.claude.mode": "cli"},
+            )
+            result = resolver.resolve()
+            assert result.config.get("engines.claude.mode") == "cli"
+            assert result.provenance["engines.claude.mode"].source == "cli"
+
+            resolver = PackResolver(repo_root=tmp_path)
+            result = resolver.resolve()
+            assert result.config.get("engines.claude.mode") == "env"
+            assert result.provenance["engines.claude.mode"].source == "env"
+
+        with patch.dict(os.environ, {}, clear=True):
+            resolver = PackResolver(repo_root=tmp_path)
+            result = resolver.resolve()
+            assert result.config.get("engines.claude.mode") == "repo"
+            assert result.provenance["engines.claude.mode"].source == "repo"
+
+        pack_file.unlink()
+        resolver = PackResolver(repo_root=tmp_path)
+        result = resolver.resolve()
+        assert result.config.get("engines.claude.mode") == "pin"
+        assert result.provenance["engines.claude.mode"].source == "pin"
+
+        lock_path.unlink()
+        resolver = PackResolver(repo_root=tmp_path)
+        result = resolver.resolve()
+        assert result.config.get("engines.claude.mode") == "stub"
+        assert result.provenance["engines.claude.mode"].source == "baseline"
+
 
 class TestConvenienceFunction:
     """Tests for the resolve_pack_config convenience function."""
@@ -336,7 +407,11 @@ class TestPackLockVerification:
         )
         is_valid, error = verify_pack_lock(lock, pack)
         assert not is_valid
-        assert "mismatch" in error.lower()
+        expected = (
+            f"Pack hash mismatch: lock has {lock.pack_hash[:12]}..., "
+            f"current is {compute_pack_hash(pack)[:12]}..."
+        )
+        assert error == expected
 
     def test_verify_empty_hash(self):
         """Verification should fail for empty hash."""
@@ -501,8 +576,15 @@ engines:
 
         # Should have warning about hash mismatch
         assert not resolver.pin_hash_valid
-        assert resolver.pin_hash_warning is not None
-        assert "mismatch" in resolver.pin_hash_warning.lower()
+        pack = load_pack_from_file(pack_file)
+        assert pack is not None
+        expected_warning = (
+            "Pack hash mismatch: lock file was generated from a different "
+            f"pack configuration. Lock hash: {lock_data['pack_hash'][:12]}..., "
+            f"current: {compute_pack_hash(pack)[:12]}... "
+            "Consider regenerating the lock file with 'lock_current_pack()'."
+        )
+        assert resolver.pin_hash_warning == expected_warning
 
     def test_ignore_lock_parameter(self, tmp_path):
         """ignore_lock=True should skip loading lock file."""

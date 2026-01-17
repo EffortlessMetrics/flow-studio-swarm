@@ -1,10 +1,6 @@
-"""Compatibility shim for routing.
+"""Routing package exports."""
 
-Prefer importing from swarm.runtime.routing going forward.
-"""
-
-from swarm.runtime.routing import (
-    CELEvaluator,
+from .base import (
     ConditionEval,
     DecisionType,
     Edge,
@@ -16,22 +12,22 @@ from swarm.runtime.routing import (
     RoutingContext,
     RoutingResult,
     RunContext,
-    SmartRouter,
     StepOutput,
     StepOutputData,
-    StepRouter,
+)
+from .cel_evaluator import CELEvaluator
+from .factory import get_router
+from .graph_router import SmartRouter, create_router, route_step
+from .step_router import (
     attach_routing_audit,
     convert_to_wp4_explanation,
-    create_router,
     emit_routing_event,
-    get_router,
     route_from_step,
-    route_step,
     store_routing_audit,
+    StepRouter,
 )
 
 __all__ = [
-    "CELEvaluator",
     "ConditionEval",
     "DecisionType",
     "Edge",
@@ -43,16 +39,17 @@ __all__ = [
     "RoutingContext",
     "RoutingResult",
     "RunContext",
-    "SmartRouter",
     "StepOutput",
     "StepOutputData",
+    "CELEvaluator",
+    "SmartRouter",
     "StepRouter",
-    "attach_routing_audit",
-    "convert_to_wp4_explanation",
     "create_router",
-    "emit_routing_event",
-    "get_router",
-    "route_from_step",
     "route_step",
+    "route_from_step",
+    "attach_routing_audit",
     "store_routing_audit",
+    "emit_routing_event",
+    "convert_to_wp4_explanation",
+    "get_router",
 ]
