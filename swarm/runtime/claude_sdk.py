@@ -65,6 +65,7 @@ from swarm.runtime._claude_sdk.sdk_import import (
 from swarm.runtime._claude_sdk.options import (
     create_high_trust_options,
     create_options_from_plan,
+    step_plan_to_agent_options,
 )
 
 # Query helpers
@@ -212,6 +213,7 @@ __all__ = [
     # Options builder
     "create_high_trust_options",
     "create_options_from_plan",
+    "step_plan_to_agent_options",
     # Query helpers
     "query_with_options",
     "query_simple",

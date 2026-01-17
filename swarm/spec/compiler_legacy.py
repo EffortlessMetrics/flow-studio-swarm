@@ -34,7 +34,7 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from swarm.config.model_registry import resolve_station_model
 from swarm.config.tool_profiles import resolve_tool_profile
 
-from .loader import load_flow, load_fragment, load_fragments, load_station
+from .loader import load_flow, load_fragment, load_station
 from .types import (
     FlowSpec,
     FlowStep,
@@ -50,6 +50,14 @@ from .compiler.models import (
     FragmentReference,
     StepIntent,
     StepPlan,
+    _dedupe_preserve_order,
+)
+from .compiler.prompt_parts import (
+    CLAUDE_CODE_PRESET,
+    SYSTEM_PRESETS,
+    build_system_append,
+    build_system_append_v2,
+    render_template,
 )
 
 if TYPE_CHECKING:
@@ -57,18 +65,6 @@ if TYPE_CHECKING:
     from swarm.runtime.engines.models import StepContext
 
 logger = logging.getLogger(__name__)
-
-# Claude preset content (default system prompt base)
-CLAUDE_CODE_PRESET = """You are Claude, an AI assistant by Anthropic. You are helpful, harmless, and honest.
-You have access to a set of tools to help accomplish tasks. Use them as needed."""
-
-# System prompt presets
-SYSTEM_PRESETS: Dict[str, str] = {
-    "default": CLAUDE_CODE_PRESET,
-    "claude_code": CLAUDE_CODE_PRESET,
-    "minimal": "You are a helpful AI assistant.",
-    "custom": "",  # Custom presets are loaded from identity.preset_content
-}
 
 # Tool profiles for quick configuration
 TOOL_PROFILES: Dict[str, Tuple[str, ...]] = {
@@ -146,145 +142,6 @@ def extract_flow_key(flow_id: str) -> str:
     return flow_id
 
 
-# =============================================================================
-# Template Rendering
-# =============================================================================
-
-
-def render_template(template: str, variables: Dict[str, Any]) -> str:
-    """Render a Mustache-style template with {{variable}} substitution.
-
-    Supports nested access like {{step.objective}} and {{run.base}}.
-
-    Args:
-        template: Template string with {{variable}} placeholders.
-        variables: Dictionary of variable values (can be nested).
-
-    Returns:
-        Rendered string with substitutions applied.
-    """
-    def get_nested(obj: Any, path: str) -> str:
-        """Get a nested value from a dict using dot notation."""
-        parts = path.split(".")
-        current = obj
-        for part in parts:
-            if isinstance(current, dict):
-                current = current.get(part, "")
-            elif hasattr(current, part):
-                current = getattr(current, part)
-            else:
-                return ""
-        return str(current) if current else ""
-
-    def replace_match(match: re.Match) -> str:
-        var_path = match.group(1).strip()
-        return get_nested(variables, var_path)
-
-    return re.sub(r"\{\{([^}]+)\}\}", replace_match, template)
-
-
-# =============================================================================
-# Prompt Building
-# =============================================================================
-
-
-def build_system_append(
-    station: StationSpec,
-    scent_trail: Optional[str] = None,
-) -> str:
-    """Build the system prompt append from station identity.
-
-    Combines:
-    - Station identity (system_append)
-    - Station invariants
-    - Scent trail (wisdom from previous runs)
-
-    Args:
-        station: The station specification.
-        scent_trail: Optional cross-run wisdom content.
-
-    Returns:
-        Combined system prompt append text.
-    """
-    parts: List[str] = []
-
-    # Station identity
-    if station.identity.system_append:
-        parts.append(station.identity.system_append.strip())
-
-    # Invariants as hard rules
-    if station.invariants:
-        parts.append("\n## Invariants (Non-Negotiable)")
-        for inv in station.invariants:
-            parts.append(f"- {inv}")
-
-    # Scent trail (truncated to avoid bloat)
-    if scent_trail:
-        trail = scent_trail[:1500]  # Cap at 1500 chars
-        if len(scent_trail) > 1500:
-            trail += "\n... (truncated)"
-        parts.append("\n## Lessons from Previous Runs")
-        parts.append(trail)
-
-    return "\n".join(parts)
-
-
-def build_system_append_v2(
-    station: StationSpec,
-    scent_trail: Optional[str] = None,
-    repo_root: Optional[Path] = None,
-    policy_invariants_ref: Optional[List[str]] = None,
-) -> str:
-    """Build the v2 system prompt append with policy fragment loading.
-
-    V2 enhancements over build_system_append:
-    - Loads policy invariants from referenced fragment files
-    - Includes station-specific invariants after global ones
-    - Better structured output with clear sections
-
-    Args:
-        station: The station specification.
-        scent_trail: Optional cross-run wisdom content.
-        repo_root: Repository root for fragment loading.
-        policy_invariants_ref: List of fragment paths for policy invariants.
-
-    Returns:
-        Combined system prompt append text.
-    """
-    parts: List[str] = []
-
-    # 1. Station identity (who you are)
-    if station.identity.system_append:
-        parts.append(station.identity.system_append.strip())
-
-    # 2. Load policy invariants from referenced fragments
-    if policy_invariants_ref:
-        fragment_content = load_fragments(
-            policy_invariants_ref,
-            repo_root,
-            separator="\n\n",
-        )
-        if fragment_content:
-            parts.append("\n## Policy Invariants (From Fragments)")
-            parts.append(fragment_content)
-
-    # 3. Station-specific invariants (always apply)
-    if station.invariants:
-        parts.append("\n## Station Invariants (Non-Negotiable)")
-        for inv in station.invariants:
-            parts.append(f"- {inv}")
-
-    # 4. Scent trail (wisdom from previous runs, truncated)
-    if scent_trail:
-        trail = scent_trail[:1500]
-        if len(scent_trail) > 1500:
-            trail += "\n... (truncated)"
-        parts.append("\n## Lessons from Previous Runs")
-        parts.append(trail)
-
-    return "\n".join(parts)
-
-
 def build_user_prompt(
     station: StationSpec,
     step: FlowStep,
@@ -347,53 +204,57 @@ def build_user_prompt(
                 parts.append(f"- **{env.step_id}** [{status}]: {env.summary[:200] if env.summary else 'No summary'}")
             parts.append("")
 
+    variables = {
+        "step": {
+            "id": step.id,
+            "objective": step.objective,
+            "scope": step.scope or "",
+        },
+        "station": {
+            "id": station.id,
+            "title": station.title,
+        },
+        "run": {
+            "base": str(run_base),
+        },
+        "context": {
+            "pointers": ", ".join(context_pack.upstream_artifacts.keys()) if context_pack else "",
+        },
+    }
+
     # 4. Input/Output requirements
     # Merge station IO with step-specific overrides
-    required_inputs = list(station.io.required_inputs) + list(step.inputs)
-    required_outputs = list(station.io.required_outputs) + list(step.outputs)
+    required_inputs = _dedupe_preserve_order(
+        list(station.io.required_inputs) + list(step.inputs)
+    )
+    required_outputs = _dedupe_preserve_order(
+        list(station.io.required_outputs) + list(step.outputs)
+    )
 
     if required_inputs:
         parts.append("## Required Inputs\n")
         parts.append("These artifacts must exist and be read:")
         for inp in required_inputs:
-            parts.append(f"- `{inp}`")
+            resolved = render_template(inp, variables)
+            parts.append(f"- `{resolved}`")
         parts.append("")
 
     if required_outputs:
         parts.append("## Required Outputs\n")
         parts.append("You MUST produce these artifacts:")
         for out in required_outputs:
-            parts.append(f"- `{out}`")
+            resolved = render_template(out, variables)
+            parts.append(f"- `{resolved}`")
         parts.append("")
 
     # 5. Template rendering (if station has a template)
     if station.runtime_prompt.template:
-        variables = {
-            "step": {
-                "id": step.id,
-                "objective": step.objective,
-                "scope": step.scope or "",
-            },
-            "station": {
-                "id": station.id,
-                "title": station.title,
-            },
-            "run": {
-                "base": str(run_base),
-            },
-            "context": {
-                "pointers": ", ".join(context_pack.upstream_artifacts.keys()) if context_pack else "",
-            },
-        }
         rendered = render_template(station.runtime_prompt.template, variables)
         parts.append(rendered)
         parts.append("")
 
     # 6. Handoff instructions (always appended)
-    handoff_path = render_template(
-        station.handoff.path_template,
-        {"run": {"base": str(run_base)}, "step": {"id": step.id}},
-    )
+    handoff_path = render_template(station.handoff.path_template, variables)
     parts.append("## Finalization (REQUIRED)\n")
     parts.append(f"When complete, write a handoff file to: `{handoff_path}`")
     parts.append("\nThe file MUST be valid JSON with these fields:")
@@ -653,6 +514,7 @@ class SpecCompiler:
             user_prompt=step_plan.user_prompt,
             compiled_at=step_plan.compiled_at,
             context_pack_size=len(context_pack.previous_envelopes) if context_pack else 0,
+            output_schema=step_plan.output_schema,
             verification=step_plan.verification,
             handoff=handoff,
             flow_key=flow_key,
@@ -729,6 +591,7 @@ class SpecCompiler:
             station=station,
             context=context,
             use_v2=True,
+            cwd=context.cwd,
         )
 
     def resolve_template(
@@ -1023,8 +886,8 @@ class SpecCompiler:
             required_outputs.extend(node.overrides["outputs"])
 
         return {
-            "required_inputs": list(set(required_inputs)),  # Dedupe
-            "required_outputs": list(set(required_outputs)),
+            "required_inputs": _dedupe_preserve_order(required_inputs),
+            "required_outputs": _dedupe_preserve_order(required_outputs),
             "handoff_template": station.handoff.path_template,
             "required_fields": list(station.handoff.required_fields),
         }
@@ -1295,6 +1158,7 @@ class SpecCompiler:
             station=station,
             context=context,
             use_v2=True,
+            cwd=context.cwd,
         )
 
 

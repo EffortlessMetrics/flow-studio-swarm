@@ -14,12 +14,6 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from swarm.config.model_registry import resolve_station_model
 from swarm.config.tool_profiles import resolve_tool_profile
 
-from ..compiler_legacy import (
-    SYSTEM_PRESETS,
-    build_system_append,
-    build_system_append_v2,
-    render_template,
-)
 from ..loader import load_fragment
 from ..types import StationSpec, VerificationRequirements
 from .models import (
@@ -30,6 +24,12 @@ from .models import (
     StepIntent,
     StepPlan,
     _dedupe_preserve_order,
+)
+from .prompt_parts import (
+    SYSTEM_PRESETS,
+    build_system_append,
+    build_system_append_v2,
+    render_template,
 )
 
 logger = logging.getLogger(__name__)
@@ -90,9 +90,14 @@ class StepPlanBuilder:
         verification = self._build_verification(intent, variables)
         sdk_options = self._merge_sdk_options(station, intent.sdk_overrides)
 
-        effective_cwd = cwd or context.cwd or (
-            str(context.repo_root) if context.repo_root else str(Path.cwd())
-        )
+        if cwd:
+            effective_cwd = str(cwd)
+        elif context.repo_root:
+            effective_cwd = str(context.repo_root)
+        elif context.cwd:
+            effective_cwd = str(context.cwd)
+        else:
+            effective_cwd = str(Path.cwd())
 
         return StepPlan(
             step_id=intent.step_id,

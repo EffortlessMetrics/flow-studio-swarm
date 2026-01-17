@@ -19,7 +19,12 @@ if str(_SWARM_ROOT) not in sys.path:
     sys.path.insert(0, str(_SWARM_ROOT))
 
 from swarm.spec.compiler import (
+    CompileContext,
+    FlowNode,
     SpecCompiler,
+    StepIntent,
+    StepPlan,
+    StepPlanBuilder,
     compile_prompt,
     render_template,
     build_system_append,
@@ -423,6 +428,28 @@ class TestSpecCompiler:
         assert plan1.prompt_hash == plan2.prompt_hash
         assert plan1.prompt_hash_v2 == plan2.prompt_hash_v2
 
+    def test_compile_step_hash_deterministic(self):
+        """FlowGraph compilation should produce stable prompt hashes."""
+        repo_root = Path(__file__).parent.parent
+        compiler = SpecCompiler(repo_root)
+        context = CompileContext(
+            run_id="test-run",
+            run_base=Path("swarm/runs/test"),
+            repo_root=repo_root,
+        )
+        node = FlowNode(
+            node_id="hash-step",
+            template_id="",
+            params={},
+            overrides={"station_id": "code-implementer"},
+        )
+
+        plan1 = compiler.compile_step(node=node, template=None, context=context)
+        plan2 = compiler.compile_step(node=node, template=None, context=context)
+
+        assert plan1.prompt_hash == plan2.prompt_hash
+        assert plan1.prompt_hash_v2 == plan2.prompt_hash_v2
+
     def test_compile_sets_compiled_at(self):
         """Compiled plan should have a timestamp."""
         repo_root = Path(__file__).parent.parent
@@ -454,6 +481,32 @@ class TestSpecCompiler:
         )
 
         assert plan.flow_key == "build"
+
+    def test_compile_respects_cwd_override(self):
+        """Explicit cwd should override repo_root defaults."""
+        repo_root = Path(__file__).parent.parent
+        compiler = SpecCompiler(repo_root)
+        run_base = Path("swarm/runs/test")
+        cwd_override = str(run_base / "custom-cwd")
+
+        plan = compiler.compile(
+            flow_id="3-build",
+            step_id="implement",
+            context_pack=None,
+            run_base=run_base,
+            cwd=cwd_override,
+        )
+
+        assert plan.cwd == cwd_override
+
+        plan_default = compiler.compile(
+            flow_id="3-build",
+            step_id="implement",
+            context_pack=None,
+            run_base=run_base,
+        )
+
+        assert plan_default.cwd == str(repo_root)
 
     def test_compile_sets_verification_requirements(self):
         """Compiled plan should include verification requirements."""
@@ -557,6 +610,93 @@ class TestPromptHashComputation:
 
         assert hash1 == hash2
 
+
+class TestStepPlanBuilder:
+    """Tests for StepPlanBuilder behavior."""
+
+    def test_builder_renders_io_templates(self):
+        """Required IO paths should render templates in prompts."""
+        repo_root = Path(__file__).parent.parent
+        builder = StepPlanBuilder(repo_root)
+        station = _create_test_station(
+            required_inputs=("{{run.base}}/inputs/{{step.id}}.md",),
+            required_outputs=("{{run.base}}/outputs/{{step.id}}.md",),
+        )
+        intent = StepIntent(
+            flow_id="test-flow",
+            flow_key="test",
+            flow_version=1,
+            step_id="test-step",
+            station_id=station.id,
+            objective="Test objective",
+            scope=None,
+            required_inputs=station.io.required_inputs,
+            required_outputs=station.io.required_outputs,
+            handoff_path_template=station.handoff.path_template,
+            required_fields=station.handoff.required_fields,
+            sdk_overrides={},
+            verification_overrides={},
+        )
+        context = CompileContext(
+            run_id="run-123",
+            run_base=Path("swarm/runs/test"),
+            repo_root=repo_root,
+        )
+
+        plan = builder.build(intent=intent, station=station, context=context)
+
+        run_base_str = str(Path("swarm/runs/test"))
+        expected_input = f"{run_base_str}/inputs/test-step.md"
+        expected_output = f"{run_base_str}/outputs/test-step.md"
+
+        assert "{{" not in plan.user_prompt
+        assert expected_input in plan.user_prompt
+        assert expected_output in plan.user_prompt
+
+
+class TestStepPlanTraceability:
+    """Tests for StepPlan traceability output."""
+
+    def test_traceability_includes_template_metadata(self):
+        """Template metadata should be present when provided."""
+        plan = StepPlan(
+            step_id="step-1",
+            station_id="station-1",
+            system_prompt="system",
+            user_prompt="user",
+            allowed_tools=(),
+            permission_mode="default",
+            max_turns=1,
+            output_schema={},
+            prompt_hash="hash1234",
+            prompt_hash_v2="hashv2",
+            template_id="template-1",
+            template_version=2,
+        )
+
+        traceability = plan.to_dict()["traceability"]
+        assert traceability["template_id"] == "template-1"
+        assert traceability["template_version"] == 2
+        assert traceability["prompt_hash_v2"] == "hashv2"
+
+    def test_traceability_omits_empty_template_metadata(self):
+        """Template metadata should be omitted when empty."""
+        plan = StepPlan(
+            step_id="step-1",
+            station_id="station-1",
+            system_prompt="system",
+            user_prompt="user",
+            allowed_tools=(),
+            permission_mode="default",
+            max_turns=1,
+            output_schema={},
+            prompt_hash="hash1234",
+            prompt_hash_v2="hashv2",
+        )
+
+        traceability = plan.to_dict()["traceability"]
+        assert "template_id" not in traceability
+        assert "template_version" not in traceability
 
 class TestAllFlowsCompile:
     """Integration tests for compiling all flows."""

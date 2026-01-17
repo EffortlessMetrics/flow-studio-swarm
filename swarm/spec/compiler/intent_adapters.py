@@ -56,7 +56,7 @@ def intent_from_flow_node(
     context: CompileContext,
 ) -> StepIntent:
     """Adapt a FlowGraph node into a StepIntent."""
-    from ..compiler_legacy import render_template
+    from .prompt_parts import render_template
 
     objective = node.params.get("objective", f"Execute step {node.node_id}")
     params: Dict[str, Any] = {}

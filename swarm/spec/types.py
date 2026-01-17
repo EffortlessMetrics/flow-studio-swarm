@@ -268,7 +268,6 @@ class PromptPlan:
     flow_version: int
     step_id: str
     prompt_hash: str
-    prompt_hash_v2: str = ""
 
     # SDK Options (programmatic, not filesystem)
     model: str
@@ -285,6 +284,12 @@ class PromptPlan:
     # Metadata for events
     compiled_at: str  # ISO timestamp
     context_pack_size: int  # Number of envelopes included
+
+    # Traceability optional fields
+    prompt_hash_v2: str = ""
+
+    # Structured output schema for SDK output_format
+    output_schema: Dict[str, Any] = field(default_factory=dict)
 
     # V2: Verification requirements (merged from station + step)
     verification: VerificationRequirements = field(

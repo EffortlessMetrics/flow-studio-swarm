@@ -52,7 +52,7 @@ class SdkOptionsSpec:
     """SDK options for Claude execution."""
     model: str  # Full model ID
     model_tier: str  # Shorthand tier
-    permission_mode: str  # "default", "bypassPermissions", "planMode"
+    permission_mode: str  # "default", "acceptEdits", "plan", "bypassPermissions"
     allowed_tools: Tuple[str, ...]  # Explicit tool list
     denied_tools: Tuple[str, ...]  # Denied tools
     tool_profile: str  # Tool profile name

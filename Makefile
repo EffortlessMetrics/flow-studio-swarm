@@ -1147,13 +1147,13 @@ profiles-help:
 .PHONY: check-agent-sdk
 check-agent-sdk:
 	@uv run --extra dev --group dev python - <<-'PY'
-	import sys
-	try:
-	    import claude_agent_sdk  # noqa: F401
-	except Exception:
-	    print("ERROR: claude-agent-sdk not installed. Run: uv sync --extra dev", file=sys.stderr)
-	    sys.exit(1)
-	print("OK: claude-agent-sdk installed.")
+		import sys
+		try:
+		    import claude_agent_sdk  # noqa: F401
+		except Exception:
+		    print("ERROR: claude-agent-sdk not installed. Run: uv sync --extra dev", file=sys.stderr)
+		    sys.exit(1)
+		print("OK: claude-agent-sdk installed.")
 	PY
 
 .PHONY: vendor-agent-sdk

@@ -9,8 +9,8 @@ from typing import Any, Dict
 
 _LAZY_ATTRS: Dict[str, str] = {
     # compiler_legacy exports
-    "CLAUDE_CODE_PRESET": "swarm.spec.compiler_legacy",
-    "SYSTEM_PRESETS": "swarm.spec.compiler_legacy",
+    "CLAUDE_CODE_PRESET": "swarm.spec.compiler.prompt_parts",
+    "SYSTEM_PRESETS": "swarm.spec.compiler.prompt_parts",
     "TOOL_PROFILES": "swarm.spec.compiler_legacy",
     "ExpandedTemplate": "swarm.spec.compiler_legacy",
     "FlowNode": "swarm.spec.compiler_legacy",
@@ -18,8 +18,8 @@ _LAZY_ATTRS: Dict[str, str] = {
     "SpecCompiler": "swarm.spec.compiler_legacy",
     "StepTemplate": "swarm.spec.compiler_legacy",
     "TemplateMetadata": "swarm.spec.compiler_legacy",
-    "build_system_append": "swarm.spec.compiler_legacy",
-    "build_system_append_v2": "swarm.spec.compiler_legacy",
+    "build_system_append": "swarm.spec.compiler.prompt_parts",
+    "build_system_append_v2": "swarm.spec.compiler.prompt_parts",
     "build_user_prompt": "swarm.spec.compiler_legacy",
     "compile_prompt": "swarm.spec.compiler_legacy",
     "expand_flow_graph": "swarm.spec.compiler_legacy",
@@ -29,7 +29,7 @@ _LAZY_ATTRS: Dict[str, str] = {
     "list_templates": "swarm.spec.compiler_legacy",
     "load_template": "swarm.spec.compiler_legacy",
     "merge_verification_requirements": "swarm.spec.compiler_legacy",
-    "render_template": "swarm.spec.compiler_legacy",
+    "render_template": "swarm.spec.compiler.prompt_parts",
     "resolve_handoff_contract": "swarm.spec.compiler_legacy",
     # models exports
     "COMPILER_VERSION": "swarm.spec.compiler.models",
