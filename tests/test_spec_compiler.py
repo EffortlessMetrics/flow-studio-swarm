@@ -398,6 +398,8 @@ class TestSpecCompiler:
 
         assert plan.prompt_hash != ""
         assert len(plan.prompt_hash) == 16  # Truncated SHA256
+        assert plan.prompt_hash_v2 != ""
+        assert len(plan.prompt_hash_v2) == 16  # Truncated SHA256
 
     def test_compile_hash_deterministic(self):
         """Prompt hash should be deterministic for same inputs."""
@@ -419,6 +421,7 @@ class TestSpecCompiler:
         )
 
         assert plan1.prompt_hash == plan2.prompt_hash
+        assert plan1.prompt_hash_v2 == plan2.prompt_hash_v2
 
     def test_compile_sets_compiled_at(self):
         """Compiled plan should have a timestamp."""
