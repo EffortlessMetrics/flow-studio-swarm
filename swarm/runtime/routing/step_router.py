@@ -344,29 +344,27 @@ def emit_routing_event(
 ) -> None:
     """Emit a routing decision event to the events table."""
     from datetime import datetime, timezone
+    from swarm.runtime.types import RunEvent
 
     if append_event_fn is None:
-        from swarm.runtime.storage import append_event
-        from swarm.runtime.types import RunEvent
+        from swarm.runtime.storage import append_event as append_event_fn
 
-        append_event_fn = append_event
-
-        event = RunEvent(
-            run_id=run_id,
-            ts=datetime.now(timezone.utc),
-            kind="route_decision",
-            flow_key=flow_key,
-            step_id=step_id,
-            payload={
-                "method": routing_result.method,
-                "selected_edge": routing_result.edge.edge_id if routing_result.edge else "",
-                "target_node": routing_result.edge.to_node if routing_result.edge else "",
-                "terminate": routing_result.terminate,
-                "needs_human": routing_result.needs_human,
-                "explanation": routing_result.explanation,
-            },
-        )
-        append_event_fn(run_id, event)
+    event = RunEvent(
+        run_id=run_id,
+        ts=datetime.now(timezone.utc),
+        kind="route_decision",
+        flow_key=flow_key,
+        step_id=step_id,
+        payload={
+            "method": routing_result.method,
+            "selected_edge": routing_result.edge.edge_id if routing_result.edge else "",
+            "target_node": routing_result.edge.to_node if routing_result.edge else "",
+            "terminate": routing_result.terminate,
+            "needs_human": routing_result.needs_human,
+            "explanation": routing_result.explanation,
+        },
+    )
+    append_event_fn(run_id, event)
 
 
 def route_from_step(

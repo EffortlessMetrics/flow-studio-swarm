@@ -159,9 +159,8 @@ def verify_pack_lock(lock: PackLock, current_pack: Pack) -> Tuple[bool, Optional
 
 def lock_current_pack(
     repo_root: Path,
-    cli_overrides: Optional[Dict[str, Any]] = None,
 ) -> Tuple[bool, str]:
-    """Lock the current resolved pack configuration."""
+    """Lock the current pack configuration (repo pack if available, else baseline)."""
     try:
         baseline = load_baseline_pack()
         repo_pack = load_repo_pack(repo_root)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guardrail: enforce complexity thresholds on changed Python files."""
+"""Guardrail: enforce rough complexity thresholds on changed Python files."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ DEFAULT_THRESHOLDS = {
 
 
 class FileAnalyzer(ast.NodeVisitor):
-    """AST visitor to count functions, classes, and cyclomatic complexity."""
+    """AST visitor to count functions, classes, and a rough branch proxy."""
 
     def __init__(self) -> None:
         self.function_count = 0
@@ -203,13 +203,18 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--allowlist",
-        default=str(Path("swarm/tools/complexity_allowlist.txt")),
+        default=str(Path(__file__).with_name("complexity_allowlist.txt")),
         help="Path to allowlist file.",
     )
     parser.add_argument("--loc", type=int, default=DEFAULT_THRESHOLDS["line_count"])
     parser.add_argument("--functions", type=int, default=DEFAULT_THRESHOLDS["function_count"])
     parser.add_argument("--classes", type=int, default=DEFAULT_THRESHOLDS["class_count"])
-    parser.add_argument("--cc", type=int, default=DEFAULT_THRESHOLDS["cyclomatic_complexity"])
+    parser.add_argument(
+        "--cc",
+        type=int,
+        default=DEFAULT_THRESHOLDS["cyclomatic_complexity"],
+        help="Approximate branch count threshold (if/for/while/try).",
+    )
     return parser.parse_args()
 
 

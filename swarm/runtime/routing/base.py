@@ -178,7 +178,7 @@ class FlowGraph:
 
     def get_max_loop_iterations(self) -> int:
         """Get the default max loop iterations from policy."""
-        return self.policy.get("max_loop_iterations", 5)
+        return self.policy.get("max_loop_iterations", 50)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "FlowGraph":
