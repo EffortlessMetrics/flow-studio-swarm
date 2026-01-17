@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
 
     state = create_state(repo_root)
     app.state.flow_studio = state
+    app.state.fs = state  # Compat alias; delete later.
 
     app.include_router(health_router)
     app.include_router(profiles_router)
