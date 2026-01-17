@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING
 
 from swarm.config.model_registry import resolve_station_model
 from swarm.config.tool_profiles import resolve_tool_profile
@@ -196,6 +196,7 @@ class StepPlan:
     prompt_hash: str  # Deterministic hash for reproducibility
 
     # Extended fields for full schema compliance
+    system_append: str = ""
     model: str = "sonnet"
     model_tier: str = "sonnet"
     sandbox_enabled: bool = True
@@ -212,13 +213,30 @@ class StepPlan:
         default_factory=lambda: VerificationRequirements()
     )
     fragments_used: Tuple[FragmentReference, ...] = ()
+    template_id: str = ""
+    template_version: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary matching prompt_plan.schema.json."""
+        traceability = {
+            "station_id": self.station_id,
+            "station_version": self.station_version,
+            "flow_id": self.flow_id,
+            "flow_version": self.flow_version,
+            "flow_key": self.flow_key,
+            "step_id": self.step_id,
+            "prompt_hash": self.prompt_hash,
+            "compiled_at": self.compiled_at,
+            "compiler_version": self.compiler_version,
+        }
+        if self.template_id:
+            traceability["template_id"] = self.template_id
+            traceability["template_version"] = self.template_version
+
         return {
             "system_prompt": {
                 "preset": "claude_code",
-                "append": "",
+                "append": self.system_append,
                 "combined": self.system_prompt,
                 "invariants": [],
                 "tone": "neutral",
@@ -245,17 +263,7 @@ class StepPlan:
                 },
                 "cwd": self.cwd,
             },
-            "traceability": {
-                "station_id": self.station_id,
-                "station_version": self.station_version,
-                "flow_id": self.flow_id,
-                "flow_version": self.flow_version,
-                "flow_key": self.flow_key,
-                "step_id": self.step_id,
-                "prompt_hash": self.prompt_hash,
-                "compiled_at": self.compiled_at,
-                "compiler_version": self.compiler_version,
-            },
+            "traceability": traceability,
             "fragments_used": [
                 {"path": f.path, "hash": f.hash, "version": f.version}
                 for f in self.fragments_used
@@ -311,6 +319,38 @@ class CompileContext:
     scent_trail: str = ""
 
 
+@dataclass(frozen=True)
+class StepIntent:
+    """Source-agnostic intent for a single step."""
+    flow_id: str
+    flow_key: str
+    step_id: str
+    station_id: str
+    objective: str
+    scope: Optional[str]
+    required_inputs: Tuple[str, ...]
+    required_outputs: Tuple[str, ...]
+    handoff_path_template: str
+    required_fields: Tuple[str, ...]
+    sdk_overrides: Dict[str, Any]
+    verification_overrides: Dict[str, Any]
+    params: Dict[str, Any] = field(default_factory=dict)
+    template_id: Optional[str] = None
+    template_version: Optional[int] = None
+    flow_version: int = 1
+
+
+@dataclass(frozen=True)
+class FlowTemplateVars:
+    """Template variables for flow info, with string fallback to flow key."""
+    id: str
+    key: str
+    version: str
+
+    def __str__(self) -> str:
+        return self.key
+
+
 # =============================================================================
 # Flow Key Extraction
 # =============================================================================
@@ -342,6 +382,23 @@ def extract_flow_key(flow_id: str) -> str:
         if len(parts) == 2 and parts[0].isdigit():
             return parts[1]
     return flow_id
+
+
+# =============================================================================
+# Small Helpers
+# =============================================================================
+
+
+def _dedupe_preserve_order(items: Iterable[str]) -> List[str]:
+    """Dedupe items while preserving first-seen order."""
+    seen: set = set()
+    result: List[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
 
 
 # =============================================================================
@@ -691,6 +748,419 @@ def resolve_handoff_contract(
     )
 
 
+class StepPlanBuilder:
+    """Build a StepPlan from a StepIntent and compile context."""
+
+    def __init__(self, repo_root: Optional[Path] = None):
+        self.repo_root = repo_root
+
+    def build(
+        self,
+        intent: StepIntent,
+        station: StationSpec,
+        context: CompileContext,
+        policy_invariants_ref: Optional[List[str]] = None,
+        use_v2: bool = True,
+        cwd: Optional[str] = None,
+    ) -> StepPlan:
+        """Build a StepPlan for the given intent and station."""
+        upstream_artifacts, previous_envelopes = self._extract_context(context.context_pack)
+        variables = self._build_variables(
+            intent=intent,
+            station=station,
+            context=context,
+            upstream_artifacts=upstream_artifacts,
+        )
+
+        system_append = self._build_system_append(
+            station=station,
+            scent_trail=context.scent_trail,
+            policy_invariants_ref=policy_invariants_ref,
+            use_v2=use_v2,
+        )
+        system_prompt = self._build_system_prompt(station, system_append)
+        user_prompt = self._build_user_prompt(
+            intent=intent,
+            station=station,
+            variables=variables,
+            upstream_artifacts=upstream_artifacts,
+            previous_envelopes=previous_envelopes,
+        )
+
+        system_prompt = self._process_fragment_includes(system_prompt)
+        user_prompt = self._process_fragment_includes(user_prompt)
+
+        fragments_used = self._collect_fragment_references(
+            station.runtime_prompt.fragments
+        )
+
+        prompt_hash = self._compute_prompt_hash(system_append, user_prompt)
+        output_schema = self._build_output_schema(station)
+        handoff_path = render_template(intent.handoff_path_template, variables)
+        verification = self._build_verification(intent, variables)
+        sdk_options = self._merge_sdk_options(station, intent.sdk_overrides)
+
+        effective_cwd = cwd or (
+            str(context.repo_root) if context.repo_root else str(Path.cwd())
+        )
+
+        return StepPlan(
+            step_id=intent.step_id,
+            station_id=station.id,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            allowed_tools=sdk_options["allowed_tools"],
+            permission_mode=sdk_options["permission_mode"],
+            max_turns=sdk_options["max_turns"],
+            output_schema=output_schema,
+            prompt_hash=prompt_hash,
+            system_append=system_append,
+            model=sdk_options["model"],
+            model_tier=sdk_options["model_tier"],
+            sandbox_enabled=sdk_options["sandbox_enabled"],
+            cwd=effective_cwd,
+            station_version=station.version,
+            flow_id=intent.flow_id,
+            flow_version=intent.flow_version,
+            flow_key=intent.flow_key,
+            compiled_at=datetime.now(timezone.utc).isoformat(),
+            compiler_version=COMPILER_VERSION,
+            handoff_path=handoff_path,
+            required_fields=intent.required_fields,
+            verification=verification,
+            fragments_used=tuple(fragments_used),
+            template_id=intent.template_id or "",
+            template_version=intent.template_version or 0,
+        )
+
+    def _extract_context(
+        self,
+        context_pack: Optional[Any],
+    ) -> Tuple[Dict[str, Any], List[Any]]:
+        """Normalize context pack inputs for prompt assembly."""
+        if not context_pack:
+            return {}, []
+
+        if hasattr(context_pack, "upstream_artifacts"):
+            upstream = context_pack.upstream_artifacts or {}
+            previous = context_pack.previous_envelopes or []
+            return upstream, previous
+
+        if isinstance(context_pack, dict):
+            upstream = context_pack.get("upstream_artifacts", {}) or {}
+            previous = context_pack.get("previous_envelopes", []) or []
+            return upstream, previous
+
+        return {}, []
+
+    def _infer_run_id(self, run_base: Path, flow_key: str) -> str:
+        """Infer run_id from run_base when not provided."""
+        if flow_key and run_base.name == flow_key:
+            return run_base.parent.name
+        return run_base.name
+
+    def _build_variables(
+        self,
+        intent: StepIntent,
+        station: StationSpec,
+        context: CompileContext,
+        upstream_artifacts: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Build template variables for substitution."""
+        run_id = context.run_id or self._infer_run_id(context.run_base, intent.flow_key)
+        context_pointers = ", ".join(str(k) for k in upstream_artifacts.keys())
+        flow_vars = FlowTemplateVars(
+            id=intent.flow_id,
+            key=intent.flow_key,
+            version=str(intent.flow_version),
+        )
+
+        return {
+            "run": {
+                "base": str(context.run_base),
+                "id": run_id,
+            },
+            "step": {
+                "id": intent.step_id,
+                "objective": intent.objective,
+                "scope": intent.scope or "",
+            },
+            "station": {
+                "id": station.id,
+                "title": station.title,
+                "version": str(station.version),
+            },
+            "flow": flow_vars,
+            "params": intent.params,
+            "context": {
+                "pointers": context_pointers,
+            },
+        }
+
+    def _build_system_append(
+        self,
+        station: StationSpec,
+        scent_trail: Optional[str],
+        policy_invariants_ref: Optional[List[str]],
+        use_v2: bool,
+    ) -> str:
+        """Build system append content for station identity + invariants."""
+        if use_v2:
+            if policy_invariants_ref is None:
+                policy_invariants_ref = list(station.runtime_prompt.fragments)
+            return build_system_append_v2(
+                station=station,
+                scent_trail=scent_trail,
+                repo_root=self.repo_root,
+                policy_invariants_ref=policy_invariants_ref,
+            )
+        return build_system_append(station, scent_trail)
+
+    def _build_system_prompt(self, station: StationSpec, system_append: str) -> str:
+        """Combine system preset with station append."""
+        preset = getattr(station.identity, "preset", "default")
+        preset_content = ""
+        if preset == "custom":
+            preset_content = getattr(station.identity, "preset_content", "")
+        elif preset in SYSTEM_PRESETS:
+            preset_content = SYSTEM_PRESETS[preset]
+
+        parts: List[str] = []
+        if preset_content:
+            parts.append(preset_content)
+        if system_append:
+            parts.append(system_append)
+        return "\n".join(parts)
+
+    def _build_user_prompt(
+        self,
+        intent: StepIntent,
+        station: StationSpec,
+        variables: Dict[str, Any],
+        upstream_artifacts: Dict[str, Any],
+        previous_envelopes: List[Any],
+    ) -> str:
+        """Build the user prompt from intent and station runtime prompt."""
+        parts: List[str] = []
+
+        if station.runtime_prompt.fragments:
+            parts.append("## Guidelines\n")
+            for frag_path in station.runtime_prompt.fragments:
+                try:
+                    frag_content = load_fragment(frag_path, self.repo_root)
+                    parts.append(frag_content.strip())
+                    parts.append("")
+                except FileNotFoundError:
+                    logger.warning("Fragment not found: %s", frag_path)
+
+        parts.append("## Objective\n")
+        objective = intent.objective
+        if "{{" in objective:
+            objective = render_template(objective, variables)
+        parts.append(objective)
+        if intent.scope:
+            scope = intent.scope
+            if "{{" in scope:
+                scope = render_template(scope, variables)
+            parts.append(f"\n**Scope:** {scope}")
+        parts.append("")
+
+        if upstream_artifacts:
+            parts.append("## Available Artifacts\n")
+            parts.append("Read these files for context:")
+            for name, path in upstream_artifacts.items():
+                parts.append(f"- `{path}` ({name})")
+            parts.append("")
+
+        if previous_envelopes:
+            parts.append("## Previous Steps\n")
+            for env in previous_envelopes[-5:]:
+                if hasattr(env, "status"):
+                    status = env.status.upper() if env.status else "?"
+                    summary = env.summary[:200] if env.summary else "No summary"
+                    step_id = env.step_id
+                else:
+                    status_val = env.get("status") if isinstance(env, dict) else None
+                    status = status_val.upper() if status_val else "?"
+                    summary_val = env.get("summary") if isinstance(env, dict) else None
+                    summary = summary_val[:200] if summary_val else "No summary"
+                    step_id = env.get("step_id") if isinstance(env, dict) else "unknown"
+                parts.append(f"- **{step_id}** [{status}]: {summary}")
+            parts.append("")
+
+        if intent.required_inputs:
+            parts.append("## Required Inputs\n")
+            parts.append("These artifacts must exist and be read:")
+            for inp in intent.required_inputs:
+                parts.append(f"- `{inp}`")
+            parts.append("")
+
+        if intent.required_outputs:
+            parts.append("## Required Outputs\n")
+            parts.append("You MUST produce these artifacts:")
+            for out in intent.required_outputs:
+                parts.append(f"- `{out}`")
+            parts.append("")
+
+        if station.runtime_prompt.template:
+            rendered = render_template(station.runtime_prompt.template, variables)
+            parts.append(rendered)
+            parts.append("")
+
+        handoff_path = render_template(intent.handoff_path_template, variables)
+        parts.append("## Finalization (REQUIRED)\n")
+        parts.append(f"When complete, write a handoff file to: `{handoff_path}`")
+        parts.append("\nThe file MUST be valid JSON with these fields:")
+        parts.append("```json")
+        parts.append("{")
+        for i, field in enumerate(intent.required_fields):
+            comma = "," if i < len(intent.required_fields) - 1 else ""
+            if field == "status":
+                parts.append(f'  "status": "VERIFIED | UNVERIFIED | PARTIAL | BLOCKED"{comma}')
+            elif field == "summary":
+                parts.append(f'  "summary": "2-paragraph summary of work done"{comma}')
+            elif field == "artifacts":
+                parts.append(f'  "artifacts": {{"name": "relative/path"}}{comma}')
+            elif field == "can_further_iteration_help":
+                parts.append(f'  "can_further_iteration_help": "yes | no"{comma}')
+            elif field == "proposed_next_step":
+                parts.append(f'  "proposed_next_step": "step_id or null"{comma}')
+            elif field == "confidence":
+                parts.append(f'  "confidence": 0.0 to 1.0{comma}')
+            elif field == "blockers":
+                parts.append(f'  "blockers": ["blocker1", "blocker2"]{comma}')
+        parts.append("}")
+        parts.append("```")
+        parts.append("\n**DO NOT** finish without writing this file.")
+
+        return "\n".join(parts)
+
+    def _build_output_schema(self, station: StationSpec) -> Dict[str, Any]:
+        """Build JSON schema for structured output."""
+        return {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": list(station.handoff.required_fields),
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["VERIFIED", "UNVERIFIED", "PARTIAL", "BLOCKED"],
+                },
+                "summary": {"type": "string"},
+                "artifacts": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                },
+                "can_further_iteration_help": {
+                    "type": "string",
+                    "enum": ["yes", "no"],
+                },
+                "proposed_next_step": {"type": ["string", "null"]},
+                "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                "blockers": {"type": "array", "items": {"type": "string"}},
+            },
+        }
+
+    def _build_verification(
+        self,
+        intent: StepIntent,
+        variables: Dict[str, Any],
+    ) -> VerificationRequirements:
+        """Build verification requirements from intent."""
+        artifacts: List[str] = []
+
+        for output_path in intent.required_outputs:
+            resolved = render_template(output_path, variables)
+            if resolved not in artifacts:
+                artifacts.append(resolved)
+
+        for artifact in intent.verification_overrides.get("required_artifacts", []):
+            resolved = render_template(artifact, variables)
+            if resolved not in artifacts:
+                artifacts.append(resolved)
+
+        commands: List[str] = []
+        for cmd in intent.verification_overrides.get("verification_commands", []):
+            commands.append(render_template(cmd, variables))
+
+        return VerificationRequirements(
+            required_artifacts=tuple(artifacts),
+            verification_commands=tuple(commands),
+        )
+
+    def _merge_sdk_options(
+        self,
+        station: StationSpec,
+        overrides: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Merge SDK options from station with overrides."""
+        sdk = station.sdk
+        category = station.category.value
+
+        raw_model = overrides.get("model", sdk.model)
+        resolved_model = resolve_station_model(raw_model, category=category)
+
+        raw_allowed_tools = overrides.get("allowed_tools", sdk.allowed_tools)
+        if isinstance(raw_allowed_tools, str):
+            resolved_tools = resolve_tool_profile(raw_allowed_tools, category=category)
+        elif raw_allowed_tools:
+            resolved_tools = tuple(raw_allowed_tools)
+        else:
+            resolved_tools = resolve_tool_profile("inherit", category=category)
+
+        return {
+            "model": resolved_model,
+            "model_tier": raw_model,
+            "permission_mode": overrides.get("permission_mode", sdk.permission_mode),
+            "allowed_tools": resolved_tools,
+            "max_turns": overrides.get("max_turns", sdk.max_turns),
+            "sandbox_enabled": overrides.get("sandbox_enabled", sdk.sandbox.enabled),
+        }
+
+    def _process_fragment_includes(self, content: str) -> str:
+        """Resolve {{fragment:...}} includes in prompt content."""
+        pattern = r"\{\{fragment:([^}]+)\}\}"
+
+        def replace_fragment(match: re.Match) -> str:
+            frag_path = match.group(1).strip()
+            if not frag_path.endswith(".md"):
+                frag_path = f"{frag_path}.md"
+            try:
+                return load_fragment(frag_path, self.repo_root)
+            except FileNotFoundError:
+                logger.warning("Fragment include not found: %s", frag_path)
+                return f"[Fragment not found: {frag_path}]"
+
+        return re.sub(pattern, replace_fragment, content)
+
+    def _collect_fragment_references(
+        self,
+        fragment_paths: Tuple[str, ...],
+    ) -> List[FragmentReference]:
+        """Collect fragment references for audit trail."""
+        refs: List[FragmentReference] = []
+
+        for frag_path in fragment_paths:
+            try:
+                content = load_fragment(frag_path, self.repo_root)
+                content_hash = hashlib.sha256(content.encode()).hexdigest()[:12]
+                refs.append(FragmentReference(
+                    path=frag_path,
+                    hash=content_hash,
+                    version="",
+                ))
+            except FileNotFoundError:
+                logger.warning("Fragment not found for audit: %s", frag_path)
+
+        return refs
+
+    def _compute_prompt_hash(self, system_append: str, user_prompt: str) -> str:
+        """Compute deterministic hash for system append + user prompt."""
+        combined = system_append + user_prompt
+        full_hash = hashlib.sha256(combined.encode("utf-8")).hexdigest()
+        return full_hash[:16]
+
+
 class SpecCompiler:
     """Compiler that produces PromptPlans from specs.
 
@@ -738,6 +1208,113 @@ class SpecCompiler:
 
         return None
 
+    def _intent_from_flow_step(
+        self,
+        flow: FlowSpec,
+        step: FlowStep,
+        station: StationSpec,
+        flow_key: str,
+    ) -> StepIntent:
+        """Adapt a FlowSpec step into a StepIntent."""
+        required_inputs = list(station.io.required_inputs) + list(step.inputs)
+        required_outputs = list(station.io.required_outputs) + list(step.outputs)
+
+        verification_overrides: Dict[str, Any] = {}
+        commands = step.sdk_overrides.get("verification_commands")
+        if commands:
+            verification_overrides["verification_commands"] = list(commands)
+
+        return StepIntent(
+            flow_id=flow.id,
+            flow_key=flow_key,
+            flow_version=flow.version,
+            step_id=step.id,
+            station_id=station.id,
+            objective=step.objective,
+            scope=step.scope,
+            required_inputs=tuple(required_inputs),
+            required_outputs=tuple(required_outputs),
+            handoff_path_template=station.handoff.path_template,
+            required_fields=station.handoff.required_fields,
+            sdk_overrides=step.sdk_overrides,
+            verification_overrides=verification_overrides,
+        )
+
+    def _intent_from_flow_node(
+        self,
+        node: FlowNode,
+        template: Optional[StepTemplate],
+        station: StationSpec,
+        context: CompileContext,
+    ) -> StepIntent:
+        """Adapt a FlowGraph node into a StepIntent."""
+        objective = node.params.get("objective", f"Execute step {node.node_id}")
+        params: Dict[str, Any] = {}
+
+        if template:
+            merged_params = {**template.parameters, **node.params}
+            params = merged_params
+            obj_spec = template.objective if isinstance(template.objective, dict) else {}
+            base_template = obj_spec.get("template", "")
+            if base_template:
+                objective = render_template(base_template, merged_params)
+
+        required_inputs = list(station.io.required_inputs)
+        required_outputs = list(station.io.required_outputs)
+
+        if template and template.io_overrides:
+            io = template.io_overrides
+            required_inputs.extend(io.get("required_inputs", []))
+            required_outputs.extend(io.get("required_outputs", []))
+
+        if "inputs" in node.overrides:
+            required_inputs.extend(node.overrides["inputs"])
+        if "outputs" in node.overrides:
+            required_outputs.extend(node.overrides["outputs"])
+
+        required_inputs = _dedupe_preserve_order(required_inputs)
+        required_outputs = _dedupe_preserve_order(required_outputs)
+
+        artifacts: List[str] = []
+        commands: List[str] = []
+
+        if template and template.constraints:
+            artifacts.extend(template.constraints.get("required_artifacts", []))
+            commands.extend(template.constraints.get("verification_commands", []))
+
+        if "verification" in node.overrides:
+            verification = node.overrides["verification"]
+            artifacts.extend(verification.get("required_artifacts", []))
+            commands.extend(verification.get("verification_commands", []))
+
+        verification_overrides: Dict[str, Any] = {}
+        if artifacts:
+            verification_overrides["required_artifacts"] = _dedupe_preserve_order(artifacts)
+        if commands:
+            verification_overrides["verification_commands"] = _dedupe_preserve_order(commands)
+
+        flow_id = context.run_id
+        flow_key = context.run_id.split("-")[0] if context.run_id else ""
+
+        return StepIntent(
+            flow_id=flow_id,
+            flow_key=flow_key,
+            flow_version=1,
+            step_id=node.node_id,
+            station_id=station.id,
+            objective=objective,
+            scope=node.params.get("scope"),
+            required_inputs=tuple(required_inputs),
+            required_outputs=tuple(required_outputs),
+            handoff_path_template=station.handoff.path_template,
+            required_fields=station.handoff.required_fields,
+            sdk_overrides=node.overrides,
+            verification_overrides=verification_overrides,
+            params=params,
+            template_id=template.id if template else None,
+            template_version=template.version if template else None,
+        )
+
     def compile(
         self,
         flow_id: str,
@@ -773,140 +1350,57 @@ class SpecCompiler:
             FileNotFoundError: If flow or station spec not found.
             ValueError: If step not found in flow.
         """
-        # Load flow spec
         flow = load_flow(flow_id, self.repo_root)
-
-        # Extract flow key for routing
         flow_key = extract_flow_key(flow_id)
 
-        # Find step in flow
-        step = None
-        for s in flow.steps:
-            if s.id == step_id:
-                step = s
-                break
-
+        step = next((s for s in flow.steps if s.id == step_id), None)
         if not step:
             raise ValueError(f"Step {step_id} not found in flow {flow_id}")
 
-        # Load station spec
         station = load_station(step.station, self.repo_root)
-
-        # Load scent trail
         scent_trail = self._load_scent_trail()
 
-        # Build template variables for path resolution
-        variables = {
-            "run": {
-                "base": str(run_base),
-            },
-            "step": {
-                "id": step.id,
-                "objective": step.objective,
-                "scope": step.scope or "",
-            },
-            "flow": {
-                "id": flow.id,
-                "key": flow_key,
-                "version": str(flow.version),
-            },
-            "station": {
-                "id": station.id,
-                "title": station.title,
-                "version": str(station.version),
-            },
-        }
-
-        # Build system append (v1 or v2)
-        if use_v2:
-            # Default policy invariants if not specified
-            if policy_invariants_ref is None:
-                policy_invariants_ref = list(station.runtime_prompt.fragments)
-
-            system_append = build_system_append_v2(
-                station=station,
-                scent_trail=scent_trail,
-                repo_root=self.repo_root,
-                policy_invariants_ref=policy_invariants_ref,
-            )
-        else:
-            system_append = build_system_append(station, scent_trail)
-
-        # Build user prompt
-        user_prompt = build_user_prompt(
-            station=station,
-            step=step,
-            context_pack=context_pack,
+        intent = self._intent_from_flow_step(flow, step, station, flow_key)
+        context = CompileContext(
             run_base=run_base,
             repo_root=self.repo_root,
+            context_pack=context_pack,
+            scent_trail=scent_trail or "",
         )
 
-        # Compute prompt hash for traceability (SHA256 of combined prompts)
-        prompt_hash = hashlib.sha256(
-            (system_append + user_prompt).encode("utf-8")
-        ).hexdigest()[:16]
-
-        # Merge SDK settings (station + step overrides)
-        # Resolve model: "inherit" -> category default, tier -> full ID
-        raw_model = step.sdk_overrides.get("model", station.sdk.model)
-        model = resolve_station_model(raw_model, category=station.category.value)
-
-        permission_mode = step.sdk_overrides.get("permission_mode", station.sdk.permission_mode)
-
-        # Resolve tool profile if using profile system, otherwise use explicit tools
-        raw_allowed_tools = step.sdk_overrides.get("allowed_tools", station.sdk.allowed_tools)
-        if isinstance(raw_allowed_tools, str):
-            # Tool profile name - resolve it
-            allowed_tools = resolve_tool_profile(raw_allowed_tools, category=station.category.value)
-        elif raw_allowed_tools:
-            allowed_tools = tuple(raw_allowed_tools)
-        else:
-            # Fallback to profile-based resolution using category
-            allowed_tools = resolve_tool_profile("inherit", category=station.category.value)
-
-        max_turns = step.sdk_overrides.get("max_turns", station.sdk.max_turns)
-        sandbox_enabled = step.sdk_overrides.get("sandbox_enabled", station.sdk.sandbox.enabled)
-
-        # Determine cwd
-        effective_cwd = cwd or (str(self.repo_root) if self.repo_root else str(Path.cwd()))
-
-        # V2: Merge verification requirements from station and step
-        verification = merge_verification_requirements(
+        builder = StepPlanBuilder(self.repo_root)
+        step_plan = builder.build(
+            intent=intent,
             station=station,
-            step=step,
-            run_base=run_base,
-            variables=variables,
+            context=context,
+            policy_invariants_ref=policy_invariants_ref,
+            use_v2=use_v2,
+            cwd=cwd,
         )
 
-        # V2: Resolve handoff contract with template substitution
-        handoff = resolve_handoff_contract(
-            station=station,
-            variables=variables,
+        handoff = HandoffContract(
+            path=step_plan.handoff_path,
+            required_fields=step_plan.required_fields,
         )
 
         return PromptPlan(
-            # Traceability
             station_id=station.id,
             station_version=station.version,
             flow_id=flow.id,
             flow_version=flow.version,
             step_id=step.id,
-            prompt_hash=prompt_hash,
-            # SDK Options
-            model=model,
-            permission_mode=permission_mode,
-            allowed_tools=allowed_tools,
-            max_turns=max_turns,
-            sandbox_enabled=sandbox_enabled,
-            cwd=effective_cwd,
-            # Prompt Content
-            system_append=system_append,
-            user_prompt=user_prompt,
-            # Metadata
-            compiled_at=datetime.now(timezone.utc).isoformat(),
+            prompt_hash=step_plan.prompt_hash,
+            model=step_plan.model,
+            permission_mode=step_plan.permission_mode,
+            allowed_tools=step_plan.allowed_tools,
+            max_turns=step_plan.max_turns,
+            sandbox_enabled=step_plan.sandbox_enabled,
+            cwd=step_plan.cwd,
+            system_append=step_plan.system_append,
+            user_prompt=step_plan.user_prompt,
+            compiled_at=step_plan.compiled_at,
             context_pack_size=len(context_pack.previous_envelopes) if context_pack else 0,
-            # V2 additions
-            verification=verification,
+            verification=step_plan.verification,
             handoff=handoff,
             flow_key=flow_key,
         )
@@ -964,88 +1458,22 @@ class SpecCompiler:
             FileNotFoundError: If station spec not found.
             ValueError: If required parameters are missing.
         """
-        # Determine station ID from template or node overrides
         station_id = self._resolve_station_id(node, template)
-
-        # Load station spec
         station = load_station(station_id, context.repo_root)
 
-        # Build objective from template + node params
-        objective = self._resolve_objective(node, template)
-
-        # Build template variables
-        variables = self._build_variables(
+        intent = self._intent_from_flow_node(
             node=node,
             template=template,
             station=station,
             context=context,
         )
 
-        # Build system prompt
-        system_prompt = self.build_system_prompt(station, context.scent_trail)
-
-        # Build user prompt
-        user_prompt = self.build_user_prompt(
-            objective=objective,
-            context_pack=context.context_pack,
-            io_contract=self._build_io_contract(node, template, station),
-            variables=variables,
-        )
-
-        # Process fragment includes in both prompts
-        system_prompt = self._process_fragment_includes(system_prompt, context.repo_root)
-        user_prompt = self._process_fragment_includes(user_prompt, context.repo_root)
-
-        # Collect fragment references for audit trail
-        fragments_used = self._collect_fragment_references(
-            station.runtime_prompt.fragments,
-            context.repo_root,
-        )
-
-        # Compute prompt hash
-        prompt_hash = self.compute_prompt_hash(system_prompt, user_prompt)
-
-        # Build output schema
-        output_schema = self._build_output_schema(station)
-
-        # Resolve handoff path
-        handoff_path = render_template(
-            station.handoff.path_template,
-            variables,
-        )
-
-        # Merge verification requirements
-        verification = self._build_verification_from_node(
-            node, template, station, variables
-        )
-
-        # Build SDK options from station with node overrides
-        sdk_options = self._merge_sdk_options(station, node)
-
-        return StepPlan(
-            step_id=node.node_id,
-            station_id=station.id,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            allowed_tools=sdk_options["allowed_tools"],
-            permission_mode=sdk_options["permission_mode"],
-            max_turns=sdk_options["max_turns"],
-            output_schema=output_schema,
-            prompt_hash=prompt_hash,
-            model=sdk_options["model"],
-            model_tier=sdk_options["model"],
-            sandbox_enabled=sdk_options["sandbox_enabled"],
-            cwd=str(context.repo_root) if context.repo_root else "",
-            station_version=station.version,
-            flow_id=context.run_id,
-            flow_version=1,
-            flow_key=context.run_id.split("-")[0] if context.run_id else "",
-            compiled_at=datetime.now(timezone.utc).isoformat(),
-            compiler_version=COMPILER_VERSION,
-            handoff_path=handoff_path,
-            required_fields=station.handoff.required_fields,
-            verification=verification,
-            fragments_used=tuple(fragments_used),
+        builder = StepPlanBuilder(context.repo_root)
+        return builder.build(
+            intent=intent,
+            station=station,
+            context=context,
+            use_v2=True,
         )
 
     def resolve_template(
@@ -1567,17 +1995,6 @@ class SpecCompiler:
         spec_hashes: List[str] = []
 
         for step in flow.steps:
-            # Create a FlowNode from the FlowStep
-            node = FlowNode(
-                node_id=step.id,
-                template_id="",  # No template for direct FlowStep
-                params={
-                    "objective": step.objective,
-                    "scope": step.scope or "",
-                },
-                overrides=step.sdk_overrides,
-            )
-
             # Load station for this step
             station = load_station(step.station, context.repo_root)
 
@@ -1614,98 +2031,13 @@ class SpecCompiler:
         flow_key: str,
     ) -> StepPlan:
         """Compile a single FlowStep into a StepPlan."""
-        # Build variables
-        variables = {
-            "run": {"base": str(context.run_base)},
-            "step": {"id": step.id, "objective": step.objective, "scope": step.scope or ""},
-            "flow": {"id": flow.id, "key": flow_key, "version": str(flow.version)},
-            "station": {"id": station.id, "title": station.title, "version": str(station.version)},
-        }
-
-        # Build system prompt
-        system_prompt = self.build_system_prompt(station, context.scent_trail)
-
-        # Build IO contract
-        io_contract = {
-            "required_inputs": list(station.io.required_inputs) + list(step.inputs),
-            "required_outputs": list(station.io.required_outputs) + list(step.outputs),
-            "handoff_template": station.handoff.path_template,
-            "required_fields": list(station.handoff.required_fields),
-        }
-
-        # Build user prompt
-        user_prompt = self.build_user_prompt(
-            objective=step.objective,
-            context_pack=None,  # Will be populated at runtime
-            io_contract=io_contract,
-            variables=variables,
-        )
-
-        # Process fragment includes
-        system_prompt = self._process_fragment_includes(system_prompt, context.repo_root)
-        user_prompt = self._process_fragment_includes(user_prompt, context.repo_root)
-
-        # Collect fragments
-        fragments_used = self._collect_fragment_references(
-            station.runtime_prompt.fragments, context.repo_root
-        )
-
-        # Compute hash
-        prompt_hash = self.compute_prompt_hash(system_prompt, user_prompt)
-
-        # Build output schema
-        output_schema = self._build_output_schema(station)
-
-        # Resolve handoff path
-        handoff_path = render_template(station.handoff.path_template, variables)
-
-        # Build verification
-        verification = merge_verification_requirements(
-            station, step, context.run_base, variables
-        )
-
-        # SDK options - resolve model and tool profiles
-        category = station.category.value
-        raw_model = step.sdk_overrides.get("model", station.sdk.model)
-        model = resolve_station_model(raw_model, category=category)
-
-        permission_mode = step.sdk_overrides.get("permission_mode", station.sdk.permission_mode)
-
-        raw_allowed_tools = step.sdk_overrides.get("allowed_tools", station.sdk.allowed_tools)
-        if isinstance(raw_allowed_tools, str):
-            allowed_tools = resolve_tool_profile(raw_allowed_tools, category=category)
-        elif raw_allowed_tools:
-            allowed_tools = tuple(raw_allowed_tools)
-        else:
-            allowed_tools = resolve_tool_profile("inherit", category=category)
-
-        max_turns = step.sdk_overrides.get("max_turns", station.sdk.max_turns)
-        sandbox_enabled = step.sdk_overrides.get("sandbox_enabled", station.sdk.sandbox.enabled)
-
-        return StepPlan(
-            step_id=step.id,
-            station_id=station.id,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            allowed_tools=allowed_tools,
-            permission_mode=permission_mode,
-            max_turns=max_turns,
-            output_schema=output_schema,
-            prompt_hash=prompt_hash,
-            model=model,
-            model_tier=raw_model,  # Preserve original tier for UI display
-            sandbox_enabled=sandbox_enabled,
-            cwd=str(context.repo_root) if context.repo_root else "",
-            station_version=station.version,
-            flow_id=flow.id,
-            flow_version=flow.version,
-            flow_key=flow_key,
-            compiled_at=datetime.now(timezone.utc).isoformat(),
-            compiler_version=COMPILER_VERSION,
-            handoff_path=handoff_path,
-            required_fields=station.handoff.required_fields,
-            verification=verification,
-            fragments_used=tuple(fragments_used),
+        intent = self._intent_from_flow_step(flow, step, station, flow_key)
+        builder = StepPlanBuilder(context.repo_root)
+        return builder.build(
+            intent=intent,
+            station=station,
+            context=context,
+            use_v2=True,
         )
 
 
