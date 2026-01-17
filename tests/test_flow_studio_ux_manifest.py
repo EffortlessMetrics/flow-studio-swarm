@@ -143,11 +143,11 @@ class TestLayoutSpecConsistency:
 
     def test_layout_screens_endpoint_exists_in_fastapi(self):
         """FastAPI must have layout_screens endpoint defined."""
-        fastapi_path = REPO_ROOT / "swarm/tools/flow_studio_fastapi.py"
-        content = fastapi_path.read_text(encoding="utf-8")
+        layout_path = REPO_ROOT / "swarm" / "tools" / "flow_studio" / "routes" / "layout.py"
+        content = layout_path.read_text(encoding="utf-8")
 
-        assert "/api/layout_screens" in content, "FastAPI missing /api/layout_screens route"
-        assert "LAYOUT_SCREENS" in content, "FastAPI missing LAYOUT_SCREENS definition"
+        assert "/api/layout_screens" in content, "Layout router missing /api/layout_screens route"
+        assert "LAYOUT_SCREENS" in content, "Layout router missing LAYOUT_SCREENS definition"
 
 
 class TestLayoutScreensAPIConsistency:
