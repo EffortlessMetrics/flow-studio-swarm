@@ -13,6 +13,13 @@ dependencies = [
     "playwright>=1.56.0",
     "duckdb>=1.0.0",
     "jsonschema>=4.25.1",
+    # Security updates for high-priority vulnerabilities
+    "authlib>=1.6.5,<2.0.0",
+    "requests>=2.32.4,<3.0.0",
+    "python-socketio>=5.14.0,<6.0.0",
+    # Security updates for medium-priority vulnerabilities
+    "starlette>=0.46.0,<1.0.0",
+    "urllib3>=2.3.0,<3.0.0",
 ]
 
 [project.optional-dependencies]

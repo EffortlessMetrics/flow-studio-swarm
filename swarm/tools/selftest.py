@@ -577,9 +577,11 @@ class SelfTestRunner:
         try:
             # Use Popen with start_new_session=True to create a new process group.
             # This ensures we can kill all child processes on timeout, not just the shell.
+            # Parse command string into list for safe execution (avoids shell injection)
+            cmd_args = shlex.split(step.full_command())
             proc = subprocess.Popen(
-                step.full_command(),
-                shell=True,
+                cmd_args,
+                shell=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -647,8 +649,8 @@ class SelfTestRunner:
         """Get current git branch name."""
         try:
             result = subprocess.run(
-                "git rev-parse --abbrev-ref HEAD",
-                shell=True,
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -661,8 +663,8 @@ class SelfTestRunner:
         """Get current git commit hash."""
         try:
             result = subprocess.run(
-                "git rev-parse --short HEAD",
-                shell=True,
+                ["git", "rev-parse", "--short", "HEAD"],
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -1049,9 +1051,11 @@ def _run_step_in_process(step_data: Dict[str, Any]) -> Dict[str, Any]:
     try:
         # Use Popen with start_new_session=True for proper timeout handling.
         # This ensures child processes are killed when timeout fires.
+        # Parse command string into list for safe execution (avoids shell injection)
+        cmd_args = shlex.split(step.full_command())
         proc = subprocess.Popen(
-            step.full_command(),
-            shell=True,
+            cmd_args,
+            shell=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -1150,15 +1154,15 @@ class DistributedSelfTestRunner:
         commit = "unknown"
         try:
             result = subprocess.run(
-                "git rev-parse --abbrev-ref HEAD",
-                shell=True, capture_output=True, text=True, timeout=5,
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                shell=False, capture_output=True, text=True, timeout=5,
             )
             if result.returncode == 0:
                 branch = result.stdout.strip()
 
             result = subprocess.run(
-                "git rev-parse --short HEAD",
-                shell=True, capture_output=True, text=True, timeout=5,
+                ["git", "rev-parse", "--short", "HEAD"],
+                shell=False, capture_output=True, text=True, timeout=5,
             )
             if result.returncode == 0:
                 commit = result.stdout.strip()

@@ -45,6 +45,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple
 
+# Cross-platform file locking support
+import sys
+import os
+if sys.platform == 'win32':
+    import msvcrt
+    import ctypes
+    from ctypes import wintypes
+else:
+    import fcntl
+
 # Module logger
 logger = logging.getLogger(__name__)
 
@@ -144,6 +154,49 @@ class ShadowFork:
         """Check if a shadow fork is currently active."""
         return self._get_marker_path().exists()
 
+    def _acquire_marker_lock(self, file_handle) -> bool:
+        """Acquire an exclusive lock on the marker file.
+
+        Args:
+            file_handle: Open file handle to lock.
+
+        Returns:
+            True if lock was acquired, False if lock is held by another process.
+        """
+        try:
+            if sys.platform == 'win32':
+                # Windows: Use msvcrt.locking with non-blocking mode
+                # Get the OS file handle
+                os_handle = msvcrt.get_osfhandle(file_handle.fileno())
+                # Lock the entire file (0 = start, 0 = length means entire file)
+                # _LK_NBLCK = non-blocking lock
+                msvcrt.locking(file_handle.fileno(), msvcrt.LK_NBLCK, 1)
+                return True
+            else:
+                # Unix: Use fcntl.flock with non-blocking mode
+                fcntl.flock(file_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return True
+        except (IOError, OSError):
+            # Lock is held by another process
+            return False
+
+    def _release_marker_lock(self, file_handle) -> None:
+        """Release the lock on the marker file.
+
+        Args:
+            file_handle: Open file handle to unlock.
+        """
+        try:
+            if sys.platform == 'win32':
+                # Windows: Unlock the file
+                msvcrt.locking(file_handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                # Unix: Unlock using flock
+                fcntl.flock(file_handle.fileno(), fcntl.LOCK_UN)
+        except (IOError, OSError):
+            # Ignore errors during unlock
+            pass
+
     def _generate_shadow_branch_name(self) -> str:
         """Generate a timestamped shadow branch name.
 
@@ -222,17 +275,73 @@ class ShadowFork:
         # Install push guard
         self.block_upstream_push()
 
-        # Create marker file
+        # Create marker file atomically using file locking
         marker_path = self._get_marker_path()
+        marker_file = None
         try:
+            # Open the marker file, creating it if it doesn't exist
+            # Use 'w+' mode to create and write
+            marker_file = open(marker_path, 'w+')
+            
+            # Try to acquire exclusive lock (non-blocking)
+            if not self._acquire_marker_lock(marker_file):
+                # Lock is held by another process - shadow fork already active
+                marker_file.close()
+                # Read the existing marker content for the error message
+                try:
+                    existing_content = marker_path.read_text().strip()
+                    shadow_branch = existing_content.split('\n')[0].split('=')[1] if '=' in existing_content else "unknown"
+                    raise RuntimeError(
+                        f"Shadow fork already active. Existing shadow: {shadow_branch}. "
+                        "Call cleanup() before creating a new shadow fork."
+                    )
+                except IOError:
+                    # Marker exists but unreadable
+                    raise RuntimeError(
+                        "Shadow fork already active (marker file exists but unreadable). "
+                        "Call cleanup() before creating a new shadow fork."
+                    )
+            
+            # Lock acquired - check if file was newly created or already had content
+            marker_file.seek(0)
+            existing_content = marker_file.read().strip()
+            
+            if existing_content:
+                # File existed before we opened it - shadow fork already active
+                self._release_marker_lock(marker_file)
+                marker_file.close()
+                shadow_branch = existing_content.split('\n')[0].split('=')[1] if '=' in existing_content else "unknown"
+                raise RuntimeError(
+                    f"Shadow fork already active. Existing shadow: {shadow_branch}. "
+                    "Call cleanup() before creating a new shadow fork."
+                )
+            
+            # File was newly created - write marker content
             marker_content = (
                 f"shadow_branch={self.shadow_branch}\n"
                 f"original_branch={self.original_branch}\n"
                 f"base_branch={self.base_branch}\n"
                 f"created_at={datetime.now(timezone.utc).isoformat()}\n"
             )
-            marker_path.write_text(marker_content)
+            marker_file.write(marker_content)
+            marker_file.flush()
+            os.fsync(marker_file.fileno())
+            
+            # Release the lock
+            self._release_marker_lock(marker_file)
+            marker_file.close()
+            
+        except RuntimeError:
+            # Re-raise RuntimeError (already active case)
+            raise
         except IOError as e:
+            # Clean up on error
+            if marker_file:
+                try:
+                    self._release_marker_lock(marker_file)
+                    marker_file.close()
+                except Exception:
+                    pass
             # Rollback: delete shadow branch and return to original
             self._run_git(["checkout", self.original_branch], check=False)
             self._run_git(["branch", "-D", self.shadow_branch], check=False)

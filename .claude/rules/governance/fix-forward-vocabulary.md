@@ -23,3 +23,5 @@ Fix-forward by default. BLOCKED is rare and literal.
 4. Boundary violation (secrets in diff)
 
 NOT for: ambiguity, uncertainty, style, "needs review"
+
+> Docs: docs/governance/FIX_FORWARD.md

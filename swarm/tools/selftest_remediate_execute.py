@@ -321,7 +321,7 @@ def dry_run(
     try:
         result = subprocess.run(
             dry_run_command,
-            shell=True,
+            shell=False,
             capture_output=True,
             text=True,
             cwd=working_dir,
@@ -547,7 +547,7 @@ def execute(
     try:
         result = subprocess.run(
             remediation.command,
-            shell=True,
+            shell=False,
             capture_output=True,
             text=True,
             cwd=working_dir,

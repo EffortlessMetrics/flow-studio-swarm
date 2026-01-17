@@ -210,7 +210,7 @@ class ClaudeHarnessBackend(RunBackend):
                 process = subprocess.Popen(
                     cmd,
                     cwd=str(self._repo_root),
-                    shell=True,
+                    shell=False,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -294,8 +294,11 @@ class ClaudeHarnessBackend(RunBackend):
             ),
         )
 
-    def _build_command(self, flow_key: str, spec: RunSpec) -> str:
-        """Build the shell command to execute a flow."""
+    def _build_command(self, flow_key: str, spec: RunSpec) -> List[str]:
+        """Build the command arguments to execute a flow.
+
+        Returns a list of arguments for safe subprocess execution.
+        """
         # Map flow keys to Make targets or Claude commands
         flow_commands = {
             "signal": "make demo-signal",
@@ -308,16 +311,22 @@ class ClaudeHarnessBackend(RunBackend):
 
         # Check if custom command provided in params
         if "command" in spec.params:
-            return spec.params["command"]
+            # Parse command string into list for safe execution
+            return shlex.split(spec.params["command"])
 
         # Use Make target if available
         if flow_key in flow_commands:
             cmd = flow_commands[flow_key]
             # Add run_id as environment variable
-            return f"RUN_ID={spec.params.get('run_id', '')} {cmd}"
+            run_id = spec.params.get('run_id', '')
+            if run_id:
+                # Use shell syntax for environment variable assignment
+                return ["sh", "-c", f"RUN_ID={run_id} {cmd}"]
+            else:
+                return shlex.split(cmd)
 
         # Fallback to slash command style
-        return f"echo 'Flow {flow_key} would run here'"
+        return ["sh", "-c", f"echo 'Flow {flow_key} would run here'"]
 
     def get_summary(self, run_id: RunId) -> Optional[RunSummary]:
         """Get summary from disk."""
@@ -563,7 +572,7 @@ class GeminiCliBackend(RunBackend):
                 process = subprocess.Popen(
                     cmd,
                     cwd=str(self._repo_root),
-                    shell=True,
+                    shell=False,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -748,7 +757,7 @@ Be concise and focused on the task."""
         events_json = "\\n".join(stub_events)
         return f'echo -e "{events_json}" && RUN_ID={run_id} echo "Flow {flow_key} completed"'
 
-    def _build_command(self, flow_key: str, run_id: RunId, spec: RunSpec) -> str:
+    def _build_command(self, flow_key: str, run_id: RunId, spec: RunSpec) -> List[str]:
         """Build the Gemini CLI command to execute a flow.
 
         Uses real `gemini` CLI when available and SWARM_GEMINI_STUB=0.
@@ -758,10 +767,13 @@ Be concise and focused on the task."""
             flow_key: The flow being executed
             run_id: The run identifier (passed explicitly from _execute_run)
             spec: The run specification
+
+        Returns:
+            List of command arguments for safe subprocess execution.
         """
         # Allow explicit command override for testing
         if "command" in spec.params:
-            return spec.params["command"]
+            return shlex.split(spec.params["command"])
 
         # Use stub when stub_mode is enabled or CLI not available
         if self.stub_mode or not self.cli_available:
@@ -770,7 +782,7 @@ Be concise and focused on the task."""
                 self.stub_mode,
                 self.cli_available,
             )
-            return self._build_stub_command(flow_key, run_id, spec)
+            return shlex.split(self._build_stub_command(flow_key, run_id, spec))
 
         # Build real gemini CLI command
         prompt = self._build_prompt(flow_key, run_id, spec)
@@ -783,8 +795,7 @@ Be concise and focused on the task."""
             prompt,
         ]
 
-        # Use shell quoting since we run with shell=True
-        return " ".join(shlex.quote(a) for a in args)
+        return args
 
     def _map_gemini_event(
         self, run_id: RunId, flow_key: str, gemini_event: Dict[str, Any]

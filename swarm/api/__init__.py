@@ -7,6 +7,19 @@ to the TypeScript frontend via a FastAPI REST API.
 Note: Although the original design mentioned Flask, the codebase standardizes
 on FastAPI. This implementation follows FastAPI patterns for consistency.
 
+IMPORTANT: To avoid import side effects, the app instance is NOT created at
+import time. Use one of these patterns:
+
+    # For ASGI servers (recommended):
+    uvicorn swarm.api.asgi:app --port 5001
+
+    # For programmatic access to the app:
+    from swarm.api.asgi import app
+
+    # For just the factory (no app creation):
+    from swarm.api import create_app
+    app = create_app()
+
 New API (v2.0) - Modular Routes:
     Spec Endpoints (from routes/specs.py):
         GET    /api/specs/templates          - List templates (for palette)
@@ -46,20 +59,31 @@ Legacy API (v1.0) - Backward Compatible:
     GET  /api/runs/<run_id>/events    - SSE event stream
 """
 
-from .server import SpecManager, app, create_app, get_spec_manager
+# Import factory and manager without triggering app creation
+from .server import SpecManager, create_app, get_spec_manager
 
-# Also expose routers for custom integration
+# Base exports (always available, no side effects)
+__all__ = [
+    "create_app",
+    "SpecManager",
+    "get_spec_manager",
+]
+
+# Expose routers for custom integration (no app creation side effects)
 try:
     from .routes import events_router, runs_router, specs_router
 
-    __all__ = [
-        "create_app",
-        "SpecManager",
-        "app",
-        "get_spec_manager",
-        "specs_router",
-        "runs_router",
-        "events_router",
-    ]
+    __all__.extend(["specs_router", "runs_router", "events_router"])
 except ImportError:
-    __all__ = ["create_app", "SpecManager", "app", "get_spec_manager"]
+    pass
+
+
+def get_app():
+    """Get the app instance (creates on first call).
+
+    This is a lazy accessor that avoids import-time app creation.
+    For direct access to the singleton app, use: from swarm.api.asgi import app
+    """
+    from .asgi import app
+
+    return app

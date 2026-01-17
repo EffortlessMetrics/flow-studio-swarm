@@ -75,13 +75,12 @@ def run_step_cli(
         "stream-json",
     ]
 
-    cmd = " ".join(shlex.quote(a) for a in args)
     cwd = str(ctx.repo_root) if ctx.repo_root else str(Path.cwd())
 
     process = subprocess.Popen(
-        cmd,
+        args,
         cwd=cwd,
-        shell=True,
+        shell=False,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

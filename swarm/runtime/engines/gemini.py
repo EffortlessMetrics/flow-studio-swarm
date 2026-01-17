@@ -428,138 +428,147 @@ class GeminiStepEngine(StepEngine):
             "--prompt",
             prompt,
         ]
-        cmd = " ".join(shlex.quote(a) for a in args)
 
         process = subprocess.Popen(
-            cmd,
+            args,
             cwd=str(self.repo_root),
-            shell=True,
+            shell=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
 
-        # Collect raw events for transcript and track assistant content
-        raw_events: List[Dict[str, Any]] = []
-        full_assistant_text: List[str] = []
-        token_counts: Dict[str, int] = {"prompt": 0, "completion": 0, "total": 0}
+        try:
+            # Collect raw events for transcript and track assistant content
+            raw_events: List[Dict[str, Any]] = []
+            full_assistant_text: List[str] = []
+            token_counts: Dict[str, int] = {"prompt": 0, "completion": 0, "total": 0}
 
-        # Track tool calls for normalized receipts
-        tool_calls: List[NormalizedToolCall] = []
-        # Track pending tool_use events by ID to handle interleaved tool calls
-        pending_tool_calls: Dict[str, Dict[str, Any]] = {}
+            # Track tool calls for normalized receipts
+            tool_calls: List[NormalizedToolCall] = []
+            # Track pending tool_use events by ID to handle interleaved tool calls
+            pending_tool_calls: Dict[str, Dict[str, Any]] = {}
 
-        if process.stdout:
-            for line in process.stdout:
-                line = line.strip()
-                if not line:
-                    continue
+            if process.stdout:
+                for line in process.stdout:
+                    line = line.strip()
+                    if not line:
+                        continue
 
-                # Try to parse and map to event
-                try:
-                    event_data = json.loads(line)
-                    # Store raw event for transcript
-                    raw_events.append(event_data)
+                    # Try to parse and map to event
+                    try:
+                        event_data = json.loads(line)
+                        # Store raw event for transcript
+                        raw_events.append(event_data)
 
-                    # Extract assistant content from message events
-                    event_type = event_data.get("type", "")
-                    if event_type == "message":
-                        role = event_data.get("role", "")
-                        if role == "assistant":
-                            content = event_data.get("content", "")
-                            if content:
-                                full_assistant_text.append(content)
+                        # Extract assistant content from message events
+                        event_type = event_data.get("type", "")
+                        if event_type == "message":
+                            role = event_data.get("role", "")
+                            if role == "assistant":
+                                content = event_data.get("content", "")
+                                if content:
+                                    full_assistant_text.append(content)
 
-                    # Track tool calls for normalized receipts
-                    if event_type == "tool_use":
-                        # Track by tool_use_id to handle multiple outstanding calls
-                        tool_use_id = (
-                            event_data.get("id")
-                            or event_data.get("tool_use_id")
-                            or f"tool_{len(pending_tool_calls)}"
+                        # Track tool calls for normalized receipts
+                        if event_type == "tool_use":
+                            # Track by tool_use_id to handle multiple outstanding calls
+                            tool_use_id = (
+                                event_data.get("id")
+                                or event_data.get("tool_use_id")
+                                or f"tool_{len(pending_tool_calls)}"
+                            )
+                            pending_tool_calls[tool_use_id] = event_data
+                        elif event_type == "tool_result":
+                            # Match result to its corresponding tool_use by ID
+                            tool_use_id = event_data.get("tool_use_id") or event_data.get("id")
+                            if tool_use_id and tool_use_id in pending_tool_calls:
+                                tool_call = from_gemini_events(
+                                    pending_tool_calls.pop(tool_use_id),
+                                    event_data,
+                                )
+                                tool_calls.append(tool_call)
+                            elif pending_tool_calls:
+                                # Fallback: if no ID match, use oldest pending (FIFO)
+                                oldest_id = next(iter(pending_tool_calls))
+                                tool_call = from_gemini_events(
+                                    pending_tool_calls.pop(oldest_id),
+                                    event_data,
+                                )
+                                tool_calls.append(tool_call)
+                            else:
+                                # tool_result without matching tool_use
+                                # Create a tool call with just the result info
+                                tool_call = from_gemini_events(
+                                    {
+                                        "name": event_data.get("tool") or event_data.get("name") or "unknown",
+                                        "args": {},
+                                    },
+                                    event_data,
+                                )
+                                tool_calls.append(tool_call)
+
+                        # Extract token counts if available (standard format)
+                        if "usage" in event_data:
+                            usage = event_data["usage"]
+                            if "prompt_tokens" in usage:
+                                token_counts["prompt"] = usage["prompt_tokens"]
+                            if "completion_tokens" in usage:
+                                token_counts["completion"] = usage["completion_tokens"]
+                            if "total_tokens" in usage:
+                                token_counts["total"] = usage["total_tokens"]
+                        # Some Gemini responses use different keys
+                        if "promptTokenCount" in event_data:
+                            token_counts["prompt"] = event_data["promptTokenCount"]
+                        if "candidatesTokenCount" in event_data:
+                            token_counts["completion"] = event_data["candidatesTokenCount"]
+                        if "totalTokenCount" in event_data:
+                            token_counts["total"] = event_data["totalTokenCount"]
+
+                        event = self._map_gemini_event(ctx, event_data)
+                        if event:
+                            events.append(event)
+                    except json.JSONDecodeError:
+                        # Log as text event and include in raw events
+                        raw_events.append({"type": "text", "message": line})
+                        events.append(
+                            RunEvent(
+                                run_id=ctx.run_id,
+                                ts=datetime.now(timezone.utc),
+                                kind="log",
+                                flow_key=ctx.flow_key,
+                                step_id=ctx.step_id,
+                                payload={"message": line},
+                            )
                         )
-                        pending_tool_calls[tool_use_id] = event_data
-                    elif event_type == "tool_result":
-                        # Match result to its corresponding tool_use by ID
-                        tool_use_id = event_data.get("tool_use_id") or event_data.get("id")
-                        if tool_use_id and tool_use_id in pending_tool_calls:
-                            tool_call = from_gemini_events(
-                                pending_tool_calls.pop(tool_use_id),
-                                event_data,
-                            )
-                            tool_calls.append(tool_call)
-                        elif pending_tool_calls:
-                            # Fallback: if no ID match, use oldest pending (FIFO)
-                            oldest_id = next(iter(pending_tool_calls))
-                            tool_call = from_gemini_events(
-                                pending_tool_calls.pop(oldest_id),
-                                event_data,
-                            )
-                            tool_calls.append(tool_call)
-                        else:
-                            # tool_result without matching tool_use
-                            # Create a tool call with just the result info
-                            tool_call = from_gemini_events(
-                                {
-                                    "name": event_data.get("tool") or event_data.get("name") or "unknown",
-                                    "args": {},
-                                },
-                                event_data,
-                            )
-                            tool_calls.append(tool_call)
 
-                    # Extract token counts if available (standard format)
-                    if "usage" in event_data:
-                        usage = event_data["usage"]
-                        if "prompt_tokens" in usage:
-                            token_counts["prompt"] = usage["prompt_tokens"]
-                        if "completion_tokens" in usage:
-                            token_counts["completion"] = usage["completion_tokens"]
-                        if "total_tokens" in usage:
-                            token_counts["total"] = usage["total_tokens"]
-                    # Some Gemini responses use different keys
-                    if "promptTokenCount" in event_data:
-                        token_counts["prompt"] = event_data["promptTokenCount"]
-                    if "candidatesTokenCount" in event_data:
-                        token_counts["completion"] = event_data["candidatesTokenCount"]
-                    if "totalTokenCount" in event_data:
-                        token_counts["total"] = event_data["totalTokenCount"]
+            # Drain orphan tool_use events that never received a tool_result.
+            # This can happen if a tool call was interrupted, errored, or timed out.
+            # These incomplete calls should still appear in receipts for debugging.
+            for tool_use_id, tool_use_event in pending_tool_calls.items():
+                tool_call = from_gemini_events(tool_use_event, None)
+                # Mark as incomplete since we never got a result
+                tool_call.success = False
+                tool_calls.append(tool_call)
 
-                    event = self._map_gemini_event(ctx, event_data)
-                    if event:
-                        events.append(event)
-                except json.JSONDecodeError:
-                    # Log as text event and include in raw events
-                    raw_events.append({"type": "text", "message": line})
-                    events.append(
-                        RunEvent(
-                            run_id=ctx.run_id,
-                            ts=datetime.now(timezone.utc),
-                            kind="log",
-                            flow_key=ctx.flow_key,
-                            step_id=ctx.step_id,
-                            payload={"message": line},
-                        )
-                    )
+            _, stderr = process.communicate()
+            end_time = datetime.now(timezone.utc)
+            duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
-        # Drain orphan tool_use events that never received a tool_result.
-        # This can happen if a tool call was interrupted, errored, or timed out.
-        # These incomplete calls should still appear in receipts for debugging.
-        for tool_use_id, tool_use_event in pending_tool_calls.items():
-            tool_call = from_gemini_events(tool_use_event, None)
-            # Mark as incomplete since we never got a result
-            tool_call.success = False
-            tool_calls.append(tool_call)
+            if process.returncode != 0:
+                error_msg = stderr[:500] if stderr else f"Exit code {process.returncode}"
+                raise RuntimeError(f"Gemini CLI failed: {error_msg}")
+    finally:
+        # Ensure process is properly terminated and resources are cleaned up
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
 
-        _, stderr = process.communicate()
-        end_time = datetime.now(timezone.utc)
-        duration_ms = int((end_time - start_time).total_seconds() * 1000)
-
-        if process.returncode != 0:
-            error_msg = stderr[:500] if stderr else f"Exit code {process.returncode}"
-            raise RuntimeError(f"Gemini CLI failed: {error_msg}")
-
-        # Write transcript JSONL to RUN_BASE/llm/<step_id>-gemini.jsonl
+    # Write transcript JSONL to RUN_BASE/llm/<step_id>-gemini.jsonl
         self._write_transcript(ctx, raw_events)
 
         # Write receipt JSON to RUN_BASE/receipts/<step_id>-gemini.json
