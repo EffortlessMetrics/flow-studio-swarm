@@ -19,13 +19,13 @@ Legacy swarm/spec/ (YAML) is supported for migration but deprecated.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 from .compile import compile_to_prompt_plan as _compile_to_prompt_plan
+from .etag import canonical_json, compute_etag_bytes, compute_file_etag
 from .errors import ConcurrencyError, SpecNotFoundError, SpecValidationError
 from .git import git_commit
 from .io import atomic_write
@@ -47,25 +47,6 @@ from .paths import (
 )
 from .schemas import load_schema
 from .validate import check_jsonschema, validate_spec
-
-# Import canonical JSON utilities
-try:
-    from swarm.runtime.spec_system.canonical import canonical_json, spec_hash
-    CANONICAL_AVAILABLE = True
-except ImportError:
-    CANONICAL_AVAILABLE = False
-
-    # Fallback implementations
-    def canonical_json(obj: Any, indent: int | None = None) -> str:
-        if indent is not None:
-            separators = (",", ": ")
-        else:
-            separators = (",", ":")
-        return json.dumps(obj, sort_keys=True, separators=separators, ensure_ascii=False, indent=indent)
-
-    def spec_hash(obj: Any, length: int = 12) -> str:
-        data = canonical_json(obj).encode("utf-8")
-        return hashlib.sha256(data).hexdigest()[:length]
 
 
 logger = logging.getLogger(__name__)
@@ -215,33 +196,6 @@ class SpecManager:
         return schema_path(self._schemas_dir(), schema_name)
 
     # =========================================================================
-    # ETag Computation
-    # =========================================================================
-
-    def _compute_etag(self, content: Union[str, bytes]) -> str:
-        """Compute SHA256 ETag from content.
-
-        Uses the canonical spec_hash for deterministic hashing.
-        """
-        if isinstance(content, str):
-            content = content.encode("utf-8")
-        return hashlib.sha256(content).hexdigest()
-
-    def _compute_data_etag(self, data: Dict[str, Any]) -> str:
-        """Compute ETag from data using canonical JSON serialization.
-
-        This ensures identical logical data produces identical ETags.
-        """
-        return spec_hash(data, length=64)
-
-    def _compute_file_etag(self, path: Path) -> Optional[str]:
-        """Compute ETag from file content."""
-        if not path.exists():
-            return None
-        content = path.read_bytes()
-        return self._compute_etag(content)
-
-    # =========================================================================
     # Schema Loading
     # =========================================================================
 
@@ -336,7 +290,7 @@ class SpecManager:
             raise SpecValidationError("flow_graph", errors)
 
         # Compute ETag
-        etag = self._compute_file_etag(path)
+        etag = compute_file_etag(path)
 
         return FlowGraph.from_dict(data, etag=etag)
 
@@ -372,7 +326,7 @@ class SpecManager:
             raise SpecValidationError("step_template", errors)
 
         # Compute ETag
-        etag = self._compute_file_etag(path)
+        etag = compute_file_etag(path)
 
         return StepTemplate.from_dict(data, etag=etag)
 
@@ -448,7 +402,7 @@ class SpecManager:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        etag = self._compute_file_etag(path)
+        etag = compute_file_etag(path)
         return data, etag
 
     # =========================================================================
@@ -520,7 +474,7 @@ class SpecManager:
 
         # Check ETag for concurrency control
         if etag is not None:
-            current_etag = self._compute_file_etag(path)
+            current_etag = compute_file_etag(path)
             if current_etag is not None and current_etag != etag:
                 raise ConcurrencyError("flow_graph", flow_id, etag, current_etag)
 
@@ -531,7 +485,7 @@ class SpecManager:
         self._atomic_write(path, content, create_backup=self._backup_on_write)
 
         # Compute new ETag
-        new_etag = self._compute_etag(content)
+        new_etag = compute_etag_bytes(content.encode("utf-8"))
 
         # Git commit if requested
         if commit or (self._enable_git and commit_message):
@@ -574,7 +528,7 @@ class SpecManager:
 
         # Check ETag for concurrency control
         if etag is not None:
-            current_etag = self._compute_file_etag(path)
+            current_etag = compute_file_etag(path)
             if current_etag is not None and current_etag != etag:
                 raise ConcurrencyError("step_template", template_id, etag, current_etag)
 
@@ -585,7 +539,7 @@ class SpecManager:
         self._atomic_write(path, content, create_backup=self._backup_on_write)
 
         # Compute new ETag
-        new_etag = self._compute_etag(content)
+        new_etag = compute_etag_bytes(content.encode("utf-8"))
 
         # Git commit if requested
         if commit or (self._enable_git and commit_message):
@@ -689,9 +643,9 @@ class SpecManager:
         merged = self._deep_merge(flow_data, ui_data)
 
         # Combined ETag from both files
-        flow_etag = self._compute_file_etag(flow_path) or ""
-        ui_etag = self._compute_file_etag(ui_path) or ""
-        combined_etag = self._compute_etag(f"{flow_etag}:{ui_etag}")
+        flow_etag = compute_file_etag(flow_path) or ""
+        ui_etag = compute_file_etag(ui_path) or ""
+        combined_etag = compute_etag_bytes(f"{flow_etag}:{ui_etag}".encode("utf-8"))
 
         return merged, combined_etag
 
@@ -745,14 +699,14 @@ class SpecManager:
         # Save flow.json using canonical JSON
         flow_content = canonical_json(flow_data, indent=2) + "\n"
         self._atomic_write(flow_path, flow_content, create_backup=self._backup_on_write)
-        flow_etag = self._compute_etag(flow_content)
+        flow_etag = compute_etag_bytes(flow_content.encode("utf-8"))
 
         # Save flow.ui.json only if there's UI data
         ui_etag = ""
         if ui_data:
             ui_content = canonical_json(ui_data, indent=2) + "\n"
             self._atomic_write(ui_path, ui_content, create_backup=self._backup_on_write)
-            ui_etag = self._compute_etag(ui_content)
+            ui_etag = compute_etag_bytes(ui_content.encode("utf-8"))
 
         logger.info(
             "Saved flow with UI: %s (flow_etag: %s, ui_etag: %s)",
@@ -788,7 +742,7 @@ class SpecManager:
 
         # Check ETag for concurrency control
         if etag is not None:
-            current_etag = self._compute_file_etag(path)
+            current_etag = compute_file_etag(path)
             if current_etag is not None and current_etag != etag:
                 raise ConcurrencyError("station", station_id, etag, current_etag)
 
@@ -802,7 +756,7 @@ class SpecManager:
         self._atomic_write(path, content, create_backup=self._backup_on_write)
 
         # Compute new ETag
-        new_etag = self._compute_etag(content)
+        new_etag = compute_etag_bytes(content.encode("utf-8"))
 
         logger.info("Saved station: %s (etag: %s)", station_id, new_etag[:16])
         return new_etag
@@ -846,7 +800,7 @@ class SpecManager:
         else:
             return None
 
-        return self._compute_file_etag(path)
+        return compute_file_etag(path)
 
     def clear_schema_cache(self) -> None:
         """Clear the schema cache."""

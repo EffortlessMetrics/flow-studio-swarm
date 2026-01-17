@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from .core import SpecManager
+from .etag import compute_etag_bytes, compute_file_etag
 from .errors import ConcurrencyError, SpecNotFoundError, SpecValidationError
+from .io import atomic_write
 from .models import ValidationError
 
 
@@ -82,9 +84,9 @@ class FlowSpecManager:
         flow_path = self._flows_dir / f"{flow_id}.json"
         ui_path = self._flows_dir / f"{flow_id}.ui.json"
 
-        flow_etag = self._manager._compute_file_etag(flow_path) or ""
-        ui_etag = self._manager._compute_file_etag(ui_path) or ""
-        combined_etag = self._manager._compute_etag(f"{flow_etag}:{ui_etag}")
+        flow_etag = compute_file_etag(flow_path) or ""
+        ui_etag = compute_file_etag(ui_path) or ""
+        combined_etag = compute_etag_bytes(f"{flow_etag}:{ui_etag}".encode("utf-8"))
 
         return merged, combined_etag
 
@@ -205,16 +207,16 @@ class FlowSpecManager:
         # Write flow graph
         flow_path = self._flows_dir / f"{flow_id}.json"
         flow_content = json.dumps(flow_data, indent=2, ensure_ascii=False) + "\n"
-        self._manager._atomic_write(flow_path, flow_content)
-        flow_etag = self._manager._compute_etag(flow_content)
+        atomic_write(flow_path, flow_content, logger=logger)
+        flow_etag = compute_etag_bytes(flow_content.encode("utf-8"))
 
         # Write UI overlay (only if there's UI data beyond flow_id)
         ui_etag = ""
         ui_path = self._flows_dir / f"{flow_id}.ui.json"
         if len(ui_data) > 1:
             ui_content = json.dumps(ui_data, indent=2, ensure_ascii=False) + "\n"
-            self._manager._atomic_write(ui_path, ui_content)
-            ui_etag = self._manager._compute_etag(ui_content)
+            atomic_write(ui_path, ui_content, logger=logger)
+            ui_etag = compute_etag_bytes(ui_content.encode("utf-8"))
 
         logger.info(
             "Shredded flow update: %s (flow_etag: %s, ui_etag: %s)",
