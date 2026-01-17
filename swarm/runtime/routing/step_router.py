@@ -121,14 +121,8 @@ class StepRouter:
     ) -> Tuple[List[Edge], List[Dict[str, Any]]]:
         """Apply exit conditions to filter candidates."""
         elimination_log: List[Dict[str, Any]] = []
-
-        node_config = flow_graph.get_node(current_node)
         iteration_count = context.iteration_counts.get(current_node, 0)
-        max_iterations = (
-            node_config.max_iterations
-            if node_config and node_config.max_iterations
-            else context.max_iterations
-        )
+        max_iterations = self._resolve_max_iterations(flow_graph, context, current_node)
 
         status = context.get("status", "")
         can_help = context.get("can_further_iteration_help", True)
@@ -172,6 +166,25 @@ class StepRouter:
             return remaining, elimination_log
 
         return candidates, elimination_log
+
+    def _resolve_max_iterations(
+        self,
+        flow_graph: FlowGraph,
+        context: RunContext,
+        current_node: str,
+    ) -> int:
+        """Resolve max iterations from node override, policy default, and runtime fuse."""
+        node_config = flow_graph.get_node(current_node)
+        policy_max = flow_graph.get_max_loop_iterations()
+        node_max = (
+            node_config.max_iterations
+            if node_config and node_config.max_iterations is not None
+            else policy_max
+        )
+        runtime_max = context.max_iterations
+        if runtime_max is None:
+            return node_max
+        return min(node_max, runtime_max)
 
     def filter_conditions(
         self,

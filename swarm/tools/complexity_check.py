@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import ast
 import datetime as dt
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +19,8 @@ DEFAULT_THRESHOLDS = {
     "class_count": 5,
     "cyclomatic_complexity": 50,
 }
+
+_ISSUE_REF_PATTERN = re.compile(r"(#\d+|[A-Z][A-Z0-9]+-\d+)")
 
 
 class FileAnalyzer(ast.NodeVisitor):
@@ -146,6 +149,10 @@ def _normalize_path(repo_root: Path, path_str: str) -> Optional[str]:
     return path.resolve().relative_to(repo_root).as_posix()
 
 
+def _reason_has_issue_ref(reason: str) -> bool:
+    return bool(_ISSUE_REF_PATTERN.search(reason))
+
+
 def _load_allowlist(path: Path) -> Tuple[Dict[str, Dict[str, str]], List[str]]:
     entries: Dict[str, Dict[str, str]] = {}
     errors: List[str] = []
@@ -180,6 +187,11 @@ def _load_allowlist(path: Path) -> Tuple[Dict[str, Dict[str, str]], List[str]]:
         if expires < today:
             errors.append(
                 f"{path}:{idx} allowlist entry expired ({expires_str}) for {rel_path}."
+            )
+
+        if not _reason_has_issue_ref(reason):
+            errors.append(
+                f"{path}:{idx} allowlist reason missing follow-up issue/ID for {rel_path}."
             )
 
         entries[rel_path] = {

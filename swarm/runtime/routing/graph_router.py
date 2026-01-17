@@ -145,6 +145,25 @@ class SmartRouter:
 
         return self._get_default_edge(valid_edges).to_node
 
+    def _resolve_max_iterations(
+        self,
+        current_node: str,
+        graph: FlowGraph,
+        context: RouteContext,
+    ) -> int:
+        """Resolve max iterations from node override, policy default, and runtime fuse."""
+        node_config = graph.get_node(current_node)
+        policy_max = graph.get_max_loop_iterations()
+        node_max = (
+            node_config.max_iterations
+            if node_config and node_config.max_iterations is not None
+            else policy_max
+        )
+        runtime_max = context.max_iterations_default
+        if runtime_max is None:
+            return node_max
+        return min(node_max, runtime_max)
+
     def _build_eval_context(
         self,
         current_node: str,
@@ -153,13 +172,8 @@ class SmartRouter:
         context: RouteContext,
     ) -> Dict[str, Any]:
         """Build the evaluation context for CEL expressions."""
-        node_config = graph.get_node(current_node)
         iteration_count = context.get_iteration_count(current_node)
-        max_iterations = (
-            node_config.max_iterations
-            if node_config and node_config.max_iterations
-            else graph.get_max_loop_iterations()
-        )
+        max_iterations = self._resolve_max_iterations(current_node, graph, context)
 
         return {
             "status": step_output.status,
@@ -204,11 +218,7 @@ class SmartRouter:
         """Check exit conditions for microloops."""
         node_config = graph.get_node(current_node)
         iteration_count = context.get_iteration_count(current_node)
-        max_iterations = (
-            node_config.max_iterations
-            if node_config and node_config.max_iterations
-            else graph.get_max_loop_iterations()
-        )
+        max_iterations = self._resolve_max_iterations(current_node, graph, context)
 
         success_values = ["VERIFIED"]
         if node_config and node_config.exit_on:
