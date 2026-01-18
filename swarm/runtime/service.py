@@ -73,6 +73,8 @@ class RunService:
             "gemini-cli": GeminiCliBackend(self._repo_root),
             # Agent SDK backend will be added when implemented
         }
+        # Cache for terminal run summaries to avoid reading disk repeatedly
+        self._summary_cache: dict[str, RunSummary] = {}
 
     @classmethod
     def get_instance(cls, repo_root: Optional[Path] = None) -> "RunService":
@@ -146,9 +148,20 @@ class RunService:
 
         Checks storage first, then queries backends.
         """
+        # Check cache first
+        if run_id in self._summary_cache:
+            return self._summary_cache[run_id]
+
         # Try storage first (works for all backends)
         summary = storage.read_summary(run_id)
         if summary:
+            # Cache if terminal state
+            if summary.status in (
+                RunStatus.SUCCEEDED,
+                RunStatus.FAILED,
+                RunStatus.CANCELED,
+            ):
+                self._summary_cache[run_id] = summary
             return summary
 
         # Fall back to querying backends
@@ -194,7 +207,8 @@ class RunService:
         for rid in storage.list_runs():
             if rid in seen_ids:
                 continue
-            summary = storage.read_summary(rid)
+            # Use get_run to leverage cache
+            summary = self.get_run(rid)
             if summary:
                 if flow_key is None or flow_key in summary.spec.flow_keys:
                     summaries.append(summary)
@@ -318,6 +332,9 @@ class RunService:
             return False
 
         storage.update_summary(run_id, {"is_exemplar": is_exemplar})
+        # Invalidate cache
+        if run_id in self._summary_cache:
+            del self._summary_cache[run_id]
         return True
 
     def add_tag(self, run_id: RunId, tag: str) -> bool:
@@ -330,6 +347,9 @@ class RunService:
         if tag not in tags:
             tags.append(tag)
             storage.update_summary(run_id, {"tags": tags})
+        # Invalidate cache
+        if run_id in self._summary_cache:
+            del self._summary_cache[run_id]
         return True
 
     def remove_tag(self, run_id: RunId, tag: str) -> bool:
@@ -340,6 +360,9 @@ class RunService:
 
         tags = [t for t in summary.tags if t != tag]
         storage.update_summary(run_id, {"tags": tags})
+        # Invalidate cache
+        if run_id in self._summary_cache:
+            del self._summary_cache[run_id]
         return True
 
     def list_exemplars(self) -> List[RunSummary]:
