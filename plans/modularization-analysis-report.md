@@ -305,32 +305,41 @@ selftest-core/
 
 ```mermaid
 graph TD
-    subgraph swarm_config[swarm.config]
-        subgraph swarm_spec[swarm.spec]
-        subgraph swarm_runtime[swarm.runtime]
-        subgraph swarm_flowstudio[swarm.flowstudio]
-        subgraph swarm_tools[swarm.tools]
-        subgraph swarm_validator[swarm.validator]
-        subgraph swarm_api[swarm.api]
-        subgraph swarm_tools_validation[swarm.tools.validation]
-        subgraph swarm_flowstudio_ui[swarm.tools.flow_studio_ui]
+    subgraph swarm[swarm]
+        swarm_config[swarm.config]
+        swarm_spec[swarm.spec]
+        swarm_runtime[swarm.runtime]
+        swarm_flowstudio[swarm.flowstudio]
+        swarm_tools[swarm.tools]
+        swarm_validator[swarm.validator]
+        swarm_api[swarm.api]
+        swarm_tools_validation[swarm.tools.validation]
+        swarm_flowstudio_ui[swarm.tools.flow_studio_ui]
+    end
+
     swarm_config --> swarm_spec
     swarm_config --> swarm_runtime
     swarm_config --> swarm_flowstudio
     swarm_config --> swarm_tools
     swarm_config --> swarm_validator
+
     swarm_spec --> swarm_runtime
     swarm_spec --> swarm_tools
+
     swarm_runtime --> swarm_api
     swarm_runtime --> swarm_tools
+
     swarm_flowstudio --> swarm_api
     swarm_flowstudio --> swarm_tools
     swarm_flowstudio --> swarm_runtime
+
     swarm_tools --> swarm_tools_validation
     swarm_tools --> swarm_flowstudio_ui
+
     swarm_api --> swarm_runtime
     swarm_api --> swarm_spec
     swarm_api --> swarm_flowstudio
+
     swarm_tools_validation --> swarm_validator
     swarm_tools_validation --> swarm_config
 ```
@@ -575,7 +584,7 @@ swarm-tools/
 │               │   └── utility_graphs.py
 │               ├── frontmatter.py
 │               ├── microloops.py
-│               ├── ├── prompts.py
+│               ├── prompts.py
 │               ├── runbase.py
 │               └── skills.py
 └── tests/

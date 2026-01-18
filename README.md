@@ -1,6 +1,9 @@
 # Flow Studio
 
 > An agentic SDLC harness that transforms requirements into merged PRs with forensic evidence.
+> For: Platform engineers and staff+ operators who need repeatable, auditable automation (not demos).
+
+Docs: [docs/INDEX.md](docs/INDEX.md) | Getting started: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Golden runs: [docs/GOLDEN_RUNS.md](docs/GOLDEN_RUNS.md) | Roadmap: [docs/ROADMAP_3_0.md](docs/ROADMAP_3_0.md) | Changelog: [CHANGELOG.md](CHANGELOG.md)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0%20%2F%20MIT-blue.svg)](LICENSE)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
@@ -222,6 +225,22 @@ make help               # All commands
 | What this system is | [TRUST_COMPILER.md](docs/explanation/TRUST_COMPILER.md) |
 | 15 lessons learned | [META_LEARNINGS.md](docs/explanation/META_LEARNINGS.md) |
 | 12 emergent laws | [EMERGENT_PHYSICS.md](docs/explanation/EMERGENT_PHYSICS.md) |
+
+---
+
+## Are You Ready to Adopt This?
+
+Flow Studio is built for teams who want **evidence**, **replayability**, and **change control** around agentic work. You'll have a better time if:
+
+- [ ] You can run Python locally and in CI (the repo assumes `uv`)
+- [ ] You have an opinionated place to store run artifacts (logs, snapshots, traces)
+- [ ] You have a stance on secrets (source, access, rotation)
+- [ ] You treat "automation with guardrails" as a feature: validation, schemas, and CI checks
+- [ ] You have a human review path when the system is uncertain
+
+Start with a known-good reference execution: [GOLDEN_RUNS.md](docs/GOLDEN_RUNS.md).
+
+See [ADOPTION_PLAYBOOK.md](docs/ADOPTION_PLAYBOOK.md) for the full onboarding guide.
 
 ---
 
