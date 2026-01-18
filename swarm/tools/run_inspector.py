@@ -33,6 +33,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from swarm.config.flow_registry import get_sdlc_flow_keys  # noqa: E402
 from swarm.flowstudio.schema import StepStatusEnum  # noqa: E402
+from swarm.runtime.safe_paths import safe_join  # noqa: E402
 
 # Canonical step artifact status - imported from flowstudio.schema
 # Aliased as StepStatus for backward compatibility within this module
@@ -292,14 +293,20 @@ class RunInspector:
             Path to the run directory, or None if not found.
         """
         # Check examples first
-        example_path = self.examples_dir / run_id
-        if example_path.exists():
-            return example_path
+        try:
+            example_path = safe_join(self.examples_dir, run_id)
+            if example_path.exists():
+                return example_path
+        except ValueError:
+            pass
 
         # Then active runs
-        active_path = self.runs_dir / run_id
-        if active_path.exists():
-            return active_path
+        try:
+            active_path = safe_join(self.runs_dir, run_id)
+            if active_path.exists():
+                return active_path
+        except ValueError:
+            pass
 
         return None
 

@@ -39,6 +39,7 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .safe_paths import safe_join
 from .types import (
     HandoffEnvelope,
     RunEvent,
@@ -259,7 +260,7 @@ def get_run_path(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Path:
         >>> get_run_path("run-20251208-143022-abc123")
         PosixPath('/path/to/swarm/runs/run-20251208-143022-abc123')
     """
-    return runs_dir / run_id
+    return safe_join(runs_dir, run_id)
 
 
 def find_run_path(run_id: RunId) -> Optional[Path]:
@@ -274,14 +275,20 @@ def find_run_path(run_id: RunId) -> Optional[Path]:
         Path to the run directory, or None if not found.
     """
     # Check examples first (committed, curated)
-    example_path = EXAMPLES_DIR / run_id
-    if example_path.exists() and example_path.is_dir():
-        return example_path
+    try:
+        example_path = safe_join(EXAMPLES_DIR, run_id)
+        if example_path.exists() and example_path.is_dir():
+            return example_path
+    except ValueError:
+        pass
 
     # Check active runs
-    runs_path = RUNS_DIR / run_id
-    if runs_path.exists() and runs_path.is_dir():
-        return runs_path
+    try:
+        runs_path = safe_join(RUNS_DIR, run_id)
+        if runs_path.exists() and runs_path.is_dir():
+            return runs_path
+    except ValueError:
+        pass
 
     return None
 
@@ -295,13 +302,19 @@ def get_run_type(run_id: RunId) -> Optional[str]:
     Returns:
         "example" if in examples/, "active" if in runs/, None if not found.
     """
-    example_path = EXAMPLES_DIR / run_id
-    if example_path.exists() and example_path.is_dir():
-        return "example"
+    try:
+        example_path = safe_join(EXAMPLES_DIR, run_id)
+        if example_path.exists() and example_path.is_dir():
+            return "example"
+    except ValueError:
+        pass
 
-    runs_path = RUNS_DIR / run_id
-    if runs_path.exists() and runs_path.is_dir():
-        return "active"
+    try:
+        runs_path = safe_join(RUNS_DIR, run_id)
+        if runs_path.exists() and runs_path.is_dir():
+            return "active"
+    except ValueError:
+        pass
 
     return None
 

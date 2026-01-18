@@ -58,6 +58,7 @@ try:
 except ImportError:
     schema = None  # Fallback
 
+from swarm.runtime.safe_paths import safe_join, validate_filename
 from swarm.tools.flow_studio_ui import get_index_html
 
 try:
@@ -903,8 +904,24 @@ def create_fastapi_app() -> FastAPI:
                 status_code=404
             )
 
+        # Validate step_id to prevent glob traversal
+        try:
+            validate_filename(step_id)
+        except ValueError:
+            return JSONResponse(
+                {"error": "Invalid step_id"},
+                status_code=400
+            )
+
         # Look for transcript files in llm/ subdirectory
-        llm_dir = Path(run_path) / flow_key / "llm"
+        try:
+            llm_dir = safe_join(run_path, flow_key, "llm")
+        except ValueError:
+            return JSONResponse(
+                {"error": "Invalid flow_key"},
+                status_code=400
+            )
+
         if not llm_dir.exists():
             return JSONResponse(
                 {
@@ -1001,8 +1018,24 @@ def create_fastapi_app() -> FastAPI:
                 status_code=404
             )
 
+        # Validate step_id to prevent glob traversal
+        try:
+            validate_filename(step_id)
+        except ValueError:
+            return JSONResponse(
+                {"error": "Invalid step_id"},
+                status_code=400
+            )
+
         # Look for receipt files
-        receipts_dir = Path(run_path) / flow_key / "receipts"
+        try:
+            receipts_dir = safe_join(run_path, flow_key, "receipts")
+        except ValueError:
+            return JSONResponse(
+                {"error": "Invalid flow_key"},
+                status_code=400
+            )
+
         if not receipts_dir.exists():
             return JSONResponse(
                 {"error": "No receipts available for this step"},
