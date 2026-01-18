@@ -2,7 +2,7 @@
 
 > For: Platform engineers understanding the governance architecture.
 
-This document explains the selftest system: its architecture, design goals, the 16 steps, governance model, and how it integrates with the seven Swarm flows.
+This document explains the selftest system: its architecture, design goals, the 16 steps, governance model, and how it integrates with the nine Swarm flows.
 
 > **First time?**
 > Try Lane B of [docs/GETTING_STARTED.md](./GETTING_STARTED.md) (10 min) to see selftest in action:
@@ -553,7 +553,7 @@ make check-flows
 **What it checks**:
 - Flow Studio FastAPI app starts successfully
 - `/api/health` returns 200 with flow and agent counts
-- `/api/flows` returns all 7 flows
+- `/api/flows` returns all 9 flows
 - `/api/graph/signal` returns nodes and edges
 - `/api/runs` includes health-check example
 
@@ -579,7 +579,7 @@ make check-flows
 FAIL flowstudio-smoke:
   /api/health returned 500
   OR
-  /api/flows returned only 6 flows (expected 7)
+  /api/flows returned only 8 flows (expected 9)
   OR
   health-check example not found in /api/runs
 ```
@@ -590,7 +590,7 @@ FAIL flowstudio-smoke:
 uv run python -m swarm.tools.flow_studio_smoke
 
 # Verify config files exist
-ls swarm/config/flows/*.yaml  # Should show 7 files
+ls swarm/config/flows/*.yaml  # Should show 9 files
 ls swarm/examples/health-check/run.json  # Should exist
 
 # Regenerate if needed
@@ -808,22 +808,35 @@ uv run pytest tests/test_selftest_degradation_log.py -v
 - Part of the build receipt (`RUN_BASE/build/build_receipt.json`)
 - If selftest fails, build is UNVERIFIED
 
-### Flow 4: Code → Gate (GATE)
-- **Selftest RE-RUN**: `make selftest --strict` to verify Flow 3's claim
+### Flow 4: Draft → Ready (REVIEW)
+- **Selftest RUN**: `make selftest` to verify stability
+- Runs during iterative review loops
+- Failures guide fixes before hitting the Gate
+
+### Flow 5: Code → Artifact (GATE)
+- **Selftest RE-RUN**: `make selftest --strict` to verify Flow 3/4's claim
 - Used by `receipt-checker` to validate build receipt
 - Used by `contract-enforcer` to verify swarm contracts
 - If selftest fails, merge decision is BOUNCE (back to Flow 3)
 
-### Flow 5: Artifact → Prod (DEPLOY)
-- **Selftest STATE**: Checked but not re-run (was already verified in Flow 4)
+### Flow 6: Artifact → Prod (DEPLOY)
+- **Selftest STATE**: Checked but not re-run (was already verified in Flow 5)
 - Included in deployment metadata
 - Used to assess risk (degraded deployments are higher risk)
 
-### Flow 6: Prod → Wisdom (ANALYSIS)
+### Flow 7: Prod → Wisdom (ANALYSIS)
 - **Selftest HISTORY**: Previous selftest states are analyzed
 - Regressions detected (e.g., "selftest was green last week, now red")
 - Used to identify systemic issues (e.g., "governance checks keep failing")
 - Feedback loops: "Fix agents-governance once and for all" → Flow 3 task
+
+### Flow 8: Reset (UTILITY)
+- **Selftest RUN**: After reset to verify repo integrity
+- Ensures `verify_clean` step passes and environment is ready for new work
+
+### Flow 9: Stepwise Demo (TESTING)
+- **Selftest RUN**: Verifies the demo environment is valid
+- Ensures all mock steps and stepwise agents are operational
 
 ---
 

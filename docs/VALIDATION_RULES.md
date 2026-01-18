@@ -223,9 +223,12 @@ x SKILL: .claude/skills/test-runner/SKILL.md: missing required field 'descriptio
 - `RUN_BASE/signal/`
 - `RUN_BASE/plan/`
 - `RUN_BASE/build/`
+- `RUN_BASE/review/`
 - `RUN_BASE/gate/`
 - `RUN_BASE/deploy/`
 - `RUN_BASE/wisdom/`
+- `RUN_BASE/reset/`
+- `RUN_BASE/demo/`
 
 **Example FAIL Output (hardcoded path)**:
 ```

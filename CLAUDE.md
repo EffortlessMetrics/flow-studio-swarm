@@ -12,7 +12,7 @@ This is not a complete manual; it points you to the right artifacts.
 
 ## What Flow Studio Does
 
-Flow Studio runs **7 sequential flows** that transform a requirement into a merged PR with receipts:
+Flow Studio runs **9 core flows** that transform a requirement into a merged PR with receipts:
 
 | Flow | Transformation | Output |
 |------|----------------|--------|
@@ -23,6 +23,8 @@ Flow Studio runs **7 sequential flows** that transform a requirement into a merg
 | **Gate** | Code → merge decision | Audit receipts, policy check, recommendation |
 | **Deploy** | Approved → production | Merge, verify health, audit trail |
 | **Wisdom** | Artifacts → learnings | Pattern detection, feedback loops |
+| **Reset** | Repo → clean state | Rebase, conflict resolution, prune |
+| **Demo** | Intent → full cycle | Stepwise-orchestrated end-to-end demo |
 
 Each flow produces **receipts** (proof of execution) and **evidence** (test results, coverage, lint output). Kill the process anytime—resume from the last checkpoint.
 
@@ -83,6 +85,7 @@ Treat this repo as four layers:
 | UI surface     | `swarm/tools/flow_studio_ui/`   | Visual + semantic contract   |
 | Adapter config | `.claude/`                      | Provider-specific wiring     |
 | Run artifacts  | `swarm/runs/<run-id>/`          | Ephemeral outputs (RUN_BASE) |
+| Flow commands  | `.claude/commands/`             | 9 flow entrypoints           |
 
 **When driving Flow Studio:**
 
@@ -327,9 +330,9 @@ See [docs/ROUTING_PROTOCOL.md](./docs/ROUTING_PROTOCOL.md) for the full routing 
 - **Built-in (3)**: explore, plan-subagent, general-subagent
 - **Cross-cutting (5)**: clarifier, risk-analyst, policy-analyst, repo-operator, gh-reporter
 - **Utility (3)**: swarm-ops, ux-critic, ux-implementer
-- **Flow-specific (45)**: See [docs/AGENT_OPS.md](./docs/AGENT_OPS.md) for full taxonomy
+- **Flow-specific (62)**: See [docs/AGENT_OPS.md](./docs/AGENT_OPS.md) for full taxonomy
 
-**Total: 56 agents** (3 built-in + 53 domain)
+**Total: 73 agents** (3 built-in + 70 domain)
 
 ---
 
@@ -534,6 +537,8 @@ features/          # BDD scenarios (AUTHORITATIVE)
 5. **Gate** (`/flow-5-gate`): Audit and merge decision -> `RUN_BASE/gate/`
 6. **Deploy** (`/flow-6-deploy`): Merge, verify, report -> `RUN_BASE/deploy/`
 7. **Wisdom** (`/flow-7-wisdom`): Analyze, learn, feedback -> `RUN_BASE/wisdom/`
+8. **Reset** (`/flow-8-reset`): Repo integrity and cleanup -> `RUN_BASE/reset/`
+9. **Demo** (`/flow-9-demo`): Full cycle verification -> `RUN_BASE/demo/`
 
 ---
 

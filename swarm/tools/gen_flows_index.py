@@ -47,7 +47,7 @@ def load_flow_configs() -> Dict[str, Any]:
         sys.exit(2)
 
     for yaml_file in sorted(CONFIG_FLOWS_DIR.glob("*.yaml")):
-        with open(yaml_file, "r") as f:
+        with open(yaml_file, "r", encoding="utf-8") as f:
             flow = yaml.safe_load(f)
             if flow and "key" in flow:
                 flows[flow["key"]] = flow
@@ -63,7 +63,7 @@ def load_agent_configs() -> Dict[str, Any]:
         sys.exit(2)
 
     for yaml_file in sorted(CONFIG_AGENTS_DIR.glob("*.yaml")):
-        with open(yaml_file, "r") as f:
+        with open(yaml_file, "r", encoding="utf-8") as f:
             agent = yaml.safe_load(f)
             if agent and "key" in agent:
                 agents[agent["key"]] = agent
@@ -260,28 +260,29 @@ def generate_index(flows: Dict[str, Any], agents: Dict[str, Any]) -> str:
 This document provides a comprehensive cross-reference of flows and agents in the swarm.
 
 **Metadata:**
-- Total Flows: 6
+- Total Flows: {flow_count}
 - Total Agents: {agent_count}
 - Generated from: `swarm/config/flows/*.yaml` and `swarm/config/agents/*.yaml`
 
 ---
 
-""".format(agent_count=len(agents))
+""".format(flow_count=len(flows), agent_count=len(agents))
 
     by_flow = generate_by_flow_section(flows)
     by_agent = generate_by_agent_section(agents, agent_flows, flows)
     quick_ref = generate_quick_reference_section(flows, agents, agent_flows)
 
+    max_flow = max([flow_index(f) for f in flows.keys()]) if flows else 0
     footer = """
 ---
 
 ## Notes
 
 - **Cross-cutting agents** appear in multiple flows and are listed separately in each flow
-- **Flow numbers** (1-6) follow the SDLC sequence: Signal → Plan → Build → Gate → Deploy → Wisdom
+- **Flow numbers** (1-{max_flow}) follow the SDLC sequence.
 - **Categories** map to semantic role families: shaping, spec/design, implementation, critic, verification, analytics, reporter, infra
 - This index is a read-only reference generated from source YAML configs in `swarm/config/`
-"""
+""".format(max_flow=max_flow)
 
     return header + by_flow + by_agent + quick_ref + footer
 
@@ -291,7 +292,7 @@ def write_index(content: str) -> bool:
     # Ensure docs directory exists
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(OUTPUT_FILE, "w") as f:
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write(content)
 
     return True
@@ -303,7 +304,7 @@ def check_index(content: str) -> bool:
         print(f"Error: {OUTPUT_FILE} does not exist")
         return False
 
-    with open(OUTPUT_FILE, "r") as f:
+    with open(OUTPUT_FILE, "r", encoding="utf-8") as f:
         existing = f.read()
 
     if content.strip() == existing.strip():

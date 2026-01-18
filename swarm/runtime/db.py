@@ -6,10 +6,16 @@ Re-exports the StatsDB implementation from swarm.runtime.statsdb to preserve
 import paths for callers (swarm.runtime.db).
 """
 
+from typing import Optional
+
 from swarm.runtime.statsdb import *  # noqa: F403
-from swarm.runtime.statsdb import __all__ as _statsdb_all
+from swarm.runtime.statsdb import __all__ as _statsdb_all, StatsDB
 
 __all__ = _statsdb_all
+
+# Backward-compatibility shim for tests that monkeypatch _global_db
+# The actual global singleton is in swarm.runtime.resilient_db._global_resilient_db
+_global_db: Optional[StatsDB] = None
 
 
 if __name__ == "__main__":

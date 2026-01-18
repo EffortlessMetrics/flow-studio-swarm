@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0-rc.1] - 2026-01-18
+
+### Added
+
+#### V3.0 Core Architecture
+- **Stepwise Orchestrator**: High-trust, intelligence-driven orchestration with per-step transactions.
+- **Pack System**: Portable flow and station bundles (`swarm/packs/`) for modular swarm composition.
+- **MacroNavigator**: Between-flow routing with constraint DSL and flow stack support.
+- **Open World Routing**: Support for flow injection (e.g., auto-rebase during Build) and ad-hoc station generation.
+- **Flow 8 (Reset/Rebase)**: New automated flow for reconciling stale branches with upstream/main.
+- **Cognitive Hierarchy**: Evolution from simple agents to Worker → Finalizer → Navigator → Curator roles.
+
+#### Infrastructure & Persistence
+- **Resilient Database**: Journal-first DuckDB with auto-rebuild from append-only `events.jsonl` ledger.
+- **Boundary Review API**: Aggregated endpoint for reviewing assumptions, decisions, and detours.
+- **Inventory Counts**: Real-time fact marker extraction and visualization in Flow Studio.
+- **Claude Agent SDK Modernization**: Full integration with the latest Anthropic Agent SDK and tool-use patterns.
+
+#### Safety & Governance
+- **Orderly Shutdown**: Support for graceful interruption and `handoff_partial.json` persistence.
+- **Memory Pushdown**: Protocol modernization and documentation refactor for reduced context bloat.
+- **Spec-First Integration**: Modular validation for flow and station contracts.
+
+### Changed
+- **FastAPI Upgrade**: Backend fully modernized with FastAPI and SSE-driven state management.
+- **Validation Framework**: Upgraded validator supporting FR-001 through FR-005 with V3 extensions.
+- **Handoff Protocol**: Standardized handoff envelopes with forensic evidence and explicit unknowns.
+
 ---
 
 ## [2.3.0] - 2025-12-09

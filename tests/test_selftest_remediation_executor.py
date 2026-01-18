@@ -174,8 +174,18 @@ class TestBlocklistCheck:
 class TestDryRun:
     """Tests for dry-run functionality."""
 
-    def test_dry_run_returns_result(self, sample_remediation: Remediation, tmp_path: Path) -> None:
+    @patch("subprocess.run")
+    def test_dry_run_returns_result(
+        self, mock_run: MagicMock, sample_remediation: Remediation, tmp_path: Path
+    ) -> None:
         """Dry run should return a DryRunResult."""
+        # Mock subprocess.run to avoid platform-specific command issues (e.g., 'make' on Windows)
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Dry run output"
+        mock_result.stderr = ""
+        mock_run.return_value = mock_result
+
         result = dry_run(sample_remediation, working_dir=tmp_path)
 
         assert isinstance(result, DryRunResult)

@@ -1,6 +1,6 @@
 # Swarm Agent Registry
 
-> Minimal viable swarm: 54 domain agents across 7 flows + 3 built-in infra.
+> Intelligent Factory: 70 domain agents across 9 flows + 3 built-in infra.
 > Domain agents live under `.claude/agents/*.md`.
 > Built-in infra agents are native to Claude Code and have no `.claude/agents` files.
 
@@ -218,3 +218,9 @@ For now: agents are pure tool-users. Only the orchestrator coordinates multiple 
 **Agents**: reset-diagnose, reset-stash-wip, reset-sync-upstream, reset-resolve-conflicts, reset-restore-wip, reset-prune-branches, reset-archive-run, reset-verify-clean
 **Cross-cutting**: repo-operator
 **Note**: Invoked via INJECT_FLOW when shadow fork diverges from upstream
+
+### Flow 9: Stepwise Demo (10 agents)
+**Question**: How does Stepwise orchestration perform in a full cycle?
+**Agents**: signal-normalizer, problem-framer, requirements-author, requirements-critic, design-optioneer, adr-author, test-strategist, code-implementer, code-critic, self-reviewer
+**Cross-cutting**: clarifier, gh-reporter
+**Note**: Specialized flow for validating the Stepwise Orchestrator and Factor Extraction engine.
