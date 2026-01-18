@@ -471,6 +471,11 @@
           "pattern": "^[a-f0-9]{16,64}$",
           "description": "SHA-256 hash of compiled prompt content (truncated to 16-64 chars)"
         },
+        "prompt_hash_v2": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{16,64}$",
+          "description": "SHA-256 hash of full system + user prompts (truncated to 16-64 chars)"
+        },
         "compiled_at": {
           "type": "string",
           "format": "date-time",

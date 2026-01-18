@@ -141,13 +141,24 @@ class TestLayoutSpecConsistency:
         ts_path = REPO_ROOT / "swarm/tools/flow_studio_ui/src/layout_spec.ts"
         assert ts_path.exists(), f"layout_spec.ts not found at {ts_path}"
 
-    def test_layout_screens_endpoint_exists_in_fastapi(self):
-        """FastAPI must have layout_screens endpoint defined."""
-        fastapi_path = REPO_ROOT / "swarm/tools/flow_studio_fastapi.py"
-        content = fastapi_path.read_text(encoding="utf-8")
+    def test_fastapi_shim_exports_app_and_factory(self):
+        """FastAPI shim should export app and app factory."""
+        from swarm.tools import flow_studio_fastapi as shim
 
-        assert "/api/layout_screens" in content, "FastAPI missing /api/layout_screens route"
-        assert "LAYOUT_SCREENS" in content, "FastAPI missing LAYOUT_SCREENS definition"
+        assert hasattr(shim, "app"), "FastAPI shim should export app"
+        assert hasattr(shim, "create_fastapi_app"), "FastAPI shim should export create_fastapi_app"
+        assert shim.create_app is shim.create_fastapi_app, (
+            "FastAPI shim should alias create_app to create_fastapi_app"
+        )
+
+    def test_layout_screens_endpoint_responds(self):
+        """FastAPI must serve /api/layout_screens."""
+        from swarm.tools.flow_studio_fastapi import app
+        from fastapi.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.get("/api/layout_screens")
+        assert resp.status_code == 200
 
 
 class TestLayoutScreensAPIConsistency:

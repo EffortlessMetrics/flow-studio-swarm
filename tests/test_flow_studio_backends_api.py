@@ -11,10 +11,7 @@ See docs/FLOW_STUDIO.md "Backends & Events Timeline" for documentation.
 """
 
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
 import pytest
 
 # Add repo root to path for imports
@@ -37,31 +34,6 @@ class TestApiRunsBackendField:
         from swarm.tools.flow_studio_fastapi import app
 
         client = TestClient(app)
-
-        # Create a mock RunService that returns a summary with backend
-        with patch("swarm.tools.flow_studio_fastapi.RunService") as mock_service_class:
-            # Create mock spec
-            mock_spec = MagicMock()
-            mock_spec.backend = "gemini-cli"
-
-            # Create mock summary
-            mock_summary = MagicMock()
-            mock_summary.id = "test-run-123"
-            mock_summary.spec = mock_spec
-            mock_summary.tags = ["backend:gemini-cli"]
-            mock_summary.title = "Test Run"
-            mock_summary.description = None
-            mock_summary.is_exemplar = False
-            mock_summary.path = "/test/path"
-
-            # Configure mock service
-            mock_service = MagicMock()
-            mock_service.list_runs.return_value = [mock_summary]
-            mock_service_class.get_instance.return_value = mock_service
-
-            # Make request - need to recreate app to pick up mock
-            # Since the app is created at import time, we need to patch differently
-            # Let's test the actual endpoint behavior
 
         # For now, just verify the endpoint exists and returns expected structure
         response = client.get("/api/runs")

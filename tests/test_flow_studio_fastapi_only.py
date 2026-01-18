@@ -208,11 +208,11 @@ def test_ui_module_extracted():
 
 def test_fastapi_uses_extracted_ui():
     """Verify FastAPI imports HTML from shared UI module."""
-    fastapi_module = repo_root / "swarm" / "tools" / "flow_studio_fastapi.py"
-    content = fastapi_module.read_text(encoding="utf-8")
+    ui_adapter = repo_root / "swarm" / "tools" / "flow_studio" / "ui" / "index.py"
+    content = ui_adapter.read_text(encoding="utf-8")
 
     assert "from swarm.tools.flow_studio_ui import get_index_html" in content, (
-        "FastAPI should import get_index_html from shared UI module"
+        "Flow Studio UI adapter should import get_index_html from shared UI module"
     )
 
 

@@ -93,6 +93,24 @@ lint-routing-strict:
 	@echo "Checking for deprecated routing field patterns (strict mode)..."
 	uv run python swarm/tools/lint_routing_fields.py --strict
 
+.PHONY: lint-shim-imports
+lint-shim-imports:
+	@echo "Checking for new shim imports..."
+	@uv run python swarm/tools/lint_shim_imports.py
+
+.PHONY: shim-imports-report
+shim-imports-report:
+	@echo "Shim import report (matches):"
+	@rg "swarm\\.runtime\\.router" -n || true
+	@rg "swarm\\.config\\.pack_registry" -n || true
+	@rg "swarm\\.runtime\\.db" -n || true
+	@rg "swarm\\.spec\\.compiler_legacy" -n || true
+
+.PHONY: complexity-check
+complexity-check:
+	@echo "Checking complexity thresholds for changed files..."
+	@uv run python swarm/tools/complexity_check.py
+
 # Operator Spine: the 8 docs every operator should read
 SPINE_DOCS = README.md docs/GETTING_STARTED.md CHEATSHEET.md GLOSSARY.md \
              docs/SELFTEST_SYSTEM.md docs/FLOW_STUDIO.md REPO_MAP.md docs/VALIDATION_RULES.md
@@ -1146,15 +1164,15 @@ profiles-help:
 
 .PHONY: check-agent-sdk
 check-agent-sdk:
-	@uv run --extra dev --group dev python - <<'PY'
-import sys
-try:
-    import claude_agent_sdk  # noqa: F401
-except Exception:
-    print("ERROR: claude-agent-sdk not installed. Run: uv sync --extra dev", file=sys.stderr)
-    sys.exit(1)
-print("OK: claude-agent-sdk installed.")
-PY
+	@uv run --extra dev --group dev python - <<-'PY'
+		import sys
+		try:
+		    import claude_agent_sdk  # noqa: F401
+		except Exception:
+		    print("ERROR: claude-agent-sdk not installed. Run: uv sync --extra dev", file=sys.stderr)
+		    sys.exit(1)
+		print("OK: claude-agent-sdk installed.")
+	PY
 
 .PHONY: vendor-agent-sdk
 vendor-agent-sdk:

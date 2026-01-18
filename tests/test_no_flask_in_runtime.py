@@ -194,10 +194,13 @@ def test_fastapi_replaces_flask_functionality():
 
     content = fastapi_module.read_text(encoding="utf-8")
 
-    # FastAPI migration should have:
-    assert "from fastapi import" in content, "Should import from fastapi"
-    assert "app = FastAPI()" in content or "app = FastAPI" in content, (
-        "Should define FastAPI app instance"
+    # FastAPI shim should point to the packaged app factory.
+    assert "create_fastapi_app" in content, "Shim should import create_fastapi_app"
+    assert "create_app = create_fastapi_app" in content, (
+        "Shim should alias create_app to create_fastapi_app"
+    )
+    assert "app = create_fastapi_app()" in content, (
+        "Shim should create app via create_fastapi_app()"
     )
 
 

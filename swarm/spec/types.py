@@ -285,6 +285,12 @@ class PromptPlan:
     compiled_at: str  # ISO timestamp
     context_pack_size: int  # Number of envelopes included
 
+    # Traceability optional fields
+    prompt_hash_v2: str = ""
+
+    # Structured output schema for SDK output_format
+    output_schema: Dict[str, Any] = field(default_factory=dict)
+
     # V2: Verification requirements (merged from station + step)
     verification: VerificationRequirements = field(
         default_factory=lambda: VerificationRequirements()

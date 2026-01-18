@@ -12,6 +12,7 @@ Usage:
 
 from __future__ import annotations
 
+import inspect
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
@@ -28,10 +29,117 @@ from swarm.runtime._claude_sdk.policy import compute_disallowed_tools
 from swarm.runtime._claude_sdk.sdk_import import get_sdk_module
 
 if TYPE_CHECKING:
+    from swarm.spec.compiler.models import StepPlan
     from swarm.spec.types import PromptPlan
 
 # Module logger
 logger = logging.getLogger(__name__)
+
+_ALLOWED_PERMISSION_MODES = {"default", "acceptEdits", "plan", "bypassPermissions"}
+_PERMISSION_MODE_ALIASES = {
+    "plan": "plan",
+    "planmode": "plan",
+    "plan_mode": "plan",
+    "acceptedits": "acceptEdits",
+    "accept_edits": "acceptEdits",
+    "default": "default",
+    "bypasspermissions": "bypassPermissions",
+    "bypass_permissions": "bypassPermissions",
+}
+
+
+def normalize_permission_mode(value: Optional[str]) -> str:
+    """Normalize permission mode values to Claude Agent SDK expectations."""
+    if not value:
+        return "bypassPermissions"
+    stripped = value.strip()
+    if stripped in _ALLOWED_PERMISSION_MODES:
+        return stripped
+    key = stripped.replace("-", "").replace("_", "").lower()
+    return _PERMISSION_MODE_ALIASES.get(key, "bypassPermissions")
+
+
+def _filter_options_kwargs(options_class: Any, options_kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop unsupported kwargs when SDK option fields differ across versions."""
+    try:
+        params = inspect.signature(options_class).parameters
+    except (TypeError, ValueError):
+        return options_kwargs
+
+    accepted = set(params.keys())
+    accepted.discard("self")
+    filtered = {k: v for k, v in options_kwargs.items() if k in accepted}
+    dropped = sorted(set(options_kwargs.keys()) - set(filtered.keys()))
+    if dropped:
+        logger.debug("Dropping unsupported ClaudeAgentOptions fields: %s", dropped)
+    return filtered
+
+
+def _build_options_kwargs(
+    plan: Any,
+    cwd: Optional[Union[str, Path]] = None,
+) -> Dict[str, Any]:
+    """Build kwargs for ClaudeAgentOptions from a plan-like object."""
+    effective_cwd: Optional[str] = None
+    if cwd is not None:
+        effective_cwd = str(cwd)
+    elif getattr(plan, "cwd", None):
+        effective_cwd = str(plan.cwd)
+
+    system_prompt: Dict[str, Any] = {
+        "type": "preset",
+        "preset": SYSTEM_PROMPT_PRESET,
+    }
+    if getattr(plan, "system_append", ""):
+        system_prompt["append"] = plan.system_append
+
+    permission_mode = normalize_permission_mode(getattr(plan, "permission_mode", None))
+
+    options_kwargs: Dict[str, Any] = {
+        "permission_mode": permission_mode,
+        "setting_sources": ["project"],
+        "system_prompt": system_prompt,
+    }
+
+    if effective_cwd:
+        options_kwargs["cwd"] = effective_cwd
+    else:
+        logger.warning(
+            "Options created without cwd and plan.cwd is empty - "
+            "execution may fail or use unexpected working directory"
+        )
+
+    model = getattr(plan, "model", None)
+    if model:
+        options_kwargs["model"] = model
+
+    max_turns = getattr(plan, "max_turns", None)
+    if max_turns:
+        options_kwargs["max_turns"] = max_turns
+
+    allowed_tools = getattr(plan, "allowed_tools", None)
+    if allowed_tools:
+        options_kwargs["allowed_tools"] = allowed_tools
+        disallowed = compute_disallowed_tools(allowed_tools)
+        if disallowed:
+            options_kwargs["disallowed_tools"] = disallowed
+        logger.debug(
+            "Plan specifies allowed_tools=%s, computed disallowed_tools=%s",
+            allowed_tools,
+            disallowed,
+        )
+
+    output_schema = getattr(plan, "output_schema", None)
+    if output_schema:
+        options_kwargs["output_format"] = {
+            "type": "json_schema",
+            "schema": output_schema,
+        }
+
+    if hasattr(plan, "sandbox_enabled"):
+        options_kwargs["sandbox"] = {"enabled": bool(plan.sandbox_enabled)}
+
+    return options_kwargs
 
 
 def create_high_trust_options(
@@ -203,78 +311,27 @@ def create_options_from_plan(
             f"Claude SDK not available: {_sdk_import_error}. "
             "Install with: pip install claude-code-sdk"
         )
-    sdk = _sdk_module
 
-    # Determine effective cwd - prefer explicit parameter, then plan.cwd
-    effective_cwd: Optional[str] = None
-    if cwd is not None:
-        effective_cwd = str(cwd)
-    elif plan.cwd:
-        effective_cwd = plan.cwd
+    sdk = get_sdk_module()
+    options_kwargs = _build_options_kwargs(plan, cwd)
+    options_kwargs = _filter_options_kwargs(sdk.ClaudeAgentOptions, options_kwargs)
+    return sdk.ClaudeAgentOptions(**options_kwargs)
 
-    # Build system prompt with preset and optional append
-    system_prompt: Dict[str, Any] = {
-        "type": "preset",
-        "preset": SYSTEM_PROMPT_PRESET,
-    }
-    if plan.system_append:
-        system_prompt["append"] = plan.system_append
 
-    # Map permission mode from plan (with fallback)
-    permission_mode = plan.permission_mode or "bypassPermissions"
+def step_plan_to_agent_options(
+    step_plan: "StepPlan",
+    cwd: Optional[Union[str, Path]] = None,
+) -> Any:
+    """Create ClaudeAgentOptions from a compiled StepPlan."""
+    from swarm.runtime._claude_sdk.sdk_import import SDK_AVAILABLE, _sdk_import_error
 
-    # Build options with MANDATORY settings from spec
-    options_kwargs: Dict[str, Any] = {
-        # 1. Permission mode from plan (or default)
-        "permission_mode": permission_mode,
-        # 2. Setting sources: ["project"] ensures CLAUDE.md and skills are loaded
-        "setting_sources": ["project"],
-        # 3. System prompt: preset + append from plan
-        "system_prompt": system_prompt,
-    }
-
-    # Working directory
-    if effective_cwd:
-        options_kwargs["cwd"] = effective_cwd
-    else:
-        logger.warning(
-            "create_options_from_plan called without cwd and plan.cwd is empty - "
-            "execution may fail or use unexpected working directory"
+    if not SDK_AVAILABLE:
+        raise RuntimeError(
+            f"Claude SDK not available: {_sdk_import_error}. "
+            "Install with: pip install claude-code-sdk"
         )
 
-    # Model from plan (map short names to full model IDs if needed)
-    if plan.model:
-        # The plan.model may be a short name like "sonnet" or full ID
-        # For now, pass through - the SDK handles model resolution
-        options_kwargs["model"] = plan.model
-
-    # Max turns from plan
-    if plan.max_turns:
-        options_kwargs["max_turns"] = plan.max_turns
-
-    # IMPORTANT: For deterministic tool restriction, both allowed_tools AND
-    # disallowed_tools must be set. allowed_tools alone may only affect
-    # permission prompting. See: platform.claude.com/cookbook/claude-agent-sdk-02
-    #
-    # When allowed_tools is specified in the PromptPlan, we compute the
-    # disallowed_tools to ensure deterministic behavior.
-    if plan.allowed_tools:
-        options_kwargs["allowed_tools"] = plan.allowed_tools
-        disallowed = compute_disallowed_tools(plan.allowed_tools)
-        if disallowed:
-            options_kwargs["disallowed_tools"] = disallowed
-        logger.debug(
-            "PromptPlan specifies allowed_tools=%s, computed disallowed_tools=%s",
-            plan.allowed_tools,
-            disallowed,
-        )
-
-    # NOTE: sandbox_enabled is prepared for future SDK support.
-    # Currently no-op, same as create_high_trust_options().
-    if plan.sandbox_enabled:
-        logger.debug(
-            "PromptPlan specifies sandbox_enabled=True (not enforced until SDK adds support)"
-        )
-
-    # The SDK now exports ClaudeAgentOptions instead of ClaudeCodeOptions
+    sdk = get_sdk_module()
+    options_kwargs = _build_options_kwargs(step_plan, cwd)
+    options_kwargs = _filter_options_kwargs(sdk.ClaudeAgentOptions, options_kwargs)
     return sdk.ClaudeAgentOptions(**options_kwargs)

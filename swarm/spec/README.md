@@ -17,7 +17,12 @@ swarm/spec/
 +-- README.md              # This file
 +-- types.py               # Python dataclasses for specs
 +-- loader.py              # YAML loading and validation
-+-- compiler.py            # Spec to PromptPlan compilation
++-- compiler_legacy.py     # Facade + legacy compiler implementation
++-- compiler/              # Modular compiler package
+|   +-- __init__.py
+|   +-- builder.py
+|   +-- intent_adapters.py
+|   +-- models.py
 |
 +-- schemas/               # JSON Schema for validation
 |   +-- station.schema.json
@@ -88,7 +93,7 @@ Fragments are included via the `runtime_prompt.fragments` field.
 Station YAML + Flow YAML + Fragments
             |
             v
-        compiler.py
+       compiler/
             |
             v
        PromptPlan

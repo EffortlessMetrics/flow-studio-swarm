@@ -417,6 +417,7 @@ class SpecManager:
                 "flow_version": plan.flow_version,
                 "step_id": plan.step_id,
                 "prompt_hash": plan.prompt_hash,
+                "prompt_hash_v2": plan.prompt_hash_v2,
                 "model": plan.model,
                 "permission_mode": plan.permission_mode,
                 "allowed_tools": list(plan.allowed_tools),
@@ -438,6 +439,7 @@ class SpecManager:
                 "flow_id": flow_id,
                 "step_id": step_id,
                 "prompt_hash": "mock-hash",
+                "prompt_hash_v2": "mock-hash",
                 "compiled_at": datetime.now(timezone.utc).isoformat(),
             }
         except Exception as e:
