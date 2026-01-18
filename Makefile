@@ -237,12 +237,12 @@ flow-studio:
 .PHONY: spec-api
 spec-api:
 	@echo "Starting Spec API server on http://127.0.0.1:5001..."
-	@uv run uvicorn swarm.api.server:app --host 127.0.0.1 --port 5001
+	@uv run uvicorn swarm.api.asgi:app --host 127.0.0.1 --port 5001
 
 .PHONY: spec-api-reload
 spec-api-reload:
 	@echo "Starting Spec API server with auto-reload..."
-	@uv run uvicorn swarm.api.server:app --reload --host 127.0.0.1 --port 5001
+	@uv run uvicorn swarm.api.asgi:app --reload --host 127.0.0.1 --port 5001
 
 # Combined: Flow Studio UI + Spec API (runs both servers)
 # Flow Studio on :5000, Spec API on :5001
@@ -257,7 +257,7 @@ flow-studio-full:
 	@echo "  API Health:      http://127.0.0.1:5001/api/health"
 	@echo "  API Docs:        http://127.0.0.1:5001/docs"
 	@echo ""
-	@(uv run uvicorn swarm.api.server:app --host 127.0.0.1 --port 5001 &) && \
+	@(uv run uvicorn swarm.api.asgi:app --host 127.0.0.1 --port 5001 &) && \
 		uv run uvicorn swarm.tools.flow_studio_fastapi:app --reload --host 127.0.0.1 --port 5000
 
 # Flow Studio smoke test: receipt-backed verification

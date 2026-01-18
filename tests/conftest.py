@@ -53,6 +53,21 @@ except ImportError as e:
     warnings.warn(f"Could not import BDD step definitions: {e}")
 
 # ============================================================================
+# Helper Functions
+# ============================================================================
+
+
+def _copy_module_tree(src: Path, dst: Path) -> None:
+    """Recursively copy a Python module tree (directories + .py files only)."""
+    dst.mkdir(parents=True, exist_ok=True)
+    for item in src.iterdir():
+        if item.is_dir() and not item.name.startswith("__pycache__"):
+            _copy_module_tree(item, dst / item.name)
+        elif item.is_file() and item.suffix == ".py":
+            shutil.copy(item, dst / item.name)
+
+
+# ============================================================================
 # Temporary Repository Fixtures
 # ============================================================================
 
@@ -98,6 +113,11 @@ def temp_repo(tmp_path):
         (repo / "swarm" / "validator").mkdir(parents=True, exist_ok=True)
         for file in real_validator_module.glob("*.py"):
             shutil.copy(file, repo / "swarm" / "validator" / file.name)
+
+    # Copy swarm/tools/validation module (required by validate_swarm.py shim)
+    real_validation_module = Path(__file__).parent.parent / "swarm" / "tools" / "validation"
+    if real_validation_module.exists():
+        _copy_module_tree(real_validation_module, repo / "swarm" / "tools" / "validation")
 
     return repo
 
