@@ -37,6 +37,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.2] - 2025-12-12
+
+### Added
+
+#### Flow Studio Improvements
+- **Non-blocking initialization**: Run history loads asynchronously in background; UI becomes interactive immediately.
+- **Context Budgets integration**: Documentation fully cross-linked with `CONTEXT_BUDGETS.md`.
+
+### Changed
+- **Test Baseline**: Updated definition of done to ~1750 passed tests.
+- **Selftest Documentation**: Normalized references to "16-step selftest" (previously "10-step").
+- **Runtime Configuration**: Clarified `stub` vs `cli` vs `sdk` engine modes in docstrings.
+
+---
+
+## [2.3.1] - 2025-12-10
+
+### Added
+
+#### Validation & Quality
+- **Clean Test Baseline**: Achieved ~1750 passed tests with zero xfails or warnings.
+- **JSON/Markdown Reporting**: `validate_swarm.py` now supports `--report json` and `--report markdown`.
+- **Line Number Precision**: Validator error messages now include line numbers for Frontmatter issues.
+- **Skill Validation**: Deep YAML validation for skill files.
+
+#### Documentation Tooling
+- **Meta-Docs Generation**: `make gen-doc-meta` for documentation coverage analysis.
+- **Invariant Checking**: `make docs-check` validates cross-references and version consistency.
+
+### Changed
+- **Performance Tests**: Moved to non-gating `@pytest.mark.performance` marker.
+- **Definition of Done**: Updated `docs/DEFINITION_OF_DONE.md` with strict xfail=0 policy.
+
+---
+
 ## [2.3.0] - 2025-12-09
 
 ### Added
@@ -262,7 +297,10 @@ These tags track Flow Studio-specific releases on a separate versioning track:
 
 ---
 
-[Unreleased]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/EffortlessMetrics/flow-studio/compare/v3.0.0-rc.1...HEAD
+[3.0.0-rc.1]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.2...v3.0.0-rc.1
+[2.3.2]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.1...v2.3.2
+[2.3.1]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.1.0...v2.1.1
