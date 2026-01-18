@@ -192,6 +192,8 @@ class FlowStudioCore:
                     "title": stitle,
                     "role": role,
                     "agents": agents_list,
+                    "_search_id": sid.lower(),
+                    "_search_title": stitle.lower(),
                 })
 
             flows[key] = {
@@ -199,6 +201,8 @@ class FlowStudioCore:
                 "title": title,
                 "description": description,
                 "steps": steps,
+                "_search_key": key.lower(),
+                "_search_title": title.lower(),
             }
 
         return flows
@@ -228,6 +232,8 @@ class FlowStudioCore:
                 "color": data.get("color", ""),
                 "model": data.get("model", "inherit"),
                 "short_role": (data.get("short_role") or "").strip(),
+                "_search_key": key.lower(),
+                "_search_role": (data.get("short_role") or "").strip().lower(),
             }
 
         return agents

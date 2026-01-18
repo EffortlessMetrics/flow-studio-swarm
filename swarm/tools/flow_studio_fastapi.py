@@ -458,10 +458,10 @@ def create_fastapi_app() -> FastAPI:
         """
         try:
             from swarm.config.model_registry import (
-                load_model_policy,
-                resolve_station_model,
-                resolve_model_tier,
                 VALID_TIERS,
+                load_model_policy,
+                resolve_model_tier,
+                resolve_station_model,
             )
 
             policy = load_model_policy()
@@ -533,8 +533,8 @@ def create_fastapi_app() -> FastAPI:
         try:
             from swarm.config.model_registry import (
                 load_model_policy,
-                resolve_tier_alias,
                 resolve_model_tier,
+                resolve_tier_alias,
             )
 
             policy = load_model_policy()
@@ -1695,7 +1695,11 @@ def create_fastapi_app() -> FastAPI:
         for flow_key, flow in _flows_cache.items():
             if len(results) >= max_results:
                 break
-            if query in flow_key.lower() or query in flow["title"].lower():
+            # Use pre-computed search keys if available, fallback to runtime lower()
+            search_key = flow.get("_search_key", flow_key.lower())
+            search_title = flow.get("_search_title", flow["title"].lower())
+
+            if query in search_key or query in search_title:
                 results.append({
                     "type": "flow",
                     "id": flow_key,
@@ -1710,7 +1714,11 @@ def create_fastapi_app() -> FastAPI:
             for step in flow.get("steps", []):
                 if len(results) >= max_results:
                     break
-                if query in step["id"].lower() or query in step["title"].lower():
+                # Use pre-computed search keys if available, fallback to runtime lower()
+                search_id = step.get("_search_id", step["id"].lower())
+                search_title = step.get("_search_title", step["title"].lower())
+
+                if query in search_id or query in search_title:
                     results.append({
                         "type": "step",
                         "flow": flow_key,
@@ -1723,8 +1731,11 @@ def create_fastapi_app() -> FastAPI:
         for agent_key, agent in _agents_cache.items():
             if len(results) >= max_results:
                 break
-            short_role = agent.get("short_role", "")
-            if query in agent_key.lower() or query in short_role.lower():
+            # Use pre-computed search keys if available, fallback to runtime lower()
+            search_key = agent.get("_search_key", agent_key.lower())
+            search_role = agent.get("_search_role", agent.get("short_role", "").lower())
+
+            if query in search_key or query in search_role:
                 # Find which flows this agent belongs to
                 agent_flows = []
                 for flow_key, flow in _flows_cache.items():
@@ -2019,7 +2030,7 @@ def create_fastapi_app() -> FastAPI:
 
         # Import the SpecCompiler
         try:
-            from swarm.spec.compiler import SpecCompiler, COMPILER_VERSION
+            from swarm.spec.compiler import COMPILER_VERSION, SpecCompiler
         except ImportError:
             return JSONResponse(
                 {"error": "SpecCompiler not available"},
