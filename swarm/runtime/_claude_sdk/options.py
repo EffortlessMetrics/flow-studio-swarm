@@ -118,10 +118,10 @@ def _build_options_kwargs(
         options_kwargs["max_turns"] = max_turns
 
     allowed_tools = getattr(plan, "allowed_tools", None)
-    if allowed_tools:
+    if allowed_tools is not None:  # Use 'is not None' to properly handle empty list []
         options_kwargs["allowed_tools"] = allowed_tools
         disallowed = compute_disallowed_tools(allowed_tools)
-        if disallowed:
+        if disallowed:  # Empty disallowed list is valid - means no tools blocked
             options_kwargs["disallowed_tools"] = disallowed
         logger.debug(
             "Plan specifies allowed_tools=%s, computed disallowed_tools=%s",

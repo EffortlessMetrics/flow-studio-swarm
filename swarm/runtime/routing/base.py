@@ -148,8 +148,14 @@ class NodeConfig:
         params = data.get("params", {})
         overrides = data.get("overrides", {})
 
-        exit_on = overrides.get("exit_on") or params.get("exit_on")
-        max_iterations = overrides.get("max_iterations") or params.get("max_iterations")
+        # Use 'in' operator to check key presence, not truthiness
+        # This ensures falsy values like 0, False, {}, [] are properly respected
+        exit_on = overrides.get("exit_on") if "exit_on" in overrides else params.get("exit_on")
+        max_iterations = (
+            overrides.get("max_iterations")
+            if "max_iterations" in overrides
+            else params.get("max_iterations")
+        )
 
         return cls(
             node_id=data.get("node_id", ""),
