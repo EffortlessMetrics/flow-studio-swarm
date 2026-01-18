@@ -321,6 +321,18 @@ def create_fastapi_app() -> FastAPI:
 
         if _core:
             _agents_cache, _flows_cache = _core.reload()
+            # Pre-compute search keys to avoid repetitive .lower() calls during search
+            for flow in _flows_cache.values():
+                flow['_search_key'] = flow['key'].lower()
+                flow['_search_title'] = flow.get('title', '').lower()
+                for step in flow.get("steps", []):
+                    step['_search_id'] = step['id'].lower()
+                    step['_search_title'] = step.get('title', '').lower()
+
+            for agent in _agents_cache.values():
+                agent['_search_key'] = agent['key'].lower()
+                agent['_search_role'] = agent.get('short_role', '').lower()
+
         _tours_cache = _load_tours()
         return _agents_cache, _flows_cache
 
@@ -458,10 +470,10 @@ def create_fastapi_app() -> FastAPI:
         """
         try:
             from swarm.config.model_registry import (
-                load_model_policy,
-                resolve_station_model,
-                resolve_model_tier,
                 VALID_TIERS,
+                load_model_policy,
+                resolve_model_tier,
+                resolve_station_model,
             )
 
             policy = load_model_policy()
@@ -533,8 +545,8 @@ def create_fastapi_app() -> FastAPI:
         try:
             from swarm.config.model_registry import (
                 load_model_policy,
-                resolve_tier_alias,
                 resolve_model_tier,
+                resolve_tier_alias,
             )
 
             policy = load_model_policy()
@@ -1681,6 +1693,31 @@ def create_fastapi_app() -> FastAPI:
     # Search Endpoint
     # =========================================================================
 
+    # Pre-computed artifact list for search (flow, step, filename, filename_lower)
+    SEARCH_COMMON_ARTIFACTS = [
+        ("signal", "normalize_input", "problem_statement.md"),
+        ("signal", "author_requirements", "requirements.md"),
+        ("signal", "author_bdd", "bdd_scenarios.feature"),
+        ("signal", "assess_risk", "risk_assessment.md"),
+        ("plan", "author_adr", "adr.md"),
+        ("plan", "design_interfaces", "api_contracts.yaml"),
+        ("plan", "design_observability", "observability_spec.md"),
+        ("plan", "author_test_strategy", "test_plan.md"),
+        ("plan", "author_work_plan", "work_plan.md"),
+        ("build", "author_tests", "test_summary.md"),
+        ("build", "implement_code", "impl_changes_summary.md"),
+        ("build", "self_review", "build_receipt.json"),
+        ("gate", "check_receipts", "receipt_audit.md"),
+        ("gate", "decide_merge", "merge_decision.md"),
+        ("deploy", "verify_deployment", "verification_report.md"),
+        ("wisdom", "audit_artifacts", "artifact_audit.md"),
+        ("wisdom", "synthesize_learnings", "learnings.md"),
+    ]
+    # Add lowercased filename for fast search
+    SEARCH_COMMON_ARTIFACTS = [
+        (f, s, fn, fn.lower()) for f, s, fn in SEARCH_COMMON_ARTIFACTS
+    ]
+
     @app.get("/api/search", response_model=schema.SearchResponse if schema else None)
     async def api_search(q: str = Query("", description="Search query")):
         """Search across flows, steps, agents, and artifacts."""
@@ -1695,7 +1732,11 @@ def create_fastapi_app() -> FastAPI:
         for flow_key, flow in _flows_cache.items():
             if len(results) >= max_results:
                 break
-            if query in flow_key.lower() or query in flow["title"].lower():
+            # Use pre-computed lowercase keys if available (fallback for safety)
+            fk_lower = flow.get('_search_key') or flow_key.lower()
+            ft_lower = flow.get('_search_title') or flow.get("title", "").lower()
+
+            if query in fk_lower or query in ft_lower:
                 results.append({
                     "type": "flow",
                     "id": flow_key,
@@ -1710,7 +1751,10 @@ def create_fastapi_app() -> FastAPI:
             for step in flow.get("steps", []):
                 if len(results) >= max_results:
                     break
-                if query in step["id"].lower() or query in step["title"].lower():
+                sid_lower = step.get('_search_id') or step["id"].lower()
+                st_lower = step.get('_search_title') or step.get("title", "").lower()
+
+                if query in sid_lower or query in st_lower:
                     results.append({
                         "type": "step",
                         "flow": flow_key,
@@ -1723,8 +1767,10 @@ def create_fastapi_app() -> FastAPI:
         for agent_key, agent in _agents_cache.items():
             if len(results) >= max_results:
                 break
-            short_role = agent.get("short_role", "")
-            if query in agent_key.lower() or query in short_role.lower():
+            ak_lower = agent.get('_search_key') or agent_key.lower()
+            ar_lower = agent.get('_search_role') or agent.get("short_role", "").lower()
+
+            if query in ak_lower or query in ar_lower:
                 # Find which flows this agent belongs to
                 agent_flows = []
                 for flow_key, flow in _flows_cache.items():
@@ -1740,30 +1786,11 @@ def create_fastapi_app() -> FastAPI:
                     "match": query
                 })
 
-        # Search artifacts (common artifact filenames)
-        common_artifacts = [
-            ("signal", "normalize_input", "problem_statement.md"),
-            ("signal", "author_requirements", "requirements.md"),
-            ("signal", "author_bdd", "bdd_scenarios.feature"),
-            ("signal", "assess_risk", "risk_assessment.md"),
-            ("plan", "author_adr", "adr.md"),
-            ("plan", "design_interfaces", "api_contracts.yaml"),
-            ("plan", "design_observability", "observability_spec.md"),
-            ("plan", "author_test_strategy", "test_plan.md"),
-            ("plan", "author_work_plan", "work_plan.md"),
-            ("build", "author_tests", "test_summary.md"),
-            ("build", "implement_code", "impl_changes_summary.md"),
-            ("build", "self_review", "build_receipt.json"),
-            ("gate", "check_receipts", "receipt_audit.md"),
-            ("gate", "decide_merge", "merge_decision.md"),
-            ("deploy", "verify_deployment", "verification_report.md"),
-            ("wisdom", "audit_artifacts", "artifact_audit.md"),
-            ("wisdom", "synthesize_learnings", "learnings.md"),
-        ]
-        for flow, step, filename in common_artifacts:
+        # Search artifacts (using pre-computed list)
+        for flow, step, filename, filename_lower in SEARCH_COMMON_ARTIFACTS:
             if len(results) >= max_results:
                 break
-            if query in filename.lower():
+            if query in filename_lower:
                 results.append({
                     "type": "artifact",
                     "flow": flow,
@@ -2019,7 +2046,7 @@ def create_fastapi_app() -> FastAPI:
 
         # Import the SpecCompiler
         try:
-            from swarm.spec.compiler import SpecCompiler, COMPILER_VERSION
+            from swarm.spec.compiler import COMPILER_VERSION, SpecCompiler
         except ImportError:
             return JSONResponse(
                 {"error": "SpecCompiler not available"},
