@@ -80,7 +80,7 @@ Read these in order:
 
 1. **[docs/TOUR_20_MIN.md](TOUR_20_MIN.md)** — Visual walkthrough of Flow Studio
 2. **[docs/DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md)** — Quality bar and merge criteria
-3. **[docs/RELEASE_NOTES_2_3_2.md](RELEASE_NOTES_2_3_2.md)** — Current release highlights
+3. **[docs/RELEASE_NOTES_3_0_0_RC1.md](RELEASE_NOTES_3_0_0_RC1.md)** — Current release highlights
 
 ### Key Concepts to Understand
 

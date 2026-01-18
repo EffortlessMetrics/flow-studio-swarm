@@ -653,3 +653,4 @@ Read `swarm/positioning.md` for positioning. Browse `swarm/examples/health-check
 | CI troubleshooting | [docs/CI_TROUBLESHOOTING.md](./docs/CI_TROUBLESHOOTING.md) |
 | **Release Notes** | |
 | Release notes v2.3.0 | [docs/RELEASE_NOTES_2_3_0.md](./docs/RELEASE_NOTES_2_3_0.md) |
+| Release notes v3.0.0-rc.1 | [docs/RELEASE_NOTES_3_0_0_RC1.md](./docs/RELEASE_NOTES_3_0_0_RC1.md) |

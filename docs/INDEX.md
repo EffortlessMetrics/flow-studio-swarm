@@ -12,7 +12,7 @@ It contains:
 
 For a portable `.claude` pack, see [`EffortlessMetrics/demo-swarm`](https://github.com/EffortlessMetrics/demo-swarm).
 
-**Status:** early re-implementation of a proven pattern. See [README.md § Status](../README.md#status) and [RELEASE_NOTES_2_3_2.md § Stability Matrix](./RELEASE_NOTES_2_3_2.md#stability-matrix).
+**Status:** V3.0 Release Candidate. See [RELEASE_NOTES_3_0_0_RC1.md § Stability Matrix](./RELEASE_NOTES_3_0_0_RC1.md#stability-matrix).
 
 ---
 

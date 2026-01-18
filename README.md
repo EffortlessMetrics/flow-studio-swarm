@@ -27,6 +27,16 @@ Just like every transition before.
 
 ---
 
+## Status
+
+**Current Version:** v3.0.0-rc.1 (Release Candidate)
+
+See [RELEASE_NOTES_3_0_0_RC1.md](docs/RELEASE_NOTES_3_0_0_RC1.md) for details on the V3 "Intelligent Factory" update.
+
+This release is **stable for evaluation**. It includes the new Pack System, Stepwise Orchestrator, and Resilient DB.
+
+---
+
 ## What Flow Studio Does
 
 Flow Studio orchestrates **9 flows** that transform a requirement into a merged PR and manage the lifecycle:
