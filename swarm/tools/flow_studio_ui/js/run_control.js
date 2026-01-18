@@ -237,8 +237,20 @@ function subscribeToRunEvents(runId) {
 }
 /**
  * Handle incoming SSE events.
+ *
+ * This function captures the active run ID at the beginning to ensure
+ * atomic processing of the event with respect to the active run.
+ * This prevents race conditions where events from an old run could
+ * be processed after the active run ID has changed.
  */
 function handleSSEEvent(event) {
+    // Capture the active run ID atomically at the start of event processing
+    // This ensures all operations in this function use the same run ID
+    const activeRunId = _state.activeRunId;
+    // If there's no active run, ignore the event
+    if (!activeRunId) {
+        return;
+    }
     switch (event.type) {
         case "step_start":
             _state.currentStep = event.stepId || null;
@@ -259,14 +271,14 @@ function handleSSEEvent(event) {
                 _state.completedFlows.push(event.flowKey);
             }
             // Notify listeners of flow completion
-            if (_callbacks.onFlowCompleted && _state.activeRunId && event.flowKey) {
-                _callbacks.onFlowCompleted(_state.activeRunId, event.flowKey);
+            if (_callbacks.onFlowCompleted && activeRunId && event.flowKey) {
+                _callbacks.onFlowCompleted(activeRunId, event.flowKey);
             }
             break;
         case "plan_completed":
             // Entire plan completed (autopilot run finished)
-            if (_callbacks.onPlanCompleted && _state.activeRunId && _state.planId) {
-                _callbacks.onPlanCompleted(_state.activeRunId, _state.planId);
+            if (_callbacks.onPlanCompleted && activeRunId && _state.planId) {
+                _callbacks.onPlanCompleted(activeRunId, _state.planId);
             }
             // Fall through to complete handling
             _state.runState = "completed";
@@ -275,8 +287,8 @@ function handleSSEEvent(event) {
                 _state.unsubscribe();
                 _state.unsubscribe = null;
             }
-            if (_callbacks.onRunComplete && _state.activeRunId) {
-                _callbacks.onRunComplete(_state.activeRunId, _state.isAutopilot);
+            if (_callbacks.onRunComplete && activeRunId) {
+                _callbacks.onRunComplete(activeRunId, _state.isAutopilot);
             }
             break;
         case "complete":
@@ -286,8 +298,8 @@ function handleSSEEvent(event) {
                 _state.unsubscribe();
                 _state.unsubscribe = null;
             }
-            if (_callbacks.onRunComplete && _state.activeRunId) {
-                _callbacks.onRunComplete(_state.activeRunId, _state.isAutopilot);
+            if (_callbacks.onRunComplete && activeRunId) {
+                _callbacks.onRunComplete(activeRunId, _state.isAutopilot);
             }
             break;
         case "error":
@@ -297,13 +309,13 @@ function handleSSEEvent(event) {
                 _state.unsubscribe();
                 _state.unsubscribe = null;
             }
-            if (_callbacks.onRunFailed && _state.activeRunId) {
-                _callbacks.onRunFailed(_state.activeRunId, _state.error);
+            if (_callbacks.onRunFailed && activeRunId) {
+                _callbacks.onRunFailed(activeRunId, _state.error);
             }
             break;
     }
     // Notify listeners of every SSE event for UI propagation
-    _callbacks.onRunEvent?.(event, _state.activeRunId);
+    _callbacks.onRunEvent?.(event, activeRunId);
     updateUI();
 }
 // ============================================================================

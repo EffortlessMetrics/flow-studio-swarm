@@ -63,6 +63,13 @@ export function initShortcutsModal() {
             toggleShortcutsModal(false);
         }
     });
+    // Close button
+    const closeBtn = document.getElementById("shortcuts-modal-close");
+    if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+            toggleShortcutsModal(false);
+        });
+    }
     // Close on ESC key within the modal
     modal.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
