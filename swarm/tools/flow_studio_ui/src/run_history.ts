@@ -187,7 +187,9 @@ export function filterRuns(type: RunFilterType): void {
   if (filterContainer) {
     filterContainer.querySelectorAll(".filter-btn").forEach(btn => {
       const filter = (btn as HTMLElement).dataset.filter;
-      btn.classList.toggle("active", filter === type);
+      const isActive = filter === type;
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-selected", isActive ? "true" : "false");
     });
   }
 
@@ -450,10 +452,11 @@ function renderFilterTabs(): string {
 
   const tabs = filters.map(filter => {
     const isActive = _state.currentFilter === filter ? " active" : "";
-    return `<span class="tab${isActive}" data-filter="${filter}">${labels[filter]}</span>`;
+    const isSelected = _state.currentFilter === filter;
+    return `<button type="button" role="tab" aria-selected="${isSelected}" class="tab${isActive}" data-filter="${filter}">${labels[filter]}</button>`;
   }).join("");
 
-  return `<div class="run-history-filters tabs">${tabs}</div>`;
+  return `<div class="run-history-filters tabs" role="tablist" aria-label="Run filters">${tabs}</div>`;
 }
 
 /**
@@ -677,8 +680,12 @@ function initRunHistoryHandlers(): void {
         if (!filter) return;
 
         // Update active state on buttons
-        filterContainer.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+        filterContainer.querySelectorAll(".filter-btn").forEach(b => {
+          b.classList.remove("active");
+          b.setAttribute("aria-selected", "false");
+        });
         btn.classList.add("active");
+        btn.setAttribute("aria-selected", "true");
 
         // Apply filter and re-render
         applyFilter(filter);
@@ -725,7 +732,9 @@ export async function initRunHistory(): Promise<void> {
   if (filterContainer) {
     filterContainer.querySelectorAll(".filter-btn").forEach(btn => {
       const filter = (btn as HTMLElement).dataset.filter;
-      btn.classList.toggle("active", filter === defaultFilter);
+      const isActive = filter === defaultFilter;
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-selected", isActive ? "true" : "false");
     });
   }
 

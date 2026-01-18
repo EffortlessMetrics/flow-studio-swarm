@@ -293,5 +293,5 @@ export function renderArtifactProducerHint(stepId, flowKey) {
  * Render tab navigation.
  */
 export function renderTabs(tabs) {
-    return tabs.map(tab => `<span class="tab${tab.active ? " active" : ""}" data-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</span>`).join("");
+    return tabs.map(tab => `<button type="button" role="tab" aria-selected="${!!tab.active}" class="tab${tab.active ? " active" : ""}" data-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>`).join("");
 }
