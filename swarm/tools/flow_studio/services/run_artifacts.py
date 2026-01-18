@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from swarm.runtime.safe_paths import validate_path_component
+
 
 class RunArtifactsError(Exception):
     def __init__(self, status_code: int, payload: Dict[str, Any]):
@@ -28,6 +30,9 @@ def resolve_run_path(run_id: str, run_inspector: Optional[Any]) -> Path:
 
 
 def load_transcript(run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]) -> Dict[str, Any]:
+    validate_path_component(flow_key)
+    validate_path_component(step_id)
+
     run_path = resolve_run_path(run_id, run_inspector)
 
     llm_dir = run_path / flow_key / "llm"
@@ -83,6 +88,9 @@ def load_transcript(run_id: str, flow_key: str, step_id: str, run_inspector: Opt
 
 
 def load_receipt(run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]) -> Dict[str, Any]:
+    validate_path_component(flow_key)
+    validate_path_component(step_id)
+
     run_path = resolve_run_path(run_id, run_inspector)
 
     receipts_dir = run_path / flow_key / "receipts"

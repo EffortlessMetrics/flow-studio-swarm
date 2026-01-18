@@ -26,6 +26,8 @@ import re
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from .safe_paths import validate_path_component
+
 # Directory names
 LLM_DIR = "llm"
 RECEIPTS_DIR = "receipts"
@@ -67,6 +69,9 @@ def transcript_path(
         >>> transcript_path(Path("/runs/abc/build"), "1", "code-implementer", "claude")
         PosixPath('/runs/abc/build/llm/1-code-implementer-claude.jsonl')
     """
+    validate_path_component(step_id)
+    validate_path_component(agent_key)
+    validate_path_component(engine)
     filename = f"{step_id}-{agent_key}-{engine}{TRANSCRIPT_EXT}"
     return run_base / LLM_DIR / filename
 
@@ -90,6 +95,8 @@ def receipt_path(
         >>> receipt_path(Path("/runs/abc/build"), "1", "code-implementer")
         PosixPath('/runs/abc/build/receipts/1-code-implementer.json')
     """
+    validate_path_component(step_id)
+    validate_path_component(agent_key)
     filename = f"{step_id}-{agent_key}{RECEIPT_EXT}"
     return run_base / RECEIPTS_DIR / filename
 
@@ -173,6 +180,7 @@ def handoff_envelope_path(run_base: Path, step_id: str) -> Path:
         >>> handoff_envelope_path(Path("/runs/abc/build"), "1")
         PosixPath('/runs/abc/build/handoff/1.json')
     """
+    validate_path_component(step_id)
     filename = f"{step_id}.json"
     return run_base / HANDOFF_DIR / filename
 
@@ -218,6 +226,7 @@ def file_changes_path(run_base: Path, step_id: str) -> Path:
         >>> file_changes_path(Path("/runs/abc/build"), "1")
         PosixPath('/runs/abc/build/forensics/file_changes_1.json')
     """
+    validate_path_component(step_id)
     filename = f"file_changes_{step_id}.json"
     return run_base / FORENSICS_DIR / filename
 
