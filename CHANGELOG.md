@@ -12,28 +12,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### V3.0 Core Architecture
-- **Stepwise Orchestrator**: High-trust, intelligence-driven orchestration with per-step transactions.
-- **Pack System**: Portable flow and station bundles (`swarm/packs/`) for modular swarm composition.
-- **MacroNavigator**: Between-flow routing with constraint DSL and flow stack support.
-- **Open World Routing**: Support for flow injection (e.g., auto-rebase during Build) and ad-hoc station generation.
 - **Flow 8 (Reset/Rebase)**: New automated flow for reconciling stale branches with upstream/main.
 - **Cognitive Hierarchy**: Evolution from simple agents to Worker → Finalizer → Navigator → Curator roles.
+- **Pack System**: Portable flow and station bundles (`swarm/packs/`) for modular swarm composition.
 
 #### Infrastructure & Persistence
 - **Resilient Database**: Journal-first DuckDB with auto-rebuild from append-only `events.jsonl` ledger.
 - **Boundary Review API**: Aggregated endpoint for reviewing assumptions, decisions, and detours.
 - **Inventory Counts**: Real-time fact marker extraction and visualization in Flow Studio.
-- **Claude Agent SDK Modernization**: Full integration with the latest Anthropic Agent SDK and tool-use patterns.
 
 #### Safety & Governance
 - **Orderly Shutdown**: Support for graceful interruption and `handoff_partial.json` persistence.
 - **Memory Pushdown**: Protocol modernization and documentation refactor for reduced context bloat.
-- **Spec-First Integration**: Modular validation for flow and station contracts.
 
 ### Changed
 - **FastAPI Upgrade**: Backend fully modernized with FastAPI and SSE-driven state management.
 - **Validation Framework**: Upgraded validator supporting FR-001 through FR-005 with V3 extensions.
-- **Handoff Protocol**: Standardized handoff envelopes with forensic evidence and explicit unknowns.
+
+---
+
+## [2.4.0] - 2025-12-31
+
+### Added
+
+#### Stepwise Orchestrator (Foundation)
+- **High-Trust Orchestrator**: Deterministic, per-step execution engine with forensic transcripts.
+- **Spec System**: Type-safe validation for flow and station contracts.
+- **Microloop Routing**: Support for 'Verified/Unverified' loop patterns within flows.
+
+#### Routing & Navigation
+- **Navigator**: Intelligent within-flow routing and sidequest management.
+- **Open World Routing**: Support for flow injection (e.g., auto-rebase during Build) and ad-hoc station generation.
+- **Sidequest Catalog**: Support for dynamic sub-routines (e.g. `ask_human`, `research`).
+- **Unified Handoffs**: Standardized envelope format for inter-step state persistence.
+
+#### Developer Experience
+- **Claude Agent SDK Modernization**: Full integration with the latest Anthropic Agent SDK.
+- **Run Playback**: Real-time execution visualization via SSE in Flow Studio.
+- **Documentation**: Extensive updates to `STEPWISE_BACKENDS.md` and architecture guides.
 
 ---
 
@@ -298,7 +314,8 @@ These tags track Flow Studio-specific releases on a separate versioning track:
 ---
 
 [Unreleased]: https://github.com/EffortlessMetrics/flow-studio/compare/v3.0.0-rc.1...HEAD
-[3.0.0-rc.1]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.2...v3.0.0-rc.1
+[3.0.0-rc.1]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.4.0...v3.0.0-rc.1
+[2.4.0]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.2...v2.4.0
 [2.3.2]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.2.0...v2.3.0
