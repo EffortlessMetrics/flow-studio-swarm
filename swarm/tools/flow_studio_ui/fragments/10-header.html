@@ -20,15 +20,15 @@
         <button id="mode-author" class="active" title="Show all paths, CLI commands, and technical details" aria-pressed="true" data-uiid="flow_studio.header.mode.author">Author</button>
         <button id="mode-operator" title="Simplified view focused on run status and decisions" aria-pressed="false" data-uiid="flow_studio.header.mode.operator">Operator</button>
       </div>
-      <div id="profile-badge" class="muted fs-profile-badge" style="display: flex; align-items: center; gap: 6px; cursor: pointer;" title="Current swarm profile" role="status" aria-live="polite" data-uiid="flow_studio.header.profile">
+      <div id="profile-badge" class="muted fs-profile-badge" style="display: flex; align-items: center; gap: 6px;" title="Current swarm profile" role="status" aria-live="polite" data-uiid="flow_studio.header.profile">
         <span id="profile-icon" aria-hidden="true">&#128230;</span>
         <span id="profile-text">Profile: Loading...</span>
       </div>
-      <div id="governance-badge" class="muted" style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: #f3f4f6; border-radius: 4px; cursor: pointer;" title="Click to view governance status" role="status" aria-live="polite" data-uiid="flow_studio.header.governance">
+      <button id="governance-badge" type="button" class="muted" style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: #f3f4f6; border-radius: 4px; cursor: pointer; border: none; font-family: inherit; font-size: inherit;" title="Click to view governance status" aria-live="polite" data-uiid="flow_studio.header.governance">
         <span id="governance-icon" aria-hidden="true">⏳</span>
         <span id="governance-text">Checking...</span>
         <span id="governance-issues-count" class="governance-issues-badge" style="display: none;">0</span>
-      </div>
+      </button>
       <label id="governance-toggle" class="governance-toggle author-only" title="Highlight governance issues on graph nodes" data-uiid="flow_studio.header.governance.overlay">
         <input type="checkbox" id="governance-overlay-checkbox" />
         <span>Show Issues</span>
