@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+
+from swarm.runtime.safe_paths import validate_path_component
 
 from ..deps import get_state
 from ..services.run_artifacts import (
@@ -93,6 +94,11 @@ async def api_runs(
 
 @router.get("/api/runs/{run_id}/summary", response_model=schema.RunSummary if schema else None)
 async def api_run_summary(run_id: str, state: FlowStudioState = Depends(get_state)):
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
     if not state.core:
         return JSONResponse({"error": "Run inspector not available"}, status_code=503)
 
@@ -156,6 +162,11 @@ async def api_start_run(
 
 @router.get("/api/runs/{run_id}/events", response_model=schema.RunEventsResponse if schema else None)
 async def api_run_events(run_id: str, state: FlowStudioState = Depends(get_state)):
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
     if state.run_service is None:
         return JSONResponse({"error": "RunService not available"}, status_code=503)
 
@@ -193,6 +204,11 @@ async def api_step_receipt(
 
 @router.post("/api/runs/{run_id}/cancel")
 async def api_cancel_run(run_id: str, state: FlowStudioState = Depends(get_state)):
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
     if state.run_service is None:
         return JSONResponse({"error": "RunService not available"}, status_code=503)
 
@@ -214,6 +230,11 @@ async def api_set_exemplar(
     is_exemplar: bool = Query(True),
     state: FlowStudioState = Depends(get_state),
 ):
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
     if state.run_service is None:
         return JSONResponse({"error": "RunService not available"}, status_code=503)
 
@@ -247,6 +268,11 @@ async def api_list_exemplars(state: FlowStudioState = Depends(get_state)):
 @router.get("/api/runs/{run_id}/wisdom/summary")
 async def api_run_wisdom_summary(run_id: str, state: FlowStudioState = Depends(get_state)):
     try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+    try:
         return load_wisdom_summary(run_id, state.run_inspector)
     except RunArtifactsError as exc:
         return JSONResponse(exc.payload, status_code=exc.status_code)
@@ -254,6 +280,11 @@ async def api_run_wisdom_summary(run_id: str, state: FlowStudioState = Depends(g
 
 @router.get("/api/runs/{run_id}/sdlc", response_model=schema.SDLCBarResponse if schema else None)
 async def api_run_sdlc(run_id: str, state: FlowStudioState = Depends(get_state)):
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
     if state.run_inspector is None:
         return JSONResponse({"error": "Run inspector not available"}, status_code=503)
 
@@ -263,6 +294,12 @@ async def api_run_sdlc(run_id: str, state: FlowStudioState = Depends(get_state))
 
 @router.get("/api/runs/{run_id}/flows/{flow_key}", response_model=schema.FlowStatusInfo if schema else None)
 async def api_run_flow(run_id: str, flow_key: str, state: FlowStudioState = Depends(get_state)):
+    try:
+        validate_path_component(run_id, "run_id")
+        validate_path_component(flow_key, "flow_key")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
     if state.run_inspector is None:
         return JSONResponse({"error": "Run inspector not available"}, status_code=503)
 
@@ -280,6 +317,13 @@ async def api_run_step(
     step_id: str,
     state: FlowStudioState = Depends(get_state),
 ):
+    try:
+        validate_path_component(run_id, "run_id")
+        validate_path_component(flow_key, "flow_key")
+        validate_path_component(step_id, "step_id")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
     if state.run_inspector is None:
         return JSONResponse({"error": "Run inspector not available"}, status_code=503)
 
@@ -300,6 +344,11 @@ async def api_run_step(
 
 @router.get("/api/runs/{run_id}/timeline", response_model=schema.TimelineResponse if schema else None)
 async def api_run_timeline(run_id: str, state: FlowStudioState = Depends(get_state)):
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
     if state.run_inspector is None:
         return JSONResponse({"error": "RunInspector not available"}, status_code=503)
 
@@ -309,6 +358,11 @@ async def api_run_timeline(run_id: str, state: FlowStudioState = Depends(get_sta
 
 @router.get("/api/runs/{run_id}/timing", response_model=schema.RunTimingResponse if schema else None)
 async def api_run_timing(run_id: str, state: FlowStudioState = Depends(get_state)):
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
     if state.run_inspector is None:
         return JSONResponse({"error": "RunInspector not available"}, status_code=503)
 
@@ -324,6 +378,12 @@ async def api_run_timing(run_id: str, state: FlowStudioState = Depends(get_state
     response_model=schema.FlowTimingResponse if schema else None,
 )
 async def api_flow_timing(run_id: str, flow_key: str, state: FlowStudioState = Depends(get_state)):
+    try:
+        validate_path_component(run_id, "run_id")
+        validate_path_component(flow_key, "flow_key")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
     if state.run_inspector is None:
         return JSONResponse({"error": "RunInspector not available"}, status_code=503)
 
