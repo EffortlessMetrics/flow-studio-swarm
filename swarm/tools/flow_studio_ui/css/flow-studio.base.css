@@ -129,6 +129,26 @@
       background: var(--fs-color-bg-hover, #e5e7eb);
     }
 
+    .fs-icon-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      color: #374151;
+      font-size: 14px;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .fs-icon-button:hover {
+      background: #d1d5db; /* Darker gray for hover */
+      color: #111827;
+    }
+
     .fs-button-primary {
       padding: 8px 16px;
       background: var(--fs-color-accent, #3b82f6);
