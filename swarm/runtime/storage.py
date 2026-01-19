@@ -39,6 +39,7 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .safe_paths import validate_path_component
 from .types import (
     HandoffEnvelope,
     RunEvent,
@@ -259,6 +260,7 @@ def get_run_path(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Path:
         >>> get_run_path("run-20251208-143022-abc123")
         PosixPath('/path/to/swarm/runs/run-20251208-143022-abc123')
     """
+    validate_path_component(run_id, "run_id")
     return runs_dir / run_id
 
 
@@ -533,6 +535,7 @@ def finalize_run_success(
         >>> print(summary.status)  # "succeeded"
     """
     from datetime import datetime, timezone
+
     from .types import RunStatus, SDLCStatus
 
     now = datetime.now(timezone.utc)
@@ -1095,6 +1098,8 @@ def write_envelope(
     Returns:
         Path to the written envelope JSON file.
     """
+    validate_path_component(flow_key, "flow_key")
+    validate_path_component(step_id, "step_id")
     run_path = get_run_path(run_id, runs_dir)
     flow_path = run_path / flow_key
     handoff_dir = flow_path / "handoff"
@@ -1126,6 +1131,8 @@ def read_envelope(
     Returns:
         The HandoffEnvelope if it exists and is valid, None otherwise.
     """
+    validate_path_component(flow_key, "flow_key")
+    validate_path_component(step_id, "step_id")
     run_path = get_run_path(run_id, runs_dir)
     flow_path = run_path / flow_key
     envelope_path = flow_path / "handoff" / f"{step_id}.json"
@@ -1163,6 +1170,7 @@ def list_envelopes(
         Dictionary mapping step_id to HandoffEnvelope for all envelopes found.
         Returns empty dict if no envelopes exist.
     """
+    validate_path_component(flow_key, "flow_key")
     run_path = get_run_path(run_id, runs_dir)
     flow_path = run_path / flow_key
     handoff_dir = flow_path / "handoff"

@@ -28,6 +28,12 @@ def resolve_run_path(run_id: str, run_inspector: Optional[Any]) -> Path:
 
 
 def load_transcript(run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]) -> Dict[str, Any]:
+    from swarm.runtime.safe_paths import validate_path_component
+
+    # Explicit validation of path components before file system access
+    validate_path_component(flow_key, "flow_key")
+    validate_path_component(step_id, "step_id")
+
     run_path = resolve_run_path(run_id, run_inspector)
 
     llm_dir = run_path / flow_key / "llm"
@@ -83,6 +89,11 @@ def load_transcript(run_id: str, flow_key: str, step_id: str, run_inspector: Opt
 
 
 def load_receipt(run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]) -> Dict[str, Any]:
+    from swarm.runtime.safe_paths import validate_path_component
+
+    validate_path_component(flow_key, "flow_key")
+    validate_path_component(step_id, "step_id")
+
     run_path = resolve_run_path(run_id, run_inspector)
 
     receipts_dir = run_path / flow_key / "receipts"
