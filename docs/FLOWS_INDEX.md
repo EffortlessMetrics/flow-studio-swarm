@@ -8,7 +8,7 @@ This document provides a comprehensive cross-reference of flows and agents in th
 
 **Metadata:**
 - Total Flows: 6
-- Total Agents: 43
+- Total Agents: 73
 - Generated from: `swarm/config/flows/*.yaml` and `swarm/config/agents/*.yaml`
 
 ---
@@ -62,7 +62,25 @@ This document provides a comprehensive cross-reference of flows and agents in th
 
 **Cross-cutting agents**: clarifier, repo-operator, gh-reporter
 
-### 4. Flow 4 - Code → Artifact (Gate)
+### 4. Flow 4 - Draft → Ready (Review)
+
+| Step # | Step ID | Agents |
+|--------|---------|--------|
+| 1 | `run_prep` | run-prep |
+| 2 | `branch` | repo-operator |
+| 3 | `pr_create` | pr-creator |
+| 4 | `harvest` | pr-feedback-harvester |
+| 5 | `cluster` | review-worklist-writer |
+| 6 | `worklist_loop` | review-worklist-writer, test-author, code-implementer, fixer, doc-writer, design-optioneer, test-executor |
+| 7 | `close_pr` | pr-commenter, pr-status-manager |
+| 8 | `cleanup` | review-cleanup, build-cleanup |
+| 9 | `sanitize` | secrets-sanitizer |
+| 10 | `commit` | repo-operator |
+| 11 | `gh_update` | gh-issue-manager, gh-reporter |
+
+**Cross-cutting agents**: policy-analyst, risk-analyst, clarifier
+
+### 5. Flow 5 - Code → Artifact (Gate)
 
 | Step # | Step ID | Agents |
 |--------|---------|--------|
@@ -70,12 +88,13 @@ This document provides a comprehensive cross-reference of flows and agents in th
 | 2 | `contract` | contract-enforcer |
 | 3 | `security` | security-scanner |
 | 4 | `coverage` | coverage-enforcer |
-| 5 | `gate_fix` | gate-fixer |
-| 6 | `merge_decision` | merge-decider |
+| 5 | `policy_check` | policy-analyst |
+| 6 | `gate_fix` | gate-fixer |
+| 7 | `merge_decision` | merge-decider |
 
 **Cross-cutting agents**: policy-analyst, risk-analyst, gh-reporter
 
-### 5. Flow 5 - Artifact → Prod (Deploy)
+### 6. Flow 6 - Artifact → Prod (Deploy)
 
 | Step # | Step ID | Agents |
 |--------|---------|--------|
@@ -87,7 +106,7 @@ This document provides a comprehensive cross-reference of flows and agents in th
 
 **Cross-cutting agents**: repo-operator, gh-reporter
 
-### 6. Flow 6 - Prod → Wisdom (Analysis)
+### 7. Flow 7 - Prod → Wisdom (Analysis)
 
 | Step # | Step ID | Agents |
 |--------|---------|--------|
@@ -99,65 +118,127 @@ This document provides a comprehensive cross-reference of flows and agents in th
 | 6 | `wisdom_report` | gh-reporter |
 
 **Cross-cutting agents**: risk-analyst, gh-reporter
+
+### 8. Flow 8 - Reset (Utility)
+
+| Step # | Step ID | Agents |
+|--------|---------|--------|
+| 1 | `diagnose` | reset-diagnose |
+| 2 | `stash_wip` | reset-stash-wip |
+| 3 | `sync_upstream` | reset-sync-upstream |
+| 4 | `resolve_conflicts` | reset-resolve-conflicts |
+| 5 | `restore_wip` | reset-restore-wip |
+| 6 | `prune_branches` | reset-prune-branches |
+| 7 | `archive_run` | reset-archive-run |
+| 8 | `verify_clean` | reset-verify-clean |
+
+**Cross-cutting agents**: clarifier, repo-operator
+
+### 9. Flow 7 - Stepwise Demo (Testing)
+
+| Step # | Step ID | Agents |
+|--------|---------|--------|
+| 1 | `gather_context` | signal-normalizer |
+| 2 | `analyze` | problem-framer |
+| 3 | `draft_requirements` | requirements-author |
+| 4 | `review_requirements` | requirements-critic |
+| 5 | `propose_options` | design-optioneer |
+| 6 | `document_decision` | adr-author |
+| 7 | `plan_tests` | test-strategist |
+| 8 | `implement` | code-implementer |
+| 9 | `review_code` | code-critic |
+| 10 | `final_review` | self-reviewer |
+
+**Cross-cutting agents**: clarifier, gh-reporter
 ## By Agent
 
 | Agent | Category | Flows | Short Role |
 |-------|----------|-------|------------|
-| `clarifier` | shaping | Flow 3, Flow 2, Flow 1 | Detect ambiguities, draft clarification questions. |
-| `problem-framer` | shaping | Flow 1 | Synthesize normalized signal → problem_statement.md. |
+| `clarifier` | shaping | Flow 3, Flow 2, Flow 8, Flow 4, Flow 1, Flow 9 | Detect ambiguities, draft clarification questions. |
+| `problem-framer` | shaping | Flow 1, Flow 9 | Synthesize normalized signal → problem_statement.md. |
+| `review-worklist-writer` | shaping | Flow 4 | Cluster PR feedback into actionable Work Items with stabl... |
 | `scope-assessor` | shaping | Flow 1 | Stakeholders, risks, T-shirt size → stakeholders.md, earl... |
-| `signal-normalizer` | shaping | Flow 1 | Parse raw input, find related context → issue_normalized.... |
+| `signal-normalizer` | shaping | Flow 1, Flow 9 | Parse raw input, find related context → issue_normalized.... |
 | `bdd-author` | spec | Flow 1 | Turn requirements into BDD scenarios → features/*.feature. |
 | `interface-designer` | spec | Flow 2 | API contracts, data models, migrations → api_contracts.ya... |
 | `observability-designer` | spec | Flow 2 | Metrics, logs, traces, SLOs, alerts → observability_spec.md. |
-| `requirements-author` | spec | Flow 1 | Write functional + non-functional requirements → requirem... |
-| `test-strategist` | spec | Flow 2 | Map BDD scenarios to test types → test_plan.md. |
-| `adr-author` | design | Flow 2 | Write ADR for chosen design → adr.md. |
-| `design-optioneer` | design | Flow 2 | Propose 2-3 architecture options with trade-offs → design... |
+| `requirements-author` | spec | Flow 1, Flow 9 | Write functional + non-functional requirements → requirem... |
+| `test-strategist` | spec | Flow 2, Flow 9 | Map BDD scenarios to test types → test_plan.md. |
+| `adr-author` | design | Flow 2, Flow 9 | Write ADR for chosen design → adr.md. |
+| `design-optioneer` | design | Flow 2, Flow 4, Flow 9 | Propose 2-3 architecture options with trade-offs → design... |
 | `work-planner` | design | Flow 2 | Break design into subtasks, define rollout strategy → wor... |
-| `code-implementer` | implementation | Flow 3 | Write code to pass tests, following ADR → src/*, impl_cha... |
+| `code-implementer` | implementation | Flow 3, Flow 4, Flow 9 | Write code to pass tests, following ADR → src/*, impl_cha... |
 | `context-loader` | implementation | Flow 3 | Load relevant code/tests/specs for subtask → subtask_cont... |
-| `doc-writer` | implementation | Flow 3 | Update inline docs, READMEs, API docs → doc_updates.md. |
-| `fixer` | implementation | Flow 3 | Apply targeted fixes from critics/mutation → fix_summary.md. |
-| `gate-fixer` | implementation | Flow 4 | Mechanical fixes only (lint/format/docs) → gate_fix_summa... |
-| `repo-operator` | implementation | Flow 3, Flow 5 | Git workflows: branch, commit, merge, tag. Safe Bash only. |
-| `test-author` | implementation | Flow 3 | Write/update tests → tests/*, test_changes_summary.md. |
-| `code-critic` | critic | Flow 3 | Harsh review vs ADR/contracts → code_critique.md. |
+| `doc-writer` | implementation | Flow 3, Flow 4 | Update inline docs, READMEs, API docs → doc_updates.md. |
+| `fixer` | implementation | Flow 3, Flow 4 | Apply targeted fixes from critics/mutation → fix_summary.md. |
+| `gate-fixer` | implementation | Flow 5 | Mechanical fixes only (lint/format/docs) → gate_fix_summa... |
+| `pr-creator` | implementation | Flow 4 | Create Draft PR if missing. Idempotent: skips if PR alrea... |
+| `pr-status-manager` | implementation | Flow 4 | Flip Draft PR to Ready when review complete. Keeps Draft ... |
+| `repo-operator` | implementation | Flow 3, Flow 6, Flow 8, Flow 4 | Git workflows: branch, commit, merge, tag, reset operatio... |
+| `reset-prune-branches` | implementation | Flow 8 | Clean up old shadow branches and stale remote tracking refs. |
+| `reset-resolve-conflicts` | implementation | Flow 8 | Resolve merge/rebase conflicts. Apply safe resolution str... |
+| `reset-restore-wip` | implementation | Flow 8 | Restore stashed work-in-progress after successful reset. |
+| `reset-stash-wip` | implementation | Flow 8 | Stash work-in-progress changes safely before reset operat... |
+| `reset-sync-upstream` | implementation | Flow 8 | Fetch upstream changes without merging. Update remote tra... |
+| `run-prep` | implementation | Flow 4 | Establish run directory and flow infrastructure. Creates ... |
+| `test-author` | implementation | Flow 3, Flow 4 | Write/update tests → tests/*, test_changes_summary.md. |
+| `ux-implementer` | implementation |  | Apply UX critique fixes to Flow Studio code and run tests. |
+| `code-critic` | critic | Flow 3, Flow 9 | Harsh review vs ADR/contracts → code_critique.md. |
 | `design-critic` | critic | Flow 2 | Validate design vs constraints → design_validation.md. Ne... |
-| `requirements-critic` | critic | Flow 1 | Verify requirements are testable, consistent → requiremen... |
+| `requirements-critic` | critic | Flow 1, Flow 9 | Verify requirements are testable, consistent → requiremen... |
 | `test-critic` | critic | Flow 3 | Harsh review vs BDD/spec → test_critique.md. |
-| `artifact-auditor` | verification | Flow 6 | Verify all expected artifacts from Flows 1-5 exist |
-| `contract-enforcer` | verification | Flow 4 | Check API changes versus contracts |
-| `coverage-enforcer` | verification | Flow 4 | Verify test coverage meets thresholds |
-| `deploy-decider` | verification | Flow 5 | Verify operationalization FRs (FR-OP-001..005) and issue ... |
-| `deploy-monitor` | verification | Flow 5 | Watch CI and deployment events |
-| `merge-decider` | verification | Flow 4 | Synthesize all checks into merge decision |
+| `ux-critic` | critic |  | Inspect Flow Studio screens and produce structured JSON c... |
+| `artifact-auditor` | verification | Flow 7 | Verify all expected artifacts from Flows 1-5 exist |
+| `build-cleanup` | verification | Flow 4 | Reseal build receipt if code changed during review. Updat... |
+| `contract-enforcer` | verification | Flow 5 | Check API changes versus contracts |
+| `coverage-enforcer` | verification | Flow 5 | Verify test coverage meets thresholds |
+| `deploy-decider` | verification | Flow 6 | Verify operationalization FRs (FR-OP-001..005) and issue ... |
+| `deploy-monitor` | verification | Flow 6 | Watch CI and deployment events |
+| `merge-decider` | verification | Flow 5 | Synthesize all checks into merge decision |
 | `mutator` | verification | Flow 3 | Run mutation tests → mutation_report.md. |
-| `receipt-checker` | verification | Flow 4 | Verify build receipt exists and is complete |
-| `security-scanner` | verification | Flow 4 | Run SAST and secret scans |
-| `self-reviewer` | verification | Flow 3 | Final review → self_review.md, build_receipt.json. |
-| `smoke-verifier` | verification | Flow 5 | Run health checks and verify artifacts |
-| `feedback-applier` | analytics | Flow 6 | Create issues, suggest doc updates → feedback_actions.md. |
-| `flow-historian` | analytics | Flow 6 | Compile timeline → flow_history.json. |
+| `receipt-checker` | verification | Flow 5 | Verify build receipt exists and is complete |
+| `reset-archive-run` | verification | Flow 8 | Archive current run state before reset. Preserve audit tr... |
+| `reset-verify-clean` | verification | Flow 8 | Verify clean state after reset. Validate repo integrity. |
+| `review-cleanup` | verification | Flow 4 | Write review_receipt.json and finalize review artifacts. ... |
+| `secrets-sanitizer` | verification | Flow 4 | Scan staged surface for secrets. Emit Gate Result (safe_t... |
+| `security-scanner` | verification | Flow 5 | Run SAST and secret scans |
+| `self-reviewer` | verification | Flow 3, Flow 9 | Final review → self_review.md, build_receipt.json. |
+| `smoke-verifier` | verification | Flow 6 | Run health checks and verify artifacts |
+| `test-executor` | verification | Flow 4 | Execute test suites to verify fixes. Uses test-runner skill. |
+| `traceability-auditor` | verification |  | Run-level coherence and spec traceability → traceability_... |
+| `wisdom-cleanup` | verification |  | Finalize wisdom_receipt.json, update run index. |
+| `feedback-applier` | analytics | Flow 7 | Create issues, suggest doc updates → feedback_actions.md. |
+| `flow-historian` | analytics | Flow 7 | Compile timeline → flow_history.json. |
+| `forensic-analyst` | analytics |  | Translate raw diffs and logs into semantic summaries for ... |
 | `impact-analyzer` | analytics | Flow 2 | Analyze cross-cutting impact of changes and produce impac... |
-| `learning-synthesizer` | analytics | Flow 6 | Extract lessons from receipts, critiques → learnings.md. |
-| `policy-analyst` | analytics | Flow 4, Flow 2 | Interpret policy docs vs change, assess policy implications. |
-| `regression-analyst` | analytics | Flow 6 | Tests, coverage, issues, blame → regression_report.md. |
-| `risk-analyst` | analytics | Flow 4, Flow 2, Flow 1, Flow 6 | Identify risk patterns (security, compliance, data, perfo... |
-| `gh-reporter` | reporter | Flow 3, Flow 5, Flow 4, Flow 2, Flow 1, Flow 6 | Post summaries to GitHub issues/PRs at flow boundaries. |
+| `learning-synthesizer` | analytics | Flow 7 | Extract lessons from receipts, critiques → learnings.md. |
+| `maintainability-analyst` | analytics |  | Naming, modularity, DRY, coupling → maintainability_analy... |
+| `pattern-analyst` | analytics |  | Cross-run patterns and trends → pattern_report.md. |
+| `policy-analyst` | analytics | Flow 5, Flow 2, Flow 4 | Interpret policy docs vs change, assess policy implications. |
+| `pr-feedback-harvester` | analytics | Flow 4 | Pull all bot/human feedback from PR. Non-blocking: return... |
+| `process-analyst` | analytics |  | Flow efficiency, iterations, bounces → process_analysis.m... |
+| `quality-analyst` | analytics |  | Code health and complexity → quality_report.md. |
+| `regression-analyst` | analytics | Flow 7 | Tests, coverage, issues, blame → regression_report.md. |
+| `reset-diagnose` | analytics | Flow 8 | Analyze upstream divergence, identify conflicts, assess s... |
+| `risk-analyst` | analytics | Flow 5, Flow 2, Flow 4, Flow 1, Flow 7 | Identify risk patterns (security, compliance, data, perfo... |
+| `signal-quality-analyst` | analytics |  | Feedback accuracy analysis → signal_quality_report.md. |
+| `solution-analyst` | analytics |  | Requirement/implementation alignment → solution_analysis.md. |
+| `gh-issue-manager` | reporter | Flow 4 | Update GitHub issue board. Link PRs to issues, update lab... |
+| `gh-reporter` | reporter | Flow 3, Flow 6, Flow 5, Flow 2, Flow 4, Flow 1, Flow 9, Flow 7 | Post summaries to GitHub issues/PRs at flow boundaries. |
+| `pr-commenter` | reporter | Flow 4 | Post idempotent summary comments to PR. Updates existing ... |
 | `swarm-ops` | infra |  | Guide for agent operations (model changes, adding agents,... |
 ## Quick Reference
 
 ### Agents by Category
 
-- **Shaping** (4): clarifier, problem-framer, scope-assessor, signal-normalizer
+- **Shaping** (5): clarifier, problem-framer, review-worklist-writer, scope-assessor, signal-normalizer
 - **Spec** (5): bdd-author, interface-designer, observability-designer, requirements-author, test-strategist
 - **Design** (3): adr-author, design-optioneer, work-planner
-- **Implementation** (7): code-implementer, context-loader, doc-writer, fixer, gate-fixer, repo-operator, test-author
-- **Critic** (4): code-critic, design-critic, requirements-critic, test-critic
-- **Verification** (11): artifact-auditor, contract-enforcer, coverage-enforcer, deploy-decider, deploy-monitor, merge-decider, mutator, receipt-checker, security-scanner, self-reviewer, smoke-verifier
-- **Analytics** (7): feedback-applier, flow-historian, impact-analyzer, learning-synthesizer, policy-analyst, regression-analyst, risk-analyst
-- **Reporter** (1): gh-reporter
+- **Implementation** (16): code-implementer, context-loader, doc-writer, fixer, gate-fixer, pr-creator, pr-status-manager, repo-operator, reset-prune-branches, reset-resolve-conflicts, reset-restore-wip, reset-stash-wip, reset-sync-upstream, run-prep, test-author, ux-implementer
+- **Critic** (5): code-critic, design-critic, requirements-critic, test-critic, ux-critic
+- **Verification** (19): artifact-auditor, build-cleanup, contract-enforcer, coverage-enforcer, deploy-decider, deploy-monitor, merge-decider, mutator, receipt-checker, reset-archive-run, reset-verify-clean, review-cleanup, secrets-sanitizer, security-scanner, self-reviewer, smoke-verifier, test-executor, traceability-auditor, wisdom-cleanup
+- **Analytics** (16): feedback-applier, flow-historian, forensic-analyst, impact-analyzer, learning-synthesizer, maintainability-analyst, pattern-analyst, policy-analyst, pr-feedback-harvester, process-analyst, quality-analyst, regression-analyst, reset-diagnose, risk-analyst, signal-quality-analyst, solution-analyst
+- **Reporter** (3): gh-issue-manager, gh-reporter, pr-commenter
 - **Infra** (1): swarm-ops
 
 ### Agents per Flow
@@ -165,17 +246,33 @@ This document provides a comprehensive cross-reference of flows and agents in th
 - **Flow 1: Signal → Spec** — 9 agents: `bdd-author`, `clarifier`, `gh-reporter`, `problem-framer`, `requirements-author`, `requirements-critic`, `risk-analyst`, `scope-assessor`, `signal-normalizer`
 - **Flow 2: Spec → Design** — 12 agents: `adr-author`, `clarifier`, `design-critic`, `design-optioneer`, `gh-reporter`, `impact-analyzer`, `interface-designer`, `observability-designer`, `policy-analyst`, `risk-analyst`, `test-strategist`, `work-planner`
 - **Flow 3: Plan → Code** — 12 agents: `clarifier`, `code-critic`, `code-implementer`, `context-loader`, `doc-writer`, `fixer`, `gh-reporter`, `mutator`, `repo-operator`, `self-reviewer`, `test-author`, `test-critic`
-- **Flow 4: Code → Artifact** — 9 agents: `contract-enforcer`, `coverage-enforcer`, `gate-fixer`, `gh-reporter`, `merge-decider`, `policy-analyst`, `receipt-checker`, `risk-analyst`, `security-scanner`
-- **Flow 5: Artifact → Prod** — 5 agents: `deploy-decider`, `deploy-monitor`, `gh-reporter`, `repo-operator`, `smoke-verifier`
-- **Flow 6: Prod → Wisdom** — 7 agents: `artifact-auditor`, `feedback-applier`, `flow-historian`, `gh-reporter`, `learning-synthesizer`, `regression-analyst`, `risk-analyst`
+- **Flow 4: Draft → Ready** — 21 agents: `build-cleanup`, `clarifier`, `code-implementer`, `design-optioneer`, `doc-writer`, `fixer`, `gh-issue-manager`, `gh-reporter`, `policy-analyst`, `pr-commenter`, `pr-creator`, `pr-feedback-harvester`, `pr-status-manager`, `repo-operator`, `review-cleanup`, `review-worklist-writer`, `risk-analyst`, `run-prep`, `secrets-sanitizer`, `test-author`, `test-executor`
+- **Flow 5: Code → Artifact** — 9 agents: `contract-enforcer`, `coverage-enforcer`, `gate-fixer`, `gh-reporter`, `merge-decider`, `policy-analyst`, `receipt-checker`, `risk-analyst`, `security-scanner`
+- **Flow 6: Artifact → Prod** — 5 agents: `deploy-decider`, `deploy-monitor`, `gh-reporter`, `repo-operator`, `smoke-verifier`
+- **Flow 7: Prod → Wisdom** — 7 agents: `artifact-auditor`, `feedback-applier`, `flow-historian`, `gh-reporter`, `learning-synthesizer`, `regression-analyst`, `risk-analyst`
+- **Flow 8: Reset** — 10 agents: `clarifier`, `repo-operator`, `reset-archive-run`, `reset-diagnose`, `reset-prune-branches`, `reset-resolve-conflicts`, `reset-restore-wip`, `reset-stash-wip`, `reset-sync-upstream`, `reset-verify-clean`
+- **Flow 9: Stepwise Demo** — 12 agents: `adr-author`, `clarifier`, `code-critic`, `code-implementer`, `design-optioneer`, `gh-reporter`, `problem-framer`, `requirements-author`, `requirements-critic`, `self-reviewer`, `signal-normalizer`, `test-strategist`
 
 ### Agents in Multiple Flows
 
-- `clarifier`: Flow 3, Flow 2, Flow 1
-- `gh-reporter`: Flow 3, Flow 5, Flow 4, Flow 2, Flow 1, Flow 6
-- `policy-analyst`: Flow 4, Flow 2
-- `repo-operator`: Flow 3, Flow 5
-- `risk-analyst`: Flow 4, Flow 2, Flow 1, Flow 6
+- `adr-author`: Flow 2, Flow 9
+- `clarifier`: Flow 3, Flow 2, Flow 8, Flow 4, Flow 1, Flow 9
+- `code-critic`: Flow 3, Flow 9
+- `code-implementer`: Flow 3, Flow 4, Flow 9
+- `design-optioneer`: Flow 2, Flow 4, Flow 9
+- `doc-writer`: Flow 3, Flow 4
+- `fixer`: Flow 3, Flow 4
+- `gh-reporter`: Flow 3, Flow 6, Flow 5, Flow 2, Flow 4, Flow 1, Flow 9, Flow 7
+- `policy-analyst`: Flow 5, Flow 2, Flow 4
+- `problem-framer`: Flow 1, Flow 9
+- `repo-operator`: Flow 3, Flow 6, Flow 8, Flow 4
+- `requirements-author`: Flow 1, Flow 9
+- `requirements-critic`: Flow 1, Flow 9
+- `risk-analyst`: Flow 5, Flow 2, Flow 4, Flow 1, Flow 7
+- `self-reviewer`: Flow 3, Flow 9
+- `signal-normalizer`: Flow 1, Flow 9
+- `test-author`: Flow 3, Flow 4
+- `test-strategist`: Flow 2, Flow 9
 
 ---
 

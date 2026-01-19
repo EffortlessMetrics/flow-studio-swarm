@@ -28,11 +28,11 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 # Module logger for budget validation warnings
 logger = logging.getLogger(__name__)
@@ -131,7 +131,7 @@ def _load_config() -> Dict[str, Any]:
 
     if _CONFIG_PATH.exists():
         with open(_CONFIG_PATH) as f:
-            _cached_config = yaml.safe_load(f)
+            _cached_config = load_yaml(f)
     else:
         _cached_config = _default_config()
 
@@ -438,6 +438,9 @@ class ContextBudgetResolver:
     3. Profile-level override (from profile's runtime_settings.context_budgets)
     4. Global defaults (from runtime.yaml defaults section)
     """
+
+    if TYPE_CHECKING:
+        from swarm.config.flow_registry import ContextBudgetOverride
 
     def __init__(self, profile_id: Optional[str] = None):
         self._profile_id = profile_id

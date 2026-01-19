@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 _CONFIG_FILE = Path(__file__).parent / "flows.yaml"
 _FLOWS_DIR = Path(__file__).parent / "flows"
@@ -148,7 +148,7 @@ class FlowRegistry:
 
     def __init__(self, config_path: Path = _CONFIG_FILE, flows_dir: Path = _FLOWS_DIR):
         with open(config_path) as f:
-            data = yaml.safe_load(f)
+            data = load_yaml(f)
 
         self._flows: List[FlowDefinition] = []
         self._by_key: Dict[str, FlowDefinition] = {}
@@ -202,7 +202,7 @@ class FlowRegistry:
             return (), ()
 
         with open(flow_file) as f:
-            flow_data = yaml.safe_load(f)
+            flow_data = load_yaml(f)
 
         steps: List[StepDefinition] = []
         for idx, step_data in enumerate(flow_data.get("steps", []), start=1):

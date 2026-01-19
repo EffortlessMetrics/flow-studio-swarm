@@ -30,6 +30,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from swarm.utils.yaml_utils import load_yaml
 from swarm.config.flow_registry import get_flow_index  # noqa: E402
 
 # Project root (two levels up from this script)
@@ -48,7 +49,7 @@ def load_flow_configs() -> Dict[str, Any]:
 
     for yaml_file in sorted(CONFIG_FLOWS_DIR.glob("*.yaml")):
         with open(yaml_file, "r") as f:
-            flow = yaml.safe_load(f)
+            flow = load_yaml(f)
             if flow and "key" in flow:
                 flows[flow["key"]] = flow
 
@@ -64,7 +65,7 @@ def load_agent_configs() -> Dict[str, Any]:
 
     for yaml_file in sorted(CONFIG_AGENTS_DIR.glob("*.yaml")):
         with open(yaml_file, "r") as f:
-            agent = yaml.safe_load(f)
+            agent = load_yaml(f)
             if agent and "key" in agent:
                 agents[agent["key"]] = agent
 

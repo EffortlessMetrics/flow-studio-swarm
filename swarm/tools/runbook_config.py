@@ -25,7 +25,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 # Default configuration - used when config file is missing or incomplete
 DEFAULT_CONFIG: Dict[str, Any] = {
@@ -146,7 +146,7 @@ def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
     # Load from file if it exists
     if config_path.exists():
         with open(config_path) as f:
-            file_config = yaml.safe_load(f)
+            file_config = load_yaml(f)
             if file_config:
                 config = _deep_merge(config, file_config)
 

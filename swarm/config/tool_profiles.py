@@ -9,7 +9,7 @@ Provides:
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 # Cache for loaded profiles
 _profiles_cache: Optional[Dict] = None
@@ -32,7 +32,7 @@ def _load_profiles() -> Dict:
         return _profiles_cache
 
     with config_path.open(encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+        data = load_yaml(f)
 
     _profiles_cache = data
     _config_path = config_path
