@@ -4,13 +4,28 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+_artifact_catalog_cache: Optional[Dict[str, Any]] = None
+_artifact_catalog_mtime: float = 0
+
 
 def load_artifact_catalog(repo_root: Path) -> Dict[str, Any]:
+    global _artifact_catalog_cache, _artifact_catalog_mtime
     catalog_path = repo_root / "swarm" / "meta" / "artifact_catalog.json"
     if not catalog_path.exists():
         return {"flows": {}}
-    with catalog_path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+
+    try:
+        stat = catalog_path.stat()
+        if _artifact_catalog_cache is not None and stat.st_mtime == _artifact_catalog_mtime:
+            return _artifact_catalog_cache
+
+        with catalog_path.open("r", encoding="utf-8") as handle:
+            _artifact_catalog_cache = json.load(handle)
+            _artifact_catalog_mtime = stat.st_mtime
+            return _artifact_catalog_cache
+    except (OSError, json.JSONDecodeError):
+        # Fallback to empty if error
+        return {"flows": {}}
 
 
 def build_artifact_graph(
@@ -146,7 +161,12 @@ def build_artifact_graph(
     return {"nodes": nodes, "edges": edges}
 
 
-def search(flows_cache: Dict[str, Any], agents_cache: Dict[str, Any], query: str) -> Dict[str, Any]:
+def search(
+    flows_cache: Dict[str, Any],
+    agents_cache: Dict[str, Any],
+    query: str,
+    agent_flow_index: Optional[Dict[str, List[str]]] = None,
+) -> Dict[str, Any]:
     query = query.lower().strip()
     if not query:
         return {"results": [], "query": ""}
@@ -189,12 +209,17 @@ def search(flows_cache: Dict[str, Any], agents_cache: Dict[str, Any], query: str
             break
         short_role = agent.get("short_role", "")
         if query in agent_key.lower() or query in short_role.lower():
-            agent_flows = []
-            for flow_key, flow in flows_cache.items():
-                for step in flow.get("steps", []):
-                    if agent_key in step.get("agents", []):
-                        agent_flows.append(flow_key)
-                        break
+            if agent_flow_index and agent_key in agent_flow_index:
+                # O(1) lookup
+                agent_flows = agent_flow_index[agent_key]
+            else:
+                # O(N*M) fallback
+                agent_flows = []
+                for flow_key, flow in flows_cache.items():
+                    for step in flow.get("steps", []):
+                        if agent_key in step.get("agents", []):
+                            agent_flows.append(flow_key)
+                            break
             results.append(
                 {
                     "type": "agent",
