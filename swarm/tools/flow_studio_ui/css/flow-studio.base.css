@@ -418,6 +418,44 @@
     .mode-toggle button:hover {
       background: #e5e7eb;
     }
+
+    /* Icon Button Utility */
+    .fs-icon-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--fs-color-bg-subtle, #f3f4f6);
+      color: var(--fs-color-text, #374151);
+      font-size: 14px;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .fs-icon-button:hover {
+      background: var(--fs-color-bg-hover, #e5e7eb);
+    }
+
+    /* Status Button Utility */
+    .fs-status-button {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: #f3f4f6;
+      border: 1px solid transparent; /* Ensure border exists for high contrast mode */
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+    }
+    .fs-status-button:hover {
+      background: #e5e7eb;
+    }
     .mode-toggle button.active {
       background: #3b82f6;
       color: white;
