@@ -99,6 +99,8 @@ async def api_run_summary(run_id: str, state: FlowStudioState = Depends(get_stat
     try:
         summary = state.core.get_run_summary(run_id)
         return summary.to_dict()
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
 
@@ -174,6 +176,8 @@ async def api_step_transcript(
 ):
     try:
         return load_transcript(run_id, flow_key, step_id, state.run_inspector)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except RunArtifactsError as exc:
         return JSONResponse(exc.payload, status_code=exc.status_code)
 
@@ -187,6 +191,8 @@ async def api_step_receipt(
 ):
     try:
         return load_receipt(run_id, flow_key, step_id, state.run_inspector)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except RunArtifactsError as exc:
         return JSONResponse(exc.payload, status_code=exc.status_code)
 
@@ -248,6 +254,8 @@ async def api_list_exemplars(state: FlowStudioState = Depends(get_state)):
 async def api_run_wisdom_summary(run_id: str, state: FlowStudioState = Depends(get_state)):
     try:
         return load_wisdom_summary(run_id, state.run_inspector)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except RunArtifactsError as exc:
         return JSONResponse(exc.payload, status_code=exc.status_code)
 
