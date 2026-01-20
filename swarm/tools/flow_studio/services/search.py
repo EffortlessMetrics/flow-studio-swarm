@@ -5,29 +5,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-_ARTIFACT_CATALOG_CACHE: Dict[Path, Any] = {}
-
-
 def load_artifact_catalog(repo_root: Path) -> Dict[str, Any]:
     catalog_path = repo_root / "swarm" / "meta" / "artifact_catalog.json"
     if not catalog_path.exists():
         return {"flows": {}}
-
-    try:
-        mtime = catalog_path.stat().st_mtime
-    except OSError:
-        return {"flows": {}}
-
-    if catalog_path in _ARTIFACT_CATALOG_CACHE:
-        cached_mtime, cached_data = _ARTIFACT_CATALOG_CACHE[catalog_path]
-        if cached_mtime == mtime:
-            return cached_data
-
     with catalog_path.open("r", encoding="utf-8") as handle:
-        data = json.load(handle)
-
-    _ARTIFACT_CATALOG_CACHE[catalog_path] = (mtime, data)
-    return data
+        return json.load(handle)
 
 
 def build_artifact_graph(
