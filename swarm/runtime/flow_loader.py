@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -76,6 +77,7 @@ def _strip_yaml_frontmatter(content: str) -> str:
     return content
 
 
+@lru_cache(maxsize=128)
 def load_orchestrator_flow_prompt(flow_key: str, repo_root: Path) -> Optional[str]:
     """Load the orchestrator flow prompt for a given flow.
 
@@ -113,6 +115,7 @@ def load_orchestrator_flow_prompt(flow_key: str, repo_root: Path) -> Optional[st
         return None
 
 
+@lru_cache(maxsize=128)
 def load_agent_step_prompt(agent_key: str, repo_root: Path) -> Optional[str]:
     """Load the step prompt for an agent.
 
