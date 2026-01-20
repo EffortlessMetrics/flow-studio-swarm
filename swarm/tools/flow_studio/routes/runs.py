@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
@@ -156,7 +155,9 @@ async def api_start_run(
         )
 
 
-@router.get("/api/runs/{run_id}/events", response_model=schema.RunEventsResponse if schema else None)
+@router.get(
+    "/api/runs/{run_id}/events", response_model=schema.RunEventsResponse if schema else None
+)
 async def api_run_events(run_id: str, state: FlowStudioState = Depends(get_state)):
     if state.run_service is None:
         return JSONResponse({"error": "RunService not available"}, status_code=503)
@@ -280,7 +281,9 @@ async def api_run_sdlc(run_id: str, state: FlowStudioState = Depends(get_state))
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-@router.get("/api/runs/{run_id}/flows/{flow_key}", response_model=schema.FlowStatusInfo if schema else None)
+@router.get(
+    "/api/runs/{run_id}/flows/{flow_key}", response_model=schema.FlowStatusInfo if schema else None
+)
 async def api_run_flow(run_id: str, flow_key: str, state: FlowStudioState = Depends(get_state)):
     if state.run_inspector is None:
         return JSONResponse({"error": "Run inspector not available"}, status_code=503)
@@ -327,7 +330,9 @@ async def api_run_step(
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-@router.get("/api/runs/{run_id}/timeline", response_model=schema.TimelineResponse if schema else None)
+@router.get(
+    "/api/runs/{run_id}/timeline", response_model=schema.TimelineResponse if schema else None
+)
 async def api_run_timeline(run_id: str, state: FlowStudioState = Depends(get_state)):
     if state.run_inspector is None:
         return JSONResponse({"error": "RunInspector not available"}, status_code=503)
@@ -341,7 +346,9 @@ async def api_run_timeline(run_id: str, state: FlowStudioState = Depends(get_sta
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-@router.get("/api/runs/{run_id}/timing", response_model=schema.RunTimingResponse if schema else None)
+@router.get(
+    "/api/runs/{run_id}/timing", response_model=schema.RunTimingResponse if schema else None
+)
 async def api_run_timing(run_id: str, state: FlowStudioState = Depends(get_state)):
     if state.run_inspector is None:
         return JSONResponse({"error": "RunInspector not available"}, status_code=503)
