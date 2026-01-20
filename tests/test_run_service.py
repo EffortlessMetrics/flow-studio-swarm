@@ -358,3 +358,144 @@ class TestRunService:
         assert exemplars[0].id == "exemplar-run"
 
         RunService.reset()
+
+    def test_list_runs_paginated_returns_total_and_slice(self, tmp_path, monkeypatch):
+        """Paginated listing should return total count and requested slice."""
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        now = datetime.now(timezone.utc)
+
+        # Create 5 runs with IDs that sort lexicographically
+        run_ids = []
+        for i in range(5):
+            run_id = f"run-20260120-{100000 + i:06d}-aaaaaa"
+            run_ids.append(run_id)
+            summary = RunSummary(
+                id=run_id,
+                spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+                status=RunStatus.SUCCEEDED,
+                sdlc_status=SDLCStatus.OK,
+                created_at=now,
+                updated_at=now,
+            )
+            storage.write_summary(run_id, summary, runs_dir=tmp_path)
+
+        # Mock storage functions to use only our test runs
+        monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
+        monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
+        # Also patch read_summary to use our tmp_path
+        orig_read_summary = storage.read_summary
+        monkeypatch.setattr(
+            storage, "read_summary",
+            lambda rid, runs_dir=None: orig_read_summary(rid, runs_dir=tmp_path)
+        )
+
+        # Get first page (limit=2, offset=0)
+        runs, total = service.list_runs_paginated(limit=2, offset=0)
+        assert total == 5
+        assert len(runs) == 2
+
+        # Get second page (limit=2, offset=2)
+        runs, total = service.list_runs_paginated(limit=2, offset=2)
+        assert total == 5
+        assert len(runs) == 2
+
+        # Get last page (limit=2, offset=4)
+        runs, total = service.list_runs_paginated(limit=2, offset=4)
+        assert total == 5
+        assert len(runs) == 1  # Only one run remaining
+
+        RunService.reset()
+
+    def test_list_runs_paginated_sorts_newest_first(self, tmp_path, monkeypatch):
+        """Paginated listing should return runs sorted by ID descending (newest first)."""
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        now = datetime.now(timezone.utc)
+
+        # Create runs with different timestamps in IDs
+        run_ids = [
+            "run-20260120-100001-aaaaaa",  # oldest
+            "run-20260120-100003-aaaaaa",  # newest
+            "run-20260120-100002-aaaaaa",  # middle
+        ]
+        for run_id in run_ids:
+            summary = RunSummary(
+                id=run_id,
+                spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+                status=RunStatus.SUCCEEDED,
+                sdlc_status=SDLCStatus.OK,
+                created_at=now,
+                updated_at=now,
+            )
+            storage.write_summary(run_id, summary, runs_dir=tmp_path)
+
+        # Mock storage functions to use only our test runs
+        monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
+        monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
+        orig_read_summary = storage.read_summary
+        monkeypatch.setattr(
+            storage, "read_summary",
+            lambda rid, runs_dir=None: orig_read_summary(rid, runs_dir=tmp_path)
+        )
+
+        runs, total = service.list_runs_paginated(limit=10, offset=0)
+        assert total == 3
+        assert len(runs) == 3
+        # Should be sorted newest first (descending by ID)
+        assert runs[0].id == "run-20260120-100003-aaaaaa"
+        assert runs[1].id == "run-20260120-100002-aaaaaa"
+        assert runs[2].id == "run-20260120-100001-aaaaaa"
+
+        RunService.reset()
+
+    def test_list_runs_paginated_with_flow_key_filter(self, tmp_path, monkeypatch):
+        """Paginated listing with flow_key filter should fall back to full scan."""
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        now = datetime.now(timezone.utc)
+
+        # Create runs with different flows
+        signal_run = RunSummary(
+            id="run-signal",
+            spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+            status=RunStatus.SUCCEEDED,
+            sdlc_status=SDLCStatus.OK,
+            created_at=now,
+            updated_at=now,
+        )
+        storage.write_summary("run-signal", signal_run, runs_dir=tmp_path)
+
+        build_run = RunSummary(
+            id="run-build",
+            spec=RunSpec(flow_keys=["build"], backend="claude-harness", initiator="test"),
+            status=RunStatus.SUCCEEDED,
+            sdlc_status=SDLCStatus.OK,
+            created_at=now,
+            updated_at=now,
+        )
+        storage.write_summary("run-build", build_run, runs_dir=tmp_path)
+
+        # Mock storage functions to use only our test runs
+        run_ids = ["run-signal", "run-build"]
+        monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
+        monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
+        orig_read_summary = storage.read_summary
+        monkeypatch.setattr(
+            storage, "read_summary",
+            lambda rid, runs_dir=None: orig_read_summary(rid, runs_dir=tmp_path)
+        )
+
+        # Filter by flow_key uses slow path which calls list_runs()
+        runs, total = service.list_runs_paginated(limit=10, offset=0, flow_key="signal")
+        assert total == 1
+        assert len(runs) == 1
+        assert runs[0].id == "run-signal"
+
+        RunService.reset()
