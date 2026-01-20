@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -76,10 +77,14 @@ def _strip_yaml_frontmatter(content: str) -> str:
     return content
 
 
+@lru_cache(maxsize=128)
 def load_orchestrator_flow_prompt(flow_key: str, repo_root: Path) -> Optional[str]:
     """Load the orchestrator flow prompt for a given flow.
 
     Loads from `swarm/prompts/orchestrator_flows/flow-{N}-{flow_key}.md`.
+
+    Results are cached using LRU cache to reduce disk I/O. Use
+    `clear_prompt_cache()` to invalidate the cache if prompt files change.
 
     Args:
         flow_key: The flow key (signal, plan, build, review, gate, deploy, wisdom).
@@ -113,12 +118,16 @@ def load_orchestrator_flow_prompt(flow_key: str, repo_root: Path) -> Optional[st
         return None
 
 
+@lru_cache(maxsize=128)
 def load_agent_step_prompt(agent_key: str, repo_root: Path) -> Optional[str]:
     """Load the step prompt for an agent.
 
     First tries `swarm/prompts/agentic_steps/{agent_key}.md`. If not found,
     falls back to `.claude/agents/{agent_key}.md`. Frontmatter is stripped
     from either location.
+
+    Results are cached using LRU cache to reduce disk I/O. Use
+    `clear_prompt_cache()` to invalidate the cache if prompt files change.
 
     Args:
         agent_key: The agent key (e.g., "code-implementer", "test-author").
@@ -168,6 +177,18 @@ def load_agent_step_prompt(agent_key: str, repo_root: Path) -> Optional[str]:
     return None
 
 
+def clear_prompt_cache() -> None:
+    """Clear the prompt loading caches.
+
+    Invalidates the LRU caches for `load_orchestrator_flow_prompt` and
+    `load_agent_step_prompt`. Call this if prompt files have changed on disk
+    and you need to reload fresh content.
+    """
+    load_orchestrator_flow_prompt.cache_clear()
+    load_agent_step_prompt.cache_clear()
+    logger.debug("Prompt caches cleared")
+
+
 def enrich_step_definition(step: StepDefinition, repo_root: Path) -> EnrichedStepDefinition:
     """Enrich a StepDefinition with loaded prompts.
 
@@ -175,8 +196,8 @@ def enrich_step_definition(step: StepDefinition, repo_root: Path) -> EnrichedSte
     - The orchestrator prompt for the step's flow
     - Agent prompts for all agents assigned to the step
 
-    The orchestrator prompt is loaded once per flow and cached internally by
-    the caller if needed. This function does not cache; it loads fresh each call.
+    The underlying prompt loading functions use LRU caching to reduce disk I/O.
+    Use `clear_prompt_cache()` to invalidate caches if files change on disk.
 
     Args:
         step: The base StepDefinition from flow_registry.
