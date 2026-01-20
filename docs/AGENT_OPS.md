@@ -189,29 +189,33 @@ Colors map to **semantic role families**—not aesthetic choice, part of the spe
 - `ux-critic` — Inspect Flow Studio screens and produce structured JSON critiques
 - `ux-implementer` — Apply UX critique fixes to Flow Studio code and run tests
 
-**Flow-specific Agents (37)**:
+**Flow-specific Agents (62)**:
 
 - **Flow 1 - Signal** (6): signal-normalizer, problem-framer, requirements-author, requirements-critic, bdd-author, scope-assessor
 - **Flow 2 - Plan** (8): impact-analyzer, design-optioneer, adr-author, interface-designer, observability-designer, test-strategist, work-planner, design-critic
 - **Flow 3 - Build** (9): context-loader, test-author, test-critic, code-implementer, code-critic, mutator, fixer, doc-writer, self-reviewer
-- **Flow 4 - Gate** (6): receipt-checker, contract-enforcer, security-scanner, coverage-enforcer, gate-fixer, merge-decider
-- **Flow 5 - Deploy** (3): deploy-monitor, smoke-verifier, deploy-decider
-- **Flow 6 - Wisdom** (5): artifact-auditor, regression-analyst, flow-historian, learning-synthesizer, feedback-applier
+- **Flow 4 - Review** (11): run-prep, pr-creator, pr-feedback-harvester, review-worklist-writer, test-executor, pr-commenter, pr-status-manager, review-cleanup, build-cleanup, secrets-sanitizer, gh-issue-manager
+- **Flow 5 - Gate** (6): receipt-checker, contract-enforcer, security-scanner, coverage-enforcer, gate-fixer, merge-decider
+- **Flow 6 - Deploy** (3): deploy-monitor, smoke-verifier, deploy-decider
+- **Flow 7 - Wisdom** (11): artifact-auditor, solution-analyst, quality-analyst, maintainability-analyst, process-analyst, regression-analyst, pattern-analyst, signal-quality-analyst, flow-historian, learning-synthesizer, feedback-applier
+- **Flow 8 - Reset** (8): reset-diagnose, reset-stash-wip, reset-sync-upstream, reset-resolve-conflicts, reset-restore-wip, reset-prune-branches, reset-archive-run, reset-verify-clean
 
-**Total: 56 agents** (3 built-in + 53 domain)
+**Total: 73 agents** (3 built-in + 70 domain)
 
 ---
 
 ## Config-Driven Agents
 
-**All 53 domain agents are config-backed:**
+**All 70 domain agents are config-backed:**
 
 - Signal (Flow 1): 6 agents
 - Plan (Flow 2): 8 agents
 - Build (Flow 3): 9 agents
-- Gate (Flow 4): 6 agents
-- Deploy (Flow 5): 3 agents
-- Wisdom (Flow 6): 5 agents
+- Review (Flow 4): 11 agents
+- Gate (Flow 5): 6 agents
+- Deploy (Flow 6): 3 agents
+- Wisdom (Flow 7): 11 agents
+- Reset (Utility Flow 8): 8 agents
 - Cross-cutting: 5 agents
 - Utility: 3 agents
 

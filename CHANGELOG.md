@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0-rc.1] - 2026-01-18
+
+### Added
+
+#### V3.0 Core Architecture
+- **Flow 8 (Reset/Rebase)**: New automated flow for reconciling stale branches with upstream/main.
+- **Cognitive Hierarchy**: Evolution from simple agents to Worker → Finalizer → Navigator → Curator roles.
+- **Pack System**: Portable flow and station bundles (`swarm/packs/`) for modular swarm composition.
+
+#### Infrastructure & Persistence
+- **Resilient Database**: Journal-first DuckDB with auto-rebuild from append-only `events.jsonl` ledger.
+- **Boundary Review API**: Aggregated endpoint for reviewing assumptions, decisions, and detours.
+- **Inventory Counts**: Real-time fact marker extraction and visualization in Flow Studio.
+
+#### Safety & Governance
+- **Orderly Shutdown**: Support for graceful interruption and `handoff_partial.json` persistence.
+- **Memory Pushdown**: Protocol modernization and documentation refactor for reduced context bloat.
+
+### Changed
+- **FastAPI Upgrade**: Backend fully modernized with FastAPI and SSE-driven state management.
+- **Validation Framework**: Upgraded validator supporting FR-001 through FR-005 with V3 extensions.
+
+---
+
+## [2.4.0] - 2025-12-31
+
+### Added
+
+#### Stepwise Orchestrator (Foundation)
+- **High-Trust Orchestrator**: Deterministic, per-step execution engine with forensic transcripts.
+- **Spec System**: Type-safe validation for flow and station contracts.
+- **Microloop Routing**: Support for 'Verified/Unverified' loop patterns within flows.
+
+#### Routing & Navigation
+- **Navigator**: Intelligent within-flow routing and sidequest management.
+- **Open World Routing**: Support for flow injection (e.g., auto-rebase during Build) and ad-hoc station generation.
+- **Sidequest Catalog**: Support for dynamic sub-routines (e.g. `ask_human`, `research`).
+- **Unified Handoffs**: Standardized envelope format for inter-step state persistence.
+
+#### Developer Experience
+- **Claude Agent SDK Modernization**: Full integration with the latest Anthropic Agent SDK.
+- **Run Playback**: Real-time execution visualization via SSE in Flow Studio.
+- **Documentation**: Extensive updates to `STEPWISE_BACKENDS.md` and architecture guides.
+
+---
+
+## [2.3.2] - 2025-12-12
+
+### Added
+
+#### Flow Studio Improvements
+- **Non-blocking initialization**: Run history loads asynchronously in background; UI becomes interactive immediately.
+- **Context Budgets integration**: Documentation fully cross-linked with `CONTEXT_BUDGETS.md`.
+
+### Changed
+- **Test Baseline**: Updated definition of done to ~1750 passed tests.
+- **Selftest Documentation**: Normalized references to "16-step selftest" (previously "10-step").
+- **Runtime Configuration**: Clarified `stub` vs `cli` vs `sdk` engine modes in docstrings.
+
+---
+
+## [2.3.1] - 2025-12-10
+
+### Added
+
+#### Validation & Quality
+- **Clean Test Baseline**: Achieved ~1750 passed tests with zero xfails or warnings.
+- **JSON/Markdown Reporting**: `validate_swarm.py` now supports `--report json` and `--report markdown`.
+- **Line Number Precision**: Validator error messages now include line numbers for Frontmatter issues.
+- **Skill Validation**: Deep YAML validation for skill files.
+
+#### Documentation Tooling
+- **Meta-Docs Generation**: `make gen-doc-meta` for documentation coverage analysis.
+- **Invariant Checking**: `make docs-check` validates cross-references and version consistency.
+
+### Changed
+- **Performance Tests**: Moved to non-gating `@pytest.mark.performance` marker.
+- **Definition of Done**: Updated `docs/DEFINITION_OF_DONE.md` with strict xfail=0 policy.
+
 ---
 
 ## [2.3.0] - 2025-12-09
@@ -234,7 +313,11 @@ These tags track Flow Studio-specific releases on a separate versioning track:
 
 ---
 
-[Unreleased]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/EffortlessMetrics/flow-studio/compare/v3.0.0-rc.1...HEAD
+[3.0.0-rc.1]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.4.0...v3.0.0-rc.1
+[2.4.0]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.2...v2.4.0
+[2.3.2]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.1...v2.3.2
+[2.3.1]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/EffortlessMetrics/flow-studio/compare/v2.1.0...v2.1.1

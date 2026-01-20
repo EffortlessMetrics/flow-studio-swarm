@@ -54,6 +54,160 @@ FLOW_STUDIO_BASE_URL = "http://localhost:5000"
 
 
 # ============================================================================
+# Static Layout Spec Fallback (from TypeScript layout_spec.ts)
+# ============================================================================
+
+STATIC_LAYOUT_SCREENS: List[Dict[str, Any]] = [
+    {
+        "id": "flows.default",
+        "route": "/",
+        "title": "Flows - Default",
+        "description": "Main Flow Studio screen with run selector, flow list, graph canvas, and inspector.",
+        "purpose": "Main Flow Studio screen with run selector, flow list, graph canvas, and inspector.",
+        "regions": [
+            {
+                "id": "header",
+                "purpose": "Global navigation, search, governance indicators, mode toggle.",
+                "uiids": [
+                    "flow_studio.header",
+                    "flow_studio.header.search",
+                    "flow_studio.header.search.input",
+                    "flow_studio.header.search.results",
+                    "flow_studio.header.controls",
+                    "flow_studio.header.tour",
+                    "flow_studio.header.tour.trigger",
+                    "flow_studio.header.tour.menu",
+                    "flow_studio.header.mode",
+                    "flow_studio.header.mode.author",
+                    "flow_studio.header.mode.operator",
+                    "flow_studio.header.governance",
+                    "flow_studio.header.governance.overlay",
+                    "flow_studio.header.reload",
+                    "flow_studio.header.reload.btn",
+                    "flow_studio.header.help",
+                ],
+            },
+            {
+                "id": "sdlc_bar",
+                "purpose": "SDLC progress bar showing flow completion status.",
+                "uiids": ["flow_studio.sdlc_bar"],
+            },
+            {
+                "id": "sidebar",
+                "purpose": "Run selector, flow list, and view toggles between agents and artifacts.",
+                "uiids": [
+                    "flow_studio.sidebar",
+                    "flow_studio.sidebar.run_selector",
+                    "flow_studio.sidebar.run_selector.select",
+                    "flow_studio.sidebar.compare_selector",
+                    "flow_studio.sidebar.flow_list",
+                    "flow_studio.sidebar.view_toggle",
+                ],
+            },
+            {
+                "id": "canvas",
+                "purpose": "Graph visualization of the current flow and SDLC legend.",
+                "uiids": [
+                    "flow_studio.canvas",
+                    "flow_studio.canvas.graph",
+                    "flow_studio.canvas.legend",
+                    "flow_studio.canvas.legend.toggle",
+                    "flow_studio.canvas.outline",
+                ],
+            },
+            {
+                "id": "inspector",
+                "purpose": "Details panel for selected step/agent/artifact, timing, and timeline.",
+                "uiids": [
+                    "flow_studio.inspector",
+                    "flow_studio.inspector.details",
+                ],
+            },
+        ],
+    },
+    {
+        "id": "flows.selftest",
+        "route": "/?modal=selftest",
+        "title": "Flows - Selftest Modal",
+        "description": "Selftest plan / results modal and controls.",
+        "purpose": "Selftest plan / results modal and controls.",
+        "regions": [
+            {
+                "id": "modal",
+                "purpose": "Selftest plan, run controls, copy helpers.",
+                "uiids": ["flow_studio.modal.selftest"],
+            },
+        ],
+    },
+    {
+        "id": "flows.shortcuts",
+        "route": "/?modal=shortcuts",
+        "title": "Flows - Shortcuts Modal",
+        "description": "Keyboard shortcuts reference modal.",
+        "purpose": "Keyboard shortcuts reference modal.",
+        "regions": [
+            {
+                "id": "modal",
+                "purpose": "Keyboard shortcuts grid.",
+                "uiids": ["flow_studio.modal.shortcuts"],
+            },
+        ],
+    },
+    {
+        "id": "flows.validation",
+        "route": "/?tab=validation",
+        "title": "Flows - Validation View",
+        "description": "Governance validation results and FR status badges.",
+        "purpose": "Governance validation results and FR status badges.",
+        "regions": [
+            {
+                "id": "header",
+                "purpose": "Governance badge and overlay toggle.",
+                "uiids": [
+                    "flow_studio.header.governance",
+                    "flow_studio.header.governance.overlay",
+                ],
+            },
+            {
+                "id": "inspector",
+                "purpose": "Validation details for selected agent or flow.",
+                "uiids": [
+                    "flow_studio.inspector",
+                    "flow_studio.inspector.details",
+                ],
+            },
+        ],
+    },
+    {
+        "id": "flows.tour",
+        "route": "/?tour=<tour_id>",
+        "title": "Flows - Tour Mode",
+        "description": "Guided tour overlay with step-by-step navigation.",
+        "purpose": "Guided tour overlay with step-by-step navigation.",
+        "regions": [
+            {
+                "id": "header",
+                "purpose": "Tour menu and controls.",
+                "uiids": [
+                    "flow_studio.header.tour",
+                    "flow_studio.header.tour.trigger",
+                    "flow_studio.header.tour.menu",
+                ],
+            },
+            {
+                "id": "canvas",
+                "purpose": "Tour card overlay on graph nodes.",
+                "uiids": [
+                    "flow_studio.canvas",
+                    "flow_studio.canvas.graph",
+                ],
+            },
+        ],
+    },
+]
+
+
+# ============================================================================
 # Core Functions
 # ============================================================================
 
@@ -62,7 +216,11 @@ def load_ux_manifest() -> Dict[str, Any]:
     if not MANIFEST_PATH.exists():
         return {"error": f"Manifest not found at {MANIFEST_PATH}"}
     try:
-        return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+        manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+        # Add layout_spec alias for backward compatibility
+        if "specs" in manifest and "layout_spec" not in manifest:
+            manifest["layout_spec"] = manifest["specs"]
+        return manifest
     except Exception as e:
         return {"error": f"Failed to load manifest: {e}"}
 
@@ -77,7 +235,7 @@ def load_critique_schema() -> Dict[str, Any]:
         return {"error": f"Failed to load schema: {e}"}
 
 
-def fetch_layout_screens_from_api() -> Optional[Dict[str, Any]]:
+def fetch_layout_screens_from_api() -> Optional[List[Dict[str, Any]]]:
     """Fetch layout screens from the live Flow Studio API."""
     if httpx is None:
         return None
@@ -85,60 +243,71 @@ def fetch_layout_screens_from_api() -> Optional[Dict[str, Any]]:
         with httpx.Client() as client:
             resp = client.get(f"{FLOW_STUDIO_BASE_URL}/api/layout_screens", timeout=10)
             if resp.status_code == 200:
-                return resp.json()
+                data = resp.json()
+                # Return just the screens list
+                if isinstance(data, dict) and "screens" in data:
+                    return data["screens"]
+                elif isinstance(data, list):
+                    return data
     except Exception:
         pass
     return None
 
 
-def get_layout_screens() -> Dict[str, Any]:
-    """Get layout screens, preferring live API over static."""
+def get_layout_screens() -> List[Dict[str, Any]]:
+    """Get layout screens as a list.
+
+    Prefers live API over static fallback.
+    Returns list of screen dicts with id, route, regions, purpose.
+    """
     # Try live API first
     live = fetch_layout_screens_from_api()
     if live:
-        return {"source": "live", "data": live}
+        return live
 
-    # Fallback to manifest reference
-    manifest = load_ux_manifest()
-    if "error" not in manifest:
-        return {
-            "source": "manifest",
-            "note": "Flow Studio not running; returning manifest reference only",
-            "api_endpoint": manifest.get("api", {}).get("endpoints", []),
-        }
-
-    return {"error": "Could not load layout screens from API or manifest"}
+    # Fallback to static layout spec
+    return STATIC_LAYOUT_SCREENS
 
 
 def get_screen_by_id(screen_id: str) -> Optional[Dict[str, Any]]:
     """Get a specific screen from the layout spec."""
-    result = get_layout_screens()
-    if "error" in result:
+    if not screen_id:
         return None
-
-    if result.get("source") == "live":
-        screens = result.get("data", {}).get("screens", [])
-        for screen in screens:
-            if screen.get("id") == screen_id:
-                return screen
-
+    screens = get_layout_screens()
+    for screen in screens:
+        if screen.get("id") == screen_id:
+            return screen
     return None
 
 
 def get_all_known_uiids() -> List[str]:
     """Extract all UIIDs from the layout spec."""
-    result = get_layout_screens()
-    if "error" in result or result.get("source") != "live":
-        return []
-
     uiids = set()
-    screens = result.get("data", {}).get("screens", [])
+    screens = get_layout_screens()
     for screen in screens:
         for region in screen.get("regions", []):
             for uiid in region.get("uiids", []):
                 uiids.add(uiid)
-
     return sorted(uiids)
+
+
+# ============================================================================
+# Backward-Compatible Function Aliases (for test compatibility)
+# ============================================================================
+
+def get_ux_manifest() -> Dict[str, Any]:
+    """Alias for load_ux_manifest for backward compatibility."""
+    return load_ux_manifest()
+
+
+def get_layout_screen_by_id(screen_id: str) -> Optional[Dict[str, Any]]:
+    """Alias for get_screen_by_id for backward compatibility."""
+    return get_screen_by_id(screen_id)
+
+
+def get_critique_schema() -> Dict[str, Any]:
+    """Alias for load_critique_schema for backward compatibility."""
+    return load_critique_schema()
 
 
 # ============================================================================

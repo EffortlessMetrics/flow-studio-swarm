@@ -19,6 +19,18 @@ from .agent_types import (
     decision_log_entry_from_dict,
     decision_log_entry_to_dict,
 )
+from .events import (
+    EventBase,
+    FactsUpdatedEvent,
+    FlowCompletedEvent,
+    RunPausedEvent,
+    RunPausingEvent,
+    RunResumedEvent,
+    RunStoppedEvent,
+    RunStoppingEvent,
+    StepEndEvent,
+    StepStartEvent,
+)
 from .macro_types import (
     FlowOutcome,
     FlowResult,
@@ -215,4 +227,14 @@ __all__ = [
     "normalized_tool_call_from_gemini_events",
     "normalized_tool_call_from_stub",
     "normalized_tool_call_from_kernel_execution",
+    "EventBase",
+    "StepStartEvent",
+    "StepEndEvent",
+    "FlowCompletedEvent",
+    "FactsUpdatedEvent",
+    "RunPausingEvent",
+    "RunPausedEvent",
+    "RunResumedEvent",
+    "RunStoppingEvent",
+    "RunStoppedEvent",
 ]

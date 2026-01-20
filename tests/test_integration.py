@@ -119,12 +119,14 @@ def test_strict_mode_rejects_registry_without_file(temp_repo, run_validator):
     And: .claude/agents/new-agent.md does not exist
     When: I run the validator
     Then: Validator exits with code 1
-    """
-    add_agent_to_registry(temp_repo, "new-agent")
 
-    result = run_validator(temp_repo)
-    assert_validator_failed(result)
-    assert "new-agent" in result.stderr
+    NOTE: As of v3.0, bijection between AGENTS.md and .claude/agents/ is no longer
+    enforced. Agents are now primarily defined in swarm/config/agents/*.yaml.
+    """
+    pytest.skip(
+        "v3.0 architecture change: bijection between AGENTS.md and .claude/agents/ "
+        "is no longer enforced. Agents are now in swarm/config/agents/*.yaml"
+    )
 
 
 def test_strict_mode_rejects_file_without_registry(temp_repo, run_validator):
@@ -167,20 +169,14 @@ def test_validator_checks_working_tree_not_staging(git_repo, run_validator):
     And: .claude/agents/new-agent.md is not created yet
     When: I run the validator
     Then: Validator fails (checks working tree, not staging area)
+
+    NOTE: As of v3.0, bijection between AGENTS.md and .claude/agents/ is no longer
+    enforced. This test was designed for the old architecture.
     """
-    import subprocess
-
-    # Add agent to registry and stage it
-    add_agent_to_registry(git_repo, "new-agent")
-    subprocess.run(
-        ["git", "add", "swarm/AGENTS.md"],
-        cwd=git_repo,
-        capture_output=True
+    pytest.skip(
+        "v3.0 architecture change: bijection between AGENTS.md and .claude/agents/ "
+        "is no longer enforced. Agents are now in swarm/config/agents/*.yaml"
     )
-
-    # Don't create the agent file
-    result = run_validator(git_repo)
-    assert_validator_failed(result)
 
 
 # ============================================================================
@@ -525,14 +521,19 @@ def test_each_error_includes_required_fields(temp_repo, run_validator):
     - Line number (when available)
     - Problem description
     - Suggested fix
+
+    NOTE: This test now uses orphan file (file without registry) rather than
+    missing file (registry without file) since the latter bijection direction
+    is no longer enforced in v3.0.
     """
-    add_agent_to_registry(temp_repo, "missing")
+    # Create an orphan file (no registry entry) - this IS enforced
+    create_agent_file(temp_repo, "orphan-agent")
 
     result = run_validator(temp_repo)
     assert_validator_failed(result)
 
     # Should include key elements
-    assert "missing" in result.stderr
+    assert "orphan-agent" in result.stderr
     assert "Fix:" in result.stderr
 
 
@@ -545,25 +546,27 @@ def test_complete_workflow_add_agent(temp_repo, run_validator):
     """
     Integration: Complete workflow of adding a new agent.
 
-    1. Add entry to AGENTS.md
-    2. Create agent file
+    As of v3.0, the bijection from registry → file is not enforced.
+    This test verifies that creating both registry entry and file works.
+
+    1. Create agent file (orphan - will fail)
+    2. Add entry to AGENTS.md
     3. Run validator
     4. Verify passes
     """
-    # Step 1: Add to registry
-    add_agent_to_registry(temp_repo, "new-workflow-agent")
-
-    # Validator should fail (file missing)
-    result = run_validator(temp_repo)
-    assert_validator_failed(result)
-
-    # Step 2: Create file
+    # Step 1: Create file without registry entry (orphan)
     create_agent_file(temp_repo, "new-workflow-agent")
 
-    # Step 3: Validate again
+    # Validator should fail (file without registry entry)
     result = run_validator(temp_repo)
+    assert_validator_failed(result)
+    assert "new-workflow-agent" in result.stderr
 
-    # Step 4: Should pass
+    # Step 2: Add to registry
+    add_agent_to_registry(temp_repo, "new-workflow-agent")
+
+    # Step 3-4: Validate again - should pass
+    result = run_validator(temp_repo)
     assert_validator_passed(result)
 
 
@@ -627,6 +630,10 @@ def test_mixed_valid_invalid_comprehensive(temp_repo, run_validator):
 
     Some agents valid, some invalid; some flows valid, some invalid.
     All errors should be reported.
+
+    NOTE: As of v3.0, the bijection from registry → file is not enforced,
+    so only orphan files (file without registry) and invalid flow references
+    are caught.
     """
     # Valid agents
     for i in range(3):
@@ -634,9 +641,9 @@ def test_mixed_valid_invalid_comprehensive(temp_repo, run_validator):
         add_agent_to_registry(temp_repo, name)
         create_agent_file(temp_repo, name)
 
-    # Invalid agents
-    add_agent_to_registry(temp_repo, "missing-file")
-    create_agent_file(temp_repo, "orphan-file")
+    # Invalid agents - only orphan file is enforced now
+    # add_agent_to_registry(temp_repo, "missing-file")  # Not enforced in v3.0
+    create_agent_file(temp_repo, "orphan-file")  # File without registry IS enforced
 
     # Valid flow
     create_flow_file(temp_repo, "flow-valid", ["valid-0", "valid-1"])
@@ -647,8 +654,7 @@ def test_mixed_valid_invalid_comprehensive(temp_repo, run_validator):
     result = run_validator(temp_repo)
     assert_validator_failed(result)
 
-    # Should report errors for invalid elements
-    assert "missing-file" in result.stderr
+    # Should report errors for enforced invalid elements
     assert "orphan-file" in result.stderr
     assert "fake-agent" in result.stderr
 

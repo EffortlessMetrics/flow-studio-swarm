@@ -3,7 +3,7 @@
 > For: Contributors understanding the physical directory layout.
 
 > Structural overview of Flow Studio
-> Generated: 2025-11-26 (post-alignment)
+> Generated: 2026-01-18 (V3 Stepwise alignment)
 
 ## Purpose
 
@@ -28,14 +28,13 @@ This map shows the **as-built** layout of the industrial agentic SDLC swarm repo
 ├── swarm/                 # Platform-neutral spec layer
 ├── tests/                 # Rust tests
 │
-├── ALIGNMENT_PLAN.md      # Original alignment design doc
-├── ALIGNMENT_SUMMARY.md   # Execution report from alignment
-├── CLAUDE.md              # Guide for Claude Code instances
+├── ARCHITECTURE.md        # V3 System Architecture
+├── CLAUDE.md              # Guide for Claude Code usage
 ├── CONTRIBUTING.md        # Contribution guidelines
 ├── LICENSE                # License file
 ├── Makefile               # Common tasks (validate-swarm, etc.)
 ├── README.md              # Repository overview
-├── REPO_CLEANUP_PLAN.md   # Cleanup strategy (historical)
+├── ROADMAP_3_0.md         # V3 roadmap and priorities
 └── REPO_MAP.md            # This file
 ```
 
@@ -43,18 +42,20 @@ This map shows the **as-built** layout of the industrial agentic SDLC swarm repo
 
 ## Spec Layer: `swarm/`
 
-**Platform-neutral definitions.** Other orchestrators can reuse these specs if they implement the required RUN_BASE semantics, Explore-like search, git ops, and microloop mechanics.
+**Platform-neutral definitions.** Other orchestrators can reuse these specs if they implement the required RUN_BASE semantics, Stepwise Orchestrator primitives, git ops, and microloop mechanics.
 
 ```
 swarm/
-├── flows/                      # Flow specifications (7 flows)
+├── flows/                      # Flow specifications (9 flows)
 │   ├── flow-signal.md          # Flow 1: Signal → Specs
 │   ├── flow-plan.md            # Flow 2: Specs → Plan
 │   ├── flow-build.md           # Flow 3: Plan → Draft (microloops)
 │   ├── flow-review.md          # Flow 4: Draft → Reviewed
 │   ├── flow-gate.md            # Flow 5: Reviewed → Verify
 │   ├── flow-deploy.md          # Flow 6: Artifact → Prod
-│   └── flow-wisdom.md          # Flow 7: Prod → Wisdom
+│   ├── flow-wisdom.md          # Flow 7: Prod → Wisdom
+│   ├── flow-reset.md           # Flow 8: Infrastructure Reset
+│   └── flow-demo.md            # Flow 9: Stepwise Walkthrough
 │
 ├── spec/                       # Formal specifications
 │   ├── contracts/              # Inter-flow contract definitions
@@ -66,23 +67,13 @@ swarm/
 │   └── run_flow_dry.py         # Dry-run flow graph analysis
 │
 ├── examples/                   # Curated demonstration snapshots
-│   └── health-check/           # End-to-end example of all 7 flows
-│       ├── code-snapshot/      # Copy of code/tests/features at snapshot time
-│       ├── signal/             # Flow 1 artifacts (problem, requirements, BDD)
-│       ├── plan/               # Flow 2 artifacts (ADR, contracts, test plan)
-│       ├── build/              # Flow 3 artifacts (receipts, critiques, git status)
-│       ├── review/             # Flow 4 artifacts (code review, feedback)
-│       ├── gate/               # Flow 5 artifacts (audits, merge recommendation)
-│       ├── deploy/             # Flow 6 artifacts (deployment verification)
-│       ├── wisdom/             # Flow 7 artifacts (regression, flow history, learnings)
-│       ├── reports/            # Generated flow-*-report.txt from run_flow_dry.py
-│       ├── EXPECTED_ARTIFACTS.md
-│       └── README.md           # Explains snapshot structure
+│   └── health-check/           # End-to-end example of the flows
 │
-├── AGENTS.md                   # Agent registry (56 agents: 3 infra + 53 domain)
+├── AGENTS.md                   # Agent registry (73 agents: 3 infra + 70 domain)
 ├── positioning.md              # Philosophy and axioms (compute for attention)
 └── skills.md                   # Skill documentation (test-runner, auto-linter, policy-runner)
 ```
+
 
 ### Key Files in `swarm/`
 
@@ -91,7 +82,7 @@ swarm/
 - **spec/contracts/**: Inter-flow handoff contracts (e.g., build_review_handoff.md)
 - **positioning.md**: Doctrine — why receipts, why microloops, why heavy context
 - **skills.md**: Describes the 4 global Skills (test-runner, auto-linter, policy-runner, heal_selftest)
-- **examples/health-check/**: Complete snapshot of a run through all 7 flows
+- **examples/health-check/**: Complete snapshot of a run through the flows
 
 ---
 
@@ -101,8 +92,8 @@ swarm/
 
 ```
 .claude/
-├── agents/                     # Claude subagent definitions (45 files)
-│   └── <domain-agent>.md       # 45 domain agents (YAML frontmatter + prompt)
+├── agents/                     # Claude subagent definitions (70 files)
+│   └── <domain-agent>.md       # 70 domain agents (YAML frontmatter + prompt)
 │
 ├── commands/                   # Slash command orchestrators
 │   ├── flow-1-signal.md        # /flow-1-signal orchestrator
@@ -111,7 +102,9 @@ swarm/
 │   ├── flow-4-review.md        # /flow-4-review orchestrator
 │   ├── flow-5-gate.md          # /flow-5-gate orchestrator
 │   ├── flow-6-deploy.md        # /flow-6-deploy orchestrator
-│   └── flow-7-wisdom.md        # /flow-7-wisdom orchestrator
+│   ├── flow-7-wisdom.md        # /flow-7-wisdom orchestrator
+│   ├── flow-8-reset.md         # /flow-8-reset orchestrator
+│   └── flow-9-demo.md          # /flow-9-demo orchestrator
 │
 ├── skills/                     # Claude Code Skill definitions
 │   ├── test-runner/
@@ -170,7 +163,9 @@ swarm/runs/<run-id>/            # RUN_BASE (gitignored)
 ├── review/                     # Flow 4 artifacts
 ├── gate/                       # Flow 5 artifacts
 ├── deploy/                     # Flow 6 artifacts
-└── wisdom/                     # Flow 7 artifacts
+├── wisdom/                     # Flow 7 artifacts
+├── reset/                      # Flow 8 artifacts
+└── demo/                       # Flow 9 artifacts
 ```
 
 **Active runs** write artifacts under `RUN_BASE/<flow>/` and are excluded from git via `.gitignore`.
@@ -276,10 +271,10 @@ This ensures:
 
 ---
 
-## Total Agent Count: 56
+## Total Agent Count: 73
 
 - **3 Built-in Infra**: explore, plan-subagent, general-subagent
-- **53 Domain Agents**: Grouped into families (Signal/Shaping, Context/Research, Plan/Design, Build/Impl, Build/Verify, Gate/Verify, Deploy, Wisdom, Reporter)
+- **70 Domain Agents**: Grouped into families (Signal/Shaping, Context/Research, Plan/Design, Build/Impl, Build/Verify, Gate/Verify, Deploy, Wisdom, Reset, Demo, Reporter)
 
 See `swarm/AGENTS.md` for the complete registry.
 
@@ -287,13 +282,13 @@ See `swarm/AGENTS.md` for the complete registry.
 
 ## Changes from Original Layout
 
-This map reflects the **post-alignment state** (2025-12-01). Key changes:
+This map reflects the **V3 Stepwise state** (2026-01-18). Key changes:
 
-- **Root cleaned**: All demo artifacts moved to `swarm/examples/health-check/`
+- **Root cleaned**: Artifacts like `test_output.log` and `echo` removed (infrastructure cleanup)
 - **RUN_BASE enforced**: Active runs write to `swarm/runs/<run-id>/` (gitignored)
-- **7 flows**: Signal, Plan, Build, Review, Gate, Deploy, Wisdom (was 6 flows before Review was added)
-- **Agent count corrected**: 56 total (3 built-in + 53 domain)
-- **Flows updated**: All 7 flows now document RUN_BASE paths, microloops, and pathing conventions
-- **CLAUDE.md rewritten**: Aligned with actual architecture (RUN_BASE, microloops, heavy context, critics)
+- **9 flows**: Added Reset (Flow 8) and Demo (Flow 9)
+- **Agent count corrected**: 73 total (3 built-in + 70 domain)
+- **V3 Architecture**: Transitioned to Stepwise Orchestrator and DuckDB-backed journal
+- **CLAUDE.md rewritten**: Aligned with V3 internal milestones
 
 See `ALIGNMENT_SUMMARY.md` for full execution report.

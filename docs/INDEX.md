@@ -12,7 +12,7 @@ It contains:
 
 For a portable `.claude` pack, see [`EffortlessMetrics/demo-swarm`](https://github.com/EffortlessMetrics/demo-swarm).
 
-**Status:** early re-implementation of a proven pattern. See [README.md § Status](../README.md#status) and [RELEASE_NOTES_2_3_2.md § Stability Matrix](./RELEASE_NOTES_2_3_2.md#stability-matrix).
+**Status:** V3.0 Release Candidate. See [RELEASE_NOTES_3_0_0_RC1.md § Stability Matrix](./RELEASE_NOTES_3_0_0_RC1.md#stability-matrix).
 
 ---
 
@@ -143,7 +143,7 @@ You should now have:
 
 - A healthy swarm (`make dev-check` green)
 - A demo run under `swarm/runs/demo-health-check/`
-- Flow Studio open with 7 flows in the sidebar
+- Flow Studio open with 9 flows in the sidebar
 
 Read `DEMO_RUN.md` (2–3 minutes) to understand the health-check scenario.
 
@@ -334,8 +334,9 @@ These are small, reversible, and teach the key patterns.
 
 ## After 75 minutes, you know
 
-- The 7 flows and their shapes (Signal light, Build heavy, Review/Gate/Deploy/Wisdom lean)
-- How agents fit into steps (config → adapter → invocation)
+- The 9 flows and their shapes (7 SDLC flows + 2 utility/demo flows)
+- The V3 routing model and utility flows (e.g., Flow 8 Reset)
+- How agents fit into steps and stations (config → pack → invocation)
 - How validation works (FR-001..005, selftest tiers)
 - How to make changes safely (edit config, regenerate, validate)
 

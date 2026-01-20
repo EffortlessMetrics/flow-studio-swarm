@@ -151,7 +151,8 @@ class TestMCPUXSpecIntegration:
         # Schema properties should cover the expected critique fields
         props = schema.get("properties", {})
         if props:
-            expected_fields = {"screen_id", "timestamp", "critic_agent"}
+            # Core required fields per ux_critique.schema.json
+            expected_fields = {"screen_id", "timestamp", "issues"}
             defined_fields = set(props.keys())
             assert expected_fields.issubset(defined_fields), (
                 f"Schema missing expected fields: {expected_fields - defined_fields}"

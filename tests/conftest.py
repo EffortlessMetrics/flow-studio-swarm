@@ -58,12 +58,15 @@ except ImportError as e:
 
 
 def _copy_module_tree(src: Path, dst: Path) -> None:
-    """Recursively copy a Python module tree (directories + .py files only)."""
+    """Recursively copy a module tree (directories + files).
+
+    Some modules include non-Python assets (schemas, templates) required by tests.
+    """
     dst.mkdir(parents=True, exist_ok=True)
     for item in src.iterdir():
         if item.is_dir() and not item.name.startswith("__pycache__"):
             _copy_module_tree(item, dst / item.name)
-        elif item.is_file() and item.suffix == ".py":
+        elif item.is_file() and item.name != ".DS_Store":
             shutil.copy(item, dst / item.name)
 
 

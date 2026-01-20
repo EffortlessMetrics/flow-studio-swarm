@@ -30,11 +30,13 @@ class TestGeminiCliBackendStubMode:
 
         cmd = backend._build_command("signal", "test-run-001", spec)
 
+        # _build_command returns List[str] for safe shell=False execution
         # Stub command uses echo, not real gemini binary
-        assert "echo -e" in cmd
+        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
+        assert "echo -e" in cmd_str
         # Ensure we're not invoking the real gemini CLI (space-bounded to avoid
         # matching "gemini-cli" in the JSON stub output)
-        assert " gemini " not in cmd
+        assert " gemini " not in cmd_str
 
     def test_uses_stub_when_cli_not_available(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Backend uses stub when gemini CLI is not on PATH."""
@@ -55,8 +57,10 @@ class TestGeminiCliBackendStubMode:
 
         cmd = backend._build_command("build", "test-run-002", spec)
 
+        # _build_command returns List[str] for safe shell=False execution
         # Falls back to stub
-        assert "echo -e" in cmd
+        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
+        assert "echo -e" in cmd_str
 
     def test_stub_command_includes_flow_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Stub command includes the flow key in output."""
@@ -72,7 +76,9 @@ class TestGeminiCliBackendStubMode:
 
         cmd = backend._build_command("gate", "test-run-003", spec)
 
-        assert "gate" in cmd
+        # _build_command returns List[str] for safe shell=False execution
+        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
+        assert "gate" in cmd_str
 
     def test_custom_command_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Backend uses custom command when provided in spec params."""
@@ -89,7 +95,8 @@ class TestGeminiCliBackendStubMode:
 
         cmd = backend._build_command("signal", "test-run-004", spec)
 
-        assert cmd == "echo 'custom command'"
+        # _build_command returns List[str] via shlex.split for safe shell=False execution
+        assert cmd == ["echo", "custom command"]
 
 
 class TestGeminiCliBackendCapabilities:

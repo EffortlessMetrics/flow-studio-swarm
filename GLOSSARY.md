@@ -7,14 +7,16 @@ Key terms used throughout the demo-swarm codebase.
 ## Core Concepts
 
 ### Flow
-A sequence of agent invocations that transforms inputs into outputs. The swarm has 7 flows:
-- **Flow 1 (Signal)**: Raw input → specs, requirements, BDD
-- **Flow 2 (Plan)**: Specs → ADR, contracts, test/work plans
-- **Flow 3 (Build)**: Plans → code, tests, receipts
-- **Flow 4 (Review)**: Code → review feedback, improvements
-- **Flow 5 (Gate)**: Code → audit, merge decision
-- **Flow 6 (Deploy)**: Artifact → production
-- **Flow 7 (Wisdom)**: Production → learnings, feedback
+A sequence of agent invocations that transforms inputs into outputs. The swarm has 9 flows:
+- **Flow 1 (Signal)**: Raw input → structured problem (requirements, BDD)
+- **Flow 2 (Plan)**: Requirements → architecture (ADR, contracts, plans)
+- **Flow 3 (Build)**: Plan → working code (implementation, tests)
+- **Flow 4 (Review)**: Draft PR → Ready PR (feedback, fixes)
+- **Flow 5 (Gate)**: Code → merge decision (audit, policy)
+- **Flow 6 (Deploy)**: Approved → production (merge, verify)
+- **Flow 7 (Wisdom)**: Artifacts → learnings (patterns, feedback)
+- **Flow 8 (Reset)**: Clean state (infrastructure wipe, maintenance)
+- **Flow 9 (Demo)**: Simulation (Stepwise Orchestrator walkthrough)
 
 ### Step
 A discrete unit of work within a flow. Steps invoke one or more agents and produce specific artifacts. Steps have IDs like `normalize`, `frame-problem`, `implement`.

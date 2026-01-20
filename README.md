@@ -1,9 +1,12 @@
 # Flow Studio
 
 > An agentic SDLC harness that transforms requirements into merged PRs with forensic evidence.
+> For: Platform engineers and staff+ operators who need repeatable, auditable automation (not demos).
+
+Docs: [docs/INDEX.md](docs/INDEX.md) | Getting started: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Golden runs: [docs/GOLDEN_RUNS.md](docs/GOLDEN_RUNS.md) | Roadmap: [docs/ROADMAP_3_0.md](docs/ROADMAP_3_0.md) | Changelog: [CHANGELOG.md](CHANGELOG.md)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0%20%2F%20MIT-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 
 ---
 
@@ -27,19 +30,31 @@ Just like every transition before.
 
 ---
 
+## Status
+
+**Current Version:** v3.0.0-rc.1 (Release Candidate)
+
+See [RELEASE_NOTES_3_0_0_RC1.md](docs/RELEASE_NOTES_3_0_0_RC1.md) for details on the V3 "Intelligent Factory" update.
+
+This release is **stable for evaluation**. It includes the new Pack System, Stepwise Orchestrator, and Resilient DB.
+
+---
+
 ## What Flow Studio Does
 
-Flow Studio runs **7 sequential flows** that transform a requirement into a merged PR:
+Flow Studio orchestrates **9 flows** that transform a requirement into a merged PR and manage the lifecycle:
 
 | Flow | Transformation | Output |
 |------|----------------|--------|
-| **Signal** | Raw input → structured problem | Requirements, BDD scenarios, risk assessment |
-| **Plan** | Requirements → architecture | ADR, contracts, work plan, test plan |
-| **Build** | Plan → working code | Implementation + tests via adversarial loops |
-| **Review** | Draft PR → Ready PR | Harvest feedback, apply fixes |
-| **Gate** | Code → merge decision | Audit receipts, policy check, recommendation |
-| **Deploy** | Approved → production | Merge, verify health, audit trail |
-| **Wisdom** | Artifacts → learnings | Pattern detection, feedback loops |
+| **1: Signal** | Raw input → structured problem | Requirements, BDD scenarios, risk assessment |
+| **2: Plan** | Requirements → architecture | ADR, contracts, work plan, test plan |
+| **3: Build** | Plan → working code | Implementation + tests via adversarial loops |
+| **4: Review** | Draft PR → Ready PR | Harvest feedback, apply fixes |
+| **5: Gate** | Code → merge decision | Audit receipts, policy check, recommendation |
+| **6: Deploy** | Approved → production | Merge, verify health, audit trail |
+| **7: Wisdom** | Artifacts → learnings | Pattern detection, feedback loops |
+| **8: Reset** | Clean state | Infrastructure wipe, cache purge |
+| **9: Demo** | Simulation | Walkthrough of the Stepwise Orchestrator |
 
 Each flow produces **receipts** (proof of execution) and **evidence** (test results, coverage, lint output). Kill the process anytime—resume from the last checkpoint with zero data loss.
 
@@ -59,8 +74,8 @@ The receipts are the product. The code is a side effect.
 ## Installation
 
 **Requirements:**
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+- Python 3.13+
+- [uv](https://docs.astral.sh/uv/) (required)
 - GNU Make (Linux/macOS: included; Windows: use WSL2 or [MSYS2](https://www.msys2.org/))
 - Node.js 20+ (optional, for UI development)
 
@@ -90,11 +105,11 @@ make flow-studio    # Start UI → http://localhost:5000
 Open: **http://localhost:5000/?run=demo-health-check&mode=operator**
 
 You'll see:
-- **Left**: 7 flows (Signal → Plan → Build → Review → Gate → Deploy → Wisdom)
+- **Left**: 9 flows (Signal → Plan → Build → Review → Gate → Deploy → Wisdom → Reset → Demo)
 - **Center**: Step graph showing what ran and what it produced
 - **Right**: Evidence, artifacts, and agent details
 
-The demo shows a complete run—all seven flows executed, all receipts captured. Click around. This is what "done" looks like.
+The demo shows a complete run—all nine flows indexed, with artifacts captured. Click around. This is what "done" looks like.
 
 ---
 
@@ -210,6 +225,22 @@ make help               # All commands
 | What this system is | [TRUST_COMPILER.md](docs/explanation/TRUST_COMPILER.md) |
 | 15 lessons learned | [META_LEARNINGS.md](docs/explanation/META_LEARNINGS.md) |
 | 12 emergent laws | [EMERGENT_PHYSICS.md](docs/explanation/EMERGENT_PHYSICS.md) |
+
+---
+
+## Are You Ready to Adopt This?
+
+Flow Studio is built for teams who want **evidence**, **replayability**, and **change control** around agentic work. You'll have a better time if:
+
+- [ ] You can run Python locally and in CI (the repo assumes `uv`)
+- [ ] You have an opinionated place to store run artifacts (logs, snapshots, traces)
+- [ ] You have a stance on secrets (source, access, rotation)
+- [ ] You treat "automation with guardrails" as a feature: validation, schemas, and CI checks
+- [ ] You have a human review path when the system is uncertain
+
+Start with a known-good reference execution: [GOLDEN_RUNS.md](docs/GOLDEN_RUNS.md).
+
+See [ADOPTION_PLAYBOOK.md](docs/ADOPTION_PLAYBOOK.md) for the full onboarding guide.
 
 ---
 

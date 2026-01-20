@@ -87,8 +87,8 @@ def test_flow_keys_bijection(artifact_catalog, flow_configs):
     catalog_flows = set(artifact_catalog["flows"].keys())
     config_flows = set(flow_configs.keys())
 
-    # Expected canonical flows
-    expected_flows = {"signal", "plan", "build", "gate", "deploy", "wisdom"}
+    # Expected canonical SDLC flows (7 flows including review)
+    expected_flows = {"signal", "plan", "build", "review", "gate", "deploy", "wisdom"}
 
     # Catalog must match expected
     assert catalog_flows == expected_flows, (
@@ -164,6 +164,7 @@ def test_decision_artifacts_consistent(artifact_catalog):
         "signal": "problem_statement.md",
         "plan": "implementation_plan.md",  # Plan's decision artifact is implementation_plan
         "build": "build_receipt.json",
+        "review": "review_receipt.json",  # Review's decision artifact is review_receipt
         "gate": "merge_recommendation.md",
         "deploy": "deployment_decision.md",
         "wisdom": "learnings.md",  # Wisdom's decision artifact is learnings
