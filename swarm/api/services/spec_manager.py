@@ -66,6 +66,64 @@ class SpecManager:
 
         logger.info("SpecManager initialized with repo_root=%s", repo_root)
 
+    def reload(self) -> None:
+        """Force reload all data from disk by clearing caches.
+
+        Clears all internal caches so the next access will re-read from disk.
+        Use this after making external modifications to configuration files.
+        """
+        self._flow_cache.clear()
+        self._template_cache.clear()
+        self._run_state_cache.clear()
+        logger.info("SpecManager caches cleared - data will reload on next access")
+
+    def list_agents(self) -> List[Dict[str, Any]]:
+        """List all available agents.
+
+        Returns:
+            List of agent summaries with id, name, description.
+        """
+        agents = []
+        agents_dir = self.repo_root / ".claude" / "agents"
+
+        if agents_dir.exists():
+            for md_file in agents_dir.glob("*.md"):
+                try:
+                    # Read frontmatter from agent file
+                    content = md_file.read_text(encoding="utf-8")
+                    if content.startswith("---"):
+                        # Extract YAML frontmatter
+                        import yaml
+                        end_marker = content.find("---", 3)
+                        if end_marker > 0:
+                            frontmatter = yaml.safe_load(content[3:end_marker])
+                            agents.append({
+                                "id": md_file.stem,
+                                "name": frontmatter.get("name", md_file.stem),
+                                "description": frontmatter.get("description", ""),
+                            })
+                        else:
+                            agents.append({
+                                "id": md_file.stem,
+                                "name": md_file.stem,
+                                "description": "",
+                            })
+                    else:
+                        agents.append({
+                            "id": md_file.stem,
+                            "name": md_file.stem,
+                            "description": "",
+                        })
+                except Exception as e:
+                    logger.warning("Failed to load agent %s: %s", md_file, e)
+                    agents.append({
+                        "id": md_file.stem,
+                        "name": md_file.stem,
+                        "description": "",
+                    })
+
+        return agents
+
     @staticmethod
     def _find_repo_root() -> Path:
         """Find repository root by looking for .git directory.

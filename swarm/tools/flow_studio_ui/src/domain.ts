@@ -1314,12 +1314,12 @@ export type FlowStudioUIID =
   // Context Budget Header Control
   | "flow_studio.header.context_budget"
   | "flow_studio.header.context_budget.trigger"
-  // Boundary Review
-  | "flow_studio.boundary_review.panel"
-  | "flow_studio.boundary_review.content"
-  | "flow_studio.boundary_review.container"
-  | "flow_studio.boundary_review.approve"
-  | "flow_studio.boundary_review.pause";
+  // Boundary Review (under modal region)
+  | "flow_studio.modal.boundary_review.panel"
+  | "flow_studio.modal.boundary_review.content"
+  | "flow_studio.modal.boundary_review.container"
+  | "flow_studio.modal.boundary_review.approve"
+  | "flow_studio.modal.boundary_review.pause";
 
 /**
  * Query an element by its data-uiid attribute with type safety.

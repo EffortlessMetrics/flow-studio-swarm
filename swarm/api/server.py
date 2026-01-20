@@ -608,6 +608,50 @@ def create_app(
         )
 
     # -------------------------------------------------------------------------
+    # Reload Endpoint
+    # -------------------------------------------------------------------------
+
+    class ReloadResponse(BaseModel):
+        """Response for /api/reload endpoint."""
+
+        status: str
+        flows: int
+        agents: int
+
+    @app.post("/api/reload", response_model=ReloadResponse, operation_id="api_reload_api_reload_post")
+    async def api_reload():
+        """Force reload all data from disk.
+
+        Reloads all flow specs, templates, and agent configurations from disk.
+        Use this after making external modifications to configuration files.
+
+        Returns:
+            ReloadResponse with reload status and counts.
+        """
+        try:
+            # Reload the SpecManager
+            spec_mgr = get_spec_manager()
+            spec_mgr.reload()
+
+            # Get counts
+            flows_count = len(spec_mgr.list_flows())
+            agents_count = len(spec_mgr.list_agents()) if hasattr(spec_mgr, 'list_agents') else 0
+
+            return ReloadResponse(
+                status="ok",
+                flows=flows_count,
+                agents=agents_count,
+            )
+
+        except Exception as e:
+            logger.error("Failed to reload: %s", e, exc_info=True)
+            return ReloadResponse(
+                status=f"error: {str(e)}",
+                flows=0,
+                agents=0,
+            )
+
+    # -------------------------------------------------------------------------
     # RunTailer Endpoints
     # -------------------------------------------------------------------------
 

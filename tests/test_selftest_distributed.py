@@ -214,6 +214,16 @@ class TestPerformance:
         code_seq, _ = run_selftest_command("--json-v2", timeout=300)
         duration_seq = time.time() - start_seq
 
+        # Skip if sequential runtime is too fast to measure meaningful speedup.
+        # When the work is sub-second, parallelism overhead dominates and the
+        # speedup measurement becomes noise. This is especially true in CI
+        # where steps may be cached or stubbed.
+        if duration_seq < 1.0:
+            pytest.skip(
+                f"Sequential runtime too fast ({duration_seq:.2f}s) to measure "
+                f"meaningful parallelism speedup. Requires >= 1.0s of work."
+            )
+
         # Run distributed
         start_dist = time.time()
         code_dist, output_dist = run_selftest_command(

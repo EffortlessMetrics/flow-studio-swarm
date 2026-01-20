@@ -104,6 +104,12 @@ HIGH_AGENT_PATTERNS = frozenset(
         # Deployment verification
         "smoke-verifier",
         "deploy-monitor",
+        # Test execution
+        "test-executor",
+        # PR creation
+        "pr-creator",
+        # Security
+        "secrets-sanitizer",
     }
 )
 
@@ -120,6 +126,18 @@ MEDIUM_AGENT_PATTERNS = frozenset(
         # Fixers (important but not decision-making)
         "fixer",
         "mutator",
+        # Analysis agents (v3.0)
+        "forensic-analyst",
+        "quality-analyst",
+        "signal-quality-analyst",
+        "solution-analyst",
+        "pattern-analyst",
+        "maintainability-analyst",
+        "traceability-auditor",
+        "process-analyst",
+        # Review/PR analysis
+        "pr-feedback-harvester",
+        "review-worklist-writer",
     }
 )
 
@@ -132,6 +150,9 @@ LOW_AGENT_PATTERNS = frozenset(
         "scope-assessor",
         # Communication
         "gh-reporter",
+        "gh-issue-manager",
+        "pr-commenter",
+        "pr-status-manager",
         # Documentation (supplementary)
         "doc-writer",
         # Post-flight analysis
@@ -143,8 +164,22 @@ LOW_AGENT_PATTERNS = frozenset(
         # Utility
         "swarm-ops",
         "ux-implementer",
+        "run-prep",
         # Git operations (mechanical)
         "repo-operator",
+        # Reset flow agents (utility/infrastructure)
+        "reset-diagnose",
+        "reset-sync-upstream",
+        "reset-stash-wip",
+        "reset-restore-wip",
+        "reset-resolve-conflicts",
+        "reset-verify-clean",
+        "reset-prune-branches",
+        "reset-archive-run",
+        # Cleanup agents
+        "review-cleanup",
+        "wisdom-cleanup",
+        "build-cleanup",
     }
 )
 
