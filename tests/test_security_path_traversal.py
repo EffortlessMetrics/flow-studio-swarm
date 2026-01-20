@@ -51,6 +51,30 @@ def test_storage_get_run_path_validation():
         storage.get_run_path("../etc")
 
 
+def test_storage_find_run_path_validation():
+    """Test that find_run_path validates run_id against path traversal."""
+    with pytest.raises(ValueError, match="run_id"):
+        storage.find_run_path("../etc")
+
+    with pytest.raises(ValueError, match="run_id"):
+        storage.find_run_path("..\\etc")
+
+    with pytest.raises(ValueError, match="run_id"):
+        storage.find_run_path("..")
+
+
+def test_storage_get_run_type_validation():
+    """Test that get_run_type validates run_id against path traversal."""
+    with pytest.raises(ValueError, match="run_id"):
+        storage.get_run_type("../etc")
+
+    with pytest.raises(ValueError, match="run_id"):
+        storage.get_run_type("..\\etc")
+
+    with pytest.raises(ValueError, match="run_id"):
+        storage.get_run_type("..")
+
+
 def test_run_artifacts_validation():
     # Validation happens before any IO or inspector access
 

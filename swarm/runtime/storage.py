@@ -275,7 +275,12 @@ def find_run_path(run_id: RunId) -> Optional[Path]:
 
     Returns:
         Path to the run directory, or None if not found.
+
+    Raises:
+        ValueError: If run_id contains path traversal sequences.
     """
+    validate_path_component(run_id, "run_id")
+
     # Check examples first (committed, curated)
     example_path = EXAMPLES_DIR / run_id
     if example_path.exists() and example_path.is_dir():
@@ -297,7 +302,12 @@ def get_run_type(run_id: RunId) -> Optional[str]:
 
     Returns:
         "example" if in examples/, "active" if in runs/, None if not found.
+
+    Raises:
+        ValueError: If run_id contains path traversal sequences.
     """
+    validate_path_component(run_id, "run_id")
+
     example_path = EXAMPLES_DIR / run_id
     if example_path.exists() and example_path.is_dir():
         return "example"
