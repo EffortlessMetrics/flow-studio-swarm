@@ -39,6 +39,7 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from swarm.runtime.safe_paths import validate_path_component
 from .types import (
     HandoffEnvelope,
     RunEvent,
@@ -259,6 +260,7 @@ def get_run_path(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Path:
         >>> get_run_path("run-20251208-143022-abc123")
         PosixPath('/path/to/swarm/runs/run-20251208-143022-abc123')
     """
+    validate_path_component(run_id, "run_id")
     return runs_dir / run_id
 
 
