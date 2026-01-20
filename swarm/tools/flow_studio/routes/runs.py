@@ -99,6 +99,8 @@ async def api_run_summary(run_id: str, state: FlowStudioState = Depends(get_stat
     try:
         summary = state.core.get_run_summary(run_id)
         return summary.to_dict()
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
 
@@ -161,6 +163,8 @@ async def api_run_events(run_id: str, state: FlowStudioState = Depends(get_state
 
     try:
         return {"run_id": run_id, "events": get_events(state.run_service, run_id)}
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
 
@@ -174,6 +178,8 @@ async def api_step_transcript(
 ):
     try:
         return load_transcript(run_id, flow_key, step_id, state.run_inspector)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except RunArtifactsError as exc:
         return JSONResponse(exc.payload, status_code=exc.status_code)
 
@@ -187,6 +193,8 @@ async def api_step_receipt(
 ):
     try:
         return load_receipt(run_id, flow_key, step_id, state.run_inspector)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except RunArtifactsError as exc:
         return JSONResponse(exc.payload, status_code=exc.status_code)
 
@@ -204,6 +212,8 @@ async def api_cancel_run(run_id: str, state: FlowStudioState = Depends(get_state
             {"error": "Run not found or already completed", "run_id": run_id},
             status_code=404,
         )
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
 
@@ -226,6 +236,8 @@ async def api_set_exemplar(
                 "is_exemplar": is_exemplar,
             }
         return JSONResponse({"error": "Run not found", "run_id": run_id}, status_code=404)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
 
@@ -248,6 +260,8 @@ async def api_list_exemplars(state: FlowStudioState = Depends(get_state)):
 async def api_run_wisdom_summary(run_id: str, state: FlowStudioState = Depends(get_state)):
     try:
         return load_wisdom_summary(run_id, state.run_inspector)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except RunArtifactsError as exc:
         return JSONResponse(exc.payload, status_code=exc.status_code)
 
@@ -257,8 +271,13 @@ async def api_run_sdlc(run_id: str, state: FlowStudioState = Depends(get_state))
     if state.run_inspector is None:
         return JSONResponse({"error": "Run inspector not available"}, status_code=503)
 
-    bar = state.run_inspector.get_sdlc_bar(run_id)
-    return {"run_id": run_id, "sdlc": bar}
+    try:
+        bar = state.run_inspector.get_sdlc_bar(run_id)
+        return {"run_id": run_id, "sdlc": bar}
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
 
 
 @router.get("/api/runs/{run_id}/flows/{flow_key}", response_model=schema.FlowStatusInfo if schema else None)
@@ -266,8 +285,13 @@ async def api_run_flow(run_id: str, flow_key: str, state: FlowStudioState = Depe
     if state.run_inspector is None:
         return JSONResponse({"error": "Run inspector not available"}, status_code=503)
 
-    result = state.run_inspector.get_flow_status(run_id, flow_key)
-    return state.run_inspector.to_dict(result)
+    try:
+        result = state.run_inspector.get_flow_status(run_id, flow_key)
+        return state.run_inspector.to_dict(result)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
 
 
 @router.get(
@@ -283,19 +307,24 @@ async def api_run_step(
     if state.run_inspector is None:
         return JSONResponse({"error": "Run inspector not available"}, status_code=503)
 
-    result = state.run_inspector.get_step_status(run_id, flow_key, step_id)
+    try:
+        result = state.run_inspector.get_step_status(run_id, flow_key, step_id)
 
-    step_timing = None
-    flow_timing = state.run_inspector.get_flow_timing(run_id, flow_key)
-    if flow_timing:
-        for step in flow_timing.steps:
-            if step.step_id == step_id:
-                step_timing = state.run_inspector.to_dict(step)
-                break
+        step_timing = None
+        flow_timing = state.run_inspector.get_flow_timing(run_id, flow_key)
+        if flow_timing:
+            for step in flow_timing.steps:
+                if step.step_id == step_id:
+                    step_timing = state.run_inspector.to_dict(step)
+                    break
 
-    step_dict = state.run_inspector.to_dict(result)
-    step_dict["timing"] = step_timing
-    return step_dict
+        step_dict = state.run_inspector.to_dict(result)
+        step_dict["timing"] = step_timing
+        return step_dict
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
 
 
 @router.get("/api/runs/{run_id}/timeline", response_model=schema.TimelineResponse if schema else None)
@@ -303,8 +332,13 @@ async def api_run_timeline(run_id: str, state: FlowStudioState = Depends(get_sta
     if state.run_inspector is None:
         return JSONResponse({"error": "RunInspector not available"}, status_code=503)
 
-    timeline = state.run_inspector.get_run_timeline(run_id)
-    return {"run_id": run_id, "events": [state.run_inspector.to_dict(e) for e in timeline]}
+    try:
+        timeline = state.run_inspector.get_run_timeline(run_id)
+        return {"run_id": run_id, "events": [state.run_inspector.to_dict(e) for e in timeline]}
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
 
 
 @router.get("/api/runs/{run_id}/timing", response_model=schema.RunTimingResponse if schema else None)
@@ -312,11 +346,16 @@ async def api_run_timing(run_id: str, state: FlowStudioState = Depends(get_state
     if state.run_inspector is None:
         return JSONResponse({"error": "RunInspector not available"}, status_code=503)
 
-    timing = state.run_inspector.get_run_timing(run_id)
-    if timing is None:
-        return {"run_id": run_id, "timing": None, "message": "No timing data available"}
+    try:
+        timing = state.run_inspector.get_run_timing(run_id)
+        if timing is None:
+            return {"run_id": run_id, "timing": None, "message": "No timing data available"}
 
-    return {"run_id": run_id, "timing": state.run_inspector.to_dict(timing)}
+        return {"run_id": run_id, "timing": state.run_inspector.to_dict(timing)}
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
 
 
 @router.get(
@@ -327,20 +366,25 @@ async def api_flow_timing(run_id: str, flow_key: str, state: FlowStudioState = D
     if state.run_inspector is None:
         return JSONResponse({"error": "RunInspector not available"}, status_code=503)
 
-    timing = state.run_inspector.get_flow_timing(run_id, flow_key)
-    if timing is None:
+    try:
+        timing = state.run_inspector.get_flow_timing(run_id, flow_key)
+        if timing is None:
+            return {
+                "run_id": run_id,
+                "flow_key": flow_key,
+                "timing": None,
+                "message": "No timing data available",
+            }
+
         return {
             "run_id": run_id,
             "flow_key": flow_key,
-            "timing": None,
-            "message": "No timing data available",
+            "timing": state.run_inspector.to_dict(timing),
         }
-
-    return {
-        "run_id": run_id,
-        "flow_key": flow_key,
-        "timing": state.run_inspector.to_dict(timing),
-    }
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
 
 
 @router.get("/api/runs/compare", response_class=JSONResponse)
@@ -359,17 +403,22 @@ async def api_runs_compare(
             status_code=400,
         )
 
-    if state.run_inspector.get_run_path(run_a) is None:
-        return JSONResponse({"error": f"Run '{run_a}' not found"}, status_code=404)
+    try:
+        if state.run_inspector.get_run_path(run_a) is None:
+            return JSONResponse({"error": f"Run '{run_a}' not found"}, status_code=404)
 
-    if state.run_inspector.get_run_path(run_b) is None:
-        return JSONResponse({"error": f"Run '{run_b}' not found"}, status_code=404)
+        if state.run_inspector.get_run_path(run_b) is None:
+            return JSONResponse({"error": f"Run '{run_b}' not found"}, status_code=404)
 
-    if flow not in state.run_inspector.catalog.get("flows", {}):
-        return JSONResponse(
-            {"error": f"Flow '{flow}' not found in catalog"},
-            status_code=404,
-        )
+        if flow not in state.run_inspector.catalog.get("flows", {}):
+            return JSONResponse(
+                {"error": f"Flow '{flow}' not found in catalog"},
+                status_code=404,
+            )
 
-    result = state.run_inspector.compare_flows(run_a, run_b, flow)
-    return result
+        result = state.run_inspector.compare_flows(run_a, run_b, flow)
+        return result
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
