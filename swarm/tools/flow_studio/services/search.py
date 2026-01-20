@@ -146,7 +146,21 @@ def build_artifact_graph(
     return {"nodes": nodes, "edges": edges}
 
 
-def search(flows_cache: Dict[str, Any], agents_cache: Dict[str, Any], query: str) -> Dict[str, Any]:
+def search(
+    flows_cache: Dict[str, Any],
+    agents_cache: Dict[str, Any],
+    query: str,
+    agent_flow_index: Optional[Dict[str, List[str]]] = None,
+) -> Dict[str, Any]:
+    """Search flows, steps, agents, and artifacts.
+
+    Args:
+        flows_cache: Dict of flow_key -> flow data
+        agents_cache: Dict of agent_key -> agent data
+        query: Search query string
+        agent_flow_index: Optional pre-computed index mapping agent_key -> [flow_keys].
+            When provided, enables O(1) agent-to-flow lookups instead of O(N*M) scan.
+    """
     query = query.lower().strip()
     if not query:
         return {"results": [], "query": ""}
@@ -189,12 +203,17 @@ def search(flows_cache: Dict[str, Any], agents_cache: Dict[str, Any], query: str
             break
         short_role = agent.get("short_role", "")
         if query in agent_key.lower() or query in short_role.lower():
-            agent_flows = []
-            for flow_key, flow in flows_cache.items():
-                for step in flow.get("steps", []):
-                    if agent_key in step.get("agents", []):
-                        agent_flows.append(flow_key)
-                        break
+            if agent_flow_index and agent_key in agent_flow_index:
+                # O(1) lookup via pre-computed index
+                agent_flows = agent_flow_index[agent_key]
+            else:
+                # O(N*M) fallback for backward compatibility
+                agent_flows = []
+                for flow_key, flow in flows_cache.items():
+                    for step in flow.get("steps", []):
+                        if agent_key in step.get("agents", []):
+                            agent_flows.append(flow_key)
+                            break
             results.append(
                 {
                     "type": "agent",

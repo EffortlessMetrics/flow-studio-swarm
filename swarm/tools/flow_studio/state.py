@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .services.core_service import create_core
 from .services.run_inspector import create_run_inspector
@@ -21,14 +21,32 @@ class FlowStudioState:
     validation_data: Optional[Dict[str, Any]]
     flows_cache: Dict[str, Any] = field(default_factory=dict)
     agents_cache: Dict[str, Any] = field(default_factory=dict)
+    agent_flow_index: Dict[str, List[str]] = field(default_factory=dict)
     tours_cache: Dict[str, Any] = field(default_factory=dict)
     lock: threading.RLock = field(default_factory=threading.RLock)
 
     def reload_from_disk(self) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if self.core:
             self.agents_cache, self.flows_cache = self.core.reload()
+
+        self._rebuild_agent_flow_index()
         self.tours_cache = load_tours(self.repo_root)
         return self.agents_cache, self.flows_cache
+
+    def _rebuild_agent_flow_index(self) -> None:
+        """Build inverted index mapping agent keys to their flows.
+
+        This enables O(1) lookups for agent-to-flow relationships during search,
+        replacing the previous O(N*M) nested loop scan.
+        """
+        self.agent_flow_index.clear()
+        for flow_key, flow in self.flows_cache.items():
+            for step in flow.get("steps", []):
+                for agent_key in step.get("agents", []):
+                    if agent_key not in self.agent_flow_index:
+                        self.agent_flow_index[agent_key] = []
+                    if flow_key not in self.agent_flow_index[agent_key]:
+                        self.agent_flow_index[agent_key].append(flow_key)
 
 
 def create_state(repo_root: Path) -> FlowStudioState:
