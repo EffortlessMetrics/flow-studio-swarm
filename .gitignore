@@ -81,3 +81,8 @@ Thumbs.db
 .playwright-mcp/
 
 nul
+
+.gemini/tmp/
+temp_work_36/
+temp_work_32/
+temp_work
