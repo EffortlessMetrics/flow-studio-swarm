@@ -24,11 +24,11 @@
         <span id="profile-icon" aria-hidden="true">&#128230;</span>
         <span id="profile-text">Profile: Loading...</span>
       </div>
-      <div id="governance-badge" class="muted" style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: #f3f4f6; border-radius: 4px; cursor: pointer;" title="Click to view governance status" role="status" aria-live="polite" data-uiid="flow_studio.header.governance">
+      <button id="governance-badge" class="muted fs-status-button" title="Click to view governance status" aria-live="polite" aria-label="View governance status" data-uiid="flow_studio.header.governance">
         <span id="governance-icon" aria-hidden="true">⏳</span>
         <span id="governance-text">Checking...</span>
         <span id="governance-issues-count" class="governance-issues-badge" style="display: none;">0</span>
-      </div>
+      </button>
       <label id="governance-toggle" class="governance-toggle author-only" title="Highlight governance issues on graph nodes" data-uiid="flow_studio.header.governance.overlay">
         <input type="checkbox" id="governance-overlay-checkbox" />
         <span>Show Issues</span>
@@ -41,6 +41,6 @@
         <span class="mono">make dev-check</span>
         <button id="reload-btn" style="margin-left: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; border: 1px solid #d1d5db; background: #f3f4f6; border-radius: 3px;" data-uiid="flow_studio.header.reload.btn">Reload</button>
       </div>
-      <button id="help-btn" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #e5e7eb; color: #374151; font-size: 14px; font-weight: bold; border: none; cursor: pointer;" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
+      <button id="help-btn" class="fs-icon-button" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
     </nav>
   </header>
