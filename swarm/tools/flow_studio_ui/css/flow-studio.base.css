@@ -129,6 +129,25 @@
       background: var(--fs-color-bg-hover, #e5e7eb);
     }
 
+    .fs-icon-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--fs-color-bg-subtle, #f3f4f6);
+      color: var(--fs-color-text, #374151);
+      font-size: 14px;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .fs-icon-button:hover {
+      background: var(--fs-color-bg-hover, #e5e7eb);
+    }
+
     .fs-button-primary {
       padding: 8px 16px;
       background: var(--fs-color-accent, #3b82f6);
