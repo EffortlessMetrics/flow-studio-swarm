@@ -82,7 +82,8 @@ Thumbs.db
 
 nul
 
+# Gemini CLI temporary directories
 .gemini/tmp/
-temp_work_36/
-temp_work_32/
-temp_work
+
+# Temporary working directories (Gemini CLI sessions, ad-hoc work)
+temp_work*/
