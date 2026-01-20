@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 # Module logger for budget validation warnings
 logger = logging.getLogger(__name__)
@@ -131,7 +131,7 @@ def _load_config() -> Dict[str, Any]:
 
     if _CONFIG_PATH.exists():
         with open(_CONFIG_PATH) as f:
-            _cached_config = yaml.safe_load(f)
+            _cached_config = load_yaml(f)
     else:
         _cached_config = _default_config()
 

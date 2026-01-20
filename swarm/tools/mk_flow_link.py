@@ -52,14 +52,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
-import yaml
-
 # Add repo root to path for imports
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from swarm.config.flow_registry import get_flow_keys  # noqa: E402
+from swarm.utils.yaml_utils import load_yaml  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -90,7 +89,7 @@ class FlowConfig:
 def _safe_load_yaml(path: Path) -> Dict[str, Any]:
     """Load YAML file safely."""
     text = path.read_text(encoding="utf-8")
-    data = yaml.safe_load(text)
+    data = load_yaml(text)
     if data is None:
         return {}
     if not isinstance(data, dict):

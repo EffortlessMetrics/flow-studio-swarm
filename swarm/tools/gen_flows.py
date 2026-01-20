@@ -38,7 +38,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CONFIG_DIR = REPO_ROOT / "swarm" / "config" / "agents"
@@ -84,7 +84,7 @@ class FlowConfig:
 
 def _safe_load_yaml(path: Path) -> Dict[str, Any]:
     text = path.read_text(encoding="utf-8")
-    data = yaml.safe_load(text)
+    data = load_yaml(text)
     if data is None:
         return {}
     if not isinstance(data, dict):

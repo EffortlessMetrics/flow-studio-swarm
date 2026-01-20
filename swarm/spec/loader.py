@@ -25,6 +25,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
+from swarm.utils.yaml_utils import load_yaml
+
 from .types import (
     FlowSpec,
     StationSpec,
@@ -85,7 +87,7 @@ def _load_json_file(path: Path) -> Dict[str, Any]:
 def _load_yaml_file(path: Path) -> Dict[str, Any]:
     """Load and parse a YAML file."""
     with open(path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+        data = load_yaml(f)
     if not data:
         raise ValueError(f"Empty YAML file: {path}")
     return data

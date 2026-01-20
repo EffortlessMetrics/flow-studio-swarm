@@ -56,7 +56,7 @@ from typing import Any, Dict, List, Tuple
 
 from flask import Flask, Response, jsonify, request
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 # Import HTML template loader for Flow Studio UI
 try:
@@ -173,7 +173,7 @@ _TOURS: Dict[str, Tour] = {}
 
 def _safe_load_yaml(path: Path) -> Dict[str, Any]:
     text = path.read_text(encoding="utf-8")
-    data = yaml.safe_load(text)
+    data = load_yaml(text)
     if data is None:
         return {}
     if not isinstance(data, dict):

@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 
 class RemediationPattern:
@@ -74,7 +74,7 @@ class RemediationSuggestionEngine:
             )
 
         with open(self.remediation_map_path) as f:
-            data = yaml.safe_load(f)
+            data = load_yaml(f)
 
         return [RemediationPattern(p) for p in data["remediation_patterns"]]
 

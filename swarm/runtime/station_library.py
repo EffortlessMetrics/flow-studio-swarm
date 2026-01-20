@@ -36,6 +36,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 import yaml
 
+from swarm.utils.yaml_utils import load_yaml
+
 if TYPE_CHECKING:
     from swarm.spec import types as compiler_types
 
@@ -571,7 +573,7 @@ class StationLibrary:
             for yaml_file in pack_dir.glob("*.yaml"):
                 try:
                     with open(yaml_file, "r") as f:
-                        data = yaml.safe_load(f)
+                        data = load_yaml(f)
 
                     file_path = str(yaml_file.resolve())
                     if isinstance(data, list):
@@ -1119,7 +1121,7 @@ class StationLibrary:
             if path.exists():
                 with open(path, "r") as f:
                     if path.suffix in (".yaml", ".yml"):
-                        data = yaml.safe_load(f) or []
+                        data = load_yaml(f) or []
                     else:
                         data = json.load(f)
 
@@ -1171,7 +1173,7 @@ class StationLibrary:
             # List file - remove from list
             with open(path, "r") as f:
                 if path.suffix in (".yaml", ".yml"):
-                    data = yaml.safe_load(f) or []
+                    data = load_yaml(f) or []
                 else:
                     data = json.load(f)
 

@@ -658,9 +658,9 @@ def load_catalog_from_file(path: Path) -> SidequestCatalog:
     try:
         with open(path, "r") as f:
             if path.suffix in (".yaml", ".yml"):
-                import yaml
+                from swarm.utils.yaml_utils import load_yaml
 
-                data = yaml.safe_load(f)
+                data = load_yaml(f)
             else:
                 data = json.load(f)
 

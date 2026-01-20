@@ -1003,9 +1003,9 @@ class _LegacySpecCompiler:
             return None
 
         try:
-            import yaml
+            from swarm.utils.yaml_utils import load_yaml
             with open(template_path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
+                data = load_yaml(f)
 
             return StepTemplate(
                 id=data.get("id", template_id),
@@ -1252,9 +1252,9 @@ def _load_template_file(template_path: Path) -> Optional[Dict[str, Any]]:
             with open(template_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         elif template_path.suffix in (".yaml", ".yml"):
-            import yaml
+            from swarm.utils.yaml_utils import load_yaml
             with open(template_path, "r", encoding="utf-8") as f:
-                return yaml.safe_load(f)
+                return load_yaml(f)
         else:
             logger.warning("Unknown template format: %s", template_path)
             return None
