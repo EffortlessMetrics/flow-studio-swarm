@@ -876,10 +876,9 @@ class SelfTestRunner:
                         print(f"  (warning: {step.id} failed, but non-blocking in degraded mode)")
                 else:
                     # In strict mode, KERNEL and GOVERNANCE failures block
-                    self.failed_steps.append(step.id)
+                    # OPTIONAL failures are tracked in optional_failed but don't block
                     if step.tier in (SelfTestTier.KERNEL, SelfTestTier.GOVERNANCE):
-                        if not self.degraded or should_block:
-                            pass  # Will be counted as failure below
+                        self.failed_steps.append(step.id)
 
         # Summarize
         self.print_footer()

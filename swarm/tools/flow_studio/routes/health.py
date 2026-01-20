@@ -55,3 +55,37 @@ async def api_health(state: FlowStudioState = Depends(get_state)) -> dict[str, A
             "validation": state.validation_data is not None,
         },
     }
+
+
+@router.post("/api/reload", response_model=schema.ReloadResponse if schema else None)
+async def api_reload(state: FlowStudioState = Depends(get_state)) -> dict[str, Any]:
+    """Force reload all data from disk.
+
+    Reloads all flow specs, agent configurations, and cached data from disk.
+    Use this after making external modifications to configuration files.
+
+    Returns:
+        ReloadResponse with reload status and counts.
+    """
+    try:
+        # Reload state caches
+        state.reload_from_disk()
+
+        # Get updated counts
+        if state.core:
+            flows_count = len(state.core.list_flows())
+        else:
+            flows_count = 0
+        agents_count = len(state.agents_cache)
+
+        return {
+            "status": "ok",
+            "flows": flows_count,
+            "agents": agents_count,
+        }
+    except Exception as e:
+        return {
+            "status": f"error: {str(e)}",
+            "flows": 0,
+            "agents": 0,
+        }
