@@ -70,6 +70,14 @@ export function initShortcutsModal(): void {
     }
   });
 
+  // Close button click handler
+  const closeBtn = document.getElementById("shortcuts-modal-close");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      toggleShortcutsModal(false);
+    });
+  }
+
   // Close on ESC key within the modal
   modal.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key === "Escape") {
