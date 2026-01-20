@@ -56,9 +56,9 @@
       </button>
       <div class="muted author-only" data-uiid="flow_studio.header.reload">
         <span class="mono">make dev-check</span>
-        <button id="reload-btn" style="margin-left: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; border: 1px solid #d1d5db; background: #f3f4f6; border-radius: 3px;" data-uiid="flow_studio.header.reload.btn">Reload</button>
+        <button id="reload-btn" class="fs-button-small" data-uiid="flow_studio.header.reload.btn">Reload</button>
       </div>
-      <button id="help-btn" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #e5e7eb; color: #374151; font-size: 14px; font-weight: bold; border: none; cursor: pointer;" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
+      <button id="help-btn" class="fs-icon-button filled" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help" style="font-weight: bold; font-size: 14px; color: #374151;">?</button>
     </nav>
   </header>
   <div id="sdlc-bar" role="status" aria-label="SDLC progress" data-uiid="flow_studio.sdlc_bar">
@@ -4014,6 +4014,184 @@ make validate-swarm</pre>
     .inventory-counts__delta-change--negative {
       opacity: 0.8;
     }
+
+    /* =========================================================================
+     * Toast Notifications
+     * =========================================================================
+     * Non-blocking toast notifications for flow completion during autopilot.
+     */
+    .toast-container {
+      position: fixed;
+      top: var(--fs-spacing-lg);
+      right: var(--fs-spacing-lg);
+      z-index: var(--fs-z-toast);
+      display: flex;
+      flex-direction: column;
+      gap: var(--fs-spacing-sm);
+      max-width: 360px;
+      pointer-events: none;
+    }
+
+    .toast {
+      display: flex;
+      align-items: stretch;
+      background: var(--fs-color-bg-base);
+      border: 1px solid var(--fs-color-border);
+      border-radius: var(--fs-radius-lg);
+      box-shadow: var(--fs-shadow-md);
+      pointer-events: auto;
+      animation: toast-slide-in 0.3s ease;
+      overflow: hidden;
+    }
+
+    .toast--info {
+      border-left: 4px solid var(--fs-color-accent);
+    }
+
+    .toast--success {
+      border-left: 4px solid var(--fs-color-success);
+    }
+
+    .toast--warning {
+      border-left: 4px solid var(--fs-color-warning);
+    }
+
+    .toast--error {
+      border-left: 4px solid var(--fs-color-error);
+    }
+
+    .toast--fade-out {
+      animation: toast-fade-out 0.3s ease forwards;
+    }
+
+    .toast__content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: var(--fs-spacing-sm);
+      padding: var(--fs-spacing-md);
+    }
+
+    .toast__icon {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: var(--fs-color-success-bg);
+      color: var(--fs-color-success);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .toast--info .toast__icon {
+      background: var(--fs-color-accent-bg);
+      color: var(--fs-color-accent);
+    }
+
+    .toast--error .toast__icon {
+      background: var(--fs-color-error-bg);
+      color: var(--fs-color-error);
+    }
+
+    .toast__message {
+      flex: 1;
+      font-size: var(--fs-font-size-body);
+      color: var(--fs-color-text);
+      line-height: 1.4;
+    }
+
+    .toast__message strong {
+      font-weight: 600;
+      color: var(--fs-color-text);
+    }
+
+    .toast__action {
+      flex-shrink: 0;
+      padding: var(--fs-spacing-xs) var(--fs-spacing-sm);
+      background: var(--fs-color-accent);
+      color: white;
+      border: none;
+      border-radius: var(--fs-radius-sm);
+      font-size: var(--fs-font-size-sm);
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color var(--fs-transition-fast);
+    }
+
+    .toast__action:hover {
+      background: var(--fs-color-accent-hover);
+    }
+
+    .toast__close {
+      flex-shrink: 0;
+      width: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-left: 1px solid var(--fs-color-border);
+      color: var(--fs-color-text-muted);
+      font-size: 18px;
+      cursor: pointer;
+      transition: background-color var(--fs-transition-fast), color var(--fs-transition-fast);
+    }
+
+    .toast__close:hover {
+      background: var(--fs-color-bg-subtle);
+      color: var(--fs-color-text);
+    }
+
+    @keyframes toast-slide-in {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes toast-fade-out {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+
+    /* Icon Button Utility */
+    .fs-icon-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      border-radius: 50%;
+      cursor: pointer;
+      color: var(--fs-color-text-muted);
+      transition: all var(--fs-transition-fast, 0.15s ease);
+    }
+    .fs-icon-button:hover {
+      background: var(--fs-color-bg-hover, #e5e7eb);
+      color: var(--fs-color-text);
+    }
+    .fs-icon-button.filled {
+       background: var(--fs-color-bg-subtle, #f3f4f6);
+    }
+    .fs-icon-button.filled:hover {
+       background: var(--fs-color-bg-hover, #e5e7eb);
+    }
   </style>
   <script type="application/json" data-inline-source="flowstudio-js-bundle">
 // api.js
@@ -4327,6 +4505,7 @@ import { Api } from "./api.js";
 import { getTeachingMode } from "./teaching_mode.js";
 import { formatDuration, formatTime, formatDateTime, createQuickCommands, escapeHtml } from "./utils.js";
 import { renderSelectNodeHint, renderAgentUsageItem, renderAgentLocationInfo, renderAgentCategoryHint, renderArtifactProducerHint, renderTabs, } from "./ui_fragments.js";
+import { RoutingDecisionCard, ForensicVerdictCard, renderInterruptionStackTab, } from "./components/index.js";
 // ============================================================================
 // Empty State
 // ============================================================================
@@ -4780,6 +4959,77 @@ function renderRoutingDecision(routing) {
     html += '</div>';
     return html;
 }
+// ============================================================================
+// Routing Tab Rendering
+// ============================================================================
+/**
+ * Load and render routing information for a step.
+ * Uses the RoutingDecisionCard and ForensicVerdictCard components
+ * when full routing data is available, falls back to simple display otherwise.
+ */
+async function loadRoutingData(container, runId, flowKey, stepId) {
+    container.innerHTML = '<div class="muted">Loading routing data...</div>';
+    try {
+        const resp = await Api.getStepReceipt(runId, flowKey, stepId);
+        const receipt = resp.receipt;
+        if (!receipt) {
+            container.innerHTML = '<div class="muted">No routing data available for this step</div>';
+            return;
+        }
+        // Clear container for rendering
+        container.innerHTML = '';
+        // Check if we have full routing decision data (V3 routing model)
+        // The receipt may include a routing_decision field with candidates
+        const receiptAny = receipt;
+        const routingDecision = receiptAny.routing_decision;
+        const forensicVerdict = receiptAny.forensic_verdict;
+        // Section: Forensic Verdict (if present)
+        if (forensicVerdict) {
+            const forensicSection = document.createElement("div");
+            forensicSection.className = "routing-tab-section";
+            forensicSection.innerHTML = '<div class="kv-label" style="margin-bottom: 8px;">Forensic Verification</div>';
+            const forensicContainer = document.createElement("div");
+            forensicSection.appendChild(forensicContainer);
+            const forensicCard = new ForensicVerdictCard({
+                container: forensicContainer,
+                startExpanded: false,
+            });
+            forensicCard.setData(forensicVerdict);
+            container.appendChild(forensicSection);
+        }
+        // Section: Full Routing Decision Card (if present)
+        if (routingDecision && routingDecision.candidates && routingDecision.candidates.length > 0) {
+            const routingSection = document.createElement("div");
+            routingSection.className = "routing-tab-section";
+            routingSection.innerHTML = '<div class="kv-label" style="margin-bottom: 8px;">Routing Decision</div>';
+            const routingCardContainer = document.createElement("div");
+            routingSection.appendChild(routingCardContainer);
+            const routingCard = new RoutingDecisionCard({
+                expandedByDefault: false,
+                onCandidateClick: (candidate) => {
+                    console.log('Routing candidate clicked:', candidate);
+                },
+            });
+            routingCard.render(routingDecision, routingCardContainer);
+            container.appendChild(routingSection);
+        }
+        // Section: Simple routing info from receipt (fallback for non-V3 routing)
+        if (receipt.routing) {
+            const simpleRoutingSection = document.createElement("div");
+            simpleRoutingSection.className = "routing-tab-section";
+            simpleRoutingSection.innerHTML = renderRoutingDecision(receipt.routing);
+            container.appendChild(simpleRoutingSection);
+        }
+        // If no routing data at all, show empty state
+        if (!forensicVerdict && !routingDecision && !receipt.routing) {
+            container.innerHTML = '<div class="muted">No routing data recorded for this step</div>';
+        }
+    }
+    catch (err) {
+        console.error("Failed to load routing data", err);
+        container.innerHTML = '<div class="muted">Routing data not available</div>';
+    }
+}
 /**
  * Show step details in the details panel
  */
@@ -4798,6 +5048,8 @@ export async function showStepDetails(data, callbacks = {}) {
     tabs.innerHTML = renderTabs([
         { id: "node", label: "Node", active: defaultTab === "node" },
         { id: "run", label: "Run", active: defaultTab === "run" },
+        { id: "routing", label: "Routing" },
+        { id: "stack", label: "Stack" },
         { id: "transcript", label: "Transcript" },
         { id: "selftest", label: "Selftest" }
     ]);
@@ -4987,6 +5239,16 @@ export async function showStepDetails(data, callbacks = {}) {
     transcriptTab.className = "tab-content";
     transcriptTab.dataset.tab = "transcript";
     transcriptTab.innerHTML = '<div class="muted">Select a step to view transcript</div>';
+    // Routing tab content (lazy-loaded)
+    const routingTab = document.createElement("div");
+    routingTab.className = "tab-content";
+    routingTab.dataset.tab = "routing";
+    routingTab.innerHTML = '<div class="muted">Click to view routing decisions</div>';
+    // Stack tab content (lazy-loaded) - shows interruption/detour stack
+    const stackTab = document.createElement("div");
+    stackTab.className = "tab-content";
+    stackTab.dataset.tab = "stack";
+    stackTab.innerHTML = '<div class="muted">Click to view execution stack</div>';
     detailsEl.appendChild(h2);
     // Add teaching callout if available and teaching mode is on
     if (teachingCallout.innerHTML) {
@@ -4995,6 +5257,8 @@ export async function showStepDetails(data, callbacks = {}) {
     detailsEl.appendChild(tabs);
     detailsEl.appendChild(nodeTab);
     detailsEl.appendChild(runTab);
+    detailsEl.appendChild(routingTab);
+    detailsEl.appendChild(stackTab);
     detailsEl.appendChild(transcriptTab);
     detailsEl.appendChild(selftestTab);
     // Add quick commands section
@@ -5018,6 +5282,14 @@ export async function showStepDetails(data, callbacks = {}) {
             // Lazy load transcript when tab is clicked
             if (tabName === "transcript" && state.currentRunId && data.flow && data.step_id) {
                 loadTranscript(transcriptTab, state.currentRunId, data.flow, data.step_id);
+            }
+            // Lazy load routing data when tab is clicked
+            if (tabName === "routing" && state.currentRunId && data.flow && data.step_id) {
+                loadRoutingData(routingTab, state.currentRunId, data.flow, data.step_id);
+            }
+            // Lazy load stack data when tab is clicked
+            if (tabName === "stack") {
+                renderInterruptionStackTab(stackTab, state.currentRunId, data.flow || null, data.step_id || null, (runId) => Api.getBoundaryReview(runId));
             }
         });
     });
@@ -6126,11 +6398,56 @@ window.addEventListener("load", async () => {
                 void loadRunStatus();
             }
         });
-        // Helper to show boundary review for a completed flow
-        async function showBoundaryReviewPanel(flowKey, runId) {
+        /**
+         * Show a non-blocking toast notification when a flow completes during autopilot.
+         */
+        function showFlowCompletedToast(flowKey, runId) {
+            // Create toast container if it doesn't exist
+            let toastContainer = document.getElementById("toast-container");
+            if (!toastContainer) {
+                toastContainer = document.createElement("div");
+                toastContainer.id = "toast-container";
+                toastContainer.className = "toast-container";
+                document.body.appendChild(toastContainer);
+            }
+            // Create toast element
+            const toast = document.createElement("div");
+            toast.className = "toast toast--info";
+            toast.innerHTML = `
+        <div class="toast__content">
+          <span class="toast__icon">&#10003;</span>
+          <span class="toast__message">Flow <strong>${flowKey}</strong> completed - review available</span>
+          <button class="toast__action" data-flow="${flowKey}" data-run="${runId}">Review</button>
+        </div>
+        <button class="toast__close" aria-label="Dismiss">&times;</button>
+      `;
+            // Add event listeners
+            const actionBtn = toast.querySelector(".toast__action");
+            if (actionBtn) {
+                actionBtn.addEventListener("click", () => {
+                    // Navigate to the completed flow for review
+                    void setActiveFlow(flowKey, true);
+                    toast.remove();
+                });
+            }
+            const closeBtn = toast.querySelector(".toast__close");
+            if (closeBtn) {
+                closeBtn.addEventListener("click", () => {
+                    toast.remove();
+                });
+            }
+            // Auto-dismiss after 8 seconds
+            setTimeout(() => {
+                toast.classList.add("toast--fade-out");
+                setTimeout(() => toast.remove(), 300);
+            }, 8000);
+            toastContainer.appendChild(toast);
+        }
+        // Helper to show boundary review for a completed flow or run
+        async function showBoundaryReviewPanel(flowKey, runId, scope = "flow") {
             try {
                 // Fetch boundary review data from the dedicated API endpoint
-                const boundary = await Api.getBoundaryReview(runId, { scope: "flow", flowKey });
+                const boundary = await Api.getBoundaryReview(runId, { scope, flowKey: scope === "flow" ? flowKey : undefined });
                 // Derive status from verification results
                 let status = "UNKNOWN";
                 if (boundary.verification_failed > 0) {
@@ -6214,14 +6531,21 @@ window.addEventListener("load", async () => {
                 // Refresh status when run state changes
                 void loadRunStatus();
             },
-            onRunComplete: (runId) => {
+            onRunComplete: (runId, isAutopilot) => {
                 // Reload run history to show completed run
                 void initRunHistory().then(() => {
                     setRunHistorySelectedRunId(runId);
                 });
-                // Show boundary review for the completed flow if applicable
-                if (state.currentFlowKey) {
-                    void showBoundaryReviewPanel(state.currentFlowKey, runId);
+                // Different behavior for autopilot vs single-flow runs
+                if (isAutopilot) {
+                    // Autopilot run: show run-level boundary review (scope="run")
+                    void showBoundaryReviewPanel(state.currentFlowKey || "signal", runId, "run");
+                }
+                else {
+                    // Single-flow run: show flow-level boundary review (existing behavior)
+                    if (state.currentFlowKey) {
+                        void showBoundaryReviewPanel(state.currentFlowKey, runId, "flow");
+                    }
                 }
             },
             onRunFailed: (_runId, _error) => {
@@ -6247,6 +6571,15 @@ window.addEventListener("load", async () => {
                 updateCompareSelector();
                 await loadRunStatus();
                 setRunHistorySelectedRunId(runId);
+            },
+            onFlowCompleted: (runId, flowKey) => {
+                // Individual flow completed during autopilot run
+                // Show a non-blocking toast notification
+                showFlowCompletedToast(flowKey, runId);
+            },
+            onPlanCompleted: (runId, _planId) => {
+                // Entire plan completed - the run-level review will be shown via onRunComplete
+                console.log(`[AutoPilot] Plan completed for run: ${runId}`);
             },
             onRunEvent: (event, runId) => {
                 // Only process events for the currently viewed run
@@ -13535,8 +13868,16 @@ export async function startRun(flowId, options) {
         _state.activeRunId = runInfo.run_id;
         _state.runState = runInfo.state || "running";
         _state.currentStep = runInfo.currentStep || null;
+        _state.currentFlow = targetFlowId;
         _state.progress = runInfo.progress || 0;
         _state.isLoading = false;
+        // Detect autopilot mode: multiple flows or plan ID
+        const flowKeys = options?.flowKeys || [];
+        const planId = options?.planId || null;
+        _state.isAutopilot = flowKeys.length > 1 || planId !== null;
+        _state.flowKeys = flowKeys.length > 0 ? flowKeys : [targetFlowId];
+        _state.planId = planId;
+        _state.completedFlows = [];
         // Subscribe to run events
         subscribeToRunEvents(runInfo.run_id);
         if (_callbacks.onRunStart) {
@@ -13674,8 +14015,20 @@ function subscribeToRunEvents(runId) {
 }
 /**
  * Handle incoming SSE events.
+ *
+ * This function captures the active run ID at the beginning to ensure
+ * atomic processing of the event with respect to the active run.
+ * This prevents race conditions where events from an old run could
+ * be processed after the active run ID has changed.
  */
 function handleSSEEvent(event) {
+    // Capture the active run ID atomically at the start of event processing
+    // This ensures all operations in this function use the same run ID
+    const activeRunId = _state.activeRunId;
+    // If there's no active run, ignore the event
+    if (!activeRunId) {
+        return;
+    }
     switch (event.type) {
         case "step_start":
             _state.currentStep = event.stepId || null;
@@ -13696,14 +14049,14 @@ function handleSSEEvent(event) {
                 _state.completedFlows.push(event.flowKey);
             }
             // Notify listeners of flow completion
-            if (_callbacks.onFlowCompleted && _state.activeRunId && event.flowKey) {
-                _callbacks.onFlowCompleted(_state.activeRunId, event.flowKey);
+            if (_callbacks.onFlowCompleted && activeRunId && event.flowKey) {
+                _callbacks.onFlowCompleted(activeRunId, event.flowKey);
             }
             break;
         case "plan_completed":
             // Entire plan completed (autopilot run finished)
-            if (_callbacks.onPlanCompleted && _state.activeRunId && _state.planId) {
-                _callbacks.onPlanCompleted(_state.activeRunId, _state.planId);
+            if (_callbacks.onPlanCompleted && activeRunId && _state.planId) {
+                _callbacks.onPlanCompleted(activeRunId, _state.planId);
             }
             // Fall through to complete handling
             _state.runState = "completed";
@@ -13712,8 +14065,8 @@ function handleSSEEvent(event) {
                 _state.unsubscribe();
                 _state.unsubscribe = null;
             }
-            if (_callbacks.onRunComplete && _state.activeRunId) {
-                _callbacks.onRunComplete(_state.activeRunId, _state.isAutopilot);
+            if (_callbacks.onRunComplete && activeRunId) {
+                _callbacks.onRunComplete(activeRunId, _state.isAutopilot);
             }
             break;
         case "complete":
@@ -13723,8 +14076,8 @@ function handleSSEEvent(event) {
                 _state.unsubscribe();
                 _state.unsubscribe = null;
             }
-            if (_callbacks.onRunComplete && _state.activeRunId) {
-                _callbacks.onRunComplete(_state.activeRunId, _state.isAutopilot);
+            if (_callbacks.onRunComplete && activeRunId) {
+                _callbacks.onRunComplete(activeRunId, _state.isAutopilot);
             }
             break;
         case "error":
@@ -13734,13 +14087,13 @@ function handleSSEEvent(event) {
                 _state.unsubscribe();
                 _state.unsubscribe = null;
             }
-            if (_callbacks.onRunFailed && _state.activeRunId) {
-                _callbacks.onRunFailed(_state.activeRunId, _state.error);
+            if (_callbacks.onRunFailed && activeRunId) {
+                _callbacks.onRunFailed(activeRunId, _state.error);
             }
             break;
     }
     // Notify listeners of every SSE event for UI propagation
-    _callbacks.onRunEvent?.(event, _state.activeRunId);
+    _callbacks.onRunEvent?.(event, activeRunId);
     updateUI();
 }
 // ============================================================================

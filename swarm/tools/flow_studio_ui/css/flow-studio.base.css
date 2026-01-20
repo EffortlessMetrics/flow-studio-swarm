@@ -3510,3 +3510,29 @@
         opacity: 0;
       }
     }
+
+    /* Icon Button Utility */
+    .fs-icon-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      border-radius: 50%;
+      cursor: pointer;
+      color: var(--fs-color-text-muted);
+      transition: all var(--fs-transition-fast, 0.15s ease);
+    }
+    .fs-icon-button:hover {
+      background: var(--fs-color-bg-hover, #e5e7eb);
+      color: var(--fs-color-text);
+    }
+    .fs-icon-button.filled {
+       background: var(--fs-color-bg-subtle, #f3f4f6);
+    }
+    .fs-icon-button.filled:hover {
+       background: var(--fs-color-bg-hover, #e5e7eb);
+    }
