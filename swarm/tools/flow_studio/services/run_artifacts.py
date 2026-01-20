@@ -23,6 +23,7 @@ def resolve_run_path(run_id: str, run_inspector: Optional[Any]) -> Path:
 
     if run_path is None:
         from swarm.runtime import storage as runtime_storage
+
         run_path = runtime_storage.find_run_path(run_id)
 
     if run_path is None:
@@ -31,7 +32,9 @@ def resolve_run_path(run_id: str, run_inspector: Optional[Any]) -> Path:
     return Path(run_path)
 
 
-def load_transcript(run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]) -> Dict[str, Any]:
+def load_transcript(
+    run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]
+) -> Dict[str, Any]:
     validate_path_component(flow_key, "flow_key")
     validate_path_component(step_id, "step_id")
     run_path = resolve_run_path(run_id, run_inspector)
@@ -88,7 +91,9 @@ def load_transcript(run_id: str, flow_key: str, step_id: str, run_inspector: Opt
     }
 
 
-def load_receipt(run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]) -> Dict[str, Any]:
+def load_receipt(
+    run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]
+) -> Dict[str, Any]:
     validate_path_component(flow_key, "flow_key")
     validate_path_component(step_id, "step_id")
     run_path = resolve_run_path(run_id, run_inspector)
