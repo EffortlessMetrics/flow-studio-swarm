@@ -45,26 +45,30 @@ async def api_runs(
     offset = max(0, offset)
 
     def _fetch_runs():
-        all_runs_inner = []
+        runs_inner = []
+        total_inner = 0
+        used_service = False
 
         if state.run_service is not None:
             try:
-                all_runs_inner = list_runs(state.run_service)
+                runs_inner, total_inner = list_runs(state.run_service, limit=limit, offset=offset)
+                used_service = True
             except Exception as exc:
                 logger.warning(
                     "RunService.list_runs failed, falling back to legacy inspector: %s",
                     exc,
                     exc_info=True,
                 )
-                all_runs_inner = []
 
-        if not all_runs_inner and state.core:
-            all_runs_inner = state.core.list_runs()
+        if not used_service and state.core:
+            all_runs = state.core.list_runs()
+            total_inner = len(all_runs)
+            runs_inner = all_runs[offset : offset + limit]
 
-        return all_runs_inner
+        return runs_inner, total_inner
 
     try:
-        all_runs = await run_in_threadpool(_fetch_runs)
+        paginated_runs, total = await run_in_threadpool(_fetch_runs)
     except Exception:
         return JSONResponse(
             {
@@ -78,8 +82,6 @@ async def api_runs(
             status_code=503,
         )
 
-    total = len(all_runs)
-    paginated_runs = all_runs[offset : offset + limit]
     has_more = (offset + limit) < total
 
     return {
