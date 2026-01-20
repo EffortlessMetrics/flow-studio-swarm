@@ -65,19 +65,21 @@ def check_ui_assets(ui_dir: Path, strict: bool) -> None:
         logger.warning(msg)
         return
 
-    import_export_from_re = re.compile(
-        r'^\s*(?:import|export)\b.*?\bfrom\s*["\'](\.?\.?/[^"\']+)["\']',
+    # Combined regex to match all import types in a single pass
+    # Optimization: Reduces 3 separate regex passes to 1
+    import_re = re.compile(
+        # Group 1: import/export ... from "..."
+        r'^\s*(?:import|export)\b.*?\bfrom\s*["\'](\.?\.?/[^"\']+)["\']'
+        # Group 2: import "..." (side effect)
+        r'|^\s*import\s*["\'](\.?\.?/[^"\']+)["\']'
+        # Group 3: import("...") (dynamic)
+        r'|\bimport\(\s*["\'](\.?\.?/[^"\']+)["\']\s*\)',
         re.MULTILINE,
     )
-    side_effect_re = re.compile(r'^\s*import\s*["\'](\.?\.?/[^"\']+)["\']', re.MULTILINE)
-    dynamic_re = re.compile(r'\bimport\(\s*["\'](\.?\.?/[^"\']+)["\']\s*\)')
 
     def parse_imports(text: str) -> set[str]:
-        return (
-            set(import_export_from_re.findall(text))
-            | set(side_effect_re.findall(text))
-            | set(dynamic_re.findall(text))
-        )
+        # Extract the non-None group from each match
+        return {m[0] or m[1] or m[2] for m in import_re.findall(text)}
 
     js_root = js_dir.resolve()
     queue: deque[Path] = deque(Path(ep) for ep in entrypoints)
