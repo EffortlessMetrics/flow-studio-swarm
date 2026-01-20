@@ -1057,14 +1057,6 @@
       transition: all 0.2s ease;
     }
     .legend-header {
-      /* Button resets */
-      background: none;
-      border: none;
-      width: 100%;
-      text-align: inherit;
-      font-family: inherit;
-      font-size: inherit;
-
       display: flex;
       align-items: center;
       justify-content: space-between;
