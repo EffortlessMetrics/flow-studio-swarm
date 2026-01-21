@@ -64,10 +64,10 @@
         <label class="muted" style="font-size: 10px;">RUN HISTORY</label>
         <button id="run-history-toggle" class="collapse-toggle" aria-expanded="true" aria-controls="run-history-list" title="Toggle run history">▼</button>
       </div>
-      <div id="run-history-filter" class="run-history-filter" data-uiid="flow_studio.sidebar.run_history.filter">
-        <button class="filter-btn active" data-filter="all">All</button>
-        <button class="filter-btn" data-filter="example">Examples</button>
-        <button class="filter-btn" data-filter="active">Active</button>
+      <div id="run-history-filter" class="run-history-filter" role="group" aria-label="Run filters" data-uiid="flow_studio.sidebar.run_history.filter">
+        <button type="button" aria-pressed="true" class="filter-btn active" data-filter="all">All</button>
+        <button type="button" aria-pressed="false" class="filter-btn" data-filter="example">Examples</button>
+        <button type="button" aria-pressed="false" class="filter-btn" data-filter="active">Active</button>
       </div>
       <div id="run-history-list" class="run-history-list" role="list" aria-label="Run history" data-uiid="flow_studio.sidebar.run_history.list">
         <div class="muted" style="padding: 8px; font-size: 11px;">Loading...</div>

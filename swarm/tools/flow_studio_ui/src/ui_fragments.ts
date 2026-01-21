@@ -322,6 +322,6 @@ export function renderArtifactProducerHint(stepId: string, flowKey: string): str
  */
 export function renderTabs(tabs: Array<{ id: string; label: string; active?: boolean }>): string {
   return tabs.map(tab =>
-    `<span class="tab${tab.active ? " active" : ""}" data-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</span>`
+    `<button type="button" role="tab" aria-selected="${tab.active ? "true" : "false"}" class="tab${tab.active ? " active" : ""}" data-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>`
   ).join("");
 }

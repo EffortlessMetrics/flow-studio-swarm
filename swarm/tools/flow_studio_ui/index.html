@@ -131,10 +131,10 @@
         <label class="muted" style="font-size: 10px;">RUN HISTORY</label>
         <button id="run-history-toggle" class="collapse-toggle" aria-expanded="true" aria-controls="run-history-list" title="Toggle run history">▼</button>
       </div>
-      <div id="run-history-filter" class="run-history-filter" data-uiid="flow_studio.sidebar.run_history.filter">
-        <button class="filter-btn active" data-filter="all">All</button>
-        <button class="filter-btn" data-filter="example">Examples</button>
-        <button class="filter-btn" data-filter="active">Active</button>
+      <div id="run-history-filter" class="run-history-filter" role="group" aria-label="Run filters" data-uiid="flow_studio.sidebar.run_history.filter">
+        <button type="button" aria-pressed="true" class="filter-btn active" data-filter="all">All</button>
+        <button type="button" aria-pressed="false" class="filter-btn" data-filter="example">Examples</button>
+        <button type="button" aria-pressed="false" class="filter-btn" data-filter="active">Active</button>
       </div>
       <div id="run-history-list" class="run-history-list" role="list" aria-label="Run history" data-uiid="flow_studio.sidebar.run_history.list">
         <div class="muted" style="padding: 8px; font-size: 11px;">Loading...</div>
@@ -1052,6 +1052,9 @@ make validate-swarm</pre>
       cursor: pointer;
       border-radius: 4px 4px 0 0;
       border: 1px solid transparent;
+      background: transparent;
+      font-family: inherit;
+      color: inherit;
     }
     .tab:hover {
       background: #f3f4f6;
@@ -1060,6 +1063,10 @@ make validate-swarm</pre>
       background: #e5f2ff;
       border-color: #d1d5db;
       border-bottom-color: #fff;
+    }
+    .tab:focus-visible {
+      outline: 2px solid #2563eb;
+      outline-offset: 2px;
     }
     .tab-content {
       display: none;
@@ -5118,6 +5125,7 @@ export async function showStepDetails(data, callbacks = {}) {
     const defaultTab = state.currentMode === "operator" ? "run" : "node";
     const tabs = document.createElement("div");
     tabs.className = "tabs";
+    tabs.setAttribute("role", "tablist");
     tabs.innerHTML = renderTabs([
         { id: "node", label: "Node", active: defaultTab === "node" },
         { id: "run", label: "Run", active: defaultTab === "run" },
@@ -5345,9 +5353,13 @@ export async function showStepDetails(data, callbacks = {}) {
     // Tab switching
     tabs.querySelectorAll(".tab").forEach(tab => {
         tab.addEventListener("click", () => {
-            tabs.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+            tabs.querySelectorAll(".tab").forEach(t => {
+                t.classList.remove("active");
+                t.setAttribute("aria-selected", "false");
+            });
             detailsEl.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
             tab.classList.add("active");
+            tab.setAttribute("aria-selected", "true");
             const tabName = tab.dataset.tab;
             const content = detailsEl.querySelector(`.tab-content[data-tab="${tabName}"]`);
             if (content)
@@ -10305,7 +10317,7 @@ export function renderArtifactProducerHint(stepId, flowKey) {
  * Render tab navigation.
  */
 export function renderTabs(tabs) {
-    return tabs.map(tab => `<span class="tab${tab.active ? " active" : ""}" data-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</span>`).join("");
+    return tabs.map(tab => `<button type="button" role="tab" aria-selected="${tab.active ? "true" : "false"}" class="tab${tab.active ? " active" : ""}" data-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>`).join("");
 }
 // utils.js
 // swarm/tools/flow_studio_ui/src/utils.ts
@@ -11124,7 +11136,9 @@ export function filterRuns(type) {
     if (filterContainer) {
         filterContainer.querySelectorAll(".filter-btn").forEach(btn => {
             const filter = btn.dataset.filter;
-            btn.classList.toggle("active", filter === type);
+            const isActive = filter === type;
+            btn.classList.toggle("active", isActive);
+            btn.setAttribute("aria-pressed", isActive ? "true" : "false");
         });
     }
     // Re-render if we have a container (for panel mode)
@@ -11556,9 +11570,13 @@ function initRunHistoryHandlers() {
                 const filter = btn.dataset.filter;
                 if (!filter)
                     return;
-                // Update active state on buttons
-                filterContainer.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+                // Update active state on buttons with aria-selected
+                filterContainer.querySelectorAll(".filter-btn").forEach(b => {
+                    b.classList.remove("active");
+                    b.setAttribute("aria-selected", "false");
+                });
                 btn.classList.add("active");
+                btn.setAttribute("aria-selected", "true");
                 // Apply filter and re-render
                 applyFilter(filter);
                 renderRunListItems();
@@ -11600,7 +11618,9 @@ export async function initRunHistory() {
     if (filterContainer) {
         filterContainer.querySelectorAll(".filter-btn").forEach(btn => {
             const filter = btn.dataset.filter;
-            btn.classList.toggle("active", filter === defaultFilter);
+            const isActive = filter === defaultFilter;
+            btn.classList.toggle("active", isActive);
+            btn.setAttribute("aria-pressed", isActive ? "true" : "false");
         });
     }
     // Load and render

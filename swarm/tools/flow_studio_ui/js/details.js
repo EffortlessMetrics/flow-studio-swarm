@@ -551,6 +551,7 @@ export async function showStepDetails(data, callbacks = {}) {
     const defaultTab = state.currentMode === "operator" ? "run" : "node";
     const tabs = document.createElement("div");
     tabs.className = "tabs";
+    tabs.setAttribute("role", "tablist");
     tabs.innerHTML = renderTabs([
         { id: "node", label: "Node", active: defaultTab === "node" },
         { id: "run", label: "Run", active: defaultTab === "run" },
@@ -778,9 +779,13 @@ export async function showStepDetails(data, callbacks = {}) {
     // Tab switching
     tabs.querySelectorAll(".tab").forEach(tab => {
         tab.addEventListener("click", () => {
-            tabs.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+            tabs.querySelectorAll(".tab").forEach(t => {
+                t.classList.remove("active");
+                t.setAttribute("aria-selected", "false");
+            });
             detailsEl.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
             tab.classList.add("active");
+            tab.setAttribute("aria-selected", "true");
             const tabName = tab.dataset.tab;
             const content = detailsEl.querySelector(`.tab-content[data-tab="${tabName}"]`);
             if (content)
