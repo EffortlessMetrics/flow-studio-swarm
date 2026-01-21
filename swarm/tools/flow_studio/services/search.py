@@ -5,32 +5,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-_ARTIFACT_CATALOG_CACHE: Dict[Path, Dict[str, Any]] = {}
-_ARTIFACT_CATALOG_MTIME: Dict[Path, float] = {}
-
-
 def load_artifact_catalog(repo_root: Path) -> Dict[str, Any]:
-    """
-    Loads the artifact catalog with mtime-based caching to minimize disk I/O and JSON parsing.
-
-    WARNING: Returns a cached dictionary. Do not modify the returned object.
-    """
     catalog_path = repo_root / "swarm" / "meta" / "artifact_catalog.json"
-
-    try:
-        stat_result = catalog_path.stat()
-    except FileNotFoundError:
+    if not catalog_path.exists():
         return {"flows": {}}
-
-    mtime = stat_result.st_mtime
-    if catalog_path not in _ARTIFACT_CATALOG_CACHE or mtime != _ARTIFACT_CATALOG_MTIME.get(
-        catalog_path, 0
-    ):
-        with catalog_path.open("r", encoding="utf-8") as handle:
-            _ARTIFACT_CATALOG_CACHE[catalog_path] = json.load(handle)
-        _ARTIFACT_CATALOG_MTIME[catalog_path] = mtime
-
-    return _ARTIFACT_CATALOG_CACHE[catalog_path]
+    with catalog_path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 def build_artifact_graph(
