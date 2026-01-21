@@ -138,7 +138,7 @@ export function filterRuns(type) {
             const filter = btn.dataset.filter;
             const isActive = filter === type;
             btn.classList.toggle("active", isActive);
-            btn.setAttribute("aria-selected", isActive ? "true" : "false");
+            btn.setAttribute("aria-pressed", isActive ? "true" : "false");
         });
     }
     // Re-render if we have a container (for panel mode)
@@ -620,7 +620,7 @@ export async function initRunHistory() {
             const filter = btn.dataset.filter;
             const isActive = filter === defaultFilter;
             btn.classList.toggle("active", isActive);
-            btn.setAttribute("aria-selected", isActive ? "true" : "false");
+            btn.setAttribute("aria-pressed", isActive ? "true" : "false");
         });
     }
     // Load and render

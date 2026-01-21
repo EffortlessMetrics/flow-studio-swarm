@@ -189,7 +189,7 @@ export function filterRuns(type: RunFilterType): void {
       const filter = (btn as HTMLElement).dataset.filter;
       const isActive = filter === type;
       btn.classList.toggle("active", isActive);
-      btn.setAttribute("aria-selected", isActive ? "true" : "false");
+      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
   }
 
@@ -733,7 +733,7 @@ export async function initRunHistory(): Promise<void> {
       const filter = (btn as HTMLElement).dataset.filter;
       const isActive = filter === defaultFilter;
       btn.classList.toggle("active", isActive);
-      btn.setAttribute("aria-selected", isActive ? "true" : "false");
+      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
   }
 
