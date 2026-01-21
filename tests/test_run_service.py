@@ -245,6 +245,26 @@ class TestStorage:
 
         assert storage.run_exists(run_id, runs_dir=tmp_path)
 
+    def test_scan_runs(self, tmp_path):
+        """Should scan runs directory for active and legacy runs efficiently."""
+        # Create active runs
+        (tmp_path / "run-active-1").mkdir()
+        (tmp_path / "run-active-1" / "meta.json").touch()
+
+        # Create legacy runs
+        (tmp_path / "run-legacy-1").mkdir()
+        (tmp_path / "run-legacy-1" / "signal").mkdir()
+
+        # Create noise
+        (tmp_path / "noise").mkdir()
+
+        active, legacy = storage.scan_runs(tmp_path)
+
+        assert "run-active-1" in active
+        assert len(active) == 1
+        assert "run-legacy-1" in legacy
+        assert len(legacy) == 1
+
 
 class TestRunService:
     """Test RunService orchestration."""
@@ -383,6 +403,7 @@ class TestRunService:
 
         # Mock storage functions to use only our test runs
         monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "scan_runs", lambda runs_dir=None: (run_ids, []))
         monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
         monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
         # Also patch read_summary to use our tmp_path
@@ -435,6 +456,7 @@ class TestRunService:
 
         # Mock storage functions to use only our test runs
         monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "scan_runs", lambda runs_dir=None: (run_ids, []))
         monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
         monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
         orig_read_summary = storage.read_summary
@@ -484,6 +506,7 @@ class TestRunService:
         # Mock storage functions to use only our test runs
         run_ids = ["run-signal", "run-build"]
         monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "scan_runs", lambda runs_dir=None: (run_ids, []))
         monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
         monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
         orig_read_summary = storage.read_summary

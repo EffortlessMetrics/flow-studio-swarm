@@ -816,6 +816,48 @@ def summarize_navigator_events(
 # -----------------------------------------------------------------------------
 
 
+def scan_runs(runs_dir: Path = RUNS_DIR) -> tuple[List[RunId], List[RunId]]:
+    """Scan runs directory and return (active_runs, legacy_runs).
+
+    Performs a single pass over the directory using os.scandir for performance.
+    Much faster than calling list_runs() and discover_legacy_runs() separately.
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        Tuple of (active_runs, legacy_runs) lists, both sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return [], []
+
+    active_runs: List[RunId] = []
+    legacy_runs: List[RunId] = []
+    flow_keys = {"signal", "plan", "build", "gate", "deploy", "wisdom"}
+
+    try:
+        with os.scandir(runs_dir) as entries:
+            for entry in entries:
+                if not entry.is_dir():
+                    continue
+
+                # Check for meta.json (active run)
+                # Using os.path.join + exists is faster than Path object overhead
+                if os.path.exists(os.path.join(entry.path, META_FILE)):
+                    active_runs.append(entry.name)
+                else:
+                    # Check for legacy flow artifacts
+                    # Only check if not active to avoid redundant stats
+                    for flow_key in flow_keys:
+                        if os.path.isdir(os.path.join(entry.path, flow_key)):
+                            legacy_runs.append(entry.name)
+                            break
+    except OSError:
+        pass
+
+    return sorted(active_runs), sorted(legacy_runs)
+
+
 def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     """List all run IDs that have meta.json files.
 
@@ -937,8 +979,11 @@ def list_all_runs(include_examples: bool = True) -> List[Dict[str, Any]]:
                 }
             )
 
-    # New-style runs with meta.json
-    for run_id in list_runs():
+    # Get both active and legacy runs in one pass
+    active_runs, legacy_runs = scan_runs(RUNS_DIR)
+
+    # Active runs with meta.json
+    for run_id in active_runs:
         if run_id in seen:
             continue
         seen.add(run_id)
@@ -953,7 +998,7 @@ def list_all_runs(include_examples: bool = True) -> List[Dict[str, Any]]:
         )
 
     # Legacy runs without meta.json
-    for run_id in discover_legacy_runs():
+    for run_id in legacy_runs:
         if run_id in seen:
             continue
         seen.add(run_id)
