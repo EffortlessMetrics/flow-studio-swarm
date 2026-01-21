@@ -56,9 +56,9 @@
       </button>
       <div class="muted author-only" data-uiid="flow_studio.header.reload">
         <span class="mono">make dev-check</span>
-        <button id="reload-btn" style="margin-left: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; border: 1px solid #d1d5db; background: #f3f4f6; border-radius: 3px;" data-uiid="flow_studio.header.reload.btn">Reload</button>
+        <button id="reload-btn" class="fs-button-small" data-uiid="flow_studio.header.reload.btn">Reload</button>
       </div>
-      <button id="help-btn" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #e5e7eb; color: #374151; font-size: 14px; font-weight: bold; border: none; cursor: pointer;" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
+      <button id="help-btn" class="fs-icon-button" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
     </nav>
   </header>
   <div id="sdlc-bar" role="status" aria-label="SDLC progress" data-uiid="flow_studio.sdlc_bar">
@@ -783,6 +783,31 @@ make validate-swarm</pre>
     }
     .fs-button-small:hover {
       background: var(--fs-color-bg-hover, #e5e7eb);
+    }
+
+    .fs-icon-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid transparent;
+      background: var(--fs-color-bg-subtle, #f3f4f6);
+      color: var(--fs-color-text-muted, #6b7280);
+      font-size: var(--fs-font-size-lg, 14px);
+      font-weight: 600;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .fs-icon-button:hover {
+      background: var(--fs-color-bg-hover, #e5e7eb);
+      color: var(--fs-color-text, #111827);
+    }
+    .fs-icon-button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
 
     .fs-button-primary {
