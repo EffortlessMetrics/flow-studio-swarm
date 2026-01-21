@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 
@@ -54,7 +56,12 @@ class RunStateManager:
         start_step: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a new run."""
+        validate_path_component(flow_id, "flow_id")
+        if run_id:
+            validate_path_component(run_id, "run_id")
+
         if run_id is None:
+            # Note: generated run_id is safe by construction (alphanumeric + hyphens)
             run_id = f"{flow_id}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:8]}"
 
         now = datetime.now(timezone.utc).isoformat()
@@ -101,6 +108,7 @@ class RunStateManager:
 
     async def get_run(self, run_id: str) -> tuple[Dict[str, Any], str]:
         """Get run state with ETag."""
+        validate_path_component(run_id, "run_id")
         async with self._get_lock(run_id):
             return self._get_run_unlocked(run_id)
 
@@ -111,6 +119,7 @@ class RunStateManager:
         expected_etag: Optional[str] = None,
     ) -> tuple[Dict[str, Any], str]:
         """Update run state with optional ETag check."""
+        validate_path_component(run_id, "run_id")
         async with self._get_lock(run_id):
             state, current_etag = self._get_run_unlocked(run_id)
 
