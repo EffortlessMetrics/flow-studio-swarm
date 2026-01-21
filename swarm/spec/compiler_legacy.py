@@ -1483,10 +1483,9 @@ def expand_flow_graph(
         >>> print(expanded["nodes"][0]["station_id"])
         'requirements-author'
     """
-    import copy
-
     # Deep copy to avoid mutating input
-    result = copy.deepcopy(flow_data)
+    # Optimization: json.loads(json.dumps(x)) is ~2x faster than copy.deepcopy(x) for large dicts
+    result = json.loads(json.dumps(flow_data))
 
     expanded_nodes = []
     for node in result.get("nodes", []):
