@@ -112,3 +112,77 @@ def test_run_inspector_validation():
     # get_flow_status validates flow_key
     with pytest.raises(ValueError, match="flow_key"):
         inspector.get_flow_status("valid_run", "../bad")
+
+
+def test_spec_manager_path_validation(tmp_path):
+    """Test that SpecManager validates path components against traversal."""
+    from swarm.api.services.spec_manager import SpecManager
+
+    manager = SpecManager(repo_root=tmp_path)
+
+    # get_flow validates flow_id
+    with pytest.raises(ValueError, match="flow_id"):
+        manager.get_flow("../etc/passwd")
+
+    with pytest.raises(ValueError, match="flow_id"):
+        manager.get_flow("..\\windows\\system32")
+
+    with pytest.raises(ValueError, match="flow_id"):
+        manager.get_flow("..")
+
+    # get_template validates template_id
+    with pytest.raises(ValueError, match="template_id"):
+        manager.get_template("../etc/passwd")
+
+    with pytest.raises(ValueError, match="template_id"):
+        manager.get_template("..")
+
+    # get_run_state validates run_id
+    with pytest.raises(ValueError, match="run_id"):
+        manager.get_run_state("../etc/passwd")
+
+    with pytest.raises(ValueError, match="run_id"):
+        manager.get_run_state("..")
+
+    # compile_prompt_plan validates flow_id and run_id
+    with pytest.raises(ValueError, match="flow_id"):
+        manager.compile_prompt_plan("../bad", "step")
+
+    with pytest.raises(ValueError, match="run_id"):
+        manager.compile_prompt_plan("valid_flow", "step", run_id="../bad")
+
+
+def test_run_state_manager_path_validation(tmp_path):
+    """Test that RunStateManager validates path components against traversal."""
+    import asyncio
+
+    from swarm.api.services.run_state import RunStateManager
+
+    manager = RunStateManager(runs_root=tmp_path)
+
+    async def run_tests():
+        # create_run validates flow_id and run_id
+        with pytest.raises(ValueError, match="flow_id"):
+            await manager.create_run("../etc/passwd")
+
+        with pytest.raises(ValueError, match="run_id"):
+            await manager.create_run("valid_flow", run_id="../etc/passwd")
+
+        with pytest.raises(ValueError, match="flow_id"):
+            await manager.create_run("..")
+
+        # get_run validates run_id
+        with pytest.raises(ValueError, match="run_id"):
+            await manager.get_run("../etc/passwd")
+
+        with pytest.raises(ValueError, match="run_id"):
+            await manager.get_run("..")
+
+        # update_run validates run_id
+        with pytest.raises(ValueError, match="run_id"):
+            await manager.update_run("../etc/passwd", {"status": "running"})
+
+        with pytest.raises(ValueError, match="run_id"):
+            await manager.update_run("..", {"status": "running"})
+
+    asyncio.run(run_tests())
