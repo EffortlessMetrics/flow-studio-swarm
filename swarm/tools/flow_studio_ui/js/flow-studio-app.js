@@ -701,12 +701,6 @@ window.addEventListener("load", async () => {
         const govBadge = document.getElementById("governance-badge");
         if (govBadge) {
             govBadge.addEventListener("click", showGovernanceDetails);
-            govBadge.addEventListener("keydown", (e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    showGovernanceDetails();
-                }
-            });
         }
         // Governance overlay toggle handler
         const govOverlayCheckbox = document.getElementById("governance-overlay-checkbox");

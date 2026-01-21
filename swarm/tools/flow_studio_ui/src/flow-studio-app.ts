@@ -909,12 +909,6 @@ window.addEventListener("load", async () => {
     const govBadge = document.getElementById("governance-badge");
     if (govBadge) {
       govBadge.addEventListener("click", showGovernanceDetails);
-      govBadge.addEventListener("keydown", (e: KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          showGovernanceDetails();
-        }
-      });
     }
 
     // Governance overlay toggle handler
