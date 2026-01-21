@@ -832,9 +832,17 @@ def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
         return []
 
     run_ids: List[RunId] = []
-    for entry in runs_dir.iterdir():
-        if entry.is_dir() and (entry / META_FILE).exists():
-            run_ids.append(entry.name)
+    # Use os.scandir for faster iteration and type checking
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    # Check for meta.json without creating Path objects
+                    meta_path = os.path.join(entry.path, META_FILE)
+                    if os.path.exists(meta_path):
+                        run_ids.append(entry.name)
+    except OSError:
+        pass
 
     return sorted(run_ids)
 
@@ -859,19 +867,30 @@ def discover_legacy_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     flow_keys = {"signal", "plan", "build", "gate", "deploy", "wisdom"}
 
     legacy_runs: List[RunId] = []
-    for entry in runs_dir.iterdir():
-        if not entry.is_dir():
-            continue
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if not entry.is_dir():
+                    continue
 
-        # Skip if already has meta.json (not legacy)
-        if (entry / META_FILE).exists():
-            continue
+                # Skip if already has meta.json (not legacy)
+                meta_path = os.path.join(entry.path, META_FILE)
+                if os.path.exists(meta_path):
+                    continue
 
-        # Check if any flow subdirectory exists
-        has_flow_artifacts = any((entry / flow_key).is_dir() for flow_key in flow_keys)
+                # Check if any flow subdirectory exists
+                # Use os.path.join and os.path.isdir for speed
+                has_flow_artifacts = False
+                for flow_key in flow_keys:
+                    flow_path = os.path.join(entry.path, flow_key)
+                    if os.path.isdir(flow_path):
+                        has_flow_artifacts = True
+                        break
 
-        if has_flow_artifacts:
-            legacy_runs.append(entry.name)
+                if has_flow_artifacts:
+                    legacy_runs.append(entry.name)
+    except OSError:
+        pass
 
     return sorted(legacy_runs)
 
@@ -892,15 +911,25 @@ def discover_example_runs() -> List[RunId]:
     flow_keys = {"signal", "plan", "build", "gate", "deploy", "wisdom"}
 
     example_runs: List[RunId] = []
-    for entry in EXAMPLES_DIR.iterdir():
-        if not entry.is_dir() or entry.name.startswith("."):
-            continue
+    try:
+        with os.scandir(EXAMPLES_DIR) as it:
+            for entry in it:
+                if not entry.is_dir() or entry.name.startswith("."):
+                    continue
 
-        # Check if any flow subdirectory exists
-        has_flow_artifacts = any((entry / flow_key).is_dir() for flow_key in flow_keys)
+                # Check if any flow subdirectory exists
+                # Use os.path.join and os.path.isdir for speed
+                has_flow_artifacts = False
+                for flow_key in flow_keys:
+                    flow_path = os.path.join(entry.path, flow_key)
+                    if os.path.isdir(flow_path):
+                        has_flow_artifacts = True
+                        break
 
-        if has_flow_artifacts:
-            example_runs.append(entry.name)
+                if has_flow_artifacts:
+                    example_runs.append(entry.name)
+    except OSError:
+        pass
 
     return sorted(example_runs)
 
