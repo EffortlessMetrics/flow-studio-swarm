@@ -452,7 +452,7 @@
       align-items: center;
       gap: 6px;
       padding: 4px 10px;
-      background: #f3f4f6;
+      background: var(--fs-color-bg-subtle, #f3f4f6);
       border: 1px solid transparent;
       border-radius: 4px;
       cursor: pointer;
@@ -461,7 +461,11 @@
       color: inherit;
     }
     .fs-status-button:hover {
-      background: #e5e7eb;
+      background: var(--fs-color-border, #e5e7eb);
+    }
+    .fs-status-button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
 
     .author-only {
