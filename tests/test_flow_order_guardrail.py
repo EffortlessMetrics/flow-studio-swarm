@@ -65,7 +65,7 @@ ALLOWED_VIOLATIONS: Dict[str, Dict[int, str]] = {
     # Run plan defaults - defines example configurations
     "swarm/runtime/run_plan_api.py": {
         27: "Example default configuration for gated mode",
-        257: "Example default configuration for review mode",
+        258: "Example default configuration for signal-to-gate mode",
     },
 }
 
