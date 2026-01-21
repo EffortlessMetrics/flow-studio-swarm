@@ -39,14 +39,17 @@ class FlowStudioState:
         This enables O(1) lookups for agent-to-flow relationships during search,
         replacing the previous O(N*M) nested loop scan.
         """
-        self.agent_flow_index.clear()
+        # Use set during construction to handle duplicates efficiently
+        from collections import defaultdict
+
+        index: Dict[str, set] = defaultdict(set)
         for flow_key, flow in self.flows_cache.items():
             for step in flow.get("steps", []):
                 for agent_key in step.get("agents", []):
-                    if agent_key not in self.agent_flow_index:
-                        self.agent_flow_index[agent_key] = []
-                    if flow_key not in self.agent_flow_index[agent_key]:
-                        self.agent_flow_index[agent_key].append(flow_key)
+                    index[agent_key].add(flow_key)
+
+        # Convert sets to lists for the final index
+        self.agent_flow_index = {k: list(v) for k, v in index.items()}
 
 
 def create_state(repo_root: Path) -> FlowStudioState:

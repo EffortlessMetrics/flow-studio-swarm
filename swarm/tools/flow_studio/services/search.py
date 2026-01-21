@@ -204,8 +204,8 @@ def search(
         short_role = agent.get("short_role", "")
         if query in agent_key.lower() or query in short_role.lower():
             if agent_flow_index and agent_key in agent_flow_index:
-                # O(1) lookup via pre-computed index
-                agent_flows = agent_flow_index[agent_key]
+                # O(1) lookup via pre-computed index - copy to prevent mutation
+                agent_flows = list(agent_flow_index[agent_key])
             else:
                 # O(N*M) fallback for backward compatibility
                 agent_flows = []
