@@ -22,7 +22,7 @@ import threading
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from . import storage
 from .types import (
@@ -204,13 +204,18 @@ class ClaudeHarnessBackend(RunBackend):
                 )
 
                 # Build command based on flow
-                cmd = self._build_command(flow_key, spec)
+                cmd, env = self._build_command(flow_key, spec)
+
+                # Prepare environment variables
+                process_env = os.environ.copy()
+                process_env.update(env)
 
                 # Execute command
                 process = subprocess.Popen(
                     cmd,
                     cwd=str(self._repo_root),
                     shell=False,
+                    env=process_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -294,11 +299,21 @@ class ClaudeHarnessBackend(RunBackend):
             ),
         )
 
-    def _build_command(self, flow_key: str, spec: RunSpec) -> List[str]:
+    def _build_command(self, flow_key: str, spec: RunSpec) -> Tuple[List[str], Dict[str, str]]:
         """Build the command arguments to execute a flow.
 
-        Returns a list of arguments for safe subprocess execution.
+        Returns:
+            Tuple containing:
+            - List of arguments for safe subprocess execution
+            - Dictionary of environment variables to set
         """
+        env: Dict[str, str] = {}
+
+        # Add run_id as environment variable if present
+        run_id = spec.params.get('run_id', '')
+        if run_id:
+            env["RUN_ID"] = run_id
+
         # Map flow keys to Make targets or Claude commands
         flow_commands = {
             "signal": "make demo-signal",
@@ -312,21 +327,15 @@ class ClaudeHarnessBackend(RunBackend):
         # Check if custom command provided in params
         if "command" in spec.params:
             # Parse command string into list for safe execution
-            return shlex.split(spec.params["command"])
+            return shlex.split(spec.params["command"]), env
 
         # Use Make target if available
         if flow_key in flow_commands:
             cmd = flow_commands[flow_key]
-            # Add run_id as environment variable
-            run_id = spec.params.get('run_id', '')
-            if run_id:
-                # Use shell syntax for environment variable assignment
-                return ["sh", "-c", f"RUN_ID={run_id} {cmd}"]
-            else:
-                return shlex.split(cmd)
+            return shlex.split(cmd), env
 
         # Fallback to slash command style
-        return ["sh", "-c", f"echo 'Flow {flow_key} would run here'"]
+        return ["echo", f"Flow {flow_key} would run here"], env
 
     def get_summary(self, run_id: RunId) -> Optional[RunSummary]:
         """Get summary from disk."""
