@@ -15,6 +15,7 @@ import {
   formatTime,
   formatDateTime,
   createQuickCommands,
+  createCopyButton,
   escapeHtml
 } from "./utils.js";
 import type {
@@ -1184,12 +1185,26 @@ export function showArtifactDetails(data: ArtifactNodeData): void {
       `swarm/runs/${state.currentRunId}/${data.flow}/${data.filename || ""}`) :
     `swarm/runs/<run-id>/${data.flow}/${data.filename || ""}`;
 
-  pathSection.innerHTML = `
-    <div class="kv-label">Path</div>
-    <div class="mono fs-text-sm">${runPath}</div>
-    <div class="kv-label" style="margin-top: 12px;">Copy Command</div>
-    <pre class="mono">cat ${runPath}</pre>
-  `;
+  const pathLabel = document.createElement("div");
+  pathLabel.className = "kv-label";
+  pathLabel.textContent = "Path";
+  pathSection.appendChild(pathLabel);
+
+  const pathContainer = document.createElement("div");
+  pathContainer.style.display = "flex";
+  pathContainer.style.alignItems = "center";
+  pathContainer.style.gap = "8px";
+
+  const pathSpan = document.createElement("div");
+  pathSpan.className = "mono fs-text-sm";
+  pathSpan.textContent = runPath;
+  pathContainer.appendChild(pathSpan);
+  pathContainer.appendChild(createCopyButton(runPath));
+  pathSection.appendChild(pathContainer);
+
+  const quickCmds = createQuickCommands([`cat ${runPath}`]);
+  quickCmds.style.marginTop = "12px";
+  pathSection.appendChild(quickCmds);
 
   const operatorOnly = document.createElement("div");
   operatorOnly.className = "operator-only";
