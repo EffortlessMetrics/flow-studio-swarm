@@ -48,12 +48,18 @@ def summarize_runs(summaries: Sequence[Any]) -> List[Dict[str, Any]]:
     return runs
 
 
-def list_runs(run_service: Any) -> List[Dict[str, Any]]:
-    summaries = run_service.list_runs(
+def list_runs(
+    run_service: Any,
+    limit: int = 100,
+    offset: int = 0,
+) -> tuple[List[Dict[str, Any]], int]:
+    summaries, total = run_service.list_runs_paginated(
+        limit=limit,
+        offset=offset,
         include_legacy=True,
         include_examples=True,
     )
-    return summarize_runs(summaries)
+    return summarize_runs(summaries), total
 
 
 def list_backends(run_service: Any) -> List[Dict[str, Any]]:
