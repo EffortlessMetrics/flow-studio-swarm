@@ -39,6 +39,8 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from swarm.runtime.safe_paths import validate_path_component
+
 from .types import (
     HandoffEnvelope,
     RunEvent,
@@ -259,6 +261,7 @@ def get_run_path(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Path:
         >>> get_run_path("run-20251208-143022-abc123")
         PosixPath('/path/to/swarm/runs/run-20251208-143022-abc123')
     """
+    validate_path_component(run_id, "run_id")
     return runs_dir / run_id
 
 
@@ -272,7 +275,12 @@ def find_run_path(run_id: RunId) -> Optional[Path]:
 
     Returns:
         Path to the run directory, or None if not found.
+
+    Raises:
+        ValueError: If run_id contains path traversal sequences.
     """
+    validate_path_component(run_id, "run_id")
+
     # Check examples first (committed, curated)
     example_path = EXAMPLES_DIR / run_id
     if example_path.exists() and example_path.is_dir():
@@ -294,7 +302,12 @@ def get_run_type(run_id: RunId) -> Optional[str]:
 
     Returns:
         "example" if in examples/, "active" if in runs/, None if not found.
+
+    Raises:
+        ValueError: If run_id contains path traversal sequences.
     """
+    validate_path_component(run_id, "run_id")
+
     example_path = EXAMPLES_DIR / run_id
     if example_path.exists() and example_path.is_dir():
         return "example"
@@ -533,6 +546,7 @@ def finalize_run_success(
         >>> print(summary.status)  # "succeeded"
     """
     from datetime import datetime, timezone
+
     from .types import RunStatus, SDLCStatus
 
     now = datetime.now(timezone.utc)

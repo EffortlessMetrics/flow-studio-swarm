@@ -33,6 +33,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from swarm.config.flow_registry import get_sdlc_flow_keys  # noqa: E402
 from swarm.flowstudio.schema import StepStatusEnum  # noqa: E402
+from swarm.runtime.safe_paths import validate_path_component  # noqa: E402
 
 # Canonical step artifact status - imported from flowstudio.schema
 # Aliased as StepStatus for backward compatibility within this module
@@ -41,20 +42,23 @@ StepStatus = StepStatusEnum
 
 class ArtifactStatus(str, Enum):
     """Status of a single artifact."""
+
     PRESENT = "present"
     MISSING = "missing"
 
 
 class FlowStatus(str, Enum):
     """Aggregate status of a flow based on decision artifact."""
-    NOT_STARTED = "not_started"    # No flow directory
-    IN_PROGRESS = "in_progress"    # Directory exists, no decision artifact
-    DONE = "done"                  # Decision artifact exists
+
+    NOT_STARTED = "not_started"  # No flow directory
+    IN_PROGRESS = "in_progress"  # Directory exists, no decision artifact
+    DONE = "done"  # Decision artifact exists
 
 
 @dataclass
 class ArtifactResult:
     """Status of a single artifact check."""
+
     path: str
     status: ArtifactStatus
     required: bool
@@ -63,6 +67,7 @@ class ArtifactResult:
 @dataclass
 class StepResult:
     """Aggregate result for a step's artifacts."""
+
     step_id: str
     status: StepStatus
     required_present: int
@@ -76,6 +81,7 @@ class StepResult:
 @dataclass
 class FlowResult:
     """Aggregate result for a flow."""
+
     flow_key: str
     status: FlowStatus
     title: str
@@ -87,6 +93,7 @@ class FlowResult:
 @dataclass
 class RunResult:
     """Aggregate result for an entire run."""
+
     run_id: str
     run_type: str  # "active" | "example"
     path: str
@@ -96,6 +103,7 @@ class RunResult:
 @dataclass
 class FlowEvent:
     """Single event in flow history."""
+
     timestamp: str  # ISO 8601
     flow: str
     step: Optional[str]
@@ -107,6 +115,7 @@ class FlowEvent:
 @dataclass
 class StepTiming:
     """Timing for a single step."""
+
     step_id: str
     started_at: Optional[str]
     ended_at: Optional[str]
@@ -116,6 +125,7 @@ class StepTiming:
 @dataclass
 class FlowTiming:
     """Timing for a flow."""
+
     flow_key: str
     started_at: Optional[str]
     ended_at: Optional[str]
@@ -126,6 +136,7 @@ class FlowTiming:
 @dataclass
 class RunTiming:
     """Complete timing for a run."""
+
     run_id: str
     started_at: Optional[str]
     ended_at: Optional[str]
@@ -202,6 +213,7 @@ class RunInspector:
         # Try to delegate to RunService for unified run listing
         try:
             from swarm.runtime.service import RunService
+
             service = RunService.get_instance(self.repo_root)
             summaries = service.list_runs(
                 include_legacy=True,
@@ -290,7 +302,12 @@ class RunInspector:
 
         Returns:
             Path to the run directory, or None if not found.
+
+        Raises:
+            ValueError: If run_id contains path traversal sequences.
         """
+        validate_path_component(run_id, "run_id")
+
         # Check examples first
         example_path = self.examples_dir / run_id
         if example_path.exists():
@@ -319,8 +336,14 @@ class RunInspector:
 
         Returns:
             StepResult with artifact statuses.
+
+        Raises:
+            ValueError: If any path component contains traversal sequences.
         """
-        run_path = self.get_run_path(run_id)
+        # Validate path components before constructing paths
+        validate_path_component(flow_key, "flow_key")
+
+        run_path = self.get_run_path(run_id)  # validates run_id
         flow_dir = run_path / flow_key if run_path else None
 
         # Get step config from catalog
@@ -341,11 +364,13 @@ class RunInspector:
             present = path.exists() if path else False
             if present:
                 required_present += 1
-            artifacts.append(ArtifactResult(
-                path=artifact,
-                status=ArtifactStatus.PRESENT if present else ArtifactStatus.MISSING,
-                required=True,
-            ))
+            artifacts.append(
+                ArtifactResult(
+                    path=artifact,
+                    status=ArtifactStatus.PRESENT if present else ArtifactStatus.MISSING,
+                    required=True,
+                )
+            )
 
         # Check optional artifacts
         for artifact in optional:
@@ -353,11 +378,13 @@ class RunInspector:
             present = path.exists() if path else False
             if present:
                 optional_present += 1
-            artifacts.append(ArtifactResult(
-                path=artifact,
-                status=ArtifactStatus.PRESENT if present else ArtifactStatus.MISSING,
-                required=False,
-            ))
+            artifacts.append(
+                ArtifactResult(
+                    path=artifact,
+                    status=ArtifactStatus.PRESENT if present else ArtifactStatus.MISSING,
+                    required=False,
+                )
+            )
 
         # Compute aggregate status
         if len(required) == 0:
@@ -390,8 +417,13 @@ class RunInspector:
 
         Returns:
             FlowResult with flow and step statuses.
+
+        Raises:
+            ValueError: If any path component contains traversal sequences.
         """
-        run_path = self.get_run_path(run_id)
+        validate_path_component(flow_key, "flow_key")
+
+        run_path = self.get_run_path(run_id)  # validates run_id
         flow_dir = run_path / flow_key if run_path else None
 
         flow_config = self.catalog.get("flows", {}).get(flow_key, {})
@@ -474,13 +506,15 @@ class RunInspector:
         # Use SDLC flows only (excludes demo/test flows like stepwise-demo)
         for flow_key in get_sdlc_flow_keys():
             flow_result = self.get_flow_status(run_id, flow_key)
-            result.append({
-                "flow_key": flow_key,
-                "title": flow_result.title,
-                "status": flow_result.status.value,
-                "decision_artifact": flow_result.decision_artifact,
-                "decision_present": flow_result.decision_present,
-            })
+            result.append(
+                {
+                    "flow_key": flow_key,
+                    "title": flow_result.title,
+                    "status": flow_result.status.value,
+                    "decision_artifact": flow_result.decision_artifact,
+                    "decision_present": flow_result.decision_present,
+                }
+            )
         return result
 
     # Status ordering for comparison: higher is better
@@ -543,20 +577,22 @@ class RunInspector:
                 change = "unchanged"
                 unchanged += 1
 
-            steps.append({
-                "step_id": step_id,
-                "run_a": {
-                    "status": step_a.status.value,
-                    "required_present": step_a.required_present,
-                    "required_total": step_a.required_total,
-                },
-                "run_b": {
-                    "status": step_b.status.value,
-                    "required_present": step_b.required_present,
-                    "required_total": step_b.required_total,
-                },
-                "change": change,
-            })
+            steps.append(
+                {
+                    "step_id": step_id,
+                    "run_a": {
+                        "status": step_a.status.value,
+                        "required_present": step_a.required_present,
+                        "required_total": step_a.required_total,
+                    },
+                    "run_b": {
+                        "status": step_b.status.value,
+                        "required_present": step_b.required_present,
+                        "required_total": step_b.required_total,
+                    },
+                    "change": change,
+                }
+            )
 
         return {
             "run_a": run_a,
@@ -602,14 +638,16 @@ class RunInspector:
             # Format 1: New format with "events" array
             if "events" in data:
                 for event_data in data.get("events", []):
-                    events.append(FlowEvent(
-                        timestamp=event_data.get("ts", ""),
-                        flow=event_data.get("flow", ""),
-                        step=event_data.get("step"),
-                        status=event_data.get("status", ""),
-                        duration_ms=event_data.get("duration_ms"),
-                        note=event_data.get("note"),
-                    ))
+                    events.append(
+                        FlowEvent(
+                            timestamp=event_data.get("ts", ""),
+                            flow=event_data.get("flow", ""),
+                            step=event_data.get("step"),
+                            status=event_data.get("status", ""),
+                            duration_ms=event_data.get("duration_ms"),
+                            note=event_data.get("note"),
+                        )
+                    )
 
             # Format 2: Legacy format with "execution_timeline" array
             elif "execution_timeline" in data:
@@ -621,27 +659,29 @@ class RunInspector:
 
                     # Create started event
                     if start_time:
-                        events.append(FlowEvent(
-                            timestamp=start_time,
-                            flow=flow_key,
-                            step=None,
-                            status="started",
-                            duration_ms=None,
-                            note=flow_data.get("decision"),
-                        ))
+                        events.append(
+                            FlowEvent(
+                                timestamp=start_time,
+                                flow=flow_key,
+                                step=None,
+                                status="started",
+                                duration_ms=None,
+                                note=flow_data.get("decision"),
+                            )
+                        )
 
                     # Create completed event
                     if end_time:
-                        events.append(FlowEvent(
-                            timestamp=end_time,
-                            flow=flow_key,
-                            step=None,
-                            status="completed",
-                            duration_ms=int(duration_min * 60 * 1000)
-                            if duration_min
-                            else None,
-                            note=flow_data.get("decision_artifact"),
-                        ))
+                        events.append(
+                            FlowEvent(
+                                timestamp=end_time,
+                                flow=flow_key,
+                                step=None,
+                                status="completed",
+                                duration_ms=int(duration_min * 60 * 1000) if duration_min else None,
+                                note=flow_data.get("decision_artifact"),
+                            )
+                        )
 
             # Sort by timestamp
             events.sort(key=lambda e: e.timestamp)
@@ -719,12 +759,14 @@ class RunInspector:
                     except (ValueError, AttributeError):
                         pass
 
-                steps.append(StepTiming(
-                    step_id=s_key,
-                    started_at=step_start,
-                    ended_at=step_end,
-                    duration_seconds=step_duration,
-                ))
+                steps.append(
+                    StepTiming(
+                        step_id=s_key,
+                        started_at=step_start,
+                        ended_at=step_end,
+                        duration_seconds=step_duration,
+                    )
+                )
 
             flows[flow_key] = FlowTiming(
                 flow_key=flow_key,
@@ -788,10 +830,7 @@ class RunInspector:
                 # Reconstruct RunTiming from JSON
                 flows = {}
                 for flow_key, flow_data in data.get("flows", {}).items():
-                    steps = [
-                        StepTiming(**step_data)
-                        for step_data in flow_data.get("steps", [])
-                    ]
+                    steps = [StepTiming(**step_data) for step_data in flow_data.get("steps", [])]
                     flows[flow_key] = FlowTiming(
                         flow_key=flow_data.get("flow_key", flow_key),
                         started_at=flow_data.get("started_at"),
@@ -847,9 +886,7 @@ class RunInspector:
         if isinstance(obj, (FlowEvent, StepTiming, FlowTiming, RunTiming)):
             return asdict(obj)
         elif hasattr(obj, "__dataclass_fields__"):
-            return {
-                k: self.to_dict(v) for k, v in obj.__dict__.items()
-            }
+            return {k: self.to_dict(v) for k, v in obj.__dict__.items()}
         elif isinstance(obj, Enum):
             return obj.value
         elif isinstance(obj, dict):
@@ -865,16 +902,14 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Inspect swarm run artifacts")
-    parser.add_argument("--run", "-r", default="health-check",
-                       help="Run ID to inspect (default: health-check)")
+    parser.add_argument(
+        "--run", "-r", default="health-check", help="Run ID to inspect (default: health-check)"
+    )
     parser.add_argument("--flow", "-f", help="Specific flow to inspect")
     parser.add_argument("--step", "-s", help="Specific step to inspect (requires --flow)")
-    parser.add_argument("--list", "-l", action="store_true",
-                       help="List available runs")
-    parser.add_argument("--sdlc-bar", action="store_true",
-                       help="Show SDLC bar data")
-    parser.add_argument("--json", action="store_true",
-                       help="Output as JSON")
+    parser.add_argument("--list", "-l", action="store_true", help="List available runs")
+    parser.add_argument("--sdlc-bar", action="store_true", help="Show SDLC bar data")
+    parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     args = parser.parse_args()
     inspector = RunInspector()
