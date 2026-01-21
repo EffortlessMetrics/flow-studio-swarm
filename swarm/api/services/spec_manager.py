@@ -581,10 +581,10 @@ class SpecManager:
         Returns:
             Parsed YAML data.
         """
-        import yaml
+        from swarm.utils.yaml_utils import load_yaml
 
         with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+            return load_yaml(f) or {}
 
     def _save_yaml(self, path: Path, data: Dict[str, Any]) -> None:
         """Save data to a YAML file.

@@ -10,6 +10,8 @@ from typing import List, Tuple
 
 import yaml
 
+from swarm.utils.yaml_utils import load_yaml
+
 
 class SkillsValidator:
     def __init__(self, repo_root: Path):
@@ -49,7 +51,7 @@ class SkillsValidator:
                         continue
 
                     frontmatter_str = content[3:end_marker]
-                    frontmatter = yaml.safe_load(frontmatter_str)
+                    frontmatter = load_yaml(frontmatter_str)
 
                     if frontmatter is None:
                         errors.append(f"{skill_name}: Empty YAML frontmatter")

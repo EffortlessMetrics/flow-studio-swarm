@@ -58,8 +58,8 @@ This document lists what Flow Studio can do, with evidence pointers.
 def parse_yaml_simple(content: str) -> Dict[str, Any]:
     """Parse YAML using PyYAML (standard library not sufficient for complex YAML)."""
     try:
-        import yaml
-        return yaml.safe_load(content)
+        from swarm.utils.yaml_utils import load_yaml
+        return load_yaml(content)
     except ImportError:
         # Fallback to a basic parser if yaml not available
         # This won't handle complex YAML but works for simple cases

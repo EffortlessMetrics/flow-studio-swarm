@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 # Default cache TTL: 5 minutes for local dev, configurable via env
 # Short TTL (30s) was causing excessive subprocess calls on page load
@@ -825,7 +825,7 @@ class StatusProvider:
             for flow_file in sorted(flows_dir.glob("*.yaml")):
                 try:
                     total += 1
-                    data = yaml.safe_load(flow_file.read_text(encoding="utf-8"))
+                    data = load_yaml(flow_file.read_text(encoding="utf-8"))
                     if data and isinstance(data, dict) and data.get("key"):
                         healthy += 1
                     else:
@@ -852,7 +852,7 @@ class StatusProvider:
             for agent_file in sorted(agents_dir.glob("*.yaml")):
                 try:
                     total += 1
-                    data = yaml.safe_load(agent_file.read_text(encoding="utf-8"))
+                    data = load_yaml(agent_file.read_text(encoding="utf-8"))
                     if (
                         data
                         and isinstance(data, dict)

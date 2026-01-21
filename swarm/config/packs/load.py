@@ -8,6 +8,8 @@ from typing import Any, Dict, Optional
 
 import yaml
 
+from swarm.utils.yaml_utils import load_yaml
+
 from .models import EngineConfig, FeaturesConfig, FlowConfig, Pack, RuntimeConfig
 from .paths import get_baseline_pack_path, get_repo_pack_path
 
@@ -65,7 +67,7 @@ def load_pack_from_file(path: Path) -> Optional[Pack]:
 
     try:
         with open(path, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+            data = load_yaml(f)
 
         if not data:
             # Empty pack is valid - uses defaults

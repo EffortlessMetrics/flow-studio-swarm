@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from swarm.runtime.safe_paths import validate_path_component
+
 
 class RunArtifactsError(Exception):
     def __init__(self, status_code: int, payload: Dict[str, Any]):
@@ -13,12 +15,15 @@ class RunArtifactsError(Exception):
 
 
 def resolve_run_path(run_id: str, run_inspector: Optional[Any]) -> Path:
+    validate_path_component(run_id, "run_id")
+
     run_path = None
     if run_inspector is not None:
         run_path = run_inspector.get_run_path(run_id)
 
     if run_path is None:
         from swarm.runtime import storage as runtime_storage
+
         run_path = runtime_storage.find_run_path(run_id)
 
     if run_path is None:
@@ -27,7 +32,11 @@ def resolve_run_path(run_id: str, run_inspector: Optional[Any]) -> Path:
     return Path(run_path)
 
 
-def load_transcript(run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]) -> Dict[str, Any]:
+def load_transcript(
+    run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]
+) -> Dict[str, Any]:
+    validate_path_component(flow_key, "flow_key")
+    validate_path_component(step_id, "step_id")
     run_path = resolve_run_path(run_id, run_inspector)
 
     llm_dir = run_path / flow_key / "llm"
@@ -82,7 +91,11 @@ def load_transcript(run_id: str, flow_key: str, step_id: str, run_inspector: Opt
     }
 
 
-def load_receipt(run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]) -> Dict[str, Any]:
+def load_receipt(
+    run_id: str, flow_key: str, step_id: str, run_inspector: Optional[Any]
+) -> Dict[str, Any]:
+    validate_path_component(flow_key, "flow_key")
+    validate_path_component(step_id, "step_id")
     run_path = resolve_run_path(run_id, run_inspector)
 
     receipts_dir = run_path / flow_key / "receipts"

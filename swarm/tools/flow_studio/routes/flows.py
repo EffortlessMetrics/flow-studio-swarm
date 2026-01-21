@@ -142,4 +142,4 @@ async def api_graph_artifacts(
 
 @router.get("/api/search", response_model=schema.SearchResponse if schema else None)
 async def api_search(q: str = Query("", description="Search query"), state: FlowStudioState = Depends(get_state)):
-    return search(state.flows_cache, state.agents_cache, q)
+    return search(state.flows_cache, state.agents_cache, q, state.agent_flow_index)

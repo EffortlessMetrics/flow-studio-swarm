@@ -13,9 +13,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Dict, Any
+
 import yaml
 
 from swarm.config.flow_registry import ContextBudgetOverride
+from swarm.utils.yaml_utils import load_yaml
 
 _CONFIG_DIR = Path(__file__).parent
 PROFILE_DIR = Path(__file__).parent.parent / "profiles"
@@ -117,7 +119,7 @@ class ProfileRegistry:
         for profile_file in sorted(self._profile_dir.glob(f"*{PROFILE_EXTENSION}")):
             try:
                 with open(profile_file) as f:
-                    data = yaml.safe_load(f)
+                    data = load_yaml(f)
 
                 if data and "meta" in data:
                     meta = _parse_profile_meta(data["meta"])
@@ -140,7 +142,7 @@ class ProfileRegistry:
             raise FileNotFoundError(f"Profile not found: {profile_id}")
 
         with open(profile_path) as f:
-            data = yaml.safe_load(f)
+            data = load_yaml(f)
 
         profile = profile_from_dict(data)
         self._profiles_cache[profile_id] = profile
@@ -193,7 +195,7 @@ class ProfileRegistry:
 
         try:
             with open(marker) as f:
-                data = yaml.safe_load(f)
+                data = load_yaml(f)
 
             if not data:
                 return None
