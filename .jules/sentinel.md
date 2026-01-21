@@ -1,4 +1,0 @@
-## 2026-01-18 - Path Traversal & Command Injection Mitigation
-**Vulnerability:** Path traversal vulnerabilities were found in `storage.py` and `run_artifacts.py` where `run_id`, `flow_key`, and `step_id` were used to construct file paths without validation. Additionally, `ClaudeHarnessBackend` was potentially vulnerable to command injection via `flow_key`.
-**Learning:** `pathlib.Path` does not automatically prevent path traversal when joining user-controlled strings. Explicit validation is required. Also, backend command construction using f-strings is risky if inputs are not validated or escaped.
-**Prevention:** Created `swarm/runtime/safe_paths.py` with `validate_path_component` enforcing a strict allowlist (alphanumeric, `_`, `-`, `.`). Applied this validation in `storage.py`, `run_artifacts.py`, and `path_helpers.py`.
