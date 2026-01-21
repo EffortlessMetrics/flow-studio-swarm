@@ -39,6 +39,26 @@ def find_repo_root() -> Path:
     return current
 
 
+def set_repo_root(path: Path) -> None:
+    """
+    Set the repository root to a specific path.
+
+    This updates all path constants in this module. Must be called before
+    any validation modules are imported if you want to override the default
+    repo root detection.
+
+    Args:
+        path: Path to repository root
+    """
+    global ROOT, AGENTS_MD, FLOW_SPECS_DIR, FLOWS_CONFIG_DIR, AGENTS_DIR, SKILLS_DIR
+    ROOT = Path(path).resolve()
+    AGENTS_MD = ROOT / "swarm" / "AGENTS.md"
+    FLOW_SPECS_DIR = ROOT / "swarm" / "flows"
+    FLOWS_CONFIG_DIR = ROOT / "swarm" / "config" / "flows"
+    AGENTS_DIR = ROOT / ".claude" / "agents"
+    SKILLS_DIR = ROOT / ".claude" / "skills"
+
+
 # Resolved paths (initialized on import)
 ROOT = find_repo_root()
 AGENTS_MD = ROOT / "swarm" / "AGENTS.md"
