@@ -358,3 +358,327 @@ class TestRunService:
         assert exemplars[0].id == "exemplar-run"
 
         RunService.reset()
+
+
+class TestRunServiceCaching:
+    """Test RunService caching behavior for terminal runs.
+
+    Note: These tests monkeypatch storage.RUNS_DIR to use tmp_path, ensuring
+    test isolation. The monkeypatched RUNS_DIR is used by storage functions
+    when called without explicit runs_dir parameter.
+    """
+
+    def test_cache_hit_for_terminal_run(self, tmp_path, monkeypatch):
+        """Should cache terminal runs and avoid repeated disk reads."""
+        monkeypatch.setattr(storage, "RUNS_DIR", tmp_path)
+
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        # Create a terminal run (in real directory for service to find)
+        run_id = "cache-test-succeeded"
+        now = datetime.now(timezone.utc)
+        summary = RunSummary(
+            id=run_id,
+            spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+            status=RunStatus.SUCCEEDED,
+            sdlc_status=SDLCStatus.OK,
+            created_at=now,
+            updated_at=now,
+        )
+        storage.write_summary(run_id, summary)  # Use default runs_dir
+
+        try:
+            # First call: should read from disk and cache
+            result1 = service.get_run(run_id)
+            assert result1 is not None
+            assert result1.status == RunStatus.SUCCEEDED
+
+            # Verify it's in the cache
+            assert run_id in service._summary_cache
+
+            # Second call: should hit cache (same object)
+            result2 = service.get_run(run_id)
+            assert result2 is result1
+        finally:
+            # Cleanup
+            import shutil
+            run_path = storage.get_run_path(run_id)
+            if run_path.exists():
+                shutil.rmtree(run_path)
+            RunService.reset()
+
+    def test_no_cache_for_non_terminal_run(self, tmp_path, monkeypatch):
+        """Should NOT cache non-terminal runs (PENDING, RUNNING)."""
+        monkeypatch.setattr(storage, "RUNS_DIR", tmp_path)
+
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        # Create a non-terminal run
+        run_id = "cache-test-running"
+        now = datetime.now(timezone.utc)
+        summary = RunSummary(
+            id=run_id,
+            spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+            status=RunStatus.RUNNING,
+            sdlc_status=SDLCStatus.UNKNOWN,
+            created_at=now,
+            updated_at=now,
+        )
+        storage.write_summary(run_id, summary)  # Use default runs_dir
+
+        try:
+            # Call get_run
+            result = service.get_run(run_id)
+            assert result is not None
+            assert result.status == RunStatus.RUNNING
+
+            # Should NOT be cached
+            assert run_id not in service._summary_cache
+        finally:
+            # Cleanup
+            import shutil
+            run_path = storage.get_run_path(run_id)
+            if run_path.exists():
+                shutil.rmtree(run_path)
+            RunService.reset()
+
+    def test_cache_invalidation_on_mark_exemplar(self, tmp_path, monkeypatch):
+        """Cache should be invalidated when marking as exemplar."""
+        monkeypatch.setattr(storage, "RUNS_DIR", tmp_path)
+
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        # Create and cache a terminal run
+        run_id = "cache-invalidate-test"
+        now = datetime.now(timezone.utc)
+        summary = RunSummary(
+            id=run_id,
+            spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+            status=RunStatus.SUCCEEDED,
+            sdlc_status=SDLCStatus.OK,
+            created_at=now,
+            updated_at=now,
+            is_exemplar=False,
+        )
+        storage.write_summary(run_id, summary)  # Use default runs_dir
+
+        try:
+            # Populate cache
+            service.get_run(run_id)
+            assert run_id in service._summary_cache
+
+            # Mark as exemplar (should invalidate cache)
+            service.mark_exemplar(run_id, True)
+            assert run_id not in service._summary_cache
+
+            # Next get_run should re-read from disk and see updated value
+            result = service.get_run(run_id)
+            assert result.is_exemplar is True
+        finally:
+            # Cleanup
+            import shutil
+            run_path = storage.get_run_path(run_id)
+            if run_path.exists():
+                shutil.rmtree(run_path)
+            RunService.reset()
+
+    def test_cache_invalidation_on_add_tag(self, tmp_path, monkeypatch):
+        """Cache should be invalidated when adding a tag."""
+        monkeypatch.setattr(storage, "RUNS_DIR", tmp_path)
+
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        run_id = "cache-tag-test"
+        now = datetime.now(timezone.utc)
+        summary = RunSummary(
+            id=run_id,
+            spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+            status=RunStatus.FAILED,
+            sdlc_status=SDLCStatus.ERROR,
+            created_at=now,
+            updated_at=now,
+            tags=[],
+        )
+        storage.write_summary(run_id, summary)  # Use default runs_dir
+
+        try:
+            # Populate cache
+            service.get_run(run_id)
+            assert run_id in service._summary_cache
+
+            # Add tag (should invalidate cache)
+            service.add_tag(run_id, "important")
+            assert run_id not in service._summary_cache
+
+            # Next get_run should see updated tags
+            result = service.get_run(run_id)
+            assert "important" in result.tags
+        finally:
+            # Cleanup
+            import shutil
+            run_path = storage.get_run_path(run_id)
+            if run_path.exists():
+                shutil.rmtree(run_path)
+            RunService.reset()
+
+    def test_cache_invalidation_on_remove_tag(self, tmp_path, monkeypatch):
+        """Cache should be invalidated when removing a tag."""
+        monkeypatch.setattr(storage, "RUNS_DIR", tmp_path)
+
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        run_id = "cache-remove-tag-test"
+        now = datetime.now(timezone.utc)
+        summary = RunSummary(
+            id=run_id,
+            spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+            status=RunStatus.FAILED,
+            sdlc_status=SDLCStatus.ERROR,
+            created_at=now,
+            updated_at=now,
+            tags=["to-remove", "keep"],
+        )
+        storage.write_summary(run_id, summary)
+
+        try:
+            # Populate cache
+            service.get_run(run_id)
+            assert run_id in service._summary_cache
+
+            # Remove tag (should invalidate cache)
+            service.remove_tag(run_id, "to-remove")
+            assert run_id not in service._summary_cache
+
+            # Next get_run should see updated tags
+            result = service.get_run(run_id)
+            assert "to-remove" not in result.tags
+            assert "keep" in result.tags
+        finally:
+            # Cleanup
+            import shutil
+            run_path = storage.get_run_path(run_id)
+            if run_path.exists():
+                shutil.rmtree(run_path)
+            RunService.reset()
+
+    def test_remove_tag_noop_if_not_present(self, tmp_path, monkeypatch):
+        """remove_tag should not invalidate cache if tag wasn't present."""
+        monkeypatch.setattr(storage, "RUNS_DIR", tmp_path)
+
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        run_id = "cache-remove-noop-test"
+        now = datetime.now(timezone.utc)
+        summary = RunSummary(
+            id=run_id,
+            spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+            status=RunStatus.FAILED,
+            sdlc_status=SDLCStatus.ERROR,
+            created_at=now,
+            updated_at=now,
+            tags=["existing"],
+        )
+        storage.write_summary(run_id, summary)
+
+        try:
+            # Populate cache
+            cached = service.get_run(run_id)
+            assert run_id in service._summary_cache
+
+            # Try to remove non-existent tag (should NOT invalidate cache)
+            service.remove_tag(run_id, "non-existent")
+            assert run_id in service._summary_cache
+
+            # Should still be the same cached object
+            assert service.get_run(run_id) is cached
+        finally:
+            # Cleanup
+            import shutil
+            run_path = storage.get_run_path(run_id)
+            if run_path.exists():
+                shutil.rmtree(run_path)
+            RunService.reset()
+
+    def test_clear_cache(self, tmp_path, monkeypatch):
+        """Should clear entire cache when clear_cache() called."""
+        monkeypatch.setattr(storage, "RUNS_DIR", tmp_path)
+
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        # Create multiple terminal runs
+        now = datetime.now(timezone.utc)
+        run_ids = []
+        for i in range(3):
+            run_id = f"clear-cache-test-{i}"
+            run_ids.append(run_id)
+            summary = RunSummary(
+                id=run_id,
+                spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+                status=RunStatus.CANCELED,
+                sdlc_status=SDLCStatus.UNKNOWN,
+                created_at=now,
+                updated_at=now,
+            )
+            storage.write_summary(run_id, summary)  # Use default runs_dir
+            service.get_run(run_id)
+
+        try:
+            # All should be cached
+            assert len(service._summary_cache) == 3
+
+            # Clear cache
+            service.clear_cache()
+            assert len(service._summary_cache) == 0
+        finally:
+            # Cleanup
+            import shutil
+            for run_id in run_ids:
+                run_path = storage.get_run_path(run_id)
+                if run_path.exists():
+                    shutil.rmtree(run_path)
+            RunService.reset()
+
+    def test_reset_clears_cache(self, tmp_path, monkeypatch):
+        """RunService.reset() should clear the cache for test isolation."""
+        monkeypatch.setattr(storage, "RUNS_DIR", tmp_path)
+
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        # Create and cache a run
+        run_id = "reset-cache-test"
+        now = datetime.now(timezone.utc)
+        summary = RunSummary(
+            id=run_id,
+            spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+            status=RunStatus.SUCCEEDED,
+            sdlc_status=SDLCStatus.OK,
+            created_at=now,
+            updated_at=now,
+        )
+        storage.write_summary(run_id, summary)  # Use default runs_dir
+        service.get_run(run_id)
+
+        try:
+            assert len(service._summary_cache) == 1
+
+            # Reset should clear the cache
+            RunService.reset()
+
+            # New instance should have empty cache
+            new_service = RunService.get_instance(tmp_path)
+            assert len(new_service._summary_cache) == 0
+        finally:
+            # Cleanup
+            import shutil
+            run_path = storage.get_run_path(run_id)
+            if run_path.exists():
+                shutil.rmtree(run_path)
+            RunService.reset()

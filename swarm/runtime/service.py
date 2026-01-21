@@ -20,9 +20,11 @@ Usage:
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import List, Optional
 
+from ..config.flow_registry import get_flow_order
 from . import storage
 from .backends import (
     ClaudeHarnessBackend,
@@ -30,7 +32,6 @@ from .backends import (
     RunBackend,
 )
 from .storage import EXAMPLES_DIR
-from ..config.flow_registry import get_flow_order
 from .types import (
     BackendCapabilities,
     BackendId,
@@ -73,6 +74,10 @@ class RunService:
             "gemini-cli": GeminiCliBackend(self._repo_root),
             # Agent SDK backend will be added when implemented
         }
+        # Cache for terminal run summaries to avoid reading disk repeatedly
+        # Thread-safe: Flask may serve concurrent requests
+        self._summary_cache: dict[str, RunSummary] = {}
+        self._cache_lock = threading.Lock()
 
     @classmethod
     def get_instance(cls, repo_root: Optional[Path] = None) -> "RunService":
@@ -83,8 +88,26 @@ class RunService:
 
     @classmethod
     def reset(cls) -> None:
-        """Reset the singleton (for testing)."""
+        """Reset the singleton (for testing).
+
+        Clears the cache and instance to ensure test isolation.
+        """
+        if cls._instance is not None:
+            cls._instance.clear_cache()
         cls._instance = None
+
+    def clear_cache(self) -> None:
+        """Clear the summary cache.
+
+        Useful for forcing re-reads from disk, e.g., after external changes.
+        """
+        with self._cache_lock:
+            self._summary_cache.clear()
+
+    def _invalidate_cache(self, run_id: RunId) -> None:
+        """Remove a single entry from the cache (thread-safe)."""
+        with self._cache_lock:
+            self._summary_cache.pop(run_id, None)
 
     # =========================================================================
     # Backend Management
@@ -144,11 +167,31 @@ class RunService:
     def get_run(self, run_id: RunId) -> Optional[RunSummary]:
         """Get a run summary by ID.
 
-        Checks storage first, then queries backends.
+        Checks cache first (for terminal runs), then storage, then backends.
+        Terminal runs (SUCCEEDED, FAILED, CANCELED) are cached to avoid
+        repeated disk reads on list_runs().
         """
+        # Check cache first (thread-safe read)
+        with self._cache_lock:
+            cached = self._summary_cache.get(run_id)
+        if cached is not None:
+            return cached
+
         # Try storage first (works for all backends)
         summary = storage.read_summary(run_id)
         if summary:
+            # Cache if terminal state (thread-safe write with re-check)
+            # Re-check under lock to avoid stale cache insertion after invalidation
+            if summary.status in (
+                RunStatus.SUCCEEDED,
+                RunStatus.FAILED,
+                RunStatus.CANCELED,
+            ):
+                with self._cache_lock:
+                    # Only insert if not already present (could have been
+                    # invalidated between storage read and this point)
+                    if run_id not in self._summary_cache:
+                        self._summary_cache[run_id] = summary
             return summary
 
         # Fall back to querying backends
@@ -194,7 +237,8 @@ class RunService:
         for rid in storage.list_runs():
             if rid in seen_ids:
                 continue
-            summary = storage.read_summary(rid)
+            # Use get_run to leverage cache
+            summary = self.get_run(rid)
             if summary:
                 if flow_key is None or flow_key in summary.spec.flow_keys:
                     summaries.append(summary)
@@ -318,6 +362,8 @@ class RunService:
             return False
 
         storage.update_summary(run_id, {"is_exemplar": is_exemplar})
+        # Invalidate cache (thread-safe)
+        self._invalidate_cache(run_id)
         return True
 
     def add_tag(self, run_id: RunId, tag: str) -> bool:
@@ -330,6 +376,8 @@ class RunService:
         if tag not in tags:
             tags.append(tag)
             storage.update_summary(run_id, {"tags": tags})
+            # Invalidate cache (thread-safe)
+            self._invalidate_cache(run_id)
         return True
 
     def remove_tag(self, run_id: RunId, tag: str) -> bool:
@@ -338,8 +386,12 @@ class RunService:
         if not summary:
             return False
 
-        tags = [t for t in summary.tags if t != tag]
-        storage.update_summary(run_id, {"tags": tags})
+        # Only update if tag is actually present
+        if tag in summary.tags:
+            tags = [t for t in summary.tags if t != tag]
+            storage.update_summary(run_id, {"tags": tags})
+            # Invalidate cache (thread-safe)
+            self._invalidate_cache(run_id)
         return True
 
     def list_exemplars(self) -> List[RunSummary]:
