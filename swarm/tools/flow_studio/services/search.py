@@ -2,15 +2,54 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+# Module-level cache: maps catalog path -> (mtime, data)
+# Avoids repeated disk I/O when artifact catalog hasn't changed.
+_artifact_catalog_cache: Dict[Path, Tuple[float, Dict[str, Any]]] = {}
+
+
+def clear_artifact_catalog_cache() -> None:
+    """Clear the artifact catalog cache.
+
+    Call this when you know the catalog file has been modified externally,
+    or during development/testing to force a fresh load.
+    """
+    _artifact_catalog_cache.clear()
 
 
 def load_artifact_catalog(repo_root: Path) -> Dict[str, Any]:
+    """Load artifact catalog with mtime-based caching.
+
+    Returns cached data if the file hasn't been modified since last read.
+    Cache is automatically invalidated when the file's mtime changes.
+
+    Handles race conditions where the file may be deleted or modified between
+    stat() and open() calls, and malformed JSON gracefully.
+    """
     catalog_path = repo_root / "swarm" / "meta" / "artifact_catalog.json"
-    if not catalog_path.exists():
+
+    try:
+        mtime = catalog_path.stat().st_mtime
+    except OSError:
+        # File doesn't exist or can't be accessed
         return {"flows": {}}
-    with catalog_path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+
+    cached = _artifact_catalog_cache.get(catalog_path)
+    if cached is not None:
+        cached_mtime, cached_data = cached
+        if cached_mtime == mtime:
+            return cached_data
+
+    try:
+        with catalog_path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        # File was deleted/modified between stat() and open(), or JSON is malformed
+        return {"flows": {}}
+
+    _artifact_catalog_cache[catalog_path] = (mtime, data)
+    return data
 
 
 def build_artifact_graph(
