@@ -74,6 +74,11 @@ EVENTS_FILE = "events.jsonl"
 RUN_STATE_FILE = "run_state.json"
 LEGACY_META_FILE = "run.json"  # Old-style optional metadata
 
+# Flow keys used for detecting legacy runs (runs without meta.json but with flow artifacts).
+# Includes core SDLC flows; excludes utility flows (reset, stepwise-demo) which wouldn't
+# exist as legacy artifacts.
+LEGACY_FLOW_KEYS = frozenset({"signal", "plan", "build", "review", "gate", "deploy", "wisdom"})
+
 # -----------------------------------------------------------------------------
 # Per-run locking for thread safety
 # -----------------------------------------------------------------------------
@@ -833,7 +838,6 @@ def scan_runs(runs_dir: Path = RUNS_DIR) -> tuple[List[RunId], List[RunId]]:
 
     active_runs: List[RunId] = []
     legacy_runs: List[RunId] = []
-    flow_keys = {"signal", "plan", "build", "gate", "deploy", "wisdom"}
 
     try:
         with os.scandir(runs_dir) as entries:
@@ -848,7 +852,7 @@ def scan_runs(runs_dir: Path = RUNS_DIR) -> tuple[List[RunId], List[RunId]]:
                 else:
                     # Check for legacy flow artifacts
                     # Only check if not active to avoid redundant stats
-                    for flow_key in flow_keys:
+                    for flow_key in LEGACY_FLOW_KEYS:
                         if os.path.isdir(os.path.join(entry.path, flow_key)):
                             legacy_runs.append(entry.name)
                             break
@@ -897,9 +901,6 @@ def discover_legacy_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     if not runs_dir.exists():
         return []
 
-    # Known flow keys that indicate a valid run directory
-    flow_keys = {"signal", "plan", "build", "gate", "deploy", "wisdom"}
-
     legacy_runs: List[RunId] = []
     for entry in runs_dir.iterdir():
         if not entry.is_dir():
@@ -910,7 +911,7 @@ def discover_legacy_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
             continue
 
         # Check if any flow subdirectory exists
-        has_flow_artifacts = any((entry / flow_key).is_dir() for flow_key in flow_keys)
+        has_flow_artifacts = any((entry / flow_key).is_dir() for flow_key in LEGACY_FLOW_KEYS)
 
         if has_flow_artifacts:
             legacy_runs.append(entry.name)
@@ -930,16 +931,13 @@ def discover_example_runs() -> List[RunId]:
     if not EXAMPLES_DIR.exists():
         return []
 
-    # Known flow keys that indicate a valid run directory
-    flow_keys = {"signal", "plan", "build", "gate", "deploy", "wisdom"}
-
     example_runs: List[RunId] = []
     for entry in EXAMPLES_DIR.iterdir():
         if not entry.is_dir() or entry.name.startswith("."):
             continue
 
         # Check if any flow subdirectory exists
-        has_flow_artifacts = any((entry / flow_key).is_dir() for flow_key in flow_keys)
+        has_flow_artifacts = any((entry / flow_key).is_dir() for flow_key in LEGACY_FLOW_KEYS)
 
         if has_flow_artifacts:
             example_runs.append(entry.name)
