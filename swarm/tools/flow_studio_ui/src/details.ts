@@ -15,6 +15,7 @@ import {
   formatTime,
   formatDateTime,
   createQuickCommands,
+  createPathWithCopy,
   escapeHtml
 } from "./utils.js";
 import type {
@@ -1184,12 +1185,21 @@ export function showArtifactDetails(data: ArtifactNodeData): void {
       `swarm/runs/${state.currentRunId}/${data.flow}/${data.filename || ""}`) :
     `swarm/runs/<run-id>/${data.flow}/${data.filename || ""}`;
 
-  pathSection.innerHTML = `
-    <div class="kv-label">Path</div>
-    <div class="mono fs-text-sm">${runPath}</div>
-    <div class="kv-label" style="margin-top: 12px;">Copy Command</div>
-    <pre class="mono">cat ${runPath}</pre>
-  `;
+  const pathLabel = document.createElement("div");
+  pathLabel.className = "kv-label";
+  pathLabel.textContent = "Path";
+  pathSection.appendChild(pathLabel);
+
+  // Use existing utility for path + copy button pattern
+  const pathContainer = createPathWithCopy(runPath);
+  // Add fs-text-sm class to the path span for consistent sizing
+  const pathSpan = pathContainer.querySelector("span");
+  if (pathSpan) pathSpan.classList.add("fs-text-sm");
+  pathSection.appendChild(pathContainer);
+
+  const quickCmds = createQuickCommands([`cat ${runPath}`]);
+  quickCmds.style.marginTop = "12px";
+  pathSection.appendChild(quickCmds);
 
   const operatorOnly = document.createElement("div");
   operatorOnly.className = "operator-only";

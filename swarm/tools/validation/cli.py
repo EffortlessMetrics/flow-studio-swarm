@@ -5,8 +5,28 @@ import argparse
 import json
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict
 
+# Early argument parsing for --repo (must happen before other imports)
+# This allows us to set the repo root before validation modules resolve their paths
+def _get_repo_override() -> Path | None:
+    """Check for --repo argument before full argument parsing."""
+    for i, arg in enumerate(sys.argv[1:]):
+        if arg == "--repo" and i + 1 < len(sys.argv) - 1:
+            return Path(sys.argv[i + 2])
+        if arg.startswith("--repo="):
+            return Path(arg.split("=", 1)[1])
+    return None
+
+
+# Set repo root if --repo was provided (must happen before importing validation modules)
+_repo_override = _get_repo_override()
+if _repo_override is not None:
+    from swarm.tools.validation.helpers import set_repo_root
+    set_repo_root(_repo_override)
+
+# Now import validation modules (they will use the configured repo root)
 from swarm.tools.validation.constants import (
     EXIT_SUCCESS,
     EXIT_VALIDATION_FAILED,
@@ -40,7 +60,14 @@ Examples:
   uv run swarm/tools/validate_swarm.py --check-modified
   uv run swarm/tools/validate_swarm.py --flows-only
   uv run swarm/tools/validate_swarm.py --debug
+  uv run swarm/tools/validate_swarm.py --repo /path/to/repo
         """
+    )
+
+    parser.add_argument(
+        "--repo",
+        metavar="PATH",
+        help="Path to repository root to validate (default: auto-detect from cwd)"
     )
 
     parser.add_argument(

@@ -319,12 +319,15 @@ def run_validator():
     Returns:
         Function(repo_path, flags=[]) -> CompletedProcess
     """
+    # Get the real project directory (where pyproject.toml and dependencies live)
+    project_root = Path(__file__).parent.parent
+
     def _run(repo_path: Path, flags: Optional[List[str]] = None):
         """
         Run the validator on the given repository.
 
         Args:
-            repo_path: Path to repository root
+            repo_path: Path to repository root to validate
             flags: Optional list of command-line flags
 
         Returns:
@@ -333,11 +336,13 @@ def run_validator():
         if flags is None:
             flags = []
 
-        cmd = ["uv", "run", "swarm/tools/validate_swarm.py"] + flags
+        # Run from project root (where uv has access to dependencies)
+        # Use --repo to specify the target repo to validate
+        cmd = ["uv", "run", "swarm/tools/validate_swarm.py", "--repo", str(repo_path)] + flags
 
         result = subprocess.run(
             cmd,
-            cwd=repo_path,
+            cwd=project_root,
             capture_output=True,
             text=True
         )
