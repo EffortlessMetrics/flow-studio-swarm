@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
+import yaml
+
 logger = logging.getLogger(__name__)
 
 
@@ -93,7 +95,6 @@ class SpecManager:
                     content = md_file.read_text(encoding="utf-8")
                     if content.startswith("---"):
                         # Extract YAML frontmatter
-                        import yaml
                         end_marker = content.find("---", 3)
                         if end_marker > 0:
                             frontmatter = yaml.safe_load(content[3:end_marker])
@@ -639,8 +640,6 @@ class SpecManager:
         Returns:
             Parsed YAML data.
         """
-        import yaml
-
         with open(path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
 
@@ -651,8 +650,6 @@ class SpecManager:
             path: Path to YAML file.
             data: Data to save.
         """
-        import yaml
-
         with open(path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
 

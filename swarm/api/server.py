@@ -635,7 +635,7 @@ def create_app(
 
             # Get counts
             flows_count = len(spec_mgr.list_flows())
-            agents_count = len(spec_mgr.list_agents()) if hasattr(spec_mgr, 'list_agents') else 0
+            agents_count = len(spec_mgr.list_agents())
 
             return ReloadResponse(
                 status="ok",
@@ -644,9 +644,9 @@ def create_app(
             )
 
         except Exception as e:
-            logger.error("Failed to reload: %s", e, exc_info=True)
+            logger.exception("Failed to reload: %s", e)
             return ReloadResponse(
-                status=f"error: {str(e)}",
+                status=f"error: {e!s}",
                 flows=0,
                 agents=0,
             )
