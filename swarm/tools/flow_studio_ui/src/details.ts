@@ -15,7 +15,7 @@ import {
   formatTime,
   formatDateTime,
   createQuickCommands,
-  createCopyButton,
+  createPathWithCopy,
   escapeHtml
 } from "./utils.js";
 import type {
@@ -1190,16 +1190,11 @@ export function showArtifactDetails(data: ArtifactNodeData): void {
   pathLabel.textContent = "Path";
   pathSection.appendChild(pathLabel);
 
-  const pathContainer = document.createElement("div");
-  pathContainer.style.display = "flex";
-  pathContainer.style.alignItems = "center";
-  pathContainer.style.gap = "8px";
-
-  const pathSpan = document.createElement("div");
-  pathSpan.className = "mono fs-text-sm";
-  pathSpan.textContent = runPath;
-  pathContainer.appendChild(pathSpan);
-  pathContainer.appendChild(createCopyButton(runPath));
+  // Use existing utility for path + copy button pattern
+  const pathContainer = createPathWithCopy(runPath);
+  // Add fs-text-sm class to the path span for consistent sizing
+  const pathSpan = pathContainer.querySelector("span");
+  if (pathSpan) pathSpan.classList.add("fs-text-sm");
   pathSection.appendChild(pathContainer);
 
   const quickCmds = createQuickCommands([`cat ${runPath}`]);

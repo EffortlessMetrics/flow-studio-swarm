@@ -4583,7 +4583,7 @@ export { fetchJSON };
 import { state } from "./state.js";
 import { Api } from "./api.js";
 import { getTeachingMode } from "./teaching_mode.js";
-import { formatDuration, formatTime, formatDateTime, createQuickCommands, createCopyButton, escapeHtml } from "./utils.js";
+import { formatDuration, formatTime, formatDateTime, createQuickCommands, createPathWithCopy, escapeHtml } from "./utils.js";
 import { renderSelectNodeHint, renderAgentUsageItem, renderAgentLocationInfo, renderAgentCategoryHint, renderArtifactProducerHint, renderTabs, } from "./ui_fragments.js";
 import { RoutingDecisionCard, ForensicVerdictCard, renderInterruptionStackTab, } from "./components/index.js";
 // ============================================================================
@@ -5506,15 +5506,12 @@ export function showArtifactDetails(data) {
     pathLabel.className = "kv-label";
     pathLabel.textContent = "Path";
     pathSection.appendChild(pathLabel);
-    const pathContainer = document.createElement("div");
-    pathContainer.style.display = "flex";
-    pathContainer.style.alignItems = "center";
-    pathContainer.style.gap = "8px";
-    const pathSpan = document.createElement("div");
-    pathSpan.className = "mono fs-text-sm";
-    pathSpan.textContent = runPath;
-    pathContainer.appendChild(pathSpan);
-    pathContainer.appendChild(createCopyButton(runPath));
+    // Use existing utility for path + copy button pattern
+    const pathContainer = createPathWithCopy(runPath);
+    // Add fs-text-sm class to the path span for consistent sizing
+    const pathSpan = pathContainer.querySelector("span");
+    if (pathSpan)
+        pathSpan.classList.add("fs-text-sm");
     pathSection.appendChild(pathContainer);
     const quickCmds = createQuickCommands([`cat ${runPath}`]);
     quickCmds.style.marginTop = "12px";
