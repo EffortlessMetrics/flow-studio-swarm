@@ -233,6 +233,10 @@ class RunService:
         Optimized to avoid loading summaries for all runs when pagination is used.
         Only loads summaries for the requested slice.
 
+        Note: The total count may slightly overestimate if some summaries fail to
+        load (corrupt meta.json, etc.). The actual number of summaries returned
+        may be less than the slice size in edge cases.
+
         Args:
             limit: Maximum number of runs to return.
             offset: Number of runs to skip.
@@ -243,39 +247,46 @@ class RunService:
         Returns:
             Tuple containing:
             - List of run summaries for the requested page.
-            - Total count of matching runs.
+            - Total count of matching runs (may slightly overestimate).
         """
         # Slow path if filtering by flow_key (cannot optimize without index)
         if flow_key is not None:
             all_runs = self.list_runs(flow_key, include_legacy, include_examples)
             return all_runs[offset : offset + limit], len(all_runs)
 
-        # Fast path: Work with IDs first
-        example_ids = []
+        # Fast path: Work with IDs first, using set for deduplication
+        seen_ids: set[str] = set()
+        all_ids: List[str] = []
+
+        # Examples first (sorted by ID descending)
         if include_examples:
             example_ids = storage.discover_example_runs()
-            # Sort examples by ID descending (approximation for created_at)
             example_ids.sort(reverse=True)
+            for rid in example_ids:
+                if rid not in seen_ids:
+                    seen_ids.add(rid)
+                    all_ids.append(rid)
 
+        # Active runs with meta.json
         active_ids = storage.list_runs()
-
-        legacy_ids = []
-        if include_legacy:
-            legacy_ids = storage.discover_legacy_runs()
+        # Legacy runs without meta.json
+        legacy_ids = storage.discover_legacy_runs() if include_legacy else []
 
         # Combine active and legacy, sort by ID descending
         # Assumption: run_id lexicographical order ~= chronological order
         other_ids = sorted(active_ids + legacy_ids, reverse=True)
 
-        # Combined list: Examples first, then others
-        all_ids = example_ids + other_ids
+        for rid in other_ids:
+            if rid not in seen_ids:
+                seen_ids.add(rid)
+                all_ids.append(rid)
 
         total = len(all_ids)
         sliced_ids = all_ids[offset : offset + limit]
 
         summaries = []
-        # Create sets for fast lookups
-        example_set = set(example_ids)
+        # Create sets for fast lookups during summary creation
+        example_set = set(storage.discover_example_runs()) if include_examples else set()
         legacy_set = set(legacy_ids)
 
         for rid in sliced_ids:
