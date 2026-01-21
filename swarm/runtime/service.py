@@ -233,8 +233,11 @@ class RunService:
                         summaries.append(summary)
                         seen_ids.add(rid)
 
+        # Get both active and legacy runs in one efficient pass
+        active_runs, legacy_runs = storage.scan_runs()
+
         # Get runs from storage (new-style with meta.json)
-        for rid in storage.list_runs():
+        for rid in active_runs:
             if rid in seen_ids:
                 continue
             # Use get_run to leverage cache
@@ -246,7 +249,7 @@ class RunService:
 
         # Include legacy runs if requested
         if include_legacy:
-            for rid in storage.discover_legacy_runs():
+            for rid in legacy_runs:
                 if rid in seen_ids:
                     continue
                 # Create minimal summary for legacy runs
@@ -311,10 +314,9 @@ class RunService:
                     seen_ids.add(rid)
                     all_ids.append(rid)
 
-        # Active runs with meta.json
-        active_ids = storage.list_runs()
-        # Legacy runs without meta.json
-        legacy_ids = storage.discover_legacy_runs() if include_legacy else []
+        # Get active and legacy runs efficiently in one pass
+        active_ids, legacy_ids_found = storage.scan_runs()
+        legacy_ids = legacy_ids_found if include_legacy else []
 
         # Combine active and legacy, sort by ID descending
         # Assumption: run_id lexicographical order ~= chronological order
