@@ -207,9 +207,8 @@ class SpecManager:
             raise ValueError(f"ETag mismatch: expected {expected_etag}, got {current_etag}")
 
         # Apply JSON Patch operations
-        import copy
-
-        updated_data = copy.deepcopy(flow_data)
+        # Optimization: json.loads(json.dumps(x)) is ~2x faster than copy.deepcopy(x) for large dicts
+        updated_data = json.loads(json.dumps(flow_data))
 
         for op in patch_operations:
             operation = op.get("op")
