@@ -1074,6 +1074,13 @@
       padding: 2px 0;
       user-select: none;
     }
+    .legend-header:focus {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
+    .legend-header:focus:not(:focus-visible) {
+      outline: none;
+    }
     .legend-arrow {
       font-size: 10px;
       transition: transform 0.2s ease;

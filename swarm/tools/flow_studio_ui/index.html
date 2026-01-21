@@ -1730,6 +1730,13 @@ make validate-swarm</pre>
       padding: 2px 0;
       user-select: none;
     }
+    .legend-header:focus {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
+    .legend-header:focus:not(:focus-visible) {
+      outline: none;
+    }
     .legend-arrow {
       font-size: 10px;
       transition: transform 0.2s ease;
@@ -4174,6 +4181,14 @@ make validate-swarm</pre>
         opacity: 0;
       }
     }
+
+    /* Respect reduced-motion preferences for toast animations */
+    @media (prefers-reduced-motion: reduce) {
+      .toast,
+      .toast--fade-out {
+        animation: none;
+      }
+    }
   </style>
   <script type="application/json" data-inline-source="flowstudio-js-bundle">
 // api.js
@@ -4996,9 +5011,7 @@ async function loadRoutingData(container, runId, flowKey, stepId) {
             container.appendChild(routingSection);
         }
         // Section: Simple routing info from receipt (fallback for non-V3 routing)
-        // Only show fallback when no full routing data exists
-        const hasFullRouting = routingDecision && routingDecision.candidates && routingDecision.candidates.length > 0;
-        if (receipt.routing && !hasFullRouting) {
+        if (receipt.routing) {
             const simpleRoutingSection = document.createElement("div");
             simpleRoutingSection.className = "routing-tab-section";
             simpleRoutingSection.innerHTML = renderRoutingDecision(receipt.routing);
@@ -6394,45 +6407,56 @@ window.addEventListener("load", async () => {
                 toastContainer.className = "toast-container";
                 toastContainer.setAttribute("role", "status");
                 toastContainer.setAttribute("aria-live", "polite");
-                toastContainer.setAttribute("aria-atomic", "true");
                 document.body.appendChild(toastContainer);
             }
-            // Create toast element using DOM construction (avoid XSS via innerHTML)
+            // Create toast element using DOM construction (XSS-safe)
             const toast = document.createElement("div");
             toast.className = "toast toast--info";
-            // Build toast content safely
+            // Build content container
             const content = document.createElement("div");
             content.className = "toast__content";
+            // Icon
             const icon = document.createElement("span");
             icon.className = "toast__icon";
             icon.textContent = "\u2713"; // checkmark
+            // Message with safe text content
             const message = document.createElement("span");
             message.className = "toast__message";
-            const flowStrong = document.createElement("strong");
-            flowStrong.textContent = flowKey;
-            message.append("Flow ", flowStrong, " completed - review available");
+            message.appendChild(document.createTextNode("Flow "));
+            const strong = document.createElement("strong");
+            strong.textContent = flowKey; // safe: textContent escapes HTML
+            message.appendChild(strong);
+            message.appendChild(document.createTextNode(" completed - review available"));
+            // Action button with data attributes
             const actionBtn = document.createElement("button");
             actionBtn.className = "toast__action";
-            actionBtn.type = "button";
             actionBtn.dataset.flow = flowKey;
             actionBtn.dataset.run = runId;
             actionBtn.textContent = "Review";
-            content.append(icon, message, actionBtn);
-            const closeBtn = document.createElement("button");
-            closeBtn.className = "toast__close";
-            closeBtn.type = "button";
-            closeBtn.setAttribute("aria-label", "Dismiss");
-            closeBtn.textContent = "\u00d7"; // multiplication sign (x)
-            toast.append(content, closeBtn);
-            // Add event listeners
             actionBtn.addEventListener("click", () => {
+                // Switch to the completed run before navigating to the flow
+                if (runId && runId !== state.currentRunId) {
+                    setRunHistorySelectedRunId(runId);
+                    state.currentRunId = runId;
+                    void loadRunStatus();
+                }
                 // Navigate to the completed flow for review
                 void setActiveFlow(flowKey, true);
                 toast.remove();
             });
+            content.appendChild(icon);
+            content.appendChild(message);
+            content.appendChild(actionBtn);
+            // Close button
+            const closeBtn = document.createElement("button");
+            closeBtn.className = "toast__close";
+            closeBtn.setAttribute("aria-label", "Dismiss");
+            closeBtn.textContent = "\u00d7"; // multiplication sign (x)
             closeBtn.addEventListener("click", () => {
                 toast.remove();
             });
+            toast.appendChild(content);
+            toast.appendChild(closeBtn);
             // Auto-dismiss after 8 seconds
             setTimeout(() => {
                 toast.classList.add("toast--fade-out");

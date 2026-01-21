@@ -851,34 +851,58 @@ window.addEventListener("load", async () => {
                 toastContainer = document.createElement("div");
                 toastContainer.id = "toast-container";
                 toastContainer.className = "toast-container";
+                toastContainer.setAttribute("role", "status");
+                toastContainer.setAttribute("aria-live", "polite");
                 document.body.appendChild(toastContainer);
             }
-            // Create toast element
+            // Create toast element using DOM construction (XSS-safe)
             const toast = document.createElement("div");
             toast.className = "toast toast--info";
-            toast.innerHTML = `
-        <div class="toast__content">
-          <span class="toast__icon">&#10003;</span>
-          <span class="toast__message">Flow <strong>${flowKey}</strong> completed - review available</span>
-          <button class="toast__action" data-flow="${flowKey}" data-run="${runId}">Review</button>
-        </div>
-        <button class="toast__close" aria-label="Dismiss">&times;</button>
-      `;
-            // Add event listeners
-            const actionBtn = toast.querySelector(".toast__action");
-            if (actionBtn) {
-                actionBtn.addEventListener("click", () => {
-                    // Navigate to the completed flow for review
-                    void setActiveFlow(flowKey, true);
-                    toast.remove();
-                });
-            }
-            const closeBtn = toast.querySelector(".toast__close");
-            if (closeBtn) {
-                closeBtn.addEventListener("click", () => {
-                    toast.remove();
-                });
-            }
+            // Build content container
+            const content = document.createElement("div");
+            content.className = "toast__content";
+            // Icon
+            const icon = document.createElement("span");
+            icon.className = "toast__icon";
+            icon.textContent = "\u2713"; // checkmark
+            // Message with safe text content
+            const message = document.createElement("span");
+            message.className = "toast__message";
+            message.appendChild(document.createTextNode("Flow "));
+            const strong = document.createElement("strong");
+            strong.textContent = flowKey; // safe: textContent escapes HTML
+            message.appendChild(strong);
+            message.appendChild(document.createTextNode(" completed - review available"));
+            // Action button with data attributes
+            const actionBtn = document.createElement("button");
+            actionBtn.className = "toast__action";
+            actionBtn.dataset.flow = flowKey;
+            actionBtn.dataset.run = runId;
+            actionBtn.textContent = "Review";
+            actionBtn.addEventListener("click", () => {
+                // Switch to the completed run before navigating to the flow
+                if (runId && runId !== state.currentRunId) {
+                    setRunHistorySelectedRunId(runId);
+                    state.currentRunId = runId;
+                    void loadRunStatus();
+                }
+                // Navigate to the completed flow for review
+                void setActiveFlow(flowKey, true);
+                toast.remove();
+            });
+            content.appendChild(icon);
+            content.appendChild(message);
+            content.appendChild(actionBtn);
+            // Close button
+            const closeBtn = document.createElement("button");
+            closeBtn.className = "toast__close";
+            closeBtn.setAttribute("aria-label", "Dismiss");
+            closeBtn.textContent = "\u00d7"; // multiplication sign (x)
+            closeBtn.addEventListener("click", () => {
+                toast.remove();
+            });
+            toast.appendChild(content);
+            toast.appendChild(closeBtn);
             // Auto-dismiss after 8 seconds
             setTimeout(() => {
                 toast.classList.add("toast--fade-out");
