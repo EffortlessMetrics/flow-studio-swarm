@@ -445,6 +445,10 @@
     .fs-icon-button:hover {
       background: var(--fs-color-bg-hover, #d1d5db);
     }
+    .fs-icon-button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
 
     /* Status Button Utility - semantic status indicators that are interactive */
     .fs-status-button {
