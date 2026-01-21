@@ -78,7 +78,7 @@ def check_ui_assets(ui_dir: Path, strict: bool) -> None:
     )
 
     def parse_imports(text: str) -> set[str]:
-        # Extract the non-None group from each match
+        # Extract the non-empty group from each match (unmatched groups are empty strings)
         return {m[0] or m[1] or m[2] for m in import_re.findall(text)}
 
     js_root = js_dir.resolve()
