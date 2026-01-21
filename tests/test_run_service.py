@@ -363,9 +363,9 @@ class TestRunService:
 class TestRunServiceCaching:
     """Test RunService caching behavior for terminal runs.
 
-    Note: These tests write to the real swarm/runs/ directory because
-    RunService uses storage functions with default parameters that can't
-    be easily monkeypatched. Each test cleans up after itself.
+    Note: These tests monkeypatch storage.RUNS_DIR to use tmp_path, ensuring
+    test isolation. The monkeypatched RUNS_DIR is used by storage functions
+    when called without explicit runs_dir parameter.
     """
 
     def test_cache_hit_for_terminal_run(self, tmp_path, monkeypatch):
@@ -517,6 +517,86 @@ class TestRunServiceCaching:
             # Next get_run should see updated tags
             result = service.get_run(run_id)
             assert "important" in result.tags
+        finally:
+            # Cleanup
+            import shutil
+            run_path = storage.get_run_path(run_id)
+            if run_path.exists():
+                shutil.rmtree(run_path)
+            RunService.reset()
+
+    def test_cache_invalidation_on_remove_tag(self, tmp_path, monkeypatch):
+        """Cache should be invalidated when removing a tag."""
+        monkeypatch.setattr(storage, "RUNS_DIR", tmp_path)
+
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        run_id = "cache-remove-tag-test"
+        now = datetime.now(timezone.utc)
+        summary = RunSummary(
+            id=run_id,
+            spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+            status=RunStatus.FAILED,
+            sdlc_status=SDLCStatus.ERROR,
+            created_at=now,
+            updated_at=now,
+            tags=["to-remove", "keep"],
+        )
+        storage.write_summary(run_id, summary)
+
+        try:
+            # Populate cache
+            service.get_run(run_id)
+            assert run_id in service._summary_cache
+
+            # Remove tag (should invalidate cache)
+            service.remove_tag(run_id, "to-remove")
+            assert run_id not in service._summary_cache
+
+            # Next get_run should see updated tags
+            result = service.get_run(run_id)
+            assert "to-remove" not in result.tags
+            assert "keep" in result.tags
+        finally:
+            # Cleanup
+            import shutil
+            run_path = storage.get_run_path(run_id)
+            if run_path.exists():
+                shutil.rmtree(run_path)
+            RunService.reset()
+
+    def test_remove_tag_noop_if_not_present(self, tmp_path, monkeypatch):
+        """remove_tag should not invalidate cache if tag wasn't present."""
+        monkeypatch.setattr(storage, "RUNS_DIR", tmp_path)
+
+        RunService.reset()
+        service = RunService.get_instance(tmp_path)
+
+        run_id = "cache-remove-noop-test"
+        now = datetime.now(timezone.utc)
+        summary = RunSummary(
+            id=run_id,
+            spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+            status=RunStatus.FAILED,
+            sdlc_status=SDLCStatus.ERROR,
+            created_at=now,
+            updated_at=now,
+            tags=["existing"],
+        )
+        storage.write_summary(run_id, summary)
+
+        try:
+            # Populate cache
+            cached = service.get_run(run_id)
+            assert run_id in service._summary_cache
+
+            # Try to remove non-existent tag (should NOT invalidate cache)
+            service.remove_tag(run_id, "non-existent")
+            assert run_id in service._summary_cache
+
+            # Should still be the same cached object
+            assert service.get_run(run_id) is cached
         finally:
             # Cleanup
             import shutil

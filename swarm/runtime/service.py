@@ -180,14 +180,18 @@ class RunService:
         # Try storage first (works for all backends)
         summary = storage.read_summary(run_id)
         if summary:
-            # Cache if terminal state (thread-safe write)
+            # Cache if terminal state (thread-safe write with re-check)
+            # Re-check under lock to avoid stale cache insertion after invalidation
             if summary.status in (
                 RunStatus.SUCCEEDED,
                 RunStatus.FAILED,
                 RunStatus.CANCELED,
             ):
                 with self._cache_lock:
-                    self._summary_cache[run_id] = summary
+                    # Only insert if not already present (could have been
+                    # invalidated between storage read and this point)
+                    if run_id not in self._summary_cache:
+                        self._summary_cache[run_id] = summary
             return summary
 
         # Fall back to querying backends
@@ -382,10 +386,12 @@ class RunService:
         if not summary:
             return False
 
-        tags = [t for t in summary.tags if t != tag]
-        storage.update_summary(run_id, {"tags": tags})
-        # Invalidate cache (thread-safe)
-        self._invalidate_cache(run_id)
+        # Only update if tag is actually present
+        if tag in summary.tags:
+            tags = [t for t in summary.tags if t != tag]
+            storage.update_summary(run_id, {"tags": tags})
+            # Invalidate cache (thread-safe)
+            self._invalidate_cache(run_id)
         return True
 
     def list_exemplars(self) -> List[RunSummary]:
