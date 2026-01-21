@@ -80,15 +80,6 @@ except ImportError:
     RunStatus = None
     SDLCStatus = None
 
-try:
-    from swarm.runtime.safe_paths import validate_path_component
-except ImportError:
-    # Fallback/Safety check
-    def validate_path_component(c, n="path component"):
-        if ".." in c or "/" in c or "\\" in c:
-            raise ValueError(f"Invalid {n}")
-        return c
-
 # Module logger - defined after all imports to avoid E402
 logger = logging.getLogger(__name__)
 
@@ -737,11 +728,6 @@ def create_fastapi_app() -> FastAPI:
     @app.get("/api/runs/{run_id}/summary", response_model=schema.RunSummary if schema else None)
     async def api_run_summary(run_id: str):
         """Get full run summary."""
-        try:
-            validate_path_component(run_id, "run_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if not _core:
             return JSONResponse(
                 {"error": "Run inspector not available"},
@@ -818,11 +804,6 @@ def create_fastapi_app() -> FastAPI:
             )
 
         try:
-            if request.profile_id:
-                validate_path_component(request.profile_id, "profile_id")
-            for f in request.flows:
-                validate_path_component(f, "flow_key")
-
             spec = RunSpec(
                 flow_keys=request.flows,
                 profile_id=request.profile_id,
@@ -852,11 +833,6 @@ def create_fastapi_app() -> FastAPI:
     @app.get("/api/runs/{run_id}/events", response_model=schema.RunEventsResponse if schema else None)
     async def api_run_events(run_id: str):
         """Get all events for a run."""
-        try:
-            validate_path_component(run_id, "run_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if _run_service is None:
             return JSONResponse(
                 {"error": "RunService not available"},
@@ -909,13 +885,6 @@ def create_fastapi_app() -> FastAPI:
                 ]
             }
         """
-        try:
-            validate_path_component(run_id, "run_id")
-            validate_path_component(flow_key, "flow_key")
-            validate_path_component(step_id, "step_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         import json as json_module
 
         # Find run path
@@ -1015,13 +984,6 @@ def create_fastapi_app() -> FastAPI:
                 }
             }
         """
-        try:
-            validate_path_component(run_id, "run_id")
-            validate_path_component(flow_key, "flow_key")
-            validate_path_component(step_id, "step_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         import json as json_module
 
         # Find run path
@@ -1080,11 +1042,6 @@ def create_fastapi_app() -> FastAPI:
     @app.post("/api/runs/{run_id}/cancel")
     async def api_cancel_run(run_id: str):
         """Cancel a running run."""
-        try:
-            validate_path_component(run_id, "run_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if _run_service is None:
             return JSONResponse(
                 {"error": "RunService not available"},
@@ -1109,11 +1066,6 @@ def create_fastapi_app() -> FastAPI:
     @app.post("/api/runs/{run_id}/exemplar")
     async def api_set_exemplar(run_id: str, is_exemplar: bool = Query(True)):
         """Mark or unmark a run as an exemplar (for teaching mode)."""
-        try:
-            validate_path_component(run_id, "run_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if _run_service is None:
             return JSONResponse(
                 {"error": "RunService not available"},
@@ -1169,11 +1121,6 @@ def create_fastapi_app() -> FastAPI:
 
         Part of v2.4.0 Flow Studio Wisdom UI integration.
         """
-        try:
-            validate_path_component(run_id, "run_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         import json as json_module
 
         # Find run path
@@ -1443,11 +1390,6 @@ def create_fastapi_app() -> FastAPI:
     @app.get("/api/runs/{run_id}/sdlc", response_model=schema.SDLCBarResponse if schema else None)
     async def api_run_sdlc(run_id: str):
         """Get SDLC bar data for a run."""
-        try:
-            validate_path_component(run_id, "run_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if _run_inspector is None:
             return JSONResponse(
                 {"error": "Run inspector not available"},
@@ -1459,12 +1401,6 @@ def create_fastapi_app() -> FastAPI:
     @app.get("/api/runs/{run_id}/flows/{flow_key}", response_model=schema.FlowStatusInfo if schema else None)
     async def api_run_flow(run_id: str, flow_key: str):
         """Get flow status for a run."""
-        try:
-            validate_path_component(run_id, "run_id")
-            validate_path_component(flow_key, "flow_key")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if _run_inspector is None:
             return JSONResponse(
                 {"error": "Run inspector not available"},
@@ -1476,13 +1412,6 @@ def create_fastapi_app() -> FastAPI:
     @app.get("/api/runs/{run_id}/flows/{flow_key}/steps/{step_id}", response_model=schema.StepStatusInfo if schema else None)
     async def api_run_step(run_id: str, flow_key: str, step_id: str):
         """Get step status for a run."""
-        try:
-            validate_path_component(run_id, "run_id")
-            validate_path_component(flow_key, "flow_key")
-            validate_path_component(step_id, "step_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if _run_inspector is None:
             return JSONResponse(
                 {"error": "Run inspector not available"},
@@ -1506,11 +1435,6 @@ def create_fastapi_app() -> FastAPI:
     @app.get("/api/runs/{run_id}/timeline", response_model=schema.TimelineResponse if schema else None)
     async def api_run_timeline(run_id: str):
         """Get chronological event timeline for a run."""
-        try:
-            validate_path_component(run_id, "run_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if _run_inspector is None:
             return JSONResponse(
                 {"error": "RunInspector not available"},
@@ -1526,11 +1450,6 @@ def create_fastapi_app() -> FastAPI:
     @app.get("/api/runs/{run_id}/timing", response_model=schema.RunTimingResponse if schema else None)
     async def api_run_timing(run_id: str):
         """Get timing summary for a run."""
-        try:
-            validate_path_component(run_id, "run_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if _run_inspector is None:
             return JSONResponse(
                 {"error": "RunInspector not available"},
@@ -1549,12 +1468,6 @@ def create_fastapi_app() -> FastAPI:
     @app.get("/api/runs/{run_id}/flows/{flow_key}/timing", response_model=schema.FlowTimingResponse if schema else None)
     async def api_flow_timing(run_id: str, flow_key: str):
         """Get timing for a specific flow in a run."""
-        try:
-            validate_path_component(run_id, "run_id")
-            validate_path_component(flow_key, "flow_key")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if _run_inspector is None:
             return JSONResponse(
                 {"error": "RunInspector not available"},
@@ -1583,13 +1496,6 @@ def create_fastapi_app() -> FastAPI:
         flow: str = Query(None, description="Flow key to compare")
     ):
         """Compare two runs for a specific flow."""
-        try:
-            if run_a: validate_path_component(run_a, "run_a")
-            if run_b: validate_path_component(run_b, "run_b")
-            if flow: validate_path_component(flow, "flow")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if _run_inspector is None:
             return JSONResponse(
                 {"error": "Run inspector not available"},
@@ -1642,13 +1548,6 @@ def create_fastapi_app() -> FastAPI:
         run_id: str = Query(None, description="Optional run ID to overlay artifact status")
     ):
         """Get artifact-centric graph for a flow."""
-        try:
-            validate_path_component(flow_key, "flow_key")
-            if run_id:
-                validate_path_component(run_id, "run_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
         if flow_key not in _flows_cache:
             available = sorted(_flows_cache.keys())
             return JSONResponse(
@@ -2117,14 +2016,6 @@ def create_fastapi_app() -> FastAPI:
                 {"error": "Request body required"},
                 status_code=400
             )
-
-        try:
-            validate_path_component(request.flow_id, "flow_id")
-            validate_path_component(request.step_id, "step_id")
-            if request.run_id:
-                validate_path_component(request.run_id, "run_id")
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
 
         # Import the SpecCompiler
         try:
