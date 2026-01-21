@@ -3518,3 +3518,11 @@
         opacity: 0;
       }
     }
+
+    /* Respect reduced-motion preferences for toast animations */
+    @media (prefers-reduced-motion: reduce) {
+      .toast,
+      .toast--fade-out {
+        animation: none;
+      }
+    }

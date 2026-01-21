@@ -4996,7 +4996,9 @@ async function loadRoutingData(container, runId, flowKey, stepId) {
             container.appendChild(routingSection);
         }
         // Section: Simple routing info from receipt (fallback for non-V3 routing)
-        if (receipt.routing) {
+        // Only show fallback when no full routing data exists
+        const hasFullRouting = routingDecision && routingDecision.candidates && routingDecision.candidates.length > 0;
+        if (receipt.routing && !hasFullRouting) {
             const simpleRoutingSection = document.createElement("div");
             simpleRoutingSection.className = "routing-tab-section";
             simpleRoutingSection.innerHTML = renderRoutingDecision(receipt.routing);
@@ -6390,34 +6392,47 @@ window.addEventListener("load", async () => {
                 toastContainer = document.createElement("div");
                 toastContainer.id = "toast-container";
                 toastContainer.className = "toast-container";
+                toastContainer.setAttribute("role", "status");
+                toastContainer.setAttribute("aria-live", "polite");
+                toastContainer.setAttribute("aria-atomic", "true");
                 document.body.appendChild(toastContainer);
             }
-            // Create toast element
+            // Create toast element using DOM construction (avoid XSS via innerHTML)
             const toast = document.createElement("div");
             toast.className = "toast toast--info";
-            toast.innerHTML = `
-        <div class="toast__content">
-          <span class="toast__icon">&#10003;</span>
-          <span class="toast__message">Flow <strong>${flowKey}</strong> completed - review available</span>
-          <button class="toast__action" data-flow="${flowKey}" data-run="${runId}">Review</button>
-        </div>
-        <button class="toast__close" aria-label="Dismiss">&times;</button>
-      `;
+            // Build toast content safely
+            const content = document.createElement("div");
+            content.className = "toast__content";
+            const icon = document.createElement("span");
+            icon.className = "toast__icon";
+            icon.textContent = "\u2713"; // checkmark
+            const message = document.createElement("span");
+            message.className = "toast__message";
+            const flowStrong = document.createElement("strong");
+            flowStrong.textContent = flowKey;
+            message.append("Flow ", flowStrong, " completed - review available");
+            const actionBtn = document.createElement("button");
+            actionBtn.className = "toast__action";
+            actionBtn.type = "button";
+            actionBtn.dataset.flow = flowKey;
+            actionBtn.dataset.run = runId;
+            actionBtn.textContent = "Review";
+            content.append(icon, message, actionBtn);
+            const closeBtn = document.createElement("button");
+            closeBtn.className = "toast__close";
+            closeBtn.type = "button";
+            closeBtn.setAttribute("aria-label", "Dismiss");
+            closeBtn.textContent = "\u00d7"; // multiplication sign (x)
+            toast.append(content, closeBtn);
             // Add event listeners
-            const actionBtn = toast.querySelector(".toast__action");
-            if (actionBtn) {
-                actionBtn.addEventListener("click", () => {
-                    // Navigate to the completed flow for review
-                    void setActiveFlow(flowKey, true);
-                    toast.remove();
-                });
-            }
-            const closeBtn = toast.querySelector(".toast__close");
-            if (closeBtn) {
-                closeBtn.addEventListener("click", () => {
-                    toast.remove();
-                });
-            }
+            actionBtn.addEventListener("click", () => {
+                // Navigate to the completed flow for review
+                void setActiveFlow(flowKey, true);
+                toast.remove();
+            });
+            closeBtn.addEventListener("click", () => {
+                toast.remove();
+            });
             // Auto-dismiss after 8 seconds
             setTimeout(() => {
                 toast.classList.add("toast--fade-out");
