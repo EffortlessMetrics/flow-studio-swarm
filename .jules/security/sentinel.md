@@ -1,0 +1,4 @@
+## 2024-01-21 - Path Traversal Vulnerability in SpecManager and RunStateManager
+**Vulnerability:** `SpecManager.get_flow`, `SpecManager.get_template`, and `RunStateManager.create_run` directly used user-provided identifiers to construct file paths without validation, allowing directory traversal (e.g., `../../target`).
+**Learning:** `pathlib.Path` using the `/` operator does not automatically sanitize `..` components. Explicit validation is required before using user input in path construction. The existence of `validate_path_component` in `safe_paths.py` suggests this was known but not applied consistently.
+**Prevention:** Always validate any user input used for file path construction using `validate_path_component` or similar allowlist-based validation before passing it to filesystem operations.

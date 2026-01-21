@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 
@@ -162,6 +164,8 @@ class SpecManager:
         Raises:
             FileNotFoundError: If flow not found.
         """
+        validate_path_component(flow_id, "flow_id")
+
         # Check cache
         if flow_id in self._flow_cache:
             return self._flow_cache[flow_id]
@@ -201,6 +205,7 @@ class SpecManager:
             FileNotFoundError: If flow not found.
             ValueError: If ETag mismatch (concurrent modification).
         """
+        validate_path_component(flow_id, "flow_id")
         flow_data, current_etag = self.get_flow(flow_id)
 
         if current_etag != expected_etag:
@@ -358,6 +363,8 @@ class SpecManager:
         Raises:
             FileNotFoundError: If template not found.
         """
+        validate_path_component(template_id, "template_id")
+
         if template_id in self._template_cache:
             return self._template_cache[template_id]
 
@@ -396,6 +403,10 @@ class SpecManager:
         Returns:
             Compiled PromptPlan dictionary.
         """
+        validate_path_component(flow_id, "flow_id")
+        if run_id:
+            validate_path_component(run_id, "run_id")
+
         try:
             from swarm.spec.compiler import compile_prompt
 
@@ -462,6 +473,8 @@ class SpecManager:
         Raises:
             FileNotFoundError: If run not found.
         """
+        validate_path_component(run_id, "run_id")
+
         if run_id in self._run_state_cache:
             return self._run_state_cache[run_id]
 
@@ -528,6 +541,7 @@ class SpecManager:
         Yields:
             SSE formatted event strings.
         """
+        validate_path_component(run_id, "run_id")
         run_dir = self.runs_root / run_id
         events_file = run_dir / "events.jsonl"
 
