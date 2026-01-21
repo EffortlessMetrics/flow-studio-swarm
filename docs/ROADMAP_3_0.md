@@ -158,7 +158,7 @@ V3 introduces **Open World Routing**—the ability for flows to dynamically spaw
 
 ## Immediate Priorities (v3.0.0)
 
-### 1. Event Contract Alignment
+### 1. Event Contract Alignment ✓
 
 **Goal:** Every state transition produces one event. UI should not infer state.
 
@@ -173,21 +173,25 @@ V3 introduces **Open World Routing**—the ability for flows to dynamically spaw
 - `run_resumed`
 
 **Tasks:**
-- [ ] Make `run_control.ts` emit callbacks (`onRunEvent`, `onFlowCompleted`, `onRunStopped`)
-- [ ] Wire `step_end` → `InventoryCounts.load()` (debounced)
-- [ ] Confirm SSE is the spine; polling only for stub backends
+- [x] Make `run_control.ts` emit callbacks (`onRunEvent`, `onFlowCompleted`, `onRunStopped`)
+- [x] Wire `step_end` → `InventoryCounts.load()` (debounced)
+- [x] Confirm SSE is the spine; polling only for stub backends
 
-### 2. Boundary Review Integration
+**Implementation:** `run_control.ts` emits all callbacks. `flow-studio-app.ts` wires `onRunEvent` to handle `step_end`/`facts_updated` events, calling `updateInventoryCounts()` with 250ms debounce.
+
+### 2. Boundary Review Integration ✓
 
 **Goal:** Boundary review is server-side aggregation, not UI assembly.
 
 **Tasks:**
-- [ ] On `flow_completed` in normal mode: fetch `/api/runs/{run}/boundary-review?scope=flow&flow_key=...`
-- [ ] On `run_completed` in autopilot: fetch `/boundary-review?scope=run`
-- [ ] Fix `_read_all_envelopes()` to include `review` flow
-- [ ] Make detour detection case-insensitive (`DETOUR` vs `detour`)
+- [x] On `flow_completed` in normal mode: fetch `/api/runs/{run}/boundary-review?scope=flow&flow_key=...`
+- [x] On `run_completed` in autopilot: fetch `/boundary-review?scope=run`
+- [x] Fix `_read_all_envelopes()` to include `review` flow
+- [x] Make detour detection case-insensitive (`DETOUR` vs `detour`)
 
-### 3. Stop Semantics
+**Implementation:** `boundary.py` API complete. `_read_all_envelopes()` uses `get_flow_order()` which includes all flows. `_extract_detours()` now uses `decision.upper()` for case-insensitive comparison. UI wired via `showBoundaryReviewPanel()` in `flow-studio-app.ts`.
+
+### 3. Stop Semantics ✓
 
 **Goal:** "Orderly Shutdown" not "Hard Kill."
 
@@ -199,11 +203,13 @@ V3 introduces **Open World Routing**—the ability for flows to dynamically spaw
 5. Emit `run_stopped` event
 
 **Tasks:**
-- [ ] `POST /api/runs/{id}/stop` triggers orderly shutdown
-- [ ] `run_control.ts` treats Stop as "stopping" state, waits for `run_stopped`
-- [ ] Display amber "Stopped" status, keep run selected
+- [x] `POST /api/runs/{id}/stop` triggers orderly shutdown
+- [x] `run_control.ts` treats Stop as "stopping" state, waits for `run_stopped`
+- [x] Display amber "Stopped" status, keep run selected
 
-### 4. Type Drift Elimination
+**Implementation:** `runs_control.py` has `/stop` endpoint with `RUN_STOPPING` → `RUN_STOPPED` events and forensic `stop_report.md`. `run_control.ts` handles "stopping"/"stopped" states distinctly from "failed".
+
+### 4. Type Drift Elimination ✓
 
 **Goal:** Single source of truth for TypeScript types.
 
@@ -213,9 +219,11 @@ V3 introduces **Open World Routing**—the ability for flows to dynamically spaw
 - CI fails if `js/domain.d.ts` is dirty after build
 
 **Tasks:**
-- [ ] Add `pnpm ts-build` target that emits declarations
-- [ ] Add CI check for dirty declarations
-- [ ] Remove duplicate type definitions
+- [x] Add `npm run ts-build` target that emits declarations
+- [x] Add CI check for dirty declarations
+- [x] Remove duplicate type definitions
+
+**Implementation:** `package.json` has `ts-build` script. CI workflow `check-ui-drift` job rebuilds TS and verifies `js/` directory matches committed state. No duplicate type definitions exist - single canonical source in `src/domain.ts`.
 
 ---
 
@@ -464,28 +472,28 @@ V4 is designed as an additive layer:
 
 Run this checklist to verify alignment:
 
-1. **SSE → Inventory Refresh**
-   - [ ] Start server + UI
-   - [ ] Start a run from UI
-   - [ ] Confirm `step_start/step_end` stream in SSE
-   - [ ] Confirm InventoryCounts updates within ~1s of `step_end`
+1. **SSE → Inventory Refresh** ✓
+   - [x] Start server + UI
+   - [x] Start a run from UI
+   - [x] Confirm `step_start/step_end` stream in SSE
+   - [x] Confirm InventoryCounts updates within ~1s of `step_end`
 
-2. **Boundary Review Flow**
-   - [ ] `flow_completed` shows "Review available" (normal mode)
-   - [ ] Autopilot shows boundary only at plan end
-   - [ ] Boundary review fetched from endpoint, not assembled in UI
+2. **Boundary Review Flow** ✓
+   - [x] `flow_completed` shows "Review available" (normal mode)
+   - [x] Autopilot shows boundary only at plan end
+   - [x] Boundary review fetched from endpoint, not assembled in UI
 
-3. **Stop Semantics**
-   - [ ] Hit Stop mid-step
-   - [ ] SDK interrupts gracefully
-   - [ ] `stop_report.md` exists
-   - [ ] Status becomes `STOPPED`, not `FAILED`
+3. **Stop Semantics** ✓
+   - [x] Hit Stop mid-step
+   - [x] SDK interrupts gracefully
+   - [x] `stop_report.md` exists
+   - [x] Status becomes `STOPPED`, not `FAILED`
 
-4. **Resilient DB**
-   - [ ] Delete DuckDB file
-   - [ ] UI still works (degraded)
-   - [ ] `/api/db/health` shows `needs_rebuild`
-   - [ ] `/api/db/rebuild` restores projection
+4. **Resilient DB** ✓
+   - [x] Delete DuckDB file
+   - [x] UI still works (degraded)
+   - [x] `/api/db/health` shows `needs_rebuild`
+   - [x] `/api/db/rebuild` restores projection
 
 ---
 

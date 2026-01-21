@@ -217,7 +217,8 @@ def _extract_detours(envelopes: List[Dict[str, Any]]) -> List[DetourSummary]:
         routing = envelope.get("routing_signal", {})
         decision = routing.get("decision", "")
 
-        if decision in ("EXTEND_GRAPH", "DETOUR"):
+        # Case-insensitive comparison for routing decisions
+        if decision.upper() in ("EXTEND_GRAPH", "DETOUR"):
             detour_idx += 1
             detours.append(
                 DetourSummary(
