@@ -250,12 +250,12 @@ export class BoundaryReview {
     this.panel.setAttribute("role", "dialog");
     this.panel.setAttribute("aria-modal", "true");
     this.panel.setAttribute("aria-labelledby", "boundary-review-title");
-    this.panel.setAttribute("data-uiid", "flow_studio.boundary_review.panel");
+    this.panel.setAttribute("data-uiid", "flow_studio.modal.boundary_review.panel");
 
     const statusStyle = STATUS_STYLES[data.status];
 
     this.panel.innerHTML = `
-      <div class="boundary-review-panel" data-uiid="flow_studio.boundary_review.content">
+      <div class="boundary-review-panel" data-uiid="flow_studio.modal.boundary_review.content">
         <div class="boundary-review__header">
           <div class="boundary-review__header-left">
             <span class="boundary-review__status-icon" style="background: ${statusStyle.bgColor}; border-color: ${statusStyle.borderColor};">
@@ -487,7 +487,7 @@ export class BoundaryReview {
           <button class="boundary-review__btn boundary-review__btn--secondary" data-action="cancel">
             Close
           </button>
-          <button class="boundary-review__btn boundary-review__btn--warning" data-action="pause" data-uiid="flow_studio.boundary_review.pause">
+          <button class="boundary-review__btn boundary-review__btn--warning" data-action="pause" data-uiid="flow_studio.modal.boundary_review.pause">
             Review & Address Issues
           </button>
         </div>
@@ -500,10 +500,10 @@ export class BoundaryReview {
     // Normal case: show both approve and pause
     return `
       <div class="boundary-review__actions">
-        <button class="boundary-review__btn boundary-review__btn--secondary" data-action="pause" data-uiid="flow_studio.boundary_review.pause">
+        <button class="boundary-review__btn boundary-review__btn--secondary" data-action="pause" data-uiid="flow_studio.modal.boundary_review.pause">
           Review & Pause
         </button>
-        <button class="boundary-review__btn boundary-review__btn--primary" data-action="approve" data-uiid="flow_studio.boundary_review.approve">
+        <button class="boundary-review__btn boundary-review__btn--primary" data-action="approve" data-uiid="flow_studio.modal.boundary_review.approve">
           Approve & Continue
         </button>
       </div>

@@ -1057,6 +1057,14 @@
       transition: all 0.2s ease;
     }
     .legend-header {
+      /* Button resets for semantic element */
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: inherit;
+      font-family: inherit;
+      font-size: inherit;
+
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -1065,6 +1073,13 @@
       color: #374151;
       padding: 2px 0;
       user-select: none;
+    }
+    .legend-header:focus {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
+    .legend-header:focus:not(:focus-visible) {
+      outline: none;
     }
     .legend-arrow {
       font-size: 10px;
@@ -3508,5 +3523,13 @@
       to {
         transform: translateX(100%);
         opacity: 0;
+      }
+    }
+
+    /* Respect reduced-motion preferences for toast animations */
+    @media (prefers-reduced-motion: reduce) {
+      .toast,
+      .toast--fade-out {
+        animation: none;
       }
     }

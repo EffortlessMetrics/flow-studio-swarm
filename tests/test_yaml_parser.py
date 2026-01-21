@@ -302,21 +302,18 @@ Body."""
 # ============================================================================
 
 
-def test_validator_enforces_strict_yaml_in_strict_mode(tmp_path):
+def test_validator_enforces_strict_yaml_in_strict_mode(tmp_path, monkeypatch):
     """
     Integration: Validator enforces strict YAML when --strict flag is set.
 
     Given: An agent file with malformed YAML
-    When: I run the validator with --strict
-    Then: It should fail with a YAML parse error
+    When: The validator's frontmatter check runs with strict=True
+    Then: It should report a YAML parse error
     """
-    repo = tmp_path / "test_repo"
-    repo.mkdir()
-
     # Create minimal structure
-    (repo / "swarm").mkdir()
-    (repo / ".claude" / "agents").mkdir(parents=True)
-    (repo / "swarm" / "AGENTS.md").write_text("""# Agent Registry
+    (tmp_path / "swarm").mkdir()
+    (tmp_path / ".claude" / "agents").mkdir(parents=True)
+    (tmp_path / "swarm" / "AGENTS.md").write_text("""# Agent Registry
 
 | Key | Flows | Role Family | Color | Source | Short Role |
 |-----|-------|-------------|-------|--------|------------|
@@ -324,7 +321,7 @@ def test_validator_enforces_strict_yaml_in_strict_mode(tmp_path):
 """)
 
     # Create agent with malformed YAML
-    bad_agent_file = repo / ".claude" / "agents" / "bad-agent.md"
+    bad_agent_file = tmp_path / ".claude" / "agents" / "bad-agent.md"
     bad_agent_file.write_text("""---
 name: bad-agent
 description: An agent with bad YAML
@@ -336,40 +333,29 @@ model: inherit
 You are a bad agent.
 """)
 
-    # Copy validator and its dependencies
-    import shutil
-    from pathlib import Path as PathlibPath
+    # Import the frontmatter validator module and helpers
+    from swarm.tools.validation.validators import frontmatter as frontmatter_module
+    from swarm.tools.validation import helpers
 
-    (repo / "swarm" / "tools").mkdir(exist_ok=True)
-    real_validator = PathlibPath(__file__).parent.parent / "swarm" / "tools" / "validate_swarm.py"
-    if real_validator.exists():
-        shutil.copy(real_validator, repo / "swarm" / "tools" / "validate_swarm.py")
+    # Use monkeypatch to patch the module-level constants in the frontmatter module
+    # This is necessary because frontmatter.py imports AGENTS_DIR directly,
+    # so we need to patch it where it's used, not where it's defined
+    monkeypatch.setattr(frontmatter_module, "AGENTS_DIR", tmp_path / ".claude" / "agents")
+    monkeypatch.setattr(frontmatter_module, "ROOT", tmp_path)
 
-    # Copy swarm/__init__.py for package structure
-    real_init = PathlibPath(__file__).parent.parent / "swarm" / "__init__.py"
-    if real_init.exists():
-        shutil.copy(real_init, repo / "swarm" / "__init__.py")
+    # Run frontmatter validation with strict_mode=True
+    # Pass an empty registry since we're just testing YAML parsing
+    result = frontmatter_module.validate_frontmatter({}, strict_mode=True)
 
-    # Copy swarm/validator module (required by validate_swarm.py)
-    real_validator_module = PathlibPath(__file__).parent.parent / "swarm" / "validator"
-    if real_validator_module.exists():
-        (repo / "swarm" / "validator").mkdir(parents=True, exist_ok=True)
-        for file in real_validator_module.glob("*.py"):
-            shutil.copy(file, repo / "swarm" / "validator" / file.name)
+    # Should have an error due to malformed YAML
+    assert result.has_errors(), f"Expected validation errors, got none. Warnings: {result.warnings}"
 
-    # Run validator with --strict flag
-    import subprocess
-    result = subprocess.run(
-        [sys.executable, "swarm/tools/validate_swarm.py", "--strict"],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        timeout=10
+    # Check that the error mentions YAML parsing issue
+    # ValidationError uses 'problem' attribute, not 'message'
+    error_problems = [e.problem for e in result.errors]
+    yaml_error_found = any(
+        "Malformed YAML" in prob or "YAML parse error" in prob
+        for prob in error_problems
     )
-
-    # Should fail due to malformed YAML
-    assert result.returncode != 0, f"Expected failure, but validator passed. Output:\n{result.stdout}"
-    # Should mention the YAML error
-    output = result.stdout + result.stderr
-    assert "Malformed YAML" in output or "YAML parse error" in output, \
-        f"Expected YAML error in output:\n{output}"
+    assert yaml_error_found, \
+        f"Expected YAML error in messages, got: {error_problems}"
