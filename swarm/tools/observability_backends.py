@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
@@ -630,7 +630,7 @@ class BackendManager:
         """Load configuration from YAML file."""
         try:
             with open(self.config_path, "r") as f:
-                return yaml.safe_load(f)
+                return load_yaml(f)
         except FileNotFoundError:
             logger.warning(f"Config file not found: {self.config_path}, using defaults")
             return {"backends": {}, "global": {"enabled": True, "strict_mode": False}}

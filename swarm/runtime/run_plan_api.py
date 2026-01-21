@@ -46,6 +46,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from swarm.config.flow_registry import get_sdlc_flow_keys
+from swarm.utils.yaml_utils import load_yaml
 from .types import (
     HumanPolicy,
     MacroAction,
@@ -355,7 +356,7 @@ class RunPlanAPI:
 
         try:
             with open(plan_path, "r") as f:
-                data = yaml.safe_load(f)
+                data = load_yaml(f)
 
             plan = stored_plan_from_dict(data)
             self._cache[plan_id] = plan

@@ -791,11 +791,13 @@ def _apply_json_patch(target_path: Path, operations: List[Dict[str, Any]]) -> No
     """Apply JSON patch operations to a file (YAML or JSON)."""
     import yaml
 
+    from swarm.utils.yaml_utils import load_yaml
+
     # Read current content
     content = target_path.read_text(encoding="utf-8")
 
     # Parse as YAML (works for JSON too)
-    data = yaml.safe_load(content) or {}
+    data = load_yaml(content) or {}
 
     # Apply operations
     for op in operations:

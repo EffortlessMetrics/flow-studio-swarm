@@ -20,7 +20,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 _CONFIG_PATH = Path(__file__).parent / "runs_retention.yaml"
 _cached_config: Optional[Dict[str, Any]] = None
@@ -63,7 +63,7 @@ def _load_config() -> Dict[str, Any]:
 
     if _CONFIG_PATH.exists():
         with open(_CONFIG_PATH, encoding="utf-8") as f:
-            _cached_config = yaml.safe_load(f) or _default_config()
+            _cached_config = load_yaml(f) or _default_config()
     else:
         _cached_config = _default_config()
 

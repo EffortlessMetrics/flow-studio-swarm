@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 def load_tours(repo_root: Path) -> Dict[str, Any]:
     """Load tours from swarm/config/tours/*.yaml"""
-    import yaml
+    from swarm.utils.yaml_utils import load_yaml
 
     tours: Dict[str, Any] = {}
     tours_dir = repo_root / "swarm" / "config" / "tours"
@@ -17,7 +17,7 @@ def load_tours(repo_root: Path) -> Dict[str, Any]:
     for cfg_path in sorted(tours_dir.glob("*.yaml")):
         try:
             text = cfg_path.read_text(encoding="utf-8")
-            data = yaml.safe_load(text)
+            data = load_yaml(text)
             if data is None or not isinstance(data, dict):
                 continue
             tour_id = data.get("id")

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 if TYPE_CHECKING:
     from swarm.runtime.station_library import StationLibrary
@@ -229,7 +229,7 @@ class PackRegistry:
         for yaml_file in stations_dir.glob("*.yaml"):
             try:
                 with open(yaml_file, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
+                    data = load_yaml(f)
 
                 if isinstance(data, list):
                     for item in data:
@@ -293,7 +293,7 @@ class PackRegistry:
         for yaml_file in flows_dir.glob("*.yaml"):
             try:
                 with open(yaml_file, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
+                    data = load_yaml(f)
 
                 if data:
                     spec = flow_spec_from_dict(data, pack_origin=f"pack:{yaml_file.stem}")

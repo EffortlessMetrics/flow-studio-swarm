@@ -168,7 +168,7 @@ def _get_all_station_ids() -> List[str]:
 
 def _load_station_spec(station_id: str) -> Optional[Dict[str, Any]]:
     """Load a station spec by ID."""
-    import yaml
+    from swarm.utils.yaml_utils import load_yaml
 
     repo_root = _get_repo_root()
     stations_dir = repo_root / "swarm" / "spec" / "stations"
@@ -177,7 +177,7 @@ def _load_station_spec(station_id: str) -> Optional[Dict[str, Any]]:
     yaml_path = stations_dir / f"{station_id}.yaml"
     if yaml_path.exists():
         with open(yaml_path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+            return load_yaml(f) or {}
 
     # Try JSON station file
     json_path = stations_dir / f"{station_id}.station.json"

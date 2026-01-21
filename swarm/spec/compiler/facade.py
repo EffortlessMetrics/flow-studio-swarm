@@ -282,9 +282,9 @@ class SpecCompiler:
             return None
 
         try:
-            import yaml
+            from swarm.utils.yaml_utils import load_yaml
             with open(template_path, "r", encoding="utf-8") as handle:
-                data = yaml.safe_load(handle)
+                data = load_yaml(handle)
 
             return StepTemplate(
                 id=data.get("id", template_id),

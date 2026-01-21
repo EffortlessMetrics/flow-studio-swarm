@@ -54,9 +54,9 @@ def validate_capability_registry() -> ValidationResult:
 
     # Parse capability registry (uses PyYAML, not SimpleYAMLParser which is for frontmatter)
     try:
-        import yaml
+        from swarm.utils.yaml_utils import load_yaml
         content = registry_path.read_text(encoding="utf-8")
-        registry = yaml.safe_load(content)
+        registry = load_yaml(content)
     except ImportError:
         result.add_warning(
             "CAPABILITY",

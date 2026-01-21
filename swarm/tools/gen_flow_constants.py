@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 # Project root (two levels up from this script)
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -59,7 +59,7 @@ def load_flows() -> List[Dict[str, Any]]:
         sys.exit(2)
 
     with open(FLOWS_YAML, "r") as f:
-        data = yaml.safe_load(f)
+        data = load_yaml(f)
 
     if not data or "flows" not in data:
         print(f"Error: {FLOWS_YAML} is missing 'flows' key")

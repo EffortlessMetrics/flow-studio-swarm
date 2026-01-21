@@ -18,14 +18,13 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
-import yaml
-
 # Add repo root to path for imports
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from swarm.config.flow_registry import get_flow_index, get_flow_keys  # noqa: E402
+from swarm.utils.yaml_utils import load_yaml  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -49,7 +48,7 @@ def load_flows() -> Dict[str, Any]:
     for flow_file in sorted(FLOW_CONFIG_DIR.glob("*.yaml")):
         try:
             with open(flow_file) as f:
-                config = yaml.safe_load(f)
+                config = load_yaml(f)
                 if config and "key" in config:
                     flows[config["key"]] = config
         except Exception as e:

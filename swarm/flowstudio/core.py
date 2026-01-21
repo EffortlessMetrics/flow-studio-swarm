@@ -21,7 +21,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
+from swarm.utils.yaml_utils import load_yaml
 
 # Import loaders from the existing flow_studio module
 # We'll use these to avoid reimplementing the wheel
@@ -144,7 +144,7 @@ class FlowStudioCore:
     def _safe_load_yaml(self, path: Path) -> Dict[str, Any]:
         """Safely load YAML from a file."""
         text = path.read_text(encoding="utf-8")
-        data = yaml.safe_load(text)
+        data = load_yaml(text)
         if data is None:
             return {}
         if not isinstance(data, dict):
