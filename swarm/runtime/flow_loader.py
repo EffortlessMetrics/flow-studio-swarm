@@ -38,6 +38,9 @@ from swarm.config.flow_registry import StepDefinition, get_flow_index, get_flow_
 # Module logger
 logger = logging.getLogger(__name__)
 
+# Cache size for prompt loading functions
+PROMPT_CACHE_SIZE = 128
+
 
 @dataclass
 class EnrichedStepDefinition:
@@ -77,22 +80,10 @@ def _strip_yaml_frontmatter(content: str) -> str:
     return content
 
 
-@lru_cache(maxsize=128)
-def load_orchestrator_flow_prompt(flow_key: str, repo_root: Path) -> Optional[str]:
-    """Load the orchestrator flow prompt for a given flow.
-
-    Loads from `swarm/prompts/orchestrator_flows/flow-{N}-{flow_key}.md`.
-
-    Results are cached using LRU cache to reduce disk I/O. Use
-    `clear_prompt_cache()` to invalidate the cache if prompt files change.
-
-    Args:
-        flow_key: The flow key (signal, plan, build, review, gate, deploy, wisdom).
-        repo_root: Repository root path.
-
-    Returns:
-        The prompt file content (with frontmatter stripped), or None if not found.
-    """
+@lru_cache(maxsize=PROMPT_CACHE_SIZE)
+def _load_orchestrator_flow_prompt_cached(flow_key: str, repo_root_str: str) -> Optional[str]:
+    """Internal cached implementation for load_orchestrator_flow_prompt."""
+    repo_root = Path(repo_root_str)
     flow_number = get_flow_index(flow_key)
     if flow_number == 99:  # Unknown flow key (get_flow_index returns 99 for unknown keys)
         logger.warning("Unknown flow key '%s' - cannot map to flow number", flow_key)
@@ -118,24 +109,30 @@ def load_orchestrator_flow_prompt(flow_key: str, repo_root: Path) -> Optional[st
         return None
 
 
-@lru_cache(maxsize=128)
-def load_agent_step_prompt(agent_key: str, repo_root: Path) -> Optional[str]:
-    """Load the step prompt for an agent.
+def load_orchestrator_flow_prompt(flow_key: str, repo_root: Path) -> Optional[str]:
+    """Load the orchestrator flow prompt for a given flow.
 
-    First tries `swarm/prompts/agentic_steps/{agent_key}.md`. If not found,
-    falls back to `.claude/agents/{agent_key}.md`. Frontmatter is stripped
-    from either location.
+    Loads from `swarm/prompts/orchestrator_flows/flow-{N}-{flow_key}.md`.
 
     Results are cached using LRU cache to reduce disk I/O. Use
     `clear_prompt_cache()` to invalidate the cache if prompt files change.
 
     Args:
-        agent_key: The agent key (e.g., "code-implementer", "test-author").
+        flow_key: The flow key (signal, plan, build, review, gate, deploy, wisdom).
         repo_root: Repository root path.
 
     Returns:
-        The prompt body (frontmatter stripped), or None if not found in either location.
+        The prompt file content (with frontmatter stripped), or None if not found.
     """
+    # Use resolved string path for consistent cache keys
+    return _load_orchestrator_flow_prompt_cached(flow_key, str(repo_root.resolve()))
+
+
+@lru_cache(maxsize=PROMPT_CACHE_SIZE)
+def _load_agent_step_prompt_cached(agent_key: str, repo_root_str: str) -> Optional[str]:
+    """Internal cached implementation for load_agent_step_prompt."""
+    repo_root = Path(repo_root_str)
+
     # Primary location: swarm/prompts/agentic_steps/
     primary_path = repo_root / "swarm" / "prompts" / "agentic_steps" / f"{agent_key}.md"
 
@@ -177,6 +174,27 @@ def load_agent_step_prompt(agent_key: str, repo_root: Path) -> Optional[str]:
     return None
 
 
+def load_agent_step_prompt(agent_key: str, repo_root: Path) -> Optional[str]:
+    """Load the step prompt for an agent.
+
+    First tries `swarm/prompts/agentic_steps/{agent_key}.md`. If not found,
+    falls back to `.claude/agents/{agent_key}.md`. Frontmatter is stripped
+    from either location.
+
+    Results are cached using LRU cache to reduce disk I/O. Use
+    `clear_prompt_cache()` to invalidate the cache if prompt files change.
+
+    Args:
+        agent_key: The agent key (e.g., "code-implementer", "test-author").
+        repo_root: Repository root path.
+
+    Returns:
+        The prompt body (frontmatter stripped), or None if not found in either location.
+    """
+    # Use resolved string path for consistent cache keys
+    return _load_agent_step_prompt_cached(agent_key, str(repo_root.resolve()))
+
+
 def clear_prompt_cache() -> None:
     """Clear the prompt loading caches.
 
@@ -184,8 +202,8 @@ def clear_prompt_cache() -> None:
     `load_agent_step_prompt`. Call this if prompt files have changed on disk
     and you need to reload fresh content.
     """
-    load_orchestrator_flow_prompt.cache_clear()
-    load_agent_step_prompt.cache_clear()
+    _load_orchestrator_flow_prompt_cached.cache_clear()
+    _load_agent_step_prompt_cached.cache_clear()
     logger.debug("Prompt caches cleared")
 
 
