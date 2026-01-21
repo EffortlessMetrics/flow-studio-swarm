@@ -187,7 +187,9 @@ export function filterRuns(type: RunFilterType): void {
   if (filterContainer) {
     filterContainer.querySelectorAll(".filter-btn").forEach(btn => {
       const filter = (btn as HTMLElement).dataset.filter;
-      btn.classList.toggle("active", filter === type);
+      const isActive = filter === type;
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
   }
 
@@ -676,9 +678,13 @@ function initRunHistoryHandlers(): void {
         const filter = (btn as HTMLElement).dataset.filter as RunFilterType;
         if (!filter) return;
 
-        // Update active state on buttons
-        filterContainer.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+        // Update active state on buttons with aria-selected
+        filterContainer.querySelectorAll(".filter-btn").forEach(b => {
+          b.classList.remove("active");
+          b.setAttribute("aria-selected", "false");
+        });
         btn.classList.add("active");
+        btn.setAttribute("aria-selected", "true");
 
         // Apply filter and re-render
         applyFilter(filter);
@@ -725,7 +731,9 @@ export async function initRunHistory(): Promise<void> {
   if (filterContainer) {
     filterContainer.querySelectorAll(".filter-btn").forEach(btn => {
       const filter = (btn as HTMLElement).dataset.filter;
-      btn.classList.toggle("active", filter === defaultFilter);
+      const isActive = filter === defaultFilter;
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
   }
 
