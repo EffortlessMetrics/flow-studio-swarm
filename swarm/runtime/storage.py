@@ -74,6 +74,10 @@ EVENTS_FILE = "events.jsonl"
 RUN_STATE_FILE = "run_state.json"
 LEGACY_META_FILE = "run.json"  # Old-style optional metadata
 
+# Flow keys used for detecting legacy runs (runs without meta.json)
+# These are the core flows that produce artifact directories
+LEGACY_FLOW_KEYS = frozenset({"signal", "plan", "build", "gate", "deploy", "wisdom"})
+
 # -----------------------------------------------------------------------------
 # Per-run locking for thread safety
 # -----------------------------------------------------------------------------
@@ -832,9 +836,17 @@ def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
         return []
 
     run_ids: List[RunId] = []
-    for entry in runs_dir.iterdir():
-        if entry.is_dir() and (entry / META_FILE).exists():
-            run_ids.append(entry.name)
+    # Use os.scandir for faster directory iteration - avoids Path object overhead
+    # and leverages cached stat info from DirEntry objects
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    # Use os.path for faster file existence check
+                    if os.path.exists(os.path.join(entry.path, META_FILE)):
+                        run_ids.append(entry.name)
+    except OSError:
+        pass
 
     return sorted(run_ids)
 
@@ -855,23 +867,26 @@ def discover_legacy_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     if not runs_dir.exists():
         return []
 
-    # Known flow keys that indicate a valid run directory
-    flow_keys = {"signal", "plan", "build", "gate", "deploy", "wisdom"}
-
     legacy_runs: List[RunId] = []
-    for entry in runs_dir.iterdir():
-        if not entry.is_dir():
-            continue
+    # Use os.scandir for faster directory iteration
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if not entry.is_dir():
+                    continue
 
-        # Skip if already has meta.json (not legacy)
-        if (entry / META_FILE).exists():
-            continue
+                # Skip if already has meta.json (not legacy)
+                if os.path.exists(os.path.join(entry.path, META_FILE)):
+                    continue
 
-        # Check if any flow subdirectory exists
-        has_flow_artifacts = any((entry / flow_key).is_dir() for flow_key in flow_keys)
-
-        if has_flow_artifacts:
-            legacy_runs.append(entry.name)
+                # Check if any flow subdirectory exists
+                # Use os.path.isdir with early exit for efficiency
+                for flow_key in LEGACY_FLOW_KEYS:
+                    if os.path.isdir(os.path.join(entry.path, flow_key)):
+                        legacy_runs.append(entry.name)
+                        break
+    except OSError:
+        pass
 
     return sorted(legacy_runs)
 
@@ -888,19 +903,22 @@ def discover_example_runs() -> List[RunId]:
     if not EXAMPLES_DIR.exists():
         return []
 
-    # Known flow keys that indicate a valid run directory
-    flow_keys = {"signal", "plan", "build", "gate", "deploy", "wisdom"}
-
     example_runs: List[RunId] = []
-    for entry in EXAMPLES_DIR.iterdir():
-        if not entry.is_dir() or entry.name.startswith("."):
-            continue
+    # Use os.scandir for faster directory iteration
+    try:
+        with os.scandir(EXAMPLES_DIR) as it:
+            for entry in it:
+                if not entry.is_dir() or entry.name.startswith("."):
+                    continue
 
-        # Check if any flow subdirectory exists
-        has_flow_artifacts = any((entry / flow_key).is_dir() for flow_key in flow_keys)
-
-        if has_flow_artifacts:
-            example_runs.append(entry.name)
+                # Check if any flow subdirectory exists
+                # Use os.path.isdir with early exit for efficiency
+                for flow_key in LEGACY_FLOW_KEYS:
+                    if os.path.isdir(os.path.join(entry.path, flow_key)):
+                        example_runs.append(entry.name)
+                        break
+    except OSError:
+        pass
 
     return sorted(example_runs)
 
