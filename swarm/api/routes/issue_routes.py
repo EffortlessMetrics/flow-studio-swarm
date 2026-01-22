@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
 from ..services.run_state import get_state_manager
 
 logger = logging.getLogger(__name__)
@@ -190,6 +191,19 @@ async def ingest_issue(request: IssueIngestionRequest):
 
         # Generate run ID
         run_id = f"issue-{repo.replace('/', '-') if repo else 'manual'}-{issue_number or 0}-{now.strftime('%Y%m%d%H%M%S')}"
+
+        # Validate run_id before file system operations
+        try:
+            validate_path_component(run_id, "generated run_id")
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_run_id",
+                    "message": f"Generated run ID is invalid: {str(e)}",
+                    "details": {"run_id": run_id},
+                },
+            )
 
         # Create run directory structure
         state_manager = get_state_manager()
