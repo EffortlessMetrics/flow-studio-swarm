@@ -40,8 +40,8 @@ class TestClaudeHarnessBackendBuildCommand:
         assert cmd == ["make", "demo-signal"]
         assert "RUN_ID" not in env
 
-    def test_build_command_custom(self) -> None:
-        """Custom command is parsed via shlex, run_id in env."""
+    def test_build_command_ignores_custom(self) -> None:
+        """Custom command parameter is IGNORED for security."""
         backend = ClaudeHarnessBackend()
         spec = RunSpec(
             flow_keys=["signal"],
@@ -50,7 +50,8 @@ class TestClaudeHarnessBackendBuildCommand:
         )
         cmd, env = backend._build_command("signal", spec)
 
-        assert cmd == ["echo", "hello"]
+        # Should ignore "echo hello" and use the standard make target
+        assert cmd == ["make", "demo-signal"]
         assert env["RUN_ID"] == "test-run"
 
     def test_build_command_fallback(self) -> None:
