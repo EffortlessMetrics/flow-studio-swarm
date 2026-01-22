@@ -354,6 +354,128 @@ make selftest-doctor
 
 ---
 
+## Cross-PR Failures: When Unrelated PRs Fail
+
+Sometimes a PR fails in CI even though the changes don't touch related code. This section documents known causes and mitigations.
+
+### Vendor SDK Artifacts Stale
+
+**Symptom:**
+```
+FAIL: docs/vendor/anthropic/agent-sdk/python/VERSION.json is stale
+  Vendored: 0.1.5
+  Installed: 0.1.6
+Run: make vendor-agent-sdk
+```
+
+**Cause:** The Claude Agent SDK was updated upstream since vendor artifacts were generated.
+
+**Why it affects unrelated PRs:**
+- SDK vendor check runs on all PRs in `test-swarm` job
+- For PRs touching SDK-related paths, check is strict (fails CI)
+- For unrelated PRs, check emits a warning but doesn't block
+
+**Paths that trigger strict enforcement:**
+- `docs/vendor/anthropic/`
+- `swarm/tools/vendor_agent_sdk`
+- `tests/contract/test_upstream_sdk`
+
+**Solution:**
+```bash
+# Update vendored artifacts
+make vendor-agent-sdk
+
+# Commit the changes
+git add docs/vendor/
+git commit -m "chore: update vendored SDK artifacts"
+```
+
+### TypeScript/JS Drift Detected
+
+**Symptom:**
+```
+::error::Flow Studio JS drift detected! Run 'make ts-build' and commit the output.
+```
+
+**Cause:** Compiled JavaScript files don't match TypeScript sources.
+
+**Why it happens:**
+- TypeScript was edited but JS not recompiled
+- Different tsc version produces different output
+- Build artifacts were modified directly
+
+**Solution:**
+```bash
+# Rebuild TypeScript
+cd swarm/tools/flow_studio_ui && npm run ts-build
+
+# Commit the compiled output
+git add swarm/tools/flow_studio_ui/js/
+git commit -m "build: regenerate Flow Studio JS"
+```
+
+### HTML Generation Drift
+
+**Symptom:**
+```
+test_flow_studio_html_migration.py::test_backends_serve_identical_html FAILED
+```
+
+**Cause:** Generated `index.html` doesn't match fragment sources.
+
+**Solution:**
+```bash
+# Regenerate HTML from fragments
+make gen-index-html
+
+# Verify the fix
+uv run pytest tests/test_flow_studio_html_migration.py -v
+```
+
+### OpenAPI Schema Changes
+
+**Symptom:**
+```
+test_flow_studio_schema_stability.py::test_required_endpoints_still_documented FAILED
+```
+
+**Cause:** FastAPI endpoints changed without updating the baseline schema.
+
+**Solution:**
+```bash
+# Dump new schema baseline
+make dump-openapi-schema
+
+# Review changes to ensure no unintended breaking changes
+git diff docs/flowstudio-openapi.json
+
+# Commit if changes are intentional
+git add docs/flowstudio-openapi.json
+git commit -m "docs: update OpenAPI schema baseline"
+```
+
+### Guardrail Test Philosophy
+
+Flow Studio uses guardrail tests to prevent drift between sources and artifacts:
+
+| Artifact | Source | Check Command | Regenerate Command |
+|----------|--------|---------------|-------------------|
+| Agent frontmatter | `swarm/config/agents/*.yaml` | `make check-adapters` | `make gen-adapters` |
+| Flow diagrams | `swarm/config/flows/*.yaml` | `make check-flows` | `make gen-flows` |
+| TypeScript constants | `swarm/config/flows.yaml` | `make check-flow-constants` | `make gen-flow-constants` |
+| index.html | `fragments/*.html` | `make check-index-html` | `make gen-index-html` |
+| Compiled JS | `src/**/*.ts` | `check-ui-drift` job | `npm run ts-build` |
+| OpenAPI schema | FastAPI app | N/A | `make dump-openapi-schema` |
+| Vendor SDK | Installed SDK | `make check-vendor-agent-sdk` | `make vendor-agent-sdk` |
+
+**When a guardrail test fails:**
+1. Check if the failure is in CI but not local (sync environment first)
+2. Regenerate the artifact from its source
+3. Review the diff to ensure changes are expected
+4. Commit the regenerated artifact
+
+---
+
 ## Pre-flight Checks: What CI Validates
 
 Before any test runs, CI validates the environment. Understanding these checks helps you debug setup issues:

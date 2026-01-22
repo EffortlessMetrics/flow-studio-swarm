@@ -158,7 +158,7 @@ V3 introduces **Open World Routing**—the ability for flows to dynamically spaw
 
 ## Release Readiness (v3.0.0)
 
-> **Status:** Near-complete — Stop semantics UI complete, CI reliability pending
+> **Status:** Complete — All acceptance criteria met
 > **Target:** Operator-grade local SDLC harness
 
 ### What "Done" Means for v3.0.0
@@ -520,10 +520,10 @@ Run this checklist to verify alignment:
    - [x] `/api/db/health` shows `needs_rebuild`
    - [x] `/api/db/rebuild` restores projection
 
-5. **CI Reliability** ⏳ PENDING
-   - [ ] Guardrail tests don't fail on unrelated PRs
-   - [ ] Vendor artifact regen is deterministic or gated
-   - [ ] Clean PR doesn't fail for historical reasons
+5. **CI Reliability** ✓
+   - [x] Guardrail tests don't fail on unrelated PRs (vendor SDK check is now path-filtered)
+   - [x] Vendor artifact regen is deterministic or gated (confirmed in audit; gen scripts are deterministic)
+   - [x] Clean PR doesn't fail for historical reasons (integration test masking fixed; cross-PR docs added)
 
 ---
 
