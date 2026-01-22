@@ -14,6 +14,7 @@
   <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
 </head>
 <body>
+<a href="#graph" class="skip-to-content">Skip to content</a>
 <div id="app" data-uiid="flow_studio">
   <header role="banner" data-uiid="flow_studio.header">
     <div>
@@ -4274,6 +4275,32 @@ make validate-swarm</pre>
       .toast--fade-out {
         animation: none;
       }
+    }
+
+    /* =========================================================================
+     * Accessibility - Skip to Content Link
+     * =========================================================================
+     */
+    .skip-to-content {
+      position: absolute;
+      top: -9999px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--fs-color-accent);
+      color: white;
+      padding: 8px 16px;
+      z-index: 10000;
+      text-decoration: none;
+      border-radius: 0 0 4px 4px;
+      font-weight: 500;
+      font-size: 13px;
+      transition: top 0.2s ease;
+    }
+
+    .skip-to-content:focus {
+      top: 0;
+      outline: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
   </style>
   <script type="application/json" data-inline-source="flowstudio-js-bundle">
