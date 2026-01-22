@@ -1,7 +1,7 @@
   <main id="graph" role="main" aria-label="Flow graph visualization" data-uiid="flow_studio.canvas">
     <!-- Empty state shown when no run is loaded -->
     <div id="canvas-empty-state" class="fs-empty" style="display: none; position: absolute; inset: 0; z-index: 5;" data-uiid="flow_studio.canvas.empty">
-      <div class="fs-empty-icon">📊</div>
+      <div class="fs-empty-icon" aria-hidden="true">📊</div>
       <p class="fs-empty-title">Welcome to Flow Studio</p>
       <p class="fs-empty-description">Select a run from the sidebar to visualize flows.</p>
       <div style="margin-top: 16px; text-align: center;">
@@ -15,7 +15,7 @@
     <div id="legend" class="collapsed" data-uiid="flow_studio.canvas.legend">
       <button class="legend-header" id="legend-toggle" type="button" aria-expanded="false" aria-controls="legend-content" data-uiid="flow_studio.canvas.legend.toggle">
         <span>Legend</span>
-        <span class="legend-arrow">▼</span>
+        <span class="legend-arrow" aria-hidden="true">▼</span>
       </button>
       <div class="legend-content" id="legend-content" data-uiid="flow_studio.canvas.legend.content">
         <div class="legend-item"><span class="legend-color" style="background: #0f766e;"></span><span>Step (teal)</span></div>

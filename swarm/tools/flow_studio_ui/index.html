@@ -30,7 +30,7 @@
       <div class="tour-dropdown" id="tour-dropdown" data-uiid="flow_studio.header.tour">
         <button id="tour-btn" class="tour-dropdown-btn" title="Start a guided tour" aria-haspopup="true" aria-expanded="false" data-uiid="flow_studio.header.tour.trigger">
           <span>Tour</span>
-          <span style="font-size: 10px;">▼</span>
+          <span style="font-size: 10px;" aria-hidden="true">▼</span>
         </button>
         <div id="tour-menu" class="tour-dropdown-menu" role="menu" aria-label="Available tours" data-uiid="flow_studio.header.tour.menu"></div>
       </div>
@@ -76,19 +76,19 @@
       <label class="muted" style="font-size: 10px; display: block; margin-bottom: 6px;">RUN CONTROL</label>
       <div class="run-control-buttons" data-uiid="flow_studio.sidebar.run_control.buttons">
         <button id="run-control-play" class="run-control-btn run-control-btn--play" title="Start run" aria-label="Start run" data-uiid="flow_studio.sidebar.run_control.play">
-          <span class="run-control-icon">&#9654;</span>
+          <span class="run-control-icon" aria-hidden="true">&#9654;</span>
           <span class="run-control-label">Start</span>
         </button>
         <button id="run-control-pause" class="run-control-btn run-control-btn--pause" title="Pause run" aria-label="Pause run" data-uiid="flow_studio.sidebar.run_control.pause" disabled>
-          <span class="run-control-icon">&#10074;&#10074;</span>
+          <span class="run-control-icon" aria-hidden="true">&#10074;&#10074;</span>
           <span class="run-control-label">Pause</span>
         </button>
         <button id="run-control-resume" class="run-control-btn run-control-btn--resume" title="Resume run" aria-label="Resume run" data-uiid="flow_studio.sidebar.run_control.resume" disabled style="display: none;">
-          <span class="run-control-icon">&#9654;</span>
+          <span class="run-control-icon" aria-hidden="true">&#9654;</span>
           <span class="run-control-label">Resume</span>
         </button>
         <button id="run-control-cancel" class="run-control-btn run-control-btn--stop" title="Stop run" aria-label="Stop run" data-uiid="flow_studio.sidebar.run_control.stop" disabled>
-          <span class="run-control-icon">&#9632;</span>
+          <span class="run-control-icon" aria-hidden="true">&#9632;</span>
           <span class="run-control-label">Stop</span>
         </button>
       </div>
@@ -131,7 +131,9 @@
     <div class="run-history-section" data-uiid="flow_studio.sidebar.run_history">
       <div class="section-header run-history-header" style="margin-top: 16px;">
         <label class="muted" style="font-size: 10px;">RUN HISTORY</label>
-        <button id="run-history-toggle" class="collapse-toggle" aria-expanded="true" aria-controls="run-history-list" title="Toggle run history">▼</button>
+        <button id="run-history-toggle" class="collapse-toggle" aria-expanded="true" aria-controls="run-history-list" aria-label="Toggle run history" title="Toggle run history">
+          <span aria-hidden="true">▼</span>
+        </button>
       </div>
       <div id="run-history-filter" class="run-history-filter" role="group" aria-label="Run filters" data-uiid="flow_studio.sidebar.run_history.filter">
         <button type="button" aria-pressed="true" class="filter-btn active" data-filter="all">All</button>
@@ -146,7 +148,7 @@
   <main id="graph" role="main" aria-label="Flow graph visualization" data-uiid="flow_studio.canvas">
     <!-- Empty state shown when no run is loaded -->
     <div id="canvas-empty-state" class="fs-empty" style="display: none; position: absolute; inset: 0; z-index: 5;" data-uiid="flow_studio.canvas.empty">
-      <div class="fs-empty-icon">📊</div>
+      <div class="fs-empty-icon" aria-hidden="true">📊</div>
       <p class="fs-empty-title">Welcome to Flow Studio</p>
       <p class="fs-empty-description">Select a run from the sidebar to visualize flows.</p>
       <div style="margin-top: 16px; text-align: center;">
@@ -160,7 +162,7 @@
     <div id="legend" class="collapsed" data-uiid="flow_studio.canvas.legend">
       <button class="legend-header" id="legend-toggle" type="button" aria-expanded="false" aria-controls="legend-content" data-uiid="flow_studio.canvas.legend.toggle">
         <span>Legend</span>
-        <span class="legend-arrow">▼</span>
+        <span class="legend-arrow" aria-hidden="true">▼</span>
       </button>
       <div class="legend-content" id="legend-content" data-uiid="flow_studio.canvas.legend.content">
         <div class="legend-item"><span class="legend-color" style="background: #0f766e;"></span><span>Step (teal)</span></div>
