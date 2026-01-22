@@ -40,7 +40,9 @@ class TestGeminiCliBackendStubMode:
         # Ensure we're not invoking the real gemini CLI
         assert " gemini " not in cmd_str
 
-    def test_uses_stub_when_cli_not_available(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_uses_stub_when_cli_not_available(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Backend uses stub when gemini CLI is not on PATH."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "0")
         monkeypatch.setenv("SWARM_GEMINI_CLI", "nonexistent-gemini-cli-xyz")
@@ -64,7 +66,9 @@ class TestGeminiCliBackendStubMode:
         assert "python3" in cmd_str
         assert "test-run-002" in env["RUN_ID"]
 
-    def test_stub_command_includes_flow_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_stub_command_includes_flow_key(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Stub command includes the flow key in output."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "1")
         backend = GeminiCliBackend()
@@ -249,10 +253,7 @@ class TestGeminiEventMapping:
         assert run_event.kind == "log"
 
 
-@pytest.mark.skipif(
-    shutil.which("gemini") is None,
-    reason="Gemini CLI not installed"
-)
+@pytest.mark.skipif(shutil.which("gemini") is None, reason="Gemini CLI not installed")
 class TestGeminiCliBackendRealCli:
     """Tests that require the real gemini CLI to be installed.
 

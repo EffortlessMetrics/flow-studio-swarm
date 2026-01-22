@@ -121,7 +121,9 @@ class TestGeminiCliBackendSecurityInjection:
         # Ensure it's contained within the prompt string
         assert f"Run ID: {malicious_run_id}" in prompt_arg
 
-    def test_env_isolation_from_command_stub_mode(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_env_isolation_from_command_stub_mode(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify environment dict is separate from command list in stub mode."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "1")
         backend = GeminiCliBackend()
@@ -143,7 +145,9 @@ class TestGeminiCliBackendSecurityInjection:
         # But it must be in the environment
         assert env.get("RUN_ID") == malicious
 
-    def test_build_stub_command_python_injection_prevented(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_build_stub_command_python_injection_prevented(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify that malicious flow_key cannot inject python code in stub mode."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "1")
         backend = GeminiCliBackend()
