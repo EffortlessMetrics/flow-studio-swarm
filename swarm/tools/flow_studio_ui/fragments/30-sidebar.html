@@ -7,19 +7,19 @@
       <label class="muted" style="font-size: 10px; display: block; margin-bottom: 6px;">RUN CONTROL</label>
       <div class="run-control-buttons" data-uiid="flow_studio.sidebar.run_control.buttons">
         <button id="run-control-play" class="run-control-btn run-control-btn--play" title="Start run" aria-label="Start run" data-uiid="flow_studio.sidebar.run_control.play">
-          <span class="run-control-icon">&#9654;</span>
+          <span class="run-control-icon" aria-hidden="true">&#9654;</span>
           <span class="run-control-label">Start</span>
         </button>
         <button id="run-control-pause" class="run-control-btn run-control-btn--pause" title="Pause run" aria-label="Pause run" data-uiid="flow_studio.sidebar.run_control.pause" disabled>
-          <span class="run-control-icon">&#10074;&#10074;</span>
+          <span class="run-control-icon" aria-hidden="true">&#10074;&#10074;</span>
           <span class="run-control-label">Pause</span>
         </button>
         <button id="run-control-resume" class="run-control-btn run-control-btn--resume" title="Resume run" aria-label="Resume run" data-uiid="flow_studio.sidebar.run_control.resume" disabled style="display: none;">
-          <span class="run-control-icon">&#9654;</span>
+          <span class="run-control-icon" aria-hidden="true">&#9654;</span>
           <span class="run-control-label">Resume</span>
         </button>
         <button id="run-control-cancel" class="run-control-btn run-control-btn--stop" title="Stop run" aria-label="Stop run" data-uiid="flow_studio.sidebar.run_control.stop" disabled>
-          <span class="run-control-icon">&#9632;</span>
+          <span class="run-control-icon" aria-hidden="true">&#9632;</span>
           <span class="run-control-label">Stop</span>
         </button>
       </div>
@@ -62,7 +62,9 @@
     <div class="run-history-section" data-uiid="flow_studio.sidebar.run_history">
       <div class="section-header run-history-header" style="margin-top: 16px;">
         <label class="muted" style="font-size: 10px;">RUN HISTORY</label>
-        <button id="run-history-toggle" class="collapse-toggle" aria-expanded="true" aria-controls="run-history-list" title="Toggle run history">▼</button>
+        <button id="run-history-toggle" class="collapse-toggle" aria-expanded="true" aria-controls="run-history-list" aria-label="Toggle run history" title="Toggle run history">
+          <span aria-hidden="true">▼</span>
+        </button>
       </div>
       <div id="run-history-filter" class="run-history-filter" role="group" aria-label="Run filters" data-uiid="flow_studio.sidebar.run_history.filter">
         <button type="button" aria-pressed="true" class="filter-btn active" data-filter="all">All</button>
