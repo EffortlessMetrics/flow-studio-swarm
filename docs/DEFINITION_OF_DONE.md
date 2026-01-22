@@ -1,9 +1,9 @@
-# Definition of Done (v2.3.2)
+# Definition of Done (v3.0.0-rc.1)
 
-> **Purpose:** This document defines what "done" means for merging code into demo-swarm.
+> **Purpose:** This document defines what "done" means for merging code into Flow Studio.
 > It consolidates the three CI gates, validation rules, and quality expectations.
 
-## Current Baseline (v2.3.2)
+## Current Baseline (v3.0.0-rc.1)
 
 | Metric | Value |
 |--------|-------|
