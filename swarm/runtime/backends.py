@@ -575,13 +575,18 @@ class GeminiCliBackend(RunBackend):
                 )
 
                 # Build Gemini CLI command (pass run_id explicitly)
-                cmd = self._build_command(flow_key, run_id, spec)
+                cmd, env = self._build_command(flow_key, run_id, spec)
+
+                # Prepare environment variables
+                process_env = os.environ.copy()
+                process_env.update(env)
 
                 # Execute command and stream JSONL output
                 process = subprocess.Popen(
                     cmd,
                     cwd=str(self._repo_root),
                     shell=False,
+                    env=process_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -747,13 +752,14 @@ Instructions:
 
 Be concise and focused on the task."""
 
-    def _build_stub_command(self, flow_key: str, run_id: RunId, spec: RunSpec) -> str:
+    def _build_stub_command(self, flow_key: str) -> List[str]:
         """Build a stub command that simulates Gemini JSONL output for testing.
+
+        Uses python to safely print lines without shell metacharacters.
+        RUN_ID is retrieved from environment in the stub to verify propagaion.
 
         Args:
             flow_key: The flow being executed
-            run_id: The run identifier (passed explicitly)
-            spec: The run specification
         """
         tool_input = f'{{"path": "swarm/flows/flow-{flow_key}.md"}}'
         stub_events = [
@@ -763,10 +769,26 @@ Be concise and focused on the task."""
             '{{"type": "tool_result", "tool": "read", "success": true}}',
             f'{{"type": "result", "flow": "{flow_key}", "status": "complete"}}',
         ]
-        events_json = "\\n".join(stub_events)
-        return f'echo -e "{events_json}" && RUN_ID={run_id} echo "Flow {flow_key} completed"'
 
-    def _build_command(self, flow_key: str, run_id: RunId, spec: RunSpec) -> List[str]:
+        # Create a python one-liner that prints each event on a new line
+        # and then prints the legacy completion message
+        events_str = "\\n".join(stub_events)
+
+        # We construct a python script that prints these lines
+        # This avoids shell metacharacter issues with 'echo -e'
+        # AND we pass the content as argument to avoid python injection
+        python_script = (
+            "import os, sys; "
+            "print(sys.argv[1]); "
+            # Verify RUN_ID propagation by printing it from env
+            "print(f'Flow {os.environ.get(\"RUN_ID\", \"UNKNOWN\")} completed')"
+        )
+
+        return ["python3", "-c", python_script, events_str]
+
+    def _build_command(
+        self, flow_key: str, run_id: RunId, spec: RunSpec
+    ) -> Tuple[List[str], Dict[str, str]]:
         """Build the Gemini CLI command to execute a flow.
 
         Uses real `gemini` CLI when available and SWARM_GEMINI_STUB=0.
@@ -778,11 +800,17 @@ Be concise and focused on the task."""
             spec: The run specification
 
         Returns:
-            List of command arguments for safe subprocess execution.
+            Tuple containing:
+            - List of command arguments for safe subprocess execution.
+            - Dictionary of environment variables.
         """
+        env: Dict[str, str] = {}
+        if run_id:
+            env["RUN_ID"] = run_id
+
         # Allow explicit command override for testing
         if "command" in spec.params:
-            return shlex.split(spec.params["command"])
+            return shlex.split(spec.params["command"]), env
 
         # Use stub when stub_mode is enabled or CLI not available
         if self.stub_mode or not self.cli_available:
@@ -791,7 +819,7 @@ Be concise and focused on the task."""
                 self.stub_mode,
                 self.cli_available,
             )
-            return shlex.split(self._build_stub_command(flow_key, run_id, spec))
+            return self._build_stub_command(flow_key), env
 
         # Build real gemini CLI command
         prompt = self._build_prompt(flow_key, run_id, spec)
@@ -804,7 +832,7 @@ Be concise and focused on the task."""
             prompt,
         ]
 
-        return args
+        return args, env
 
     def _map_gemini_event(
         self, run_id: RunId, flow_key: str, gemini_event: Dict[str, Any]

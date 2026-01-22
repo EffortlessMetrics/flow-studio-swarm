@@ -28,14 +28,16 @@ class TestGeminiCliBackendStubMode:
             initiator="test",
         )
 
-        cmd = backend._build_command("signal", "test-run-001", spec)
+        cmd, env = backend._build_command("signal", "test-run-001", spec)
 
-        # _build_command returns List[str] for safe shell=False execution
-        # Stub command uses echo, not real gemini binary
-        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
-        assert "echo -e" in cmd_str
-        # Ensure we're not invoking the real gemini CLI (space-bounded to avoid
-        # matching "gemini-cli" in the JSON stub output)
+        # _build_command returns Tuple[List[str], Dict[str, str]]
+        # Stub command uses python to print, avoiding shell metacharacters
+        cmd_str = " ".join(cmd)
+        assert "python3" in cmd_str
+        assert "print" in cmd_str
+        assert "test-run-001" in env["RUN_ID"]
+
+        # Ensure we're not invoking the real gemini CLI
         assert " gemini " not in cmd_str
 
     def test_uses_stub_when_cli_not_available(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -55,12 +57,12 @@ class TestGeminiCliBackendStubMode:
             initiator="test",
         )
 
-        cmd = backend._build_command("build", "test-run-002", spec)
+        cmd, env = backend._build_command("build", "test-run-002", spec)
 
-        # _build_command returns List[str] for safe shell=False execution
         # Falls back to stub
-        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
-        assert "echo -e" in cmd_str
+        cmd_str = " ".join(cmd)
+        assert "python3" in cmd_str
+        assert "test-run-002" in env["RUN_ID"]
 
     def test_stub_command_includes_flow_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Stub command includes the flow key in output."""
@@ -74,11 +76,11 @@ class TestGeminiCliBackendStubMode:
             initiator="test",
         )
 
-        cmd = backend._build_command("gate", "test-run-003", spec)
+        cmd, env = backend._build_command("gate", "test-run-003", spec)
 
-        # _build_command returns List[str] for safe shell=False execution
-        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
+        cmd_str = " ".join(cmd)
         assert "gate" in cmd_str
+        assert "test-run-003" in env["RUN_ID"]
 
     def test_custom_command_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Backend uses custom command when provided in spec params."""
@@ -93,10 +95,11 @@ class TestGeminiCliBackendStubMode:
             params={"command": "echo 'custom command'"},
         )
 
-        cmd = backend._build_command("signal", "test-run-004", spec)
+        cmd, env = backend._build_command("signal", "test-run-004", spec)
 
         # _build_command returns List[str] via shlex.split for safe shell=False execution
         assert cmd == ["echo", "custom command"]
+        assert "test-run-004" in env["RUN_ID"]
 
 
 class TestGeminiCliBackendCapabilities:
@@ -274,12 +277,13 @@ class TestGeminiCliBackendRealCli:
             initiator="test",
         )
 
-        cmd = backend._build_command("signal", "test-run-123", spec)
+        cmd, env = backend._build_command("signal", "test-run-123", spec)
 
         # Real command uses gemini CLI
         assert "gemini" in cmd
         assert "--output-format" in cmd
         assert "stream-json" in cmd
+        assert "test-run-123" in env["RUN_ID"]
 
     def test_prompt_includes_flow_context(
         self, monkeypatch: pytest.MonkeyPatch
