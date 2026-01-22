@@ -7,3 +7,8 @@
 **Vulnerability:** `ClaudeHarnessBackend` and `GeminiCliBackend` honored a `command` parameter in the `RunSpec` params, passing it directly to `subprocess.Popen` (via `shlex.split`). This allowed any user with access to the API to execute arbitrary commands on the server.
 **Learning:** "Debug" or "Testing" features that allow arbitrary command execution are extremely dangerous and should not be present in production code paths, even if they are intended for internal use.
 **Prevention:** Strictly validate or ignore command overrides in backend logic. Ensure that data structures coming from the API (like `params`) do not directly control execution paths without strict allowlisting.
+
+## 2026-01-22 - Unchecked File Creation in Issue Ingestion
+**Vulnerability:** The `ingest_issue` endpoint used user-provided `repo` input to construct a `run_id` and created directories before validating the `run_id` against the allowlist. This allowed creation of garbage directories or potential traversal attempts (though mitigated by filename structure) before the validation logic in `create_run` was triggered.
+**Learning:** Input validation must occur *before* any side effects (like file creation), not just before the "main" operation.
+**Prevention:** Validate all constructed paths/IDs immediately after generation and before any filesystem operations.
