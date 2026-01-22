@@ -8,7 +8,8 @@
         <p class="fs-text-sm fs-text-muted">Generate a demo run with:</p>
         <div style="display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 12px; background: #f3f4f6; border-radius: 4px;">
           <code class="mono" style="font-size: 12px;">make stepwise-sdlc-stub</code>
-          <button class="copy-btn" onclick="navigator.clipboard.writeText('make stepwise-sdlc-stub').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard">Copy</button>
+          <!-- Copy button injected by runs_flows.ts into this container -->
+          <div id="demo-command-copy-container"></div>
         </div>
       </div>
     </div>

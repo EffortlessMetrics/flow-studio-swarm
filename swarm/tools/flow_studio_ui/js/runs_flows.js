@@ -14,6 +14,7 @@ import { Api } from "./api.js";
 import { renderGraphCore } from "./graph.js";
 import { renderFlowOutline } from "./graph_outline.js";
 import { getTeachingMode } from "./teaching_mode.js";
+import { createCopyButton } from "./utils.js";
 import { renderNoRuns, renderNoFlows, renderRunsLoadError, } from "./ui_fragments.js";
 // Cached wisdom summary for current run
 let _cachedWisdomSummary = null;
@@ -30,6 +31,14 @@ export function updateCanvasEmptyState(hasRuns) {
     if (!emptyState)
         return;
     emptyState.style.display = hasRuns ? "none" : "flex";
+    // Inject copy button if container exists and is empty
+    const copyContainer = document.getElementById("demo-command-copy-container");
+    if (copyContainer && copyContainer.childNodes.length === 0) {
+        const btn = createCopyButton("make stepwise-sdlc-stub", "Copy");
+        // Ensure button is keyboard accessible
+        btn.setAttribute("aria-label", "Copy demo command to clipboard");
+        copyContainer.appendChild(btn);
+    }
 }
 // ============================================================================
 // Module configuration - callbacks set by consumer
