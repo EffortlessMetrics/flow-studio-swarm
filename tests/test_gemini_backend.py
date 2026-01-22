@@ -80,8 +80,8 @@ class TestGeminiCliBackendStubMode:
         cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
         assert "gate" in cmd_str
 
-    def test_custom_command_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Backend uses custom command when provided in spec params."""
+    def test_custom_command_override_ignored(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Backend ignores custom command in spec params for security."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "1")
         backend = GeminiCliBackend()
 
@@ -95,8 +95,11 @@ class TestGeminiCliBackendStubMode:
 
         cmd = backend._build_command("signal", "test-run-004", spec)
 
-        # _build_command returns List[str] via shlex.split for safe shell=False execution
-        assert cmd == ["echo", "custom command"]
+        # Should NOT use custom command, but fallback to stub or real command
+        # Since STUB=1, it should use the stub command
+        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
+        assert "echo -e" in cmd_str
+        assert "custom command" not in cmd_str
 
 
 class TestGeminiCliBackendCapabilities:
