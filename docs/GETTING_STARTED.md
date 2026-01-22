@@ -23,7 +23,7 @@ Welcome! You're 10 minutes away from understanding how Flow Studio works. This g
 
 **Choose your lane:**
 
-- **Lane A: SDLC Demo** — See the nine flows in action with Flow Studio
+- **Lane A: SDLC Demo** — See the seven core flows in action with Flow Studio
 - **Lane B: Governance Demo** — Understand how the selftest validates the swarm
 
 Both paths take about 10 minutes. You can do both.
@@ -98,7 +98,7 @@ For the full philosophy, read [AGOPS_MANIFESTO.md](./AGOPS_MANIFESTO.md). For cu
 
 ## Lane A: SDLC Demo
 
-**What you'll learn:** How the nine flows (Signal → Plan → Build → Review → Gate → Deploy → Wisdom → Reset → Demo) work together to automate the SDLC.
+**What you'll learn:** How the seven core flows (Signal → Plan → Build → Review → Gate → Deploy → Wisdom) work together to automate the SDLC.
 
 **Time:** 10 minutes
 
@@ -117,7 +117,7 @@ If `make dev-check` is green, skip ahead. If it fails, run `make selftest-doctor
 make demo-run
 ```
 
-This copies the example health-check scenario to `swarm/runs/demo-health-check/`, complete with all 9 flow artifacts.
+This copies the example health-check scenario to `swarm/runs/demo-health-check/`, complete with all 7 flow artifacts.
 
 ### Step 3: Launch Flow Studio (1 min)
 
@@ -133,7 +133,7 @@ http://localhost:5000/?run=demo-health-check&mode=operator
 
 You should see:
 
-- **Left sidebar**: 9 flows (Signal, Plan, Build, Review, Gate, Deploy, Wisdom, Reset, Demo)
+- **Left sidebar**: 7 core flows (Signal, Plan, Build, Review, Gate, Deploy, Wisdom)
 - **Center graph**: Steps and stations for the selected flow
 - **SDLC bar at top**: Progress across all flows (all green for demo-health-check)
 - **Right panel**: Details for the selected step/agent
@@ -159,8 +159,9 @@ You should see:
 - **Gate (Flow 5)**: Pre-merge audit — receipts, contracts, security, policy
 - **Deploy (Flow 6)**: Release — merge, verify, report
 - **Wisdom (Flow 7)**: Learning — regressions, learnings, feedback
-- **Reset (Flow 8)**: Maintenance — clean state, infrastructure wipe
-- **Demo (Flow 9)**: Simulation — walkthrough of the Stepwise Orchestrator
+
+**Utility flows** (available but not part of core SDLC):
+- **Reset (Flow 8)**: Maintenance — rebase stale branches, resolve conflicts
 
 ---
 
@@ -326,7 +327,7 @@ If it says a different address, use that instead.
 
 | Path | Purpose |
 |------|---------|
-| `swarm/runs/demo-health-check/` | Demo run artifacts (all 9 flows) |
+| `swarm/runs/demo-health-check/` | Demo run artifacts (all 7 core flows) |
 | `swarm/flows/flow-*.md` | Flow specs (what should happen) |
 | `.claude/agents/*.md` | Agent definitions (who does it) |
 | `docs/FLOW_STUDIO.md` | Flow Studio reference |

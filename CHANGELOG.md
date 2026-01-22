@@ -43,7 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Storage layer hardening**: Comprehensive path traversal prevention
 
 #### Bug Fixes
-- **Boundary review**: Case-insensitive detour detection (`DETOUR` vs `detour`)
+- **Boundary review**: Robust detour detection with normalization for decision handling (handles None, non-strings, whitespace, case variations)
+
+#### Documentation
+- **Definition of Done**: Updated to v3.0.0-rc.1, clarified purpose and acceptance criteria
+- **GETTING_STARTED.md**: Fixed flow count to accurately reflect 7 core flows
 
 ---
 

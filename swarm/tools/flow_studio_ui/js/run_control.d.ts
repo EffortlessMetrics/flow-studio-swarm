@@ -29,6 +29,8 @@ interface RunControlState {
     planId: string | null;
     /** Completed flows in this run (for autopilot tracking) */
     completedFlows: string[];
+    /** Path to stop report (set when run is stopped) */
+    stopReportPath: string | null;
 }
 /**
  * Callbacks for run control events
@@ -42,8 +44,10 @@ export interface RunControlCallbacks {
     onRunComplete?: (runId: string, isAutopilot: boolean) => void;
     /** Called when a run fails (error condition) */
     onRunFailed?: (runId: string, error: string) => void;
+    /** Called when a run is transitioning to stopped (intermediate state) */
+    onRunStopping?: (runId: string) => void;
     /** Called when a run is stopped by user (clean stop, distinct from failure) */
-    onRunStopped?: (runId: string) => void;
+    onRunStopped?: (runId: string, stopReportPath?: string) => void;
     /** Called when run needs to be selected in the UI */
     onSelectRun?: (runId: string) => Promise<void>;
     /** Called for every SSE event received during a run */
@@ -78,6 +82,11 @@ export declare function getCompletedFlows(): readonly string[];
  */
 export declare function getCurrentFlow(): string | null;
 /**
+ * Get the stop report path (if run was stopped).
+ * This path is relative to RUN_BASE and can be used to display stop forensics.
+ */
+export declare function getStopReportPath(): string | null;
+/**
  * Start a new run.
  *
  * @param flowId - Flow ID to run (defaults to current flow)
@@ -105,6 +114,8 @@ export declare function resumeRun(): Promise<void>;
  * Stop the current run.
  *
  * Stopped is a clean user-initiated termination, distinct from a failure.
+ * The run transitions through "stopping" → "stopped" states.
+ * A stop_report.md is written with forensic information.
  * Stopped runs remain selectable and reviewable (no auto-reset).
  */
 export declare function stopRun(): Promise<void>;

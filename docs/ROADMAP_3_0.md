@@ -158,7 +158,7 @@ V3 introduces **Open World Routing**—the ability for flows to dynamically spaw
 
 ## Release Readiness (v3.0.0)
 
-> **Status:** Partial — Backend complete, UI wiring incomplete for Stop semantics
+> **Status:** Near-complete — Stop semantics UI complete, CI reliability pending
 > **Target:** Operator-grade local SDLC harness
 
 ### What "Done" Means for v3.0.0
@@ -189,9 +189,9 @@ A new user should be able to:
 - [x] Make `run_control.ts` emit callbacks (`onRunEvent`, `onFlowCompleted`, `onRunStopped`)
 - [x] Wire `step_end` → `InventoryCounts.load()` (debounced)
 - [x] Confirm SSE is the spine; polling only for stub backends
-- [ ] UI subscribes to `run:stopping` and `run:stopped` SSE events
+- [x] UI subscribes to `run:stopping` and `run:stopped` SSE events
 
-**Implementation:** `run_control.ts` emits callbacks. Backend emits `run:stopping`/`run:stopped` events, but UI's `eventTypes` array in `client.ts` doesn't include them yet.
+**Implementation:** `run_control.ts` emits callbacks. `client.ts` `eventTypes` array includes `"run:stopping"` and `"run:stopped"`. `run_control.ts` handles these in `handleSSEEvent()`.
 
 ### 2. Boundary Review Integration ✓
 
@@ -205,7 +205,7 @@ A new user should be able to:
 
 **Implementation:** `boundary.py` API complete. `_extract_detours()` uses robust normalization: `str(routing.get("decision") or "").strip().upper()`.
 
-### 3. Stop Semantics ⏳ PARTIAL
+### 3. Stop Semantics ✓
 
 **Goal:** "Orderly Shutdown" not "Hard Kill."
 
@@ -216,24 +216,20 @@ A new user should be able to:
 4. Write `RunState` as `STOPPED` (not `FAILED`)
 5. Emit `run_stopped` event
 
-**Backend (Complete):**
+**Backend:**
 - [x] `POST /api/runs/{id}/stop` triggers orderly shutdown
 - [x] Backend emits `RUN_STOPPING` → `RUN_STOPPED` events
 - [x] Backend writes `stop_report.md` with forensics
 
-**UI (Incomplete):**
-- [ ] UI Stop button calls `POST /api/runs/{id}/stop` (currently calls DELETE /cancel)
-- [ ] UI subscribes to `run:stopping` and `run:stopped` SSE events
-- [ ] UI has intermediate "stopping" state (currently jumps to "stopped")
-- [ ] UI surfaces `stop_report.md` path from response
+**UI:**
+- [x] `FlowStudioAPI.stopRun()` calls `POST /api/runs/{id}/stop`
+- [x] `run_control.ts` Stop button uses `stopRun()` (`cancelRun()` deprecated alias)
+- [x] `client.ts` includes `"run:stopping"` and `"run:stopped"` in `eventTypes` array
+- [x] `run_control.ts` handles `run_stopping` and `run_stopped` SSE events
+- [x] UI has intermediate "stopping" state in state machine and `updateUI()`
+- [x] `stop_report_path` stored in state and passed to `onRunStopped` callback
 
-**What Needs to Change:**
-1. Add `FlowStudioAPI.stopRun()` method that calls `POST /api/runs/{id}/stop`
-2. Wire `run_control.ts` Stop button to use `stopRun()` instead of `cancelRun()`
-3. Add `"run:stopping"` and `"run:stopped"` to `eventTypes` array in `client.ts`
-4. Add SSE handlers for these events in `run_control.ts`
-5. Add intermediate "stopping" state to UI state machine
-6. Display `stop_report_path` from response (modal or artifact panel)
+**Implementation:** `client.ts` has `stopRun()` method. `run_control.ts` implements full stop flow with intermediate state, SSE handlers, and callbacks for `onRunStopping`/`onRunStopped`.
 
 ### 4. Type Drift Elimination ✓
 
@@ -509,14 +505,14 @@ Run this checklist to verify alignment:
    - [x] Autopilot shows boundary only at plan end
    - [x] Boundary review fetched from endpoint, not assembled in UI
 
-3. **Stop Semantics** ⏳ PARTIAL
+3. **Stop Semantics** ✓
    - [x] Backend: `POST /api/runs/{id}/stop` exists and works
    - [x] Backend: Emits `run:stopping` → `run:stopped` events
    - [x] Backend: Writes `stop_report.md` with forensics
-   - [ ] UI: Stop button calls POST /stop (currently calls DELETE = cancel)
-   - [ ] UI: Subscribes to `run:stopping` and `run:stopped` SSE events
-   - [ ] UI: Has intermediate "stopping" state distinct from "stopped"
-   - [ ] UI: Surfaces `stop_report.md` path
+   - [x] UI: Stop button calls `stopRun()` which uses POST /stop
+   - [x] UI: Subscribes to `run:stopping` and `run:stopped` SSE events
+   - [x] UI: Has intermediate "stopping" state distinct from "stopped"
+   - [x] UI: Stores `stop_report_path` and passes to `onRunStopped` callback
 
 4. **Resilient DB** ✓
    - [x] Delete DuckDB file

@@ -24,6 +24,7 @@ const _state = {
     flowKeys: [],
     planId: null,
     completedFlows: [],
+    stopReportPath: null,
 };
 let _callbacks = {};
 // ============================================================================
@@ -49,7 +50,7 @@ export function getRunControlState() {
  */
 export function hasActiveRun() {
     return _state.activeRunId !== null &&
-        (_state.runState === "running" || _state.runState === "paused");
+        (_state.runState === "running" || _state.runState === "paused" || _state.runState === "stopping");
 }
 /**
  * Check if the current run is an autopilot run.
@@ -68,6 +69,13 @@ export function getCompletedFlows() {
  */
 export function getCurrentFlow() {
     return _state.currentFlow;
+}
+/**
+ * Get the stop report path (if run was stopped).
+ * This path is relative to RUN_BASE and can be used to display stop forensics.
+ */
+export function getStopReportPath() {
+    return _state.stopReportPath;
 }
 // ============================================================================
 // Run Control Actions
@@ -171,6 +179,8 @@ export async function resumeRun() {
  * Stop the current run.
  *
  * Stopped is a clean user-initiated termination, distinct from a failure.
+ * The run transitions through "stopping" → "stopped" states.
+ * A stop_report.md is written with forensic information.
  * Stopped runs remain selectable and reviewable (no auto-reset).
  */
 export async function stopRun() {
@@ -181,25 +191,34 @@ export async function stopRun() {
     if (_state.runState !== "running" && _state.runState !== "paused") {
         return;
     }
+    const runId = _state.activeRunId;
     _state.isLoading = true;
+    // Set intermediate "stopping" state
+    _state.runState = "stopping";
     updateUI();
+    // Fire the stopping callback
+    if (_callbacks.onRunStopping) {
+        _callbacks.onRunStopping(runId);
+    }
+    // Fire state change for general listeners
+    if (_callbacks.onStateChange) {
+        _callbacks.onStateChange("stopping", runId);
+    }
     try {
-        // Use the existing cancelRun API endpoint (backend still calls it cancel)
-        await flowStudioApi.cancelRun(_state.activeRunId, _state.etag || undefined);
-        const runId = _state.activeRunId;
-        // Unsubscribe from events
-        if (_state.unsubscribe) {
-            _state.unsubscribe();
-            _state.unsubscribe = null;
-        }
-        // Set state to "stopped" - distinct from "failed"
+        // Use the proper stop endpoint (POST /api/runs/{id}/stop)
+        const response = await flowStudioApi.stopRun(runId, "user_requested", 5000, _state.etag || undefined);
+        // Store the stop report path for later access
+        _state.stopReportPath = response.stop_report_path;
+        // Note: We don't immediately set state to "stopped" here.
+        // The backend emits run:stopped SSE event which will trigger the final transition.
+        // However, if SSE is not available or fails, we handle it here as fallback.
         _state.runState = "stopped";
         _state.isLoading = false;
         // No error message - stopped is a clean state, not an error
         _state.error = null;
-        // Fire the stopped callback (not failed)
+        // Fire the stopped callback with stop report path
         if (_callbacks.onRunStopped) {
-            _callbacks.onRunStopped(runId);
+            _callbacks.onRunStopped(runId, response.stop_report_path);
         }
         // Also fire state change for general listeners
         if (_callbacks.onStateChange) {
@@ -210,6 +229,8 @@ export async function stopRun() {
     }
     catch (err) {
         _state.isLoading = false;
+        // Revert to previous state on error
+        _state.runState = "running"; // or paused - we lost track, but running is safer
         _state.error = err.message || "Failed to stop run";
         console.error("Failed to stop run", err);
         updateUI();
@@ -302,6 +323,30 @@ function handleSSEEvent(event) {
                 _callbacks.onRunComplete(activeRunId, _state.isAutopilot);
             }
             break;
+        case "run_stopping":
+            // Run is transitioning to stopped state (intermediate state)
+            _state.runState = "stopping";
+            if (_callbacks.onRunStopping) {
+                _callbacks.onRunStopping(activeRunId);
+            }
+            if (_callbacks.onStateChange) {
+                _callbacks.onStateChange("stopping", activeRunId);
+            }
+            break;
+        case "run_stopped":
+            // Run has been stopped cleanly (final state)
+            _state.runState = "stopped";
+            _state.stopReportPath = event.payload?.stop_report_path || null;
+            _state.error = null; // Stopped is clean, not an error
+            // Keep subscription open for a moment to catch any final events
+            // But mark the run as stopped
+            if (_callbacks.onRunStopped) {
+                _callbacks.onRunStopped(activeRunId, _state.stopReportPath || undefined);
+            }
+            if (_callbacks.onStateChange) {
+                _callbacks.onStateChange("stopped", activeRunId);
+            }
+            break;
         case "error":
             _state.runState = "failed";
             _state.error = event.payload?.error || "Run failed";
@@ -341,6 +386,7 @@ function resetState() {
     _state.flowKeys = [];
     _state.planId = null;
     _state.completedFlows = [];
+    _state.stopReportPath = null;
 }
 /**
  * Set the active run to monitor (for existing runs).
@@ -397,7 +443,7 @@ function updateUI() {
         return;
     }
     // Remove all state classes
-    statusContainer.classList.remove("run-control-status--pending", "run-control-status--running", "run-control-status--paused", "run-control-status--completed", "run-control-status--failed", "run-control-status--stopped");
+    statusContainer.classList.remove("run-control-status--pending", "run-control-status--running", "run-control-status--paused", "run-control-status--stopping", "run-control-status--completed", "run-control-status--failed", "run-control-status--stopped");
     // Handle loading state
     if (_state.isLoading) {
         playBtn.disabled = true;
@@ -448,6 +494,20 @@ function updateUI() {
                 : "Paused";
             statusText.className = "run-control-status-text run-control-status-text--paused";
             statusContainer.classList.add("run-control-status--paused");
+            break;
+        case "stopping":
+            // Run is stopping - intermediate state, all buttons disabled
+            playBtn.disabled = true;
+            playBtn.style.display = "";
+            pauseBtn.disabled = true;
+            pauseBtn.style.display = "";
+            resumeBtn.style.display = "none";
+            cancelBtn.disabled = true;
+            statusText.textContent = _state.currentStep
+                ? `Stopping at: ${_state.currentStep}...`
+                : "Stopping...";
+            statusText.className = "run-control-status-text run-control-status-text--stopping";
+            statusContainer.classList.add("run-control-status--stopping");
             break;
         case "completed":
             // Run completed - can start new
