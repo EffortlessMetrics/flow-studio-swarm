@@ -156,7 +156,20 @@ V3 introduces **Open World Routing**—the ability for flows to dynamically spaw
 
 ---
 
-## Immediate Priorities (v3.0.0)
+## Release Readiness (v3.0.0)
+
+> **Status:** Partial — Backend complete, UI wiring incomplete for Stop semantics
+> **Target:** Operator-grade local SDLC harness
+
+### What "Done" Means for v3.0.0
+
+A new user should be able to:
+- Start a run from the UI, watch it progress via SSE, inspect artifacts
+- Review boundaries (flow + run scope) from the UI using server aggregation
+- Stop a run mid-step without corrupting state, inspect stop forensics
+- Have CI prevent UI/TS drift and spec/contract drift
+
+---
 
 ### 1. Event Contract Alignment ✓
 
@@ -176,8 +189,9 @@ V3 introduces **Open World Routing**—the ability for flows to dynamically spaw
 - [x] Make `run_control.ts` emit callbacks (`onRunEvent`, `onFlowCompleted`, `onRunStopped`)
 - [x] Wire `step_end` → `InventoryCounts.load()` (debounced)
 - [x] Confirm SSE is the spine; polling only for stub backends
+- [ ] UI subscribes to `run:stopping` and `run:stopped` SSE events
 
-**Implementation:** `run_control.ts` emits all callbacks. `flow-studio-app.ts` wires `onRunEvent` to handle `step_end`/`facts_updated` events, calling `updateInventoryCounts()` with 250ms debounce.
+**Implementation:** `run_control.ts` emits callbacks. Backend emits `run:stopping`/`run:stopped` events, but UI's `eventTypes` array in `client.ts` doesn't include them yet.
 
 ### 2. Boundary Review Integration ✓
 
@@ -187,11 +201,11 @@ V3 introduces **Open World Routing**—the ability for flows to dynamically spaw
 - [x] On `flow_completed` in normal mode: fetch `/api/runs/{run}/boundary-review?scope=flow&flow_key=...`
 - [x] On `run_completed` in autopilot: fetch `/boundary-review?scope=run`
 - [x] Fix `_read_all_envelopes()` to include `review` flow
-- [x] Make detour detection case-insensitive (`DETOUR` vs `detour`)
+- [x] Make detour detection robust (handles None, non-strings, whitespace, case)
 
-**Implementation:** `boundary.py` API complete. `_read_all_envelopes()` uses `get_flow_order()` which includes all flows. `_extract_detours()` now uses `decision.upper()` for case-insensitive comparison. UI wired via `showBoundaryReviewPanel()` in `flow-studio-app.ts`.
+**Implementation:** `boundary.py` API complete. `_extract_detours()` uses robust normalization: `str(routing.get("decision") or "").strip().upper()`.
 
-### 3. Stop Semantics ✓
+### 3. Stop Semantics ⏳ PARTIAL
 
 **Goal:** "Orderly Shutdown" not "Hard Kill."
 
@@ -202,12 +216,24 @@ V3 introduces **Open World Routing**—the ability for flows to dynamically spaw
 4. Write `RunState` as `STOPPED` (not `FAILED`)
 5. Emit `run_stopped` event
 
-**Tasks:**
+**Backend (Complete):**
 - [x] `POST /api/runs/{id}/stop` triggers orderly shutdown
-- [x] `run_control.ts` treats Stop as "stopping" state, waits for `run_stopped`
-- [x] Display amber "Stopped" status, keep run selected
+- [x] Backend emits `RUN_STOPPING` → `RUN_STOPPED` events
+- [x] Backend writes `stop_report.md` with forensics
 
-**Implementation:** `runs_control.py` has `/stop` endpoint with `RUN_STOPPING` → `RUN_STOPPED` events and forensic `stop_report.md`. `run_control.ts` handles "stopping"/"stopped" states distinctly from "failed".
+**UI (Incomplete):**
+- [ ] UI Stop button calls `POST /api/runs/{id}/stop` (currently calls DELETE /cancel)
+- [ ] UI subscribes to `run:stopping` and `run:stopped` SSE events
+- [ ] UI has intermediate "stopping" state (currently jumps to "stopped")
+- [ ] UI surfaces `stop_report.md` path from response
+
+**What Needs to Change:**
+1. Add `FlowStudioAPI.stopRun()` method that calls `POST /api/runs/{id}/stop`
+2. Wire `run_control.ts` Stop button to use `stopRun()` instead of `cancelRun()`
+3. Add `"run:stopping"` and `"run:stopped"` to `eventTypes` array in `client.ts`
+4. Add SSE handlers for these events in `run_control.ts`
+5. Add intermediate "stopping" state to UI state machine
+6. Display `stop_report_path` from response (modal or artifact panel)
 
 ### 4. Type Drift Elimination ✓
 
@@ -223,7 +249,7 @@ V3 introduces **Open World Routing**—the ability for flows to dynamically spaw
 - [x] Add CI check for dirty declarations
 - [x] Remove duplicate type definitions
 
-**Implementation:** `package.json` has `ts-build` script. CI workflow `check-ui-drift` job rebuilds TS and verifies `js/` directory matches committed state. No duplicate type definitions exist - single canonical source in `src/domain.ts`.
+**Implementation:** `package.json` has `ts-build` script. CI workflow `check-ui-drift` job rebuilds TS and verifies `js/` directory matches committed state.
 
 ---
 
@@ -483,17 +509,25 @@ Run this checklist to verify alignment:
    - [x] Autopilot shows boundary only at plan end
    - [x] Boundary review fetched from endpoint, not assembled in UI
 
-3. **Stop Semantics** ✓
-   - [x] Hit Stop mid-step
-   - [x] SDK interrupts gracefully
-   - [x] `stop_report.md` exists
-   - [x] Status becomes `STOPPED`, not `FAILED`
+3. **Stop Semantics** ⏳ PARTIAL
+   - [x] Backend: `POST /api/runs/{id}/stop` exists and works
+   - [x] Backend: Emits `run:stopping` → `run:stopped` events
+   - [x] Backend: Writes `stop_report.md` with forensics
+   - [ ] UI: Stop button calls POST /stop (currently calls DELETE = cancel)
+   - [ ] UI: Subscribes to `run:stopping` and `run:stopped` SSE events
+   - [ ] UI: Has intermediate "stopping" state distinct from "stopped"
+   - [ ] UI: Surfaces `stop_report.md` path
 
 4. **Resilient DB** ✓
    - [x] Delete DuckDB file
    - [x] UI still works (degraded)
    - [x] `/api/db/health` shows `needs_rebuild`
    - [x] `/api/db/rebuild` restores projection
+
+5. **CI Reliability** ⏳ PENDING
+   - [ ] Guardrail tests don't fail on unrelated PRs
+   - [ ] Vendor artifact regen is deterministic or gated
+   - [ ] Clean PR doesn't fail for historical reasons
 
 ---
 
