@@ -143,7 +143,7 @@ You should now have:
 
 - A healthy swarm (`make dev-check` green)
 - A demo run under `swarm/runs/demo-health-check/`
-- Flow Studio open with 9 flows in the sidebar
+- Flow Studio open with 7 core flows in the sidebar
 
 Read `DEMO_RUN.md` (2–3 minutes) to understand the health-check scenario.
 
@@ -334,7 +334,7 @@ These are small, reversible, and teach the key patterns.
 
 ## After 75 minutes, you know
 
-- The 9 flows and their shapes (7 SDLC flows + 2 utility/demo flows)
+- The 7 core flows and their shapes (Signal → Wisdom) plus utility flows (Reset)
 - The V3 routing model and utility flows (e.g., Flow 8 Reset)
 - How agents fit into steps and stations (config → pack → invocation)
 - How validation works (FR-001..005, selftest tiers)
@@ -410,3 +410,125 @@ Flow Studio supports URL parameters for direct navigation:
 14. `ARCHITECTURE.md` — v3.0 system architecture (cognitive hierarchy, components)
 15. `docs/AGOPS_MANIFESTO.md` — AgOps operational philosophy (the "why" behind the design)
 16. `docs/ROADMAP_3_0.md` — v3.0 roadmap and immediate priorities
+
+---
+
+## Deep Reference (By Domain)
+
+These subdirectories contain detailed specifications organized by domain. Read the Operator Spine first; use these when you need specifics.
+
+### Architecture Decisions (`docs/adr/`)
+
+Architectural Decision Records capture why key decisions were made:
+
+- `ADR-001-spec-first-architecture.md` — Specs before code principle
+- `ADR-002-graph-native-flows.md` — Flow-as-graph model
+- `ADR-003-station-hierarchy.md` — Station abstraction layers
+- `ADR-004-bounded-smart-routing.md` — Navigator routing constraints
+- `00001-swarm-selftest-scope.md` — Selftest boundary decisions
+
+### Artifacts (`docs/artifacts/`)
+
+Contracts for output formats and naming:
+
+- `NAMING_CONVENTIONS.md` — Artifact path patterns (`RUN_BASE/<flow>/<type>/...`)
+- `RECEIPT_SCHEMA.md` — Receipt JSON structure and evidence binding
+- `HANDOFF_PROTOCOL.md` — Inter-step handoff envelope format
+- `TEACHING_NOTES.md` — Teaching notes contract (inputs/outputs/behavior)
+- `OBSERVABILITY.md` — Logging and tracing requirements
+- `SCENT_TRAIL.md` — Decision trail schema
+- `CAPABILITY_REGISTRY.md` — Capability claims and evidence
+- `DATA_RETENTION.md` — Artifact lifecycle and cleanup
+
+### Execution (`docs/execution/`)
+
+Runtime behavior specifications:
+
+- `ROUTING_PROTOCOL.md` — V3 routing model (CONTINUE, DETOUR, INJECT)
+- `MICROLOOPS.md` — Adversarial iteration patterns (author ↔ critic)
+- `ERROR_TAXONOMY.md` — Error categories (transient, permanent, fatal)
+- `ERROR_HANDLING.md` — Retry logic and circuit breakers
+- `TIMEOUT_POLICY.md` — Hard limits by scope (flow, step, LLM call)
+- `RESUME_PROTOCOL.md` — Checkpoint and resume semantics
+- `CONTEXT_DISCIPLINE.md` — Context budget management
+- `TOKEN_BUDGETS.md` — Token allocation by role
+- `DETOUR_CATALOG.md` — Known problem → fix mappings
+- `SUBSUMPTION.md` — Kernel compensates for backend gaps
+
+### Governance (`docs/governance/`)
+
+Policy and contract enforcement:
+
+- `AGENT_COMPOSITION.md` — When to spawn vs inline
+- `ANTI_PATTERNS.md` — Common mistakes and fixes
+- `FIX_FORWARD.md` — VERIFIED/UNVERIFIED/BLOCKED semantics
+- `PACK_CHECK.md` — Validation philosophy (competence over compliance)
+- `PANEL_THINKING.md` — Multi-metric evaluation (anti-Goodhart)
+- `TEST_ANTI_PATTERNS.md` — Test quality indicators
+- `DEPRECATION.md` — Breaking change lifecycle
+- `MIGRATIONS.md` — Data migration patterns
+- `VERSIONING.md` — Semantic versioning rules
+
+### Reference (`docs/reference/`)
+
+SDK and API contracts:
+
+- `SDK_CAPABILITIES.md` — What the SDK exposes
+- `SDK_LAYER_README.md` — SDK architecture overview
+- `AGENT_SDK_VENDORING.md` — Vendor dependency management
+- `CLAUDE_AGENT_SDK_ADAPTER_CONTRACT.md` — Claude SDK adapter spec
+- `FLOW_STUDIO_ADAPTER_CONTRACT.md` — Flow Studio backend contract
+- `CAPABILITIES.md` — Capability enumeration
+- `EVIDENCE_PANEL.md` — Evidence panel schema
+
+### Safety (`docs/safety/`)
+
+Security and reliability:
+
+- `COMMIT_GUIDELINES.md` — Git commit best practices
+- `DEPENDENCY_MANAGEMENT.md` — Dependency intake checklist
+- `SECRET_MANAGEMENT.md` — Secrets handling and rotation
+- `GIT_SAFETY.md` — Safe git operations
+- `SANDBOX.md` — Isolation and boundary rules
+- `INCIDENT_RESPONSE.md` — Severity tiers and response protocol
+- `ROLLBACK_GUIDE.md` — Rollback methods and constraints
+
+### Designs (`docs/designs/`)
+
+Future feature designs (aspirational):
+
+- `AUTO_REMEDIATION_DESIGN.md` — Automated fix system
+- `DISTRIBUTED_SELFTEST_DESIGN.md` — Parallel test execution
+- `OBSERVABILITY_PLUGINS_DESIGN.md` — Pluggable monitoring
+- `RUNBOOK_AUTOMATION_DESIGN.md` — Automated runbook execution
+- `CROSS_REPO_TEMPLATE_DESIGN.md` — Multi-repo swarm templates
+
+### Explanation (`docs/explanation/`)
+
+Philosophy and patterns (the "why"):
+
+- `META_LEARNINGS.md` — 15 lessons from building this
+- `EMERGENT_PHYSICS.md` — 12 laws that emerged
+- `TRUST_COMPILER.md` — Core thesis: verification > generation
+- `OPERATING_MODEL.md` — Factory metaphor
+- `ATTENTION_ARBITRAGE.md` — Compute-for-attention trade
+- `FORENSICS_OVER_TESTIMONY.md` — Evidence hierarchy
+- `NARROW_TRUST.md` — Scope × evidence principle
+- `TESTS_AS_EVIDENCE.md` — Tests as verification artifacts
+- `REVIEW_AS_PILOTING.md` — Human review patterns
+- `GOVERNANCE_EVOLUTION.md` — How rules emerged
+- `VALIDATOR_AS_LAW.md` — Validator is the constitution
+- `CALIBRATION_METRICS.md` — System health metrics
+- `PHYSICS_PRINCIPLES.md` — Principle index
+
+### Troubleshooting (`docs/troubleshooting/`)
+
+Diagnosis guides:
+
+- `FAILED_RUNS.md` — Debugging failed runs
+
+### Specs (`docs/specs/`)
+
+Feature specifications:
+
+- `TIMELINE_OVERLAYS_SPEC.md` — Timeline visualization spec

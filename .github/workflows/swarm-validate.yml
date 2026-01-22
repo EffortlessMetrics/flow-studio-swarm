@@ -74,10 +74,33 @@ jobs:
         continue-on-error: false
 
       - name: Run integration tests (xfail allowed)
+        id: integration-tests
         if: success()
-        run: make test-integration || true
+        run: |
+          # Run integration tests and capture result
+          # Note: continue-on-error allows workflow to proceed while preserving exit code
+          make test-integration
         continue-on-error: true
 
+      - name: Report integration test status
+        if: always() && steps.integration-tests.outcome != 'skipped'
+        run: |
+          if [[ "${{ steps.integration-tests.outcome }}" == "failure" ]]; then
+            echo "::warning::Integration tests failed. This is expected for some tests marked xfail."
+            echo "Review test output above for unexpected failures."
+          else
+            echo "Integration tests passed."
+          fi
+
       - name: Run full swarm dev check (backup)
+        id: dev-check
         if: success()
-        run: make dev-check || true
+        run: make dev-check
+        continue-on-error: true
+
+      - name: Report dev-check status
+        if: always() && steps.dev-check.outcome != 'skipped'
+        run: |
+          if [[ "${{ steps.dev-check.outcome }}" == "failure" ]]; then
+            echo "::warning::Dev-check failed. Review output above for issues."
+          fi

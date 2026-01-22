@@ -19,6 +19,15 @@ Flow Studio is the visual learning interface for the swarm SDLC. It renders
 flows, steps, and stations as an interactive graph, letting you understand how
 the swarm works without reading every spec file.
 
+**Run Control v1.1 Changelog** (January 2026):
+
+- **Stop Semantics**: New `stop()` function replaces `cancel()` with clean shutdown and forensics
+- **Intermediate State**: Runs transition through `stopping` before `stopped` for proper drain
+- **Stop Reports**: `stop_report.md` written with forensics (last step, routing intent, tool calls)
+- **SSE Events**: New `run:stopping` and `run:stopped` events for real-time state tracking
+- **API Endpoint**: `POST /api/runs/{id}/stop` with `StopResponse` including `stop_report_path`
+- **Deprecation**: `cancelRun()` is now a deprecated alias for `stopRun()`
+
 **UX v1.0 Changelog** (December 2025):
 
 - **Onboarding Panel**: New flow/step/agent explainer with "First Edit" CTA for new users
@@ -621,6 +630,47 @@ Flow Studio exposes a REST API for programmatic access:
 | `GET /api/runs/<id>/summary` | Run summary with flow status |
 | `GET /api/runs/<id>/sdlc` | SDLC bar data |
 
+### Run Control Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/runs` | POST | Start a new run |
+| `/api/runs/<id>` | GET | Get run state with ETag |
+| `/api/runs/<id>/pause` | POST | Pause a running run |
+| `/api/runs/<id>/resume` | POST | Resume a paused run |
+| `/api/runs/<id>/stop` | POST | Stop a run gracefully (preferred) |
+| `/api/runs/<id>` | DELETE | Cancel a run (deprecated, use stop) |
+| `/api/runs/<id>/events` | GET (SSE) | Subscribe to run events |
+
+**Stop Endpoint Details** (`POST /api/runs/<id>/stop`):
+
+Request body:
+```json
+{
+  "reason": "user_requested",
+  "drain_timeout_ms": 5000
+}
+```
+
+Response:
+```json
+{
+  "run_id": "run-abc123",
+  "status": "stopped",
+  "message": "Run stopped successfully",
+  "timestamp": "2025-01-21T10:00:00Z",
+  "stop_report_path": "build/stop_report.md",
+  "stop_info": {
+    "last_step_id": "S3",
+    "last_routing_intent": "CONTINUE",
+    "last_tool_calls": ["Read", "Write"],
+    "open_assumptions": [],
+    "stop_reason": "user_requested",
+    "stopped_at": "2025-01-21T10:00:00Z"
+  }
+}
+```
+
 ---
 
 ## Troubleshooting
@@ -780,6 +830,45 @@ The SDK is available when `data-ui-ready="ready"` on `<html>`. Types are defined
 | `getLayoutScreens()` | `LayoutScreen[]` | Get all screen definitions from layout spec |
 | `getLayoutScreenById(id)` | `LayoutScreen \| undefined` | Get a specific screen by ID |
 | `getAllKnownUIIDs()` | `string[]` | Get all UIIDs defined in layout spec |
+
+### Run Control SDK
+
+The run control module provides programmatic control over flow execution. Import from `run_control.ts`:
+
+| Method | Returns | Purpose |
+|--------|---------|---------|
+| `start(flowId?, options?)` | `Promise<void>` | Start a new run |
+| `pause()` | `Promise<void>` | Pause the current run |
+| `resume()` | `Promise<void>` | Resume a paused run |
+| `stop()` | `Promise<void>` | Stop the current run gracefully |
+| `cancel()` | `Promise<void>` | **Deprecated**: Use `stop()` instead |
+
+**Stop vs Cancel**: The `stop()` function is the preferred method for terminating a run. It creates a clean savepoint with forensics, transitions through `stopping` to `stopped` state, and writes a stop report. The `cancel()` function is a deprecated alias that calls `stop()` internally.
+
+**Run States**:
+
+| State | Meaning | Allowed Actions |
+|-------|---------|-----------------|
+| `pending` | No active run | start |
+| `running` | Run in progress | pause, stop |
+| `paused` | Run paused at step boundary | resume, stop |
+| `stopping` | Run is draining (intermediate) | none |
+| `stopped` | Run stopped by user (clean) | start new |
+| `completed` | Run finished successfully | start new |
+| `failed` | Run encountered error | start new |
+
+**Stop Report**: When a run is stopped, a `stop_report.md` is written to `RUN_BASE/<flow>/` with forensic information including:
+- Last step executed
+- Last routing intent
+- Recent tool calls
+- Open assumptions at stop time
+- Stop reason and timestamp
+
+Access the stop report path via `getStopReportPath()` after a stop completes.
+
+**SSE Events for Stop**:
+- `run:stopping` - Emitted when stop is initiated (intermediate state)
+- `run:stopped` - Emitted when stop completes, includes `stop_report_path` in payload
 
 ### Layout Spec (v0.5.0+)
 

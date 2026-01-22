@@ -137,7 +137,36 @@ jobs:
         run: uv sync --frozen --extra dev
 
       - name: Check vendored SDK artifacts
-        run: make check-vendor-agent-sdk
+        id: sdk-check
+        run: |
+          # Check if this PR touches SDK-related paths
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Get list of changed files in this PR
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} HEAD 2>/dev/null || echo "")
+
+            # Check if any SDK-related paths were changed
+            SDK_PATHS_CHANGED=false
+            for pattern in "docs/vendor/anthropic" "swarm/tools/vendor_agent_sdk" "tests/contract/test_upstream_sdk"; do
+              if echo "$CHANGED_FILES" | grep -q "$pattern"; then
+                SDK_PATHS_CHANGED=true
+                break
+              fi
+            done
+
+            if [[ "$SDK_PATHS_CHANGED" == "true" ]]; then
+              echo "::notice::SDK-related files changed - enforcing strict vendor check"
+              make check-vendor-agent-sdk
+            else
+              # For unrelated PRs, warn but don't fail
+              echo "::notice::No SDK-related files changed - running vendor check as warning only"
+              if ! make check-vendor-agent-sdk; then
+                echo "::warning::Vendor SDK artifacts may be stale. This is not blocking since this PR doesn't touch SDK files. Run 'make vendor-agent-sdk' to update."
+              fi
+            fi
+          else
+            # On push (main branch), always enforce strictly
+            make check-vendor-agent-sdk
+          fi
 
       - name: Run gating tests
         run: |

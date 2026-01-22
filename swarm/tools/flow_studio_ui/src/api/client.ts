@@ -85,7 +85,7 @@ export interface CompiledFlow {
 /**
  * Run control state
  */
-export type RunState = "pending" | "running" | "paused" | "completed" | "failed" | "stopped";
+export type RunState = "pending" | "running" | "paused" | "stopping" | "completed" | "failed" | "stopped";
 
 /**
  * Run information
@@ -187,6 +187,38 @@ export interface InterruptRequest {
 }
 
 /**
+ * Request to stop a run gracefully
+ */
+export interface StopRequest {
+  reason: string;
+  drain_timeout_ms?: number;
+}
+
+/**
+ * Stop report forensic information
+ */
+export interface StopReportInfo {
+  last_step_id: string | null;
+  last_routing_intent: string | null;
+  last_tool_calls: string[];
+  open_assumptions: string[];
+  stop_reason: string;
+  stopped_at: string;
+}
+
+/**
+ * Response from stop endpoint
+ */
+export interface StopResponse {
+  run_id: string;
+  status: string;
+  message: string;
+  timestamp: string;
+  stop_report_path: string;
+  stop_info: StopReportInfo;
+}
+
+/**
  * SSE event types for run playback
  */
 export type SSEEventType =
@@ -197,6 +229,8 @@ export type SSEEventType =
   | "facts_updated"
   | "flow_completed"
   | "plan_completed"
+  | "run_stopping"
+  | "run_stopped"
   | "error"
   | "complete";
 
@@ -631,6 +665,42 @@ export class FlowStudioAPI {
   }
 
   /**
+   * Stop a run gracefully with savepoint.
+   * Backend: POST /api/runs/{run_id}/stop
+   *
+   * Unlike cancel (DELETE), stop creates a clean savepoint that can be resumed.
+   * The run transitions through "stopping" → "stopped" states.
+   * A stop_report.md is written with forensic information.
+   *
+   * @param runId - Run to stop
+   * @param reason - Reason for stopping (default: "user_requested")
+   * @param drainTimeoutMs - Timeout for draining messages (default: 5000)
+   * @param etag - Optional ETag for optimistic locking
+   * @returns StopResponse with stop_report_path and forensic info
+   */
+  async stopRun(
+    runId: string,
+    reason = "user_requested",
+    drainTimeoutMs = 5000,
+    etag?: string
+  ): Promise<StopResponse> {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (etag) headers["If-Match"] = `"${etag}"`;
+
+    return fetchJSON<StopResponse>(
+      `${this.baseUrl}/api/runs/${encodeURIComponent(runId)}/stop`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          reason,
+          drain_timeout_ms: drainTimeoutMs,
+        }),
+      }
+    );
+  }
+
+  /**
    * Get run info (backwards compatible wrapper)
    */
   async getRunInfo(runId: string): Promise<RunInfo> {
@@ -696,6 +766,7 @@ export class FlowStudioAPI {
       "connected", "heartbeat",
       "run:started", "run:paused", "run:resumed", "run:completed",
       "run:failed", "run:canceled", "run:interrupted",
+      "run:stopping", "run:stopped",
       "step:started", "step:progress", "step:completed", "step:failed", "step:skipped",
       "artifact:created", "artifact:updated",
       "flow:completed", "plan:completed",

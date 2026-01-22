@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Flow Studio UX
+- **Copy button on canvas empty state**: One-click copy of example commands
+- **Copy button on artifact details path**: Quick path copying for file navigation
+
+### Changed
+
+#### Performance Optimizations
+- **Run discovery**: Use `os.scandir` for faster directory traversal
+- **Dict copying**: JSON serialization replaces deepcopy for ~3x speedup
+- **Runs list API**: Server-side pagination reduces payload size
+- **Terminal run summaries**: Thread-safe caching prevents redundant computation
+- **Agent search**: O(1) lookups via agent-to-flow index
+- **Prompt loading**: LRU caching reduces repeated file reads
+- **Artifact catalog**: mtime-based caching skips unchanged files
+- **YAML loading**: CSafeLoader for faster parsing
+- **JS import parsing**: Single-pass regex reduces parse time
+
+#### Accessibility (a11y)
+- **Profile badge**: Converted to semantic button with correct ARIA placement
+- **Tab components**: Proper ARIA attributes for screen readers
+- **Keyboard shortcuts modal**: Added close button
+- **Icon buttons**: Standardized with `.fs-icon-button` utility class
+- **Header buttons**: Semantic buttons with preserved accessibility
+- **Legend toggle**: Semantic button for accessibility
+- **NodeInspector**: ARIA labels on icon buttons
+
+### Fixed
+
+#### Security
+- **Command injection prevention**: Sanitize `run_id` in ClaudeHarnessBackend
+- **Path traversal prevention**: Validate paths in SpecManager and RunStateManager
+- **Storage layer hardening**: Comprehensive path traversal prevention
+
+#### Bug Fixes
+- **Boundary review**: Robust detour detection with normalization for decision handling (handles None, non-strings, whitespace, case variations)
+
+#### Documentation
+- **Definition of Done**: Updated to v3.0.0-rc.1, clarified purpose and acceptance criteria
+- **GETTING_STARTED.md**: Fixed flow count to accurately reflect 7 core flows
+
+---
+
 ## [3.0.0-rc.1] - 2026-01-18
 
 ### Added

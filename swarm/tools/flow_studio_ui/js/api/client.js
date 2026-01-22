@@ -303,6 +303,33 @@ export class FlowStudioAPI {
         });
     }
     /**
+     * Stop a run gracefully with savepoint.
+     * Backend: POST /api/runs/{run_id}/stop
+     *
+     * Unlike cancel (DELETE), stop creates a clean savepoint that can be resumed.
+     * The run transitions through "stopping" → "stopped" states.
+     * A stop_report.md is written with forensic information.
+     *
+     * @param runId - Run to stop
+     * @param reason - Reason for stopping (default: "user_requested")
+     * @param drainTimeoutMs - Timeout for draining messages (default: 5000)
+     * @param etag - Optional ETag for optimistic locking
+     * @returns StopResponse with stop_report_path and forensic info
+     */
+    async stopRun(runId, reason = "user_requested", drainTimeoutMs = 5000, etag) {
+        const headers = { "Content-Type": "application/json" };
+        if (etag)
+            headers["If-Match"] = `"${etag}"`;
+        return fetchJSON(`${this.baseUrl}/api/runs/${encodeURIComponent(runId)}/stop`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                reason,
+                drain_timeout_ms: drainTimeoutMs,
+            }),
+        });
+    }
+    /**
      * Get run info (backwards compatible wrapper)
      */
     async getRunInfo(runId) {
@@ -357,6 +384,7 @@ export class FlowStudioAPI {
             "connected", "heartbeat",
             "run:started", "run:paused", "run:resumed", "run:completed",
             "run:failed", "run:canceled", "run:interrupted",
+            "run:stopping", "run:stopped",
             "step:started", "step:progress", "step:completed", "step:failed", "step:skipped",
             "artifact:created", "artifact:updated",
             "flow:completed", "plan:completed",
