@@ -38,6 +38,11 @@ from typing import Any, Dict, List, Optional, Union
 
 import yaml
 
+try:
+    from yaml import CSafeLoader as SafeLoader
+except ImportError:
+    from yaml import SafeLoader  # type: ignore[assignment]
+
 from .runner import Category, Severity, Step, Tier
 
 
@@ -144,7 +149,7 @@ def load_steps_from_yaml(path: Union[str, Path]) -> List[Step]:
         raise FileNotFoundError(f"Config file not found: {path}")
 
     with open(path) as f:
-        data = yaml.safe_load(f)
+        data = yaml.load(f, Loader=SafeLoader)
 
     if data is None:
         raise ValueError(f"Empty or invalid YAML file: {path}")
@@ -227,7 +232,7 @@ class SelftestConfig:
         """
         path = Path(path)
         with open(path) as f:
-            data = yaml.safe_load(f)
+            data = yaml.load(f, Loader=SafeLoader)
 
         if data is None:
             raise ValueError(f"Empty or invalid YAML file: {path}")
