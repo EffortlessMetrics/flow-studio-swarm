@@ -226,6 +226,51 @@ class TestStorage:
         assert "legacy-run" in legacy
         assert "normal-run" not in legacy
 
+    def test_scan_runs_classifies_correctly(self, tmp_path):
+        """scan_runs should classify active and legacy runs in single pass."""
+        # Create an active run (has meta.json)
+        now = datetime.now(timezone.utc)
+        active_summary = RunSummary(
+            id="active-run",
+            spec=RunSpec(flow_keys=["signal"], backend="claude-harness", initiator="test"),
+            status=RunStatus.PENDING,
+            sdlc_status=SDLCStatus.UNKNOWN,
+            created_at=now,
+            updated_at=now,
+        )
+        storage.write_summary("active-run", active_summary, runs_dir=tmp_path)
+
+        # Create a legacy run (has signal/ dir but no meta.json)
+        legacy_path = tmp_path / "legacy-run"
+        (legacy_path / "signal").mkdir(parents=True)
+
+        # Create an empty directory (neither active nor legacy)
+        (tmp_path / "empty-dir").mkdir()
+
+        # scan_runs should classify correctly
+        active_runs, legacy_runs = storage.scan_runs(runs_dir=tmp_path)
+
+        assert "active-run" in active_runs
+        assert "legacy-run" in legacy_runs
+        assert "empty-dir" not in active_runs
+        assert "empty-dir" not in legacy_runs
+        # Active should not appear in legacy list and vice versa
+        assert "legacy-run" not in active_runs
+        assert "active-run" not in legacy_runs
+
+    def test_scan_runs_empty_directory(self, tmp_path):
+        """scan_runs should return empty lists for empty directory."""
+        active_runs, legacy_runs = storage.scan_runs(runs_dir=tmp_path)
+        assert active_runs == []
+        assert legacy_runs == []
+
+    def test_scan_runs_nonexistent_directory(self, tmp_path):
+        """scan_runs should return empty lists for nonexistent directory."""
+        nonexistent = tmp_path / "does-not-exist"
+        active_runs, legacy_runs = storage.scan_runs(runs_dir=nonexistent)
+        assert active_runs == []
+        assert legacy_runs == []
+
     def test_run_exists(self, tmp_path):
         """Should check if run exists by meta.json presence."""
         run_id = "exists-test"
