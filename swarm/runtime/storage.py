@@ -903,9 +903,31 @@ def discover_legacy_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     Returns:
         List of run IDs that appear to be legacy runs.
     """
-    # Delegate to scan_runs but return only legacy runs
-    _, legacy_runs = scan_runs(runs_dir)
-    return legacy_runs
+    if not runs_dir.exists():
+        return []
+
+    legacy_runs: List[RunId] = []
+    # Use os.scandir for faster directory iteration
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if not entry.is_dir():
+                    continue
+
+                # Skip if already has meta.json (not legacy)
+                if os.path.exists(os.path.join(entry.path, META_FILE)):
+                    continue
+
+                # Check if any flow subdirectory exists
+                # Use os.path.isdir with early exit for efficiency
+                for flow_key in LEGACY_FLOW_KEYS:
+                    if os.path.isdir(os.path.join(entry.path, flow_key)):
+                        legacy_runs.append(entry.name)
+                        break
+    except OSError:
+        pass
+
+    return sorted(legacy_runs)
 
 
 def discover_example_runs() -> List[RunId]:
