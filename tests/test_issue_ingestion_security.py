@@ -1,9 +1,10 @@
+"""Security tests for issue ingestion endpoint."""
+
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, patch
-from datetime import datetime, timezone
-from pathlib import Path
 
 # Mock necessary modules before importing routes
 # We need to mock swarm.runtime.autopilot and swarm.api.services.run_state
@@ -24,8 +25,8 @@ def mock_autopilot():
 @pytest.fixture
 def client():
     # Import the router
-    from swarm.api.routes.issue_routes import router
     from fastapi import FastAPI
+    from swarm.api.routes.issue_routes import router
 
     app = FastAPI()
     app.include_router(router)

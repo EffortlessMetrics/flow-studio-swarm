@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from swarm.runtime.safe_paths import validate_path_component
+
 from ..services.run_state import get_state_manager
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,6 @@ def _parse_issue_url(url: str) -> tuple[str, str, int]:
 
 def _get_autopilot_controller():
     """Get or create the global autopilot controller."""
-    from swarm.runtime.autopilot import AutopilotController
 
     # Import from autopilot_routes to share the same controller instance
     from .autopilot_routes import _get_autopilot_controller as get_controller
