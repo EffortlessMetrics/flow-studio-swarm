@@ -324,11 +324,6 @@ class ClaudeHarnessBackend(RunBackend):
             "wisdom": "make demo-wisdom",
         }
 
-        # Check if custom command provided in params
-        if "command" in spec.params:
-            # Parse command string into list for safe execution
-            return shlex.split(spec.params["command"]), env
-
         # Use Make target if available
         if flow_key in flow_commands:
             cmd = flow_commands[flow_key]
@@ -780,10 +775,6 @@ Be concise and focused on the task."""
         Returns:
             List of command arguments for safe subprocess execution.
         """
-        # Allow explicit command override for testing
-        if "command" in spec.params:
-            return shlex.split(spec.params["command"])
-
         # Use stub when stub_mode is enabled or CLI not available
         if self.stub_mode or not self.cli_available:
             logger.debug(
