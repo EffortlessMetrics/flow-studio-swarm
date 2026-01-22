@@ -28,17 +28,23 @@ class TestGeminiCliBackendStubMode:
             initiator="test",
         )
 
-        cmd = backend._build_command("signal", "test-run-001", spec)
+        cmd, env = backend._build_command("signal", "test-run-001", spec)
 
-        # _build_command returns List[str] for safe shell=False execution
-        # Stub command uses echo, not real gemini binary
-        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
-        assert "echo -e" in cmd_str
-        # Ensure we're not invoking the real gemini CLI (space-bounded to avoid
-        # matching "gemini-cli" in the JSON stub output)
+        # _build_command returns Tuple[List[str], Dict[str, str]]
+        # Stub command uses sys.executable (python) to print, avoiding shell metacharacters
+        # Check first element is a python executable (works cross-platform)
+        assert "python" in cmd[0].lower()
+        assert cmd[1] == "-c"
+        assert "print" in cmd[2]
+        assert "test-run-001" in env["RUN_ID"]
+
+        # Ensure we're not invoking the real gemini CLI
+        cmd_str = " ".join(cmd)
         assert " gemini " not in cmd_str
 
-    def test_uses_stub_when_cli_not_available(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_uses_stub_when_cli_not_available(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Backend uses stub when gemini CLI is not on PATH."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "0")
         monkeypatch.setenv("SWARM_GEMINI_CLI", "nonexistent-gemini-cli-xyz")
@@ -55,14 +61,16 @@ class TestGeminiCliBackendStubMode:
             initiator="test",
         )
 
-        cmd = backend._build_command("build", "test-run-002", spec)
+        cmd, env = backend._build_command("build", "test-run-002", spec)
 
-        # _build_command returns List[str] for safe shell=False execution
-        # Falls back to stub
-        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
-        assert "echo -e" in cmd_str
+        # Falls back to stub - check first element is a python executable
+        assert "python" in cmd[0].lower()
+        assert cmd[1] == "-c"
+        assert "test-run-002" in env["RUN_ID"]
 
-    def test_stub_command_includes_flow_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_stub_command_includes_flow_key(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Stub command includes the flow key in output."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "1")
         backend = GeminiCliBackend()
@@ -74,11 +82,11 @@ class TestGeminiCliBackendStubMode:
             initiator="test",
         )
 
-        cmd = backend._build_command("gate", "test-run-003", spec)
+        cmd, env = backend._build_command("gate", "test-run-003", spec)
 
-        # _build_command returns List[str] for safe shell=False execution
-        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
+        cmd_str = " ".join(cmd)
         assert "gate" in cmd_str
+        assert "test-run-003" in env["RUN_ID"]
 
     def test_custom_command_ignored_for_security(
         self, monkeypatch: pytest.MonkeyPatch
@@ -100,12 +108,16 @@ class TestGeminiCliBackendStubMode:
             params={"command": "echo 'custom command'"},
         )
 
-        cmd = backend._build_command("signal", "test-run-004", spec)
+        cmd, env = backend._build_command("signal", "test-run-004", spec)
 
         # Command param should be IGNORED - backend uses stub instead
         # This is a security requirement: command overrides are RCE vectors
-        cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
-        assert "echo -e" in cmd_str  # Stub command, not custom command
+        # Stub uses Python, not custom command
+        assert "python" in cmd[0].lower()
+        assert cmd[1] == "-c"
+        assert "test-run-004" in env["RUN_ID"]
+        # The custom command should NOT be in the command
+        cmd_str = " ".join(cmd)
         assert "custom command" not in cmd_str
 
 
@@ -256,10 +268,7 @@ class TestGeminiEventMapping:
         assert run_event.kind == "log"
 
 
-@pytest.mark.skipif(
-    shutil.which("gemini") is None,
-    reason="Gemini CLI not installed"
-)
+@pytest.mark.skipif(shutil.which("gemini") is None, reason="Gemini CLI not installed")
 class TestGeminiCliBackendRealCli:
     """Tests that require the real gemini CLI to be installed.
 
@@ -284,12 +293,13 @@ class TestGeminiCliBackendRealCli:
             initiator="test",
         )
 
-        cmd = backend._build_command("signal", "test-run-123", spec)
+        cmd, env = backend._build_command("signal", "test-run-123", spec)
 
         # Real command uses gemini CLI
         assert "gemini" in cmd
         assert "--output-format" in cmd
         assert "stream-json" in cmd
+        assert "test-run-123" in env["RUN_ID"]
 
     def test_prompt_includes_flow_context(
         self, monkeypatch: pytest.MonkeyPatch
