@@ -1,13 +1,13 @@
 {
   "count": 17,
-  "generated_at": "2026-01-14T10:09:50+00:00",
+  "generated_at": "2026-01-22T03:29:04+00:00",
   "note": "Extracted from REFERENCE.md",
   "reference_sdk_distribution": "claude-agent-sdk",
   "reference_sdk_version": "0.1.19",
   "reference_sha256": "ad8944a4bb7a8f8127cd115694da6d062880b5fab0dd9033ab535cc7190f3537",
   "reference_snapshot_date": "2026-01-13",
   "reference_source": "https://docs.anthropic.com/en/docs/agent-sdk/python",
-  "source": "docs\\vendor\\anthropic\\agent-sdk\\python\\REFERENCE.md",
+  "source": "docs/vendor/anthropic/agent-sdk/python/REFERENCE.md",
   "tool_names": [
     "AskUserQuestion",
     "Bash",

@@ -21,7 +21,9 @@ Usage:
 import argparse
 import getpass
 import json
+import os
 import re
+import shlex
 import socket
 import subprocess
 import sys
@@ -141,6 +143,16 @@ ALLOWLISTED_PATTERNS = [
     "uv run swarm/tools/check_selftest_ac_freshness.py --update",
     "uv run swarm/tools/check_selftest_ac_freshness.py --check",
 ]
+
+def _as_argv(cmd: str) -> list[str]:
+    """Convert a command string to an argv list for subprocess.
+
+    Uses shlex.split with appropriate quoting for the current platform.
+    On Windows, uses posix=False to handle Windows-style quoting.
+    """
+    # posix=False keeps Windows quoting behavior when needed
+    return shlex.split(cmd, posix=(os.name != "nt"))
+
 
 # Blocklisted patterns (NEVER auto-execute)
 # These are blocked even if someone accidentally puts them in an allowlist
@@ -320,7 +332,7 @@ def dry_run(
     # Execute the dry-run command
     try:
         result = subprocess.run(
-            dry_run_command,
+            _as_argv(dry_run_command),
             shell=False,
             capture_output=True,
             text=True,
@@ -546,7 +558,7 @@ def execute(
     start_time = time.time()
     try:
         result = subprocess.run(
-            remediation.command,
+            _as_argv(remediation.command),
             shell=False,
             capture_output=True,
             text=True,

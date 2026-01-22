@@ -161,7 +161,7 @@ You should see:
 - **Wisdom (Flow 7)**: Learning — regressions, learnings, feedback
 
 **Utility flows** (available but not part of core SDLC):
-- **Reset (Flow 8)**: Maintenance — rebase stale branches, resolve conflicts
+- **Reset (Flow 8)**: Maintenance — branch synchronization, cleanup, run archiving
 
 ---
 

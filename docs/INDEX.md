@@ -143,7 +143,7 @@ You should now have:
 
 - A healthy swarm (`make dev-check` green)
 - A demo run under `swarm/runs/demo-health-check/`
-- Flow Studio open with 7 core flows in the sidebar
+- Flow Studio open with 9 flows in the sidebar (7 core SDLC + 2 utility/testing)
 
 Read `DEMO_RUN.md` (2–3 minutes) to understand the health-check scenario.
 

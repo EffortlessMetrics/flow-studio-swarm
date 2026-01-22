@@ -132,7 +132,7 @@ class ShadowFork:
         """Get the current branch name.
 
         Returns:
-            Current branch name, or None if not on a branch.
+            Current branch name, or None if in detached HEAD state.
         """
         success, stdout, _ = self._run_git(
             ["rev-parse", "--abbrev-ref", "HEAD"],
@@ -141,6 +141,48 @@ class ShadowFork:
         if success and stdout and stdout != "HEAD":
             return stdout
         return None
+
+    def _ref_exists(self, ref: str) -> bool:
+        """Check if a git ref exists.
+
+        Args:
+            ref: Git ref to check (branch name, remote/branch, etc.)
+
+        Returns:
+            True if the ref exists, False otherwise.
+        """
+        success, _, _ = self._run_git(
+            ["rev-parse", "--verify", ref],
+            check=False,
+        )
+        return success
+
+    def _resolve_base_ref(self, preferred: str) -> str:
+        """Resolve a usable base ref, with fallbacks.
+
+        Tries the preferred base branch first, then common fallbacks,
+        finally defaulting to HEAD if nothing else works.
+
+        Args:
+            preferred: The preferred base branch name.
+
+        Returns:
+            A valid git ref to use as the base.
+        """
+        candidates = [
+            preferred,
+            f"origin/{preferred}",
+            "main",
+            "origin/main",
+            "master",
+            "origin/master",
+            "HEAD",
+        ]
+        for ref in candidates:
+            if ref == "HEAD" or self._ref_exists(ref):
+                return ref
+        # Should never reach here since HEAD is always valid, but just in case
+        return "HEAD"
 
     def _get_marker_path(self) -> Path:
         """Get the path to the shadow fork marker file."""
@@ -235,12 +277,20 @@ class ShadowFork:
                 # Marker exists but unreadable - continue with cleanup
                 self._cleanup_marker()
 
-        # Save current branch before switching
+        # Save current branch before switching (may be None in detached HEAD)
         current = self._get_current_branch()
-        if current is None:
-            raise RuntimeError("Not on a branch. Cannot create shadow fork.")
-        self.original_branch = current
-        self.base_branch = base_branch
+        # In detached HEAD, use "HEAD" as original_branch for restoration
+        self.original_branch = current or "HEAD"
+
+        # Resolve base branch with fallbacks (handles missing main, detached HEAD, etc.)
+        base_ref = self._resolve_base_ref(base_branch)
+        self.base_branch = base_ref
+        if base_ref != base_branch:
+            logger.info(
+                "Base branch '%s' not found, using '%s' instead",
+                base_branch,
+                base_ref,
+            )
 
         # Check for uncommitted changes that would be lost
         success, stdout, _ = self._run_git(["status", "--porcelain"])
@@ -250,22 +300,12 @@ class ShadowFork:
                 "These will be carried into the shadow branch."
             )
 
-        # Ensure base branch exists
-        success, _, stderr = self._run_git(
-            ["rev-parse", "--verify", base_branch],
-            check=False,
-        )
-        if not success:
-            raise RuntimeError(
-                f"Base branch '{base_branch}' does not exist: {stderr}"
-            )
-
         # Generate shadow branch name
         self.shadow_branch = self._generate_shadow_branch_name()
 
         # Create and switch to shadow branch
         success, _, stderr = self._run_git(
-            ["checkout", "-b", self.shadow_branch, base_branch]
+            ["checkout", "-b", self.shadow_branch, base_ref]
         )
         if not success:
             raise RuntimeError(
