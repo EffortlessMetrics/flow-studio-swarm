@@ -373,12 +373,13 @@ def cmd_write() -> int:
     ver = safe_get_dist_version(dist_name) if dist_name else None
 
     # Build payloads
+    # Use major.minor for Python version to be stable across patch versions
     version_payload = {
         "generated_at": utc_now_iso(),
         "import_module": module_name,
         "distribution": dist_name,
         "version": ver,
-        "python": sys.version.split()[0],
+        "python": f"{sys.version_info.major}.{sys.version_info.minor}",
     }
 
     api_payload = build_api_manifest(mod)
@@ -386,11 +387,12 @@ def cmd_write() -> int:
     # Extract tool names and reference metadata
     tool_names = extract_tool_names_from_reference(REFERENCE_MD)
     reference_meta = extract_reference_metadata(REFERENCE_MD)
+    # Use as_posix() for cross-platform path consistency in manifests
     tools_payload = {
         "generated_at": utc_now_iso(),
         "tool_names": tool_names,
         "count": len(tool_names),
-        "source": str(REFERENCE_MD.relative_to(REPO_ROOT)) if REFERENCE_MD.exists() else None,
+        "source": REFERENCE_MD.relative_to(REPO_ROOT).as_posix() if REFERENCE_MD.exists() else None,
         "reference_sha256": reference_meta.get("reference_sha256"),
         "reference_source": reference_meta.get("reference_source"),
         "reference_snapshot_date": reference_meta.get("reference_snapshot_date"),
@@ -456,22 +458,24 @@ def cmd_check(strict: bool = False) -> int:
         return 2
 
     # Build expected payloads
+    # Use major.minor for Python version to be stable across patch versions
     version_payload = {
         "generated_at": utc_now_iso(),  # Will be ignored in comparison
         "import_module": module_name,
         "distribution": dist_name,
         "version": ver,
-        "python": sys.version.split()[0],
+        "python": f"{sys.version_info.major}.{sys.version_info.minor}",
     }
 
     api_payload = build_api_manifest(mod)
     tool_names = extract_tool_names_from_reference(REFERENCE_MD)
     reference_meta = extract_reference_metadata(REFERENCE_MD)
+    # Use as_posix() for cross-platform path consistency in manifests
     tools_payload = {
         "generated_at": utc_now_iso(),
         "tool_names": tool_names,
         "count": len(tool_names),
-        "source": str(REFERENCE_MD.relative_to(REPO_ROOT)) if REFERENCE_MD.exists() else None,
+        "source": REFERENCE_MD.relative_to(REPO_ROOT).as_posix() if REFERENCE_MD.exists() else None,
         "reference_sha256": reference_meta.get("reference_sha256"),
         "reference_source": reference_meta.get("reference_source"),
         "reference_snapshot_date": reference_meta.get("reference_snapshot_date"),
