@@ -146,7 +146,11 @@ class RunStateManager:
         self._cache[run_id] = state
 
     def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
-        """List recent runs."""
+        """List recent runs.
+
+        Uses os.scandir for efficient directory traversal - DirEntry objects
+        are lighter than Path objects and cache stat results.
+        """
         runs = []
 
         if not self.runs_root.exists():
@@ -154,9 +158,12 @@ class RunStateManager:
 
         # Get directories sorted by modification time
         run_dirs = []
-        for item in self.runs_root.iterdir():
-            if item.is_dir() and (item / "run_state.json").exists():
-                run_dirs.append((item.stat().st_mtime, item))
+        with os.scandir(self.runs_root) as it:
+            for entry in it:
+                if entry.is_dir():
+                    run_state_path = os.path.join(entry.path, "run_state.json")
+                    if os.path.exists(run_state_path):
+                        run_dirs.append((entry.stat().st_mtime, Path(entry.path)))
 
         run_dirs.sort(key=lambda x: x[0], reverse=True)
 
