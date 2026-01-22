@@ -3615,3 +3615,15 @@
         animation: none;
       }
     }
+
+    /* Header dev actions */
+    .header-dev-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dev-check-container {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
