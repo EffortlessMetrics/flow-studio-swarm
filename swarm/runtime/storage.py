@@ -37,7 +37,7 @@ import os
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from swarm.runtime.safe_paths import validate_path_component
 
@@ -851,6 +851,45 @@ def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     return sorted(run_ids)
 
 
+def scan_runs(runs_dir: Path = RUNS_DIR) -> Tuple[List[RunId], List[RunId]]:
+    """Scan runs directory and classify runs as active (with meta.json) or legacy.
+
+    Performs a single pass over the directory for efficiency, identifying both
+    active runs (created by RunService) and legacy runs (older folder structure).
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        Tuple of (active_run_ids, legacy_run_ids), both sorted.
+    """
+    if not runs_dir.exists():
+        return [], []
+
+    active_runs: List[RunId] = []
+    legacy_runs: List[RunId] = []
+
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if not entry.is_dir():
+                    continue
+
+                # Check for meta.json to determine if it's an active run
+                if os.path.exists(os.path.join(entry.path, META_FILE)):
+                    active_runs.append(entry.name)
+                else:
+                    # Check for legacy flow artifacts
+                    for flow_key in LEGACY_FLOW_KEYS:
+                        if os.path.isdir(os.path.join(entry.path, flow_key)):
+                            legacy_runs.append(entry.name)
+                            break
+    except OSError:
+        pass
+
+    return sorted(active_runs), sorted(legacy_runs)
+
+
 def discover_legacy_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     """Find runs that have flow artifacts but no meta.json (legacy runs).
 
@@ -864,31 +903,9 @@ def discover_legacy_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     Returns:
         List of run IDs that appear to be legacy runs.
     """
-    if not runs_dir.exists():
-        return []
-
-    legacy_runs: List[RunId] = []
-    # Use os.scandir for faster directory iteration
-    try:
-        with os.scandir(runs_dir) as it:
-            for entry in it:
-                if not entry.is_dir():
-                    continue
-
-                # Skip if already has meta.json (not legacy)
-                if os.path.exists(os.path.join(entry.path, META_FILE)):
-                    continue
-
-                # Check if any flow subdirectory exists
-                # Use os.path.isdir with early exit for efficiency
-                for flow_key in LEGACY_FLOW_KEYS:
-                    if os.path.isdir(os.path.join(entry.path, flow_key)):
-                        legacy_runs.append(entry.name)
-                        break
-    except OSError:
-        pass
-
-    return sorted(legacy_runs)
+    # Delegate to scan_runs but return only legacy runs
+    _, legacy_runs = scan_runs(runs_dir)
+    return legacy_runs
 
 
 def discover_example_runs() -> List[RunId]:
@@ -955,8 +972,11 @@ def list_all_runs(include_examples: bool = True) -> List[Dict[str, Any]]:
                 }
             )
 
+    # Use scan_runs for efficient single-pass directory scanning
+    active_runs, legacy_runs = scan_runs()
+
     # New-style runs with meta.json
-    for run_id in list_runs():
+    for run_id in active_runs:
         if run_id in seen:
             continue
         seen.add(run_id)
@@ -971,7 +991,7 @@ def list_all_runs(include_examples: bool = True) -> List[Dict[str, Any]]:
         )
 
     # Legacy runs without meta.json
-    for run_id in discover_legacy_runs():
+    for run_id in legacy_runs:
         if run_id in seen:
             continue
         seen.add(run_id)
