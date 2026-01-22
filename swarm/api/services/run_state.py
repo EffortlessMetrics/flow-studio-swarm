@@ -153,20 +153,23 @@ class RunStateManager:
             return runs
 
         # Get directories sorted by modification time
-        run_dirs = []
-        for item in self.runs_root.iterdir():
-            if item.is_dir() and (item / "run_state.json").exists():
-                run_dirs.append((item.stat().st_mtime, item))
+        run_entries = []
+        with os.scandir(self.runs_root) as it:
+            for entry in it:
+                if entry.is_dir():
+                    # Use os.path for faster file existence check and entry.stat() which is cached
+                    if os.path.exists(os.path.join(entry.path, "run_state.json")):
+                        run_entries.append((entry.stat().st_mtime, entry))
 
-        run_dirs.sort(key=lambda x: x[0], reverse=True)
+        run_entries.sort(key=lambda x: x[0], reverse=True)
 
-        for _, run_dir in run_dirs[:limit]:
-            state_path = run_dir / "run_state.json"
+        for _, entry in run_entries[:limit]:
+            state_path = Path(entry.path) / "run_state.json"
             try:
                 state = json.loads(state_path.read_text(encoding="utf-8"))
                 runs.append(
                     {
-                        "run_id": state.get("run_id", run_dir.name),
+                        "run_id": state.get("run_id", entry.name),
                         "flow_key": state.get("flow_id", "").split("-")[-1]
                         if state.get("flow_id")
                         else None,
@@ -175,7 +178,7 @@ class RunStateManager:
                     }
                 )
             except Exception as e:
-                logger.warning("Failed to load run state %s: %s", run_dir, e)
+                logger.warning("Failed to load run state %s: %s", entry.path, e)
 
         return runs
 
