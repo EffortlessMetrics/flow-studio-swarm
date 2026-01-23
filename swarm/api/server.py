@@ -268,9 +268,7 @@ def create_app(
                         async for results in tailer.watch_active_runs(poll_interval_ms=1000):
                             total_ingested = sum(results.values())
                             tailer_state["total_events_ingested"] += total_ingested
-                            tailer_state["last_ingest_at"] = datetime.now(
-                                timezone.utc
-                            ).isoformat()
+                            tailer_state["last_ingest_at"] = datetime.now(timezone.utc).isoformat()
                             logger.debug(
                                 "Tailer ingested %d events from %d runs",
                                 total_ingested,
@@ -472,7 +470,11 @@ def create_app(
     # Template Endpoints
     # -------------------------------------------------------------------------
 
-    @app.get("/api/spec/templates", response_model=TemplateListResponse, operation_id="legacy_list_templates")
+    @app.get(
+        "/api/spec/templates",
+        response_model=TemplateListResponse,
+        operation_id="legacy_list_templates",
+    )
     async def list_templates():
         """List all available step templates."""
         templates = get_spec_manager().list_templates()
@@ -510,14 +512,18 @@ def create_app(
     # Validation / Compilation Endpoints
     # -------------------------------------------------------------------------
 
-    @app.post("/api/spec/validate", response_model=ValidationResponse, operation_id="legacy_validate_spec")
+    @app.post(
+        "/api/spec/validate", response_model=ValidationResponse, operation_id="legacy_validate_spec"
+    )
     async def validate_spec(request: ValidationRequest):
         """Validate a flow spec without saving."""
         data = request.model_dump(exclude_none=True)
         errors = get_spec_manager().validate_flow(data)
         return ValidationResponse(valid=len(errors) == 0, errors=errors)
 
-    @app.post("/api/spec/compile", response_model=CompileResponse, operation_id="legacy_compile_spec")
+    @app.post(
+        "/api/spec/compile", response_model=CompileResponse, operation_id="legacy_compile_spec"
+    )
     async def compile_spec(request: CompileRequest):
         """Preview PromptPlan compilation."""
         try:
@@ -611,7 +617,9 @@ def create_app(
     # RunTailer Endpoints
     # -------------------------------------------------------------------------
 
-    @app.get("/api/tailer/health", response_model=TailerHealthInfo, operation_id="tailer_health_check")
+    @app.get(
+        "/api/tailer/health", response_model=TailerHealthInfo, operation_id="tailer_health_check"
+    )
     async def tailer_health(request: Request):
         """Check RunTailer health.
 
@@ -642,7 +650,11 @@ def create_app(
             error=tailer_state.get("error"),
         )
 
-    @app.post("/api/tailer/ingest/{run_id}", response_model=TailerIngestResponse, operation_id="tailer_trigger_ingest")
+    @app.post(
+        "/api/tailer/ingest/{run_id}",
+        response_model=TailerIngestResponse,
+        operation_id="tailer_trigger_ingest",
+    )
     async def trigger_ingest(run_id: str, request: Request):
         """Manually trigger ingestion for a specific run.
 

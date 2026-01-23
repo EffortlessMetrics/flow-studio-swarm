@@ -37,7 +37,6 @@ Tests that selftest emits the correct Prometheus metrics at key execution points
 import json
 import os
 import sys
-import tempfile
 import time
 from pathlib import Path
 from unittest import mock
@@ -130,7 +129,9 @@ class TestStepMetrics:
             lines = f.readlines()
 
         # Find duration metric
-        duration_metrics = [json.loads(line) for line in lines if "duration" in json.loads(line)["metric_name"]]
+        duration_metrics = [
+            json.loads(line) for line in lines if "duration" in json.loads(line)["metric_name"]
+        ]
         assert len(duration_metrics) == 1
 
         metric = duration_metrics[0]
@@ -160,7 +161,9 @@ class TestStepMetrics:
             lines = f.readlines()
 
         # Find failure metric
-        failure_metrics = [json.loads(line) for line in lines if "failures" in json.loads(line)["metric_name"]]
+        failure_metrics = [
+            json.loads(line) for line in lines if "failures" in json.loads(line)["metric_name"]
+        ]
         assert len(failure_metrics) == 1
 
         metric = failure_metrics[0]
@@ -192,7 +195,11 @@ class TestStepMetrics:
             lines = f.readlines()
 
         # Find kernel failure metric
-        kernel_metrics = [json.loads(line) for line in lines if "kernel_failures" in json.loads(line)["metric_name"]]
+        kernel_metrics = [
+            json.loads(line)
+            for line in lines
+            if "kernel_failures" in json.loads(line)["metric_name"]
+        ]
         assert len(kernel_metrics) == 1
 
         metric = kernel_metrics[0]
@@ -440,7 +447,7 @@ class TestMetricsIntegration:
 
         # Import after chdir so metrics file is written to tmp_path
         from selftest import SelfTestRunner
-        from selftest_config import SelfTestStep, SelfTestTier, SelfTestSeverity, SelfTestCategory
+        from selftest_config import SelfTestCategory, SelfTestSeverity, SelfTestStep, SelfTestTier
 
         # Create a simple test step
         test_step = SelfTestStep(
@@ -485,7 +492,7 @@ class TestPrometheusIntegration:
         """Test that Prometheus metrics are registered correctly."""
         from prometheus_client import REGISTRY
 
-        metrics = SelftestMetrics(backend="prometheus")
+        SelftestMetrics(backend="prometheus")
 
         # Check that metrics are in registry
         metric_names = [metric.name for metric in REGISTRY.collect()]
@@ -501,7 +508,9 @@ class TestPrometheusIntegration:
         with mock.patch.dict(sys.modules, {"prometheus_client": None}):
             # Force reimport to trigger fallback
             import importlib
+
             import selftest_metrics
+
             importlib.reload(selftest_metrics)
 
             metrics = selftest_metrics.SelftestMetrics(backend="prometheus")

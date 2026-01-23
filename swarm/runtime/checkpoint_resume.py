@@ -28,7 +28,7 @@ import logging
 import os
 import signal
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -39,7 +39,6 @@ from swarm.runtime.path_helpers import (
     RECEIPTS_DIR,
     handoff_envelope_path,
     list_receipts,
-    parse_receipt_filename,
     receipt_path,
 )
 
@@ -266,9 +265,7 @@ class CheckpointManager:
                 last_checkpoint=last_checkpoint,
             )
 
-    def check_partial_state(
-        self, flow_key: str, step_id: str
-    ) -> Optional[PartialState]:
+    def check_partial_state(self, flow_key: str, step_id: str) -> Optional[PartialState]:
         """Check for partial artifacts from an incomplete step.
 
         When a step fails mid-execution, some artifacts may have been
@@ -424,9 +421,7 @@ class CheckpointManager:
 
         return True, "Checkpoint is valid"
 
-    def _load_checkpoint_from_receipt(
-        self, r_path: Path, flow_key: str
-    ) -> Optional[Checkpoint]:
+    def _load_checkpoint_from_receipt(self, r_path: Path, flow_key: str) -> Optional[Checkpoint]:
         """Load a Checkpoint from a receipt file.
 
         Args:
@@ -746,9 +741,7 @@ class InterruptHandler:
         os._exit(exit_code)
 
 
-def capture_interrupt_state(
-    run_base: Path, flow_key: str, step_id: str
-) -> InterruptState:
+def capture_interrupt_state(run_base: Path, flow_key: str, step_id: str) -> InterruptState:
     """Capture state during graceful shutdown (SIGINT/SIGTERM).
 
     This creates an InterruptState snapshot of the current execution

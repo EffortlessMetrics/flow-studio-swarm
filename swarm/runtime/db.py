@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 db.py - StatsDB compatibility shim.
 
@@ -9,7 +10,8 @@ import paths for callers (swarm.runtime.db).
 from typing import Optional
 
 from swarm.runtime.statsdb import *  # noqa: F403
-from swarm.runtime.statsdb import __all__ as _statsdb_all, StatsDB
+from swarm.runtime.statsdb import StatsDB
+from swarm.runtime.statsdb import __all__ as _statsdb_all
 
 __all__ = _statsdb_all
 

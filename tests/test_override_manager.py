@@ -13,16 +13,16 @@ Coverage:
 """
 
 import json
+
+# Import the module under test
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
-# Import the module under test
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "swarm" / "tools"))
 from override_manager import Override, OverrideManager
-
 
 # ============================================================================
 # Fixtures
@@ -47,16 +47,13 @@ def manager(override_file):
 def manager_with_overrides(manager):
     """Create a manager with some pre-existing overrides."""
     manager.create_override(
-        step_id="core-checks",
-        reason="Known CI flakiness",
-        approver="alice@example.com",
-        hours=24
+        step_id="core-checks", reason="Known CI flakiness", approver="alice@example.com", hours=24
     )
     manager.create_override(
         step_id="policy-tests",
         reason="Policy engine migration",
         approver="bob@example.com",
-        hours=48
+        hours=48,
     )
     return manager
 
@@ -72,9 +69,7 @@ class TestCreateOverride:
     def test_create_override_basic(self, manager):
         """Create an override with minimal required parameters."""
         override = manager.create_override(
-            step_id="core-checks",
-            reason="CI flakiness during deploy",
-            approver="alice@example.com"
+            step_id="core-checks", reason="CI flakiness during deploy", approver="alice@example.com"
         )
 
         assert override.step_id == "core-checks"
@@ -88,7 +83,7 @@ class TestCreateOverride:
             step_id="policy-tests",
             reason="Policy engine maintenance",
             approver="bob@example.com",
-            hours=72
+            hours=72,
         )
 
         # Parse expiration and verify it's approximately 72 hours from now
@@ -101,9 +96,7 @@ class TestCreateOverride:
     def test_create_override_persists_to_file(self, manager, override_file):
         """Override is persisted to the config file."""
         manager.create_override(
-            step_id="agents-governance",
-            reason="Agent migration",
-            approver="charlie@example.com"
+            step_id="agents-governance", reason="Agent migration", approver="charlie@example.com"
         )
 
         # Verify file exists and contains the override
@@ -117,9 +110,7 @@ class TestCreateOverride:
         """Override has valid ISO format timestamps."""
         before = datetime.now(timezone.utc)
         override = manager.create_override(
-            step_id="bdd",
-            reason="BDD test refactor",
-            approver="dev@example.com"
+            step_id="bdd", reason="BDD test refactor", approver="dev@example.com"
         )
         after = datetime.now(timezone.utc)
 
@@ -137,17 +128,13 @@ class TestCreateOverride:
     def test_create_override_revokes_existing(self, manager):
         """Creating a new override for same step_id revokes the old one."""
         # Create first override
-        first = manager.create_override(
-            step_id="core-checks",
-            reason="First reason",
-            approver="alice@example.com"
+        manager.create_override(
+            step_id="core-checks", reason="First reason", approver="alice@example.com"
         )
 
         # Create second override for same step
-        second = manager.create_override(
-            step_id="core-checks",
-            reason="Updated reason",
-            approver="bob@example.com"
+        manager.create_override(
+            step_id="core-checks", reason="Updated reason", approver="bob@example.com"
         )
 
         # Load all overrides and check statuses
@@ -190,17 +177,13 @@ class TestListOverrides:
         """Revoked overrides are not included in list."""
         # Create and then revoke an override
         manager.create_override(
-            step_id="core-checks",
-            reason="Temporary",
-            approver="alice@example.com"
+            step_id="core-checks", reason="Temporary", approver="alice@example.com"
         )
         manager.revoke_override("core-checks")
 
         # Create a new active one
         manager.create_override(
-            step_id="policy-tests",
-            reason="Active override",
-            approver="bob@example.com"
+            step_id="policy-tests", reason="Active override", approver="bob@example.com"
         )
 
         overrides = manager.list_overrides()
@@ -217,15 +200,13 @@ class TestListOverrides:
             "approver": "old@example.com",
             "created_at": (now - timedelta(hours=48)).isoformat(),
             "expires_at": (now - timedelta(hours=24)).isoformat(),
-            "status": "APPROVED"
+            "status": "APPROVED",
         }
         override_file.write_text(json.dumps({"overrides": [expired_override]}))
 
         # Add a fresh active override
         manager.create_override(
-            step_id="fresh-step",
-            reason="Fresh reason",
-            approver="fresh@example.com"
+            step_id="fresh-step", reason="Fresh reason", approver="fresh@example.com"
         )
 
         overrides = manager.list_overrides()
@@ -244,9 +225,7 @@ class TestRevokeOverride:
     def test_revoke_existing_override(self, manager):
         """Successfully revoke an existing active override."""
         manager.create_override(
-            step_id="core-checks",
-            reason="Temporary skip",
-            approver="alice@example.com"
+            step_id="core-checks", reason="Temporary skip", approver="alice@example.com"
         )
 
         result = manager.revoke_override("core-checks")
@@ -263,9 +242,7 @@ class TestRevokeOverride:
     def test_revoke_already_revoked_override(self, manager):
         """Revoking an already revoked override returns False."""
         manager.create_override(
-            step_id="core-checks",
-            reason="Temporary skip",
-            approver="alice@example.com"
+            step_id="core-checks", reason="Temporary skip", approver="alice@example.com"
         )
         manager.revoke_override("core-checks")
 
@@ -276,9 +253,7 @@ class TestRevokeOverride:
     def test_revoke_persists_to_file(self, manager, override_file):
         """Revocation is persisted to the config file."""
         manager.create_override(
-            step_id="core-checks",
-            reason="Temporary",
-            approver="alice@example.com"
+            step_id="core-checks", reason="Temporary", approver="alice@example.com"
         )
         manager.revoke_override("core-checks")
 
@@ -298,9 +273,7 @@ class TestIsOverrideActive:
     def test_active_override_returns_true(self, manager):
         """Returns True for active override."""
         manager.create_override(
-            step_id="core-checks",
-            reason="CI flakiness",
-            approver="alice@example.com"
+            step_id="core-checks", reason="CI flakiness", approver="alice@example.com"
         )
 
         assert manager.is_override_active("core-checks") is True
@@ -312,9 +285,7 @@ class TestIsOverrideActive:
     def test_revoked_override_returns_false(self, manager):
         """Returns False for revoked override."""
         manager.create_override(
-            step_id="core-checks",
-            reason="Temporary",
-            approver="alice@example.com"
+            step_id="core-checks", reason="Temporary", approver="alice@example.com"
         )
         manager.revoke_override("core-checks")
 
@@ -330,7 +301,7 @@ class TestIsOverrideActive:
             "approver": "old@example.com",
             "created_at": (now - timedelta(hours=48)).isoformat(),
             "expires_at": (now - timedelta(hours=24)).isoformat(),
-            "status": "APPROVED"
+            "status": "APPROVED",
         }
         override_file.write_text(json.dumps({"overrides": [expired_override]}))
 
@@ -354,7 +325,7 @@ class TestExpiredOverrides:
             "approver": "alice@example.com",
             "created_at": (now - timedelta(hours=23, minutes=59)).isoformat(),
             "expires_at": (now + timedelta(minutes=1)).isoformat(),
-            "status": "APPROVED"
+            "status": "APPROVED",
         }
         override_file.write_text(json.dumps({"overrides": [almost_expired]}))
 
@@ -369,7 +340,7 @@ class TestExpiredOverrides:
             "approver": "alice@example.com",
             "created_at": (now - timedelta(hours=24, minutes=1)).isoformat(),
             "expires_at": (now - timedelta(seconds=1)).isoformat(),
-            "status": "APPROVED"
+            "status": "APPROVED",
         }
         override_file.write_text(json.dumps({"overrides": [just_expired]}))
 
@@ -407,7 +378,7 @@ class TestInvalidFormat:
             "approver": "alice@example.com",
             "created_at": "2024-01-01T00:00:00+00:00",
             "expires_at": "not-a-date",
-            "status": "APPROVED"
+            "status": "APPROVED",
         }
         override_file.write_text(json.dumps({"overrides": [invalid_override]}))
 
@@ -441,7 +412,7 @@ class TestMissingFields:
             "reason": "Missing status",
             "approver": "alice@example.com",
             "created_at": "2024-01-01T00:00:00+00:00",
-            "expires_at": "2024-01-02T00:00:00+00:00"
+            "expires_at": "2024-01-02T00:00:00+00:00",
             # Missing: "status"
         }
         override_file.write_text(json.dumps({"overrides": [incomplete_override]}))
@@ -462,9 +433,7 @@ class TestMissingFields:
 
         # Should be able to create override (creates parent dirs)
         override = manager.create_override(
-            step_id="new-step",
-            reason="First override",
-            approver="alice@example.com"
+            step_id="new-step", reason="First override", approver="alice@example.com"
         )
         assert override.step_id == "new-step"
         assert non_existent.exists()
@@ -484,9 +453,7 @@ class TestMultipleOverrides:
 
         for i, step in enumerate(steps):
             manager.create_override(
-                step_id=step,
-                reason=f"Reason for {step}",
-                approver=f"approver-{i}@example.com"
+                step_id=step, reason=f"Reason for {step}", approver=f"approver-{i}@example.com"
             )
 
         overrides = manager.list_overrides()
@@ -524,7 +491,7 @@ class TestOverrideDataclass:
             approver="test@example.com",
             created_at="2024-01-01T00:00:00+00:00",
             expires_at="2024-01-02T00:00:00+00:00",
-            status="APPROVED"
+            status="APPROVED",
         )
 
         assert override.step_id == "test-step"
@@ -540,7 +507,7 @@ class TestOverrideDataclass:
             approver="test@example.com",
             created_at="2024-01-01T00:00:00+00:00",
             expires_at="2024-01-02T00:00:00+00:00",
-            status="APPROVED"
+            status="APPROVED",
         )
         override2 = Override(
             step_id="test-step",
@@ -548,7 +515,7 @@ class TestOverrideDataclass:
             approver="test@example.com",
             created_at="2024-01-01T00:00:00+00:00",
             expires_at="2024-01-02T00:00:00+00:00",
-            status="APPROVED"
+            status="APPROVED",
         )
 
         assert override1 == override2
@@ -570,7 +537,7 @@ class TestDefaultConfigPath:
     def test_creates_parent_directories(self, tmp_path):
         """Manager creates parent directories if they don't exist."""
         config_file = tmp_path / "deeply" / "nested" / "path" / "overrides.json"
-        manager = OverrideManager(config_file=config_file)
+        OverrideManager(config_file=config_file)
 
         # Parent directories should be created
         assert config_file.parent.exists()

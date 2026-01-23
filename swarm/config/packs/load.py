@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import yaml
-
 from swarm.utils.yaml_utils import load_yaml
 
 from .models import EngineConfig, FeaturesConfig, FlowConfig, Pack, RuntimeConfig

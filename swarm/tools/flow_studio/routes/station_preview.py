@@ -26,7 +26,7 @@ async def api_station_compile_preview(
         return JSONResponse({"error": "Request body required"}, status_code=400)
 
     try:
-        from swarm.spec.compiler import SpecCompiler, COMPILER_VERSION
+        from swarm.spec.compiler import COMPILER_VERSION, SpecCompiler
     except ImportError:
         return JSONResponse({"error": "SpecCompiler not available"}, status_code=503)
 

@@ -36,15 +36,10 @@ from .storage import (
     read_run_state,
 )
 from .types import (
-    HandoffEnvelope,
-    InterruptionFrame,
-    ResumePoint,
     RunEvent,
     RunId,
     RunState,
     handoff_envelope_from_dict,
-    interruption_frame_from_dict,
-    resume_point_from_dict,
     injected_node_spec_from_dict,
 )
 
@@ -198,12 +193,14 @@ def _apply_run_started(
 
     # Record flow transition if this is the first flow
     if state.flow_key:
-        state.flow_transition_history.append({
-            "flow_key": state.flow_key,
-            "flow_index": state.current_flow_index,
-            "action": "started",
-            "timestamp": event.ts.isoformat() if event.ts else None,
-        })
+        state.flow_transition_history.append(
+            {
+                "flow_key": state.flow_key,
+                "flow_index": state.current_flow_index,
+                "action": "started",
+                "timestamp": event.ts.isoformat() if event.ts else None,
+            }
+        )
 
     return state
 
@@ -390,12 +387,14 @@ def _apply_flow_started(
     state.current_step_id = None
 
     # Record flow transition
-    state.flow_transition_history.append({
-        "flow_key": state.flow_key,
-        "flow_index": state.current_flow_index,
-        "action": "started",
-        "timestamp": event.ts.isoformat() if event.ts else None,
-    })
+    state.flow_transition_history.append(
+        {
+            "flow_key": state.flow_key,
+            "flow_index": state.current_flow_index,
+            "action": "started",
+            "timestamp": event.ts.isoformat() if event.ts else None,
+        }
+    )
 
     return state
 
@@ -412,13 +411,15 @@ def _apply_flow_completed(
     flow_key = event.flow_key or payload.get("flow_key", state.flow_key)
 
     # Record flow transition
-    state.flow_transition_history.append({
-        "flow_key": flow_key,
-        "flow_index": state.current_flow_index,
-        "action": "completed",
-        "outcome": payload.get("outcome", "succeeded"),
-        "timestamp": event.ts.isoformat() if event.ts else None,
-    })
+    state.flow_transition_history.append(
+        {
+            "flow_key": flow_key,
+            "flow_index": state.current_flow_index,
+            "action": "completed",
+            "outcome": payload.get("outcome", "succeeded"),
+            "timestamp": event.ts.isoformat() if event.ts else None,
+        }
+    )
 
     return state
 
@@ -442,14 +443,16 @@ def _apply_macro_route(
         state.current_flow_index = payload["flow_index"]
 
     # Record in transition history
-    state.flow_transition_history.append({
-        "flow_key": next_flow or state.flow_key,
-        "from_flow": payload.get("from_flow"),
-        "action": action or "advance",
-        "reason": payload.get("reason"),
-        "loop_count": payload.get("loop_count"),
-        "timestamp": event.ts.isoformat() if event.ts else None,
-    })
+    state.flow_transition_history.append(
+        {
+            "flow_key": next_flow or state.flow_key,
+            "from_flow": payload.get("from_flow"),
+            "action": action or "advance",
+            "reason": payload.get("reason"),
+            "loop_count": payload.get("loop_count"),
+            "timestamp": event.ts.isoformat() if event.ts else None,
+        }
+    )
 
     return state
 
@@ -603,17 +606,13 @@ def verify_run_state(
     stored_completed = set(stored_state.completed_nodes)
     rebuilt_completed = set(rebuilt_state.completed_nodes)
     if stored_completed != rebuilt_completed:
-        mismatches.append(
-            f"completed_nodes: {stored_completed} vs {rebuilt_completed}"
-        )
+        mismatches.append(f"completed_nodes: {stored_completed} vs {rebuilt_completed}")
 
     # Compare injected nodes (order-independent)
     stored_injected = set(stored_state.injected_nodes)
     rebuilt_injected = set(rebuilt_state.injected_nodes)
     if stored_injected != rebuilt_injected:
-        mismatches.append(
-            f"injected_nodes: {stored_injected} vs {rebuilt_injected}"
-        )
+        mismatches.append(f"injected_nodes: {stored_injected} vs {rebuilt_injected}")
 
     if mismatches:
         logger.warning(

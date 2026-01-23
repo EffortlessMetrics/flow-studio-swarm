@@ -1,9 +1,9 @@
 """Tests for configuration handling."""
 
 import tempfile
-from pathlib import Path
 
 import pytest
+
 from selftest_core import (
     Category,
     Severity,
@@ -89,22 +89,26 @@ class TestStepFromDict:
     def test_invalid_severity(self):
         """Test error on invalid severity."""
         with pytest.raises(ValueError, match="Invalid severity"):
-            step_from_dict({
-                "id": "test",
-                "tier": "kernel",
-                "command": "true",
-                "severity": "invalid",
-            })
+            step_from_dict(
+                {
+                    "id": "test",
+                    "tier": "kernel",
+                    "command": "true",
+                    "severity": "invalid",
+                }
+            )
 
     def test_invalid_category(self):
         """Test error on invalid category."""
         with pytest.raises(ValueError, match="Invalid category"):
-            step_from_dict({
-                "id": "test",
-                "tier": "kernel",
-                "command": "true",
-                "category": "invalid",
-            })
+            step_from_dict(
+                {
+                    "id": "test",
+                    "tier": "kernel",
+                    "command": "true",
+                    "category": "invalid",
+                }
+            )
 
 
 class TestLoadStepsFromYaml:
@@ -196,7 +200,12 @@ class TestValidateSteps:
     def test_invalid_dependency(self):
         """Test detection of invalid dependencies."""
         data = [
-            {"id": "a", "tier": "kernel", "command": "true", "dependencies": ["nonexistent"]},
+            {
+                "id": "a",
+                "tier": "kernel",
+                "command": "true",
+                "dependencies": ["nonexistent"],
+            },
         ]
         steps = load_steps_from_list(data)
         errors = validate_steps(steps)

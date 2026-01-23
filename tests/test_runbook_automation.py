@@ -16,8 +16,8 @@ if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 import pytest
-import yaml
 
+import yaml
 
 # ============================================================================
 # Configuration Tests
@@ -193,7 +193,13 @@ class TestRunbookConfigLoader:
         """validate_config should detect invalid version."""
         from swarm.tools.runbook_config import validate_config
 
-        config = {"version": "2.0", "triggers": {}, "actions": {}, "notifications": {}, "limits": {}}
+        config = {
+            "version": "2.0",
+            "triggers": {},
+            "actions": {},
+            "notifications": {},
+            "limits": {},
+        }
         errors = validate_config(config)
         assert any("version" in e.lower() for e in errors)
 
@@ -388,7 +394,7 @@ class TestArtifactPaths:
         with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
-        config_artifacts = set(config.get("artifacts", {}).get("include", []))
+        set(config.get("artifacts", {}).get("include", []))
 
         # Load workflow
         workflow_path = Path(".github/workflows/selftest-auto-diagnostics.yml")

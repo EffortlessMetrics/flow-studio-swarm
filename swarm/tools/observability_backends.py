@@ -78,7 +78,9 @@ class ObservabilityBackend(ABC):
         pass
 
     @abstractmethod
-    def emit_run_completed(self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]) -> None:
+    def emit_run_completed(
+        self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]
+    ) -> None:
         """
         Emit event when a selftest run completes.
 
@@ -173,18 +175,25 @@ class PrometheusBackend(ObservabilityBackend):
                     if self.serve_port == 0:
                         # Ephemeral port mode - let OS choose
                         import socket
+
                         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         sock.bind((self.serve_addr, 0))
                         actual_port = sock.getsockname()[1]
                         sock.close()
                         start_http_server(actual_port, self.serve_addr, registry=self.registry)
-                        logger.info(f"Prometheus metrics server started on {self.serve_addr}:{actual_port} (ephemeral)")
+                        logger.info(
+                            f"Prometheus metrics server started on {self.serve_addr}:{actual_port} (ephemeral)"
+                        )
                     else:
                         start_http_server(self.serve_port, self.serve_addr, registry=self.registry)
-                        logger.info(f"Prometheus metrics server started on {self.serve_addr}:{self.serve_port}")
+                        logger.info(
+                            f"Prometheus metrics server started on {self.serve_addr}:{self.serve_port}"
+                        )
                 except OSError as e:
                     if "Address already in use" in str(e):
-                        logger.warning(f"Prometheus port {self.serve_port} already in use; skipping metrics server (likely already running)")
+                        logger.warning(
+                            f"Prometheus port {self.serve_port} already in use; skipping metrics server (likely already running)"
+                        )
                     elif self.strict_mode:
                         raise RuntimeError(f"Failed to start Prometheus HTTP server: {e}") from e
                     else:
@@ -223,7 +232,9 @@ class PrometheusBackend(ObservabilityBackend):
         except Exception as e:
             logger.warning(f"Failed to emit step_failed to Prometheus: {e}")
 
-    def emit_run_completed(self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]) -> None:
+    def emit_run_completed(
+        self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]
+    ) -> None:
         if not self.enabled or not self.prom:
             return
         try:
@@ -233,7 +244,9 @@ class PrometheusBackend(ObservabilityBackend):
 
             # Push to gateway if configured
             if self.pushgateway_url:
-                self.push_to_gateway(self.pushgateway_url, job=self.job_name, registry=self.registry)
+                self.push_to_gateway(
+                    self.pushgateway_url, job=self.job_name, registry=self.registry
+                )
                 logger.info(f"Pushed metrics to Prometheus pushgateway at {self.pushgateway_url}")
 
         except Exception as e:
@@ -327,7 +340,9 @@ class DatadogBackend(ObservabilityBackend):
         except Exception as e:
             logger.warning(f"Failed to emit step_failed to Datadog: {e}")
 
-    def emit_run_completed(self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]) -> None:
+    def emit_run_completed(
+        self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]
+    ) -> None:
         if not self.enabled or not self.dd:
             return
         try:
@@ -443,7 +458,9 @@ class CloudWatchBackend(ObservabilityBackend):
         if not self.enabled or not self.cw:
             return
         try:
-            dimensions = self._get_dimensions({"StepId": step_id, "Tier": tier, "Severity": severity})
+            dimensions = self._get_dimensions(
+                {"StepId": step_id, "Tier": tier, "Severity": severity}
+            )
             self.cloudwatch.put_metric_data(
                 Namespace=self.namespace,
                 MetricData=[
@@ -459,7 +476,9 @@ class CloudWatchBackend(ObservabilityBackend):
         except Exception as e:
             logger.warning(f"Failed to emit step_failed to CloudWatch: {e}")
 
-    def emit_run_completed(self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]) -> None:
+    def emit_run_completed(
+        self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]
+    ) -> None:
         if not self.enabled or not self.cw:
             return
         try:
@@ -532,7 +551,9 @@ class LogBackend(ObservabilityBackend):
             try:
                 self.stream = open(self.output, "a")
             except Exception as e:
-                logger.warning(f"Failed to open log file {self.output}: {e}, falling back to stdout")
+                logger.warning(
+                    f"Failed to open log file {self.output}: {e}, falling back to stdout"
+                )
                 self.stream = sys.stdout
 
     def _get_timestamp(self) -> str:
@@ -567,7 +588,10 @@ class LogBackend(ObservabilityBackend):
     def emit_step_completed(self, step_id: str, duration_ms: int, result: str, tier: str) -> None:
         if not self.enabled:
             return
-        self._log_event("step_completed", {"step_id": step_id, "duration_ms": duration_ms, "result": result, "tier": tier})
+        self._log_event(
+            "step_completed",
+            {"step_id": step_id, "duration_ms": duration_ms, "result": result, "tier": tier},
+        )
 
     def emit_step_failed(self, step_id: str, severity: str, error_message: str, tier: str) -> None:
         if not self.enabled:
@@ -577,7 +601,9 @@ class LogBackend(ObservabilityBackend):
             data["error_message"] = error_message[:500]  # Truncate
         self._log_event("step_failed", data)
 
-    def emit_run_completed(self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]) -> None:
+    def emit_run_completed(
+        self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]
+    ) -> None:
         if not self.enabled:
             return
         self._log_event(
@@ -645,7 +671,9 @@ class BackendManager:
         # Prometheus
         if backends_config.get("prometheus", {}).get("enabled", False):
             try:
-                backend = PrometheusBackend(backends_config["prometheus"], strict_mode=self.strict_mode)
+                backend = PrometheusBackend(
+                    backends_config["prometheus"], strict_mode=self.strict_mode
+                )
                 if backend.enabled:
                     self.backends.append(backend)
                     logger.info("Prometheus backend initialized")
@@ -703,7 +731,9 @@ class BackendManager:
             try:
                 backend.emit_run_started(run_id, tier, timestamp)
             except Exception as e:
-                logger.warning(f"Backend {backend.__class__.__name__} failed to emit run_started: {e}")
+                logger.warning(
+                    f"Backend {backend.__class__.__name__} failed to emit run_started: {e}"
+                )
 
     def emit_step_completed(self, step_id: str, duration_ms: int, result: str, tier: str) -> None:
         """Forward step_completed event to all backends."""
@@ -711,7 +741,9 @@ class BackendManager:
             try:
                 backend.emit_step_completed(step_id, duration_ms, result, tier)
             except Exception as e:
-                logger.warning(f"Backend {backend.__class__.__name__} failed to emit step_completed: {e}")
+                logger.warning(
+                    f"Backend {backend.__class__.__name__} failed to emit step_completed: {e}"
+                )
 
     def emit_step_failed(self, step_id: str, severity: str, error_message: str, tier: str) -> None:
         """Forward step_failed event to all backends."""
@@ -719,15 +751,21 @@ class BackendManager:
             try:
                 backend.emit_step_failed(step_id, severity, error_message, tier)
             except Exception as e:
-                logger.warning(f"Backend {backend.__class__.__name__} failed to emit step_failed: {e}")
+                logger.warning(
+                    f"Backend {backend.__class__.__name__} failed to emit step_failed: {e}"
+                )
 
-    def emit_run_completed(self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]) -> None:
+    def emit_run_completed(
+        self, run_id: str, result: str, duration_ms: int, summary: Dict[str, Any]
+    ) -> None:
         """Forward run_completed event to all backends."""
         for backend in self.backends:
             try:
                 backend.emit_run_completed(run_id, result, duration_ms, summary)
             except Exception as e:
-                logger.warning(f"Backend {backend.__class__.__name__} failed to emit run_completed: {e}")
+                logger.warning(
+                    f"Backend {backend.__class__.__name__} failed to emit run_completed: {e}"
+                )
 
     def close(self) -> None:
         """Close all backends."""

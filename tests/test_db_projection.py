@@ -11,9 +11,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -38,7 +35,9 @@ class TestProjectionOnlyMode:
 
         # Force reimport to pick up env changes
         import importlib
+
         import swarm.runtime.db as db_module
+
         importlib.reload(db_module)
 
     def test_projection_only_blocks_direct_writes(self, tmp_path):
@@ -48,7 +47,9 @@ class TestProjectionOnlyMode:
 
         # Reimport to pick up env changes
         import importlib
+
         import swarm.runtime.db as db_module
+
         importlib.reload(db_module)
 
         db_path = tmp_path / "test.duckdb"
@@ -70,7 +71,9 @@ class TestProjectionOnlyMode:
 
         # Reimport to pick up env changes
         import importlib
+
         import swarm.runtime.db as db_module
+
         importlib.reload(db_module)
 
         db_path = tmp_path / "test.duckdb"
@@ -88,7 +91,9 @@ class TestProjectionOnlyMode:
 
         # Reimport to pick up env changes
         import importlib
+
         import swarm.runtime.db as db_module
+
         importlib.reload(db_module)
 
         db_path = tmp_path / "test.duckdb"
@@ -130,7 +135,9 @@ class TestProjectionOnlyMode:
 
         # Reimport to pick up env changes
         import importlib
+
         import swarm.runtime.db as db_module
+
         importlib.reload(db_module)
 
         db_path = tmp_path / "test.duckdb"
@@ -296,7 +303,6 @@ class TestRebuildIntegrity:
         assert stats1.run_id == stats2.run_id
         assert stats1.status == stats2.status
 
-
     def test_ingest_events_idempotent(self, tmp_path):
         """Ingesting same events twice skips duplicates (by event_id)."""
         from swarm.runtime.db import StatsDB
@@ -346,9 +352,14 @@ class TestIngestionOffset:
 
         # Ingest some events
         events = [
-            {"event_id": "evt-1", "seq": 1, "kind": "run_start",
-             "flow_key": "build", "ts": "2025-01-01T00:00:00Z",
-             "payload": {"flow_keys": ["build"]}},
+            {
+                "event_id": "evt-1",
+                "seq": 1,
+                "kind": "run_start",
+                "flow_key": "build",
+                "ts": "2025-01-01T00:00:00Z",
+                "payload": {"flow_keys": ["build"]},
+            },
         ]
         db.ingest_events(events, run_id)
 
@@ -372,9 +383,14 @@ class TestIngestionOffset:
         run_id = "test-offset-run"
 
         events = [
-            {"event_id": "evt-1", "seq": 1, "kind": "run_start",
-             "flow_key": "build", "ts": "2025-01-01T00:00:00Z",
-             "payload": {"flow_keys": ["build"]}},
+            {
+                "event_id": "evt-1",
+                "seq": 1,
+                "kind": "run_start",
+                "flow_key": "build",
+                "ts": "2025-01-01T00:00:00Z",
+                "payload": {"flow_keys": ["build"]},
+            },
         ]
 
         # First ingestion

@@ -59,64 +59,49 @@ class ModelPolicyPreviewResponse(BaseModel):
     affected_stations_count: int = Field(
         description="Number of stations affected by the proposed changes"
     )
-    diff_summary: str = Field(
-        description="Human-readable summary of changes"
-    )
+    diff_summary: str = Field(description="Human-readable summary of changes")
 
 
 class StationPreviewResponse(BaseModel):
     """Response for station preview endpoint."""
 
-    resolved_model: str = Field(
-        description="Resolved model tier alias (haiku, sonnet, opus)"
-    )
-    resolved_tools: List[str] = Field(
-        description="List of allowed tools for this station"
-    )
+    resolved_model: str = Field(description="Resolved model tier alias (haiku, sonnet, opus)")
+    resolved_tools: List[str] = Field(description="List of allowed tools for this station")
     compiled_system_prompt: str = Field(
         description="First 500 characters of compiled system prompt"
     )
     injected_fragments: List[str] = Field(
         description="List of fragment paths injected into the prompt"
     )
-    output_contracts: List[str] = Field(
-        description="Required output artifacts for this station"
-    )
+    output_contracts: List[str] = Field(description="Required output artifacts for this station")
 
 
 class ReferentialIntegrity(BaseModel):
     """Referential integrity check results."""
 
     missing_stations: List[str] = Field(
-        default_factory=list,
-        description="Station template_ids referenced but not found"
+        default_factory=list, description="Station template_ids referenced but not found"
     )
     missing_nodes: List[str] = Field(
-        default_factory=list,
-        description="Node IDs referenced in edges but not defined"
+        default_factory=list, description="Node IDs referenced in edges but not defined"
     )
     orphan_edges: List[str] = Field(
-        default_factory=list,
-        description="Edge IDs that reference non-existent nodes"
+        default_factory=list, description="Edge IDs that reference non-existent nodes"
     )
 
 
 class FlowValidationResponse(BaseModel):
     """Response for flow validation endpoint."""
 
-    schema_valid: bool = Field(
-        description="Whether the flow passes JSON schema validation"
-    )
+    schema_valid: bool = Field(description="Whether the flow passes JSON schema validation")
     schema_errors: List[str] = Field(
-        default_factory=list,
-        description="List of schema validation errors"
+        default_factory=list, description="List of schema validation errors"
     )
     referential_integrity: ReferentialIntegrity = Field(
         description="Referential integrity check results"
     )
     warnings: List[str] = Field(
-        default_factory=list,
-        description="Non-fatal warnings about the flow configuration"
+        default_factory=list, description="Non-fatal warnings about the flow configuration"
     )
 
 
@@ -311,13 +296,16 @@ async def preview_model_policy(request: ModelPolicyPreviewRequest):
         # Build proposed policy by merging changes
         proposed_policy = {
             "user_preferences": current_policy.get("user_preferences", {"primary_model": "sonnet"}),
-            "tiers": current_policy.get("tiers", {
-                "primary": "inherit_user_primary",
-                "economy": "haiku",
-                "standard": "sonnet",
-                "elite": "opus",
-                "edge": "sonnet",
-            }),
+            "tiers": current_policy.get(
+                "tiers",
+                {
+                    "primary": "inherit_user_primary",
+                    "economy": "haiku",
+                    "standard": "sonnet",
+                    "elite": "opus",
+                    "edge": "sonnet",
+                },
+            ),
             "group_assignments": current_policy.get("group_assignments", {}),
         }
 
@@ -360,8 +348,7 @@ async def preview_model_policy(request: ModelPolicyPreviewRequest):
 
         # Count affected stations (those that would change)
         affected_count = sum(
-            1 for sid in effective_models
-            if effective_models[sid] != current_models.get(sid, "")
+            1 for sid in effective_models if effective_models[sid] != current_models.get(sid, "")
         )
 
         # Build diff summary
@@ -651,7 +638,7 @@ async def validate_flow(flow_id: str):
                 )
 
             # Nodes with no outgoing edges (should be exit nodes or OK)
-            exit_candidates = node_ids - source_nodes
+            node_ids - source_nodes
             # This is often fine, just informational
 
         # Deduplicate missing items

@@ -434,9 +434,9 @@ class ShadowForkWorkspace(Workspace):
 
         # Get diff stat from base (get_diff() returns str, not tuple)
         if self._fork.shadow_branch:
-            diff_stat = self._run_git([
-                "diff", "--stat", f"{self._base_branch}...{self._fork.shadow_branch}"
-            ])
+            diff_stat = self._run_git(
+                ["diff", "--stat", f"{self._base_branch}...{self._fork.shadow_branch}"]
+            )
         else:
             diff_stat = ""
 
@@ -641,12 +641,14 @@ class ShadowForkWorkspace(Workspace):
         """Get upstream divergence info."""
         try:
             # Get ahead/behind counts
-            result = self._run_git([
-                "rev-list",
-                "--left-right",
-                "--count",
-                f"{self._base_branch}...HEAD",
-            ])
+            result = self._run_git(
+                [
+                    "rev-list",
+                    "--left-right",
+                    "--count",
+                    f"{self._base_branch}...HEAD",
+                ]
+            )
             if result:
                 parts = result.split()
                 if len(parts) == 2:

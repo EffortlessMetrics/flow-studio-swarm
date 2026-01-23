@@ -6,9 +6,8 @@ import sys
 
 def test_flow_studio_app_import_has_no_app_singleton(monkeypatch):
     """flow_studio.app should only define create_app, not create it at import."""
-    from fastapi import FastAPI
-
     import swarm.tools.flow_studio.state as state
+    from fastapi import FastAPI
 
     called = {"create_state": False}
 
@@ -29,9 +28,7 @@ def test_flow_studio_app_import_has_no_app_singleton(monkeypatch):
             "flow_studio.app should not instantiate a FastAPI app at import time."
         )
 
-    assert not called["create_state"], (
-        "Importing flow_studio.app should not call create_state()."
-    )
+    assert not called["create_state"], "Importing flow_studio.app should not call create_state()."
 
 
 def test_shim_imports_do_not_pull_heavy_deps(monkeypatch):
@@ -67,10 +64,7 @@ def test_shim_imports_do_not_pull_heavy_deps(monkeypatch):
     heavy_loaded = sorted(
         name
         for name in new_modules
-        if any(
-            name == prefix or name.startswith(prefix + ".")
-            for prefix in heavy_prefixes
-        )
+        if any(name == prefix or name.startswith(prefix + ".") for prefix in heavy_prefixes)
     )
 
     assert not heavy_loaded, f"Shim imports pulled heavy deps: {heavy_loaded}"

@@ -18,8 +18,12 @@ router = APIRouter()
     response_model=schema.ModelPolicyPreviewResponse if schema else None,
 )
 async def api_model_policy_preview(
-    category: str = Query(..., description="Station category (e.g., implementation, critic, shaping)"),
-    model: str = Query("inherit", description="Model value to resolve (inherit, haiku, sonnet, opus)"),
+    category: str = Query(
+        ..., description="Station category (e.g., implementation, critic, shaping)"
+    ),
+    model: str = Query(
+        "inherit", description="Model value to resolve (inherit, haiku, sonnet, opus)"
+    ),
 ):
     try:
         return preview_model_policy(category, model)

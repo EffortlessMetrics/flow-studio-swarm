@@ -54,13 +54,15 @@ from typing import List, Optional
 
 class SelfTestTier(Enum):
     """Selftest tier indicating criticality and failure behavior."""
-    KERNEL = "kernel"          # Must pass; failures block workflow
+
+    KERNEL = "kernel"  # Must pass; failures block workflow
     GOVERNANCE = "governance"  # Should pass; can warn in degraded mode
-    OPTIONAL = "optional"      # Nice-to-have; failures are informational
+    OPTIONAL = "optional"  # Nice-to-have; failures are informational
 
 
 class SelfTestSeverity(Enum):
     """Severity level of a selftest step."""
+
     CRITICAL = "critical"
     WARNING = "warning"
     INFO = "info"
@@ -68,6 +70,7 @@ class SelfTestSeverity(Enum):
 
 class SelfTestCategory(Enum):
     """Category of a selftest step."""
+
     SECURITY = "security"
     PERFORMANCE = "performance"
     CORRECTNESS = "correctness"
@@ -92,6 +95,7 @@ class SelfTestStep:
         ac_ids: List of acceptance criteria IDs that this step covers (e.g., ['AC-SELFTEST-KERNEL-FAST'])
         timeout: Timeout in seconds for step execution (default: 300)
     """
+
     id: str
     name: str
     description: str
@@ -169,7 +173,11 @@ SELFTEST_STEPS = [
         command=[
             "uv run swarm/tools/skills_lint.py",
         ],
-        ac_ids=["AC-SELFTEST-INTROSPECTABLE", "AC-SELFTEST-FAILURE-HINTS", "AC-SELFTEST-DEGRADATION-TRACKED"],
+        ac_ids=[
+            "AC-SELFTEST-INTROSPECTABLE",
+            "AC-SELFTEST-FAILURE-HINTS",
+            "AC-SELFTEST-DEGRADATION-TRACKED",
+        ],
         allow_fail_in_degraded=True,
     ),
     SelfTestStep(
@@ -182,7 +190,11 @@ SELFTEST_STEPS = [
         command=[
             "uv run swarm/tools/validate_swarm.py --check-modified",
         ],
-        ac_ids=["AC-SELFTEST-INTROSPECTABLE", "AC-SELFTEST-FAILURE-HINTS", "AC-SELFTEST-DEGRADATION-TRACKED"],
+        ac_ids=[
+            "AC-SELFTEST-INTROSPECTABLE",
+            "AC-SELFTEST-FAILURE-HINTS",
+            "AC-SELFTEST-DEGRADATION-TRACKED",
+        ],
         allow_fail_in_degraded=True,
     ),
     SelfTestStep(
@@ -195,7 +207,11 @@ SELFTEST_STEPS = [
         command=[
             "uv run swarm/tools/bdd_validator.py",
         ],
-        ac_ids=["AC-SELFTEST-INTROSPECTABLE", "AC-SELFTEST-FAILURE-HINTS", "AC-SELFTEST-DEGRADATION-TRACKED"],
+        ac_ids=[
+            "AC-SELFTEST-INTROSPECTABLE",
+            "AC-SELFTEST-FAILURE-HINTS",
+            "AC-SELFTEST-DEGRADATION-TRACKED",
+        ],
         allow_fail_in_degraded=True,
     ),
     SelfTestStep(
@@ -209,7 +225,11 @@ SELFTEST_STEPS = [
             "echo 'Checking AC coverage status...'",
             "true",  # Placeholder; would read from build artifacts
         ],
-        ac_ids=["AC-SELFTEST-INTROSPECTABLE", "AC-SELFTEST-FAILURE-HINTS", "AC-SELFTEST-DEGRADATION-TRACKED"],
+        ac_ids=[
+            "AC-SELFTEST-INTROSPECTABLE",
+            "AC-SELFTEST-FAILURE-HINTS",
+            "AC-SELFTEST-DEGRADATION-TRACKED",
+        ],
         allow_fail_in_degraded=True,
     ),
     SelfTestStep(
@@ -223,7 +243,11 @@ SELFTEST_STEPS = [
             "echo 'Running policy checks...'",
             "true",  # Placeholder; would run OPA if installed
         ],
-        ac_ids=["AC-SELFTEST-INTROSPECTABLE", "AC-SELFTEST-FAILURE-HINTS", "AC-SELFTEST-DEGRADATION-TRACKED"],
+        ac_ids=[
+            "AC-SELFTEST-INTROSPECTABLE",
+            "AC-SELFTEST-FAILURE-HINTS",
+            "AC-SELFTEST-DEGRADATION-TRACKED",
+        ],
         allow_fail_in_degraded=True,
     ),
     SelfTestStep(
@@ -238,7 +262,11 @@ SELFTEST_STEPS = [
             "uv run swarm/tools/gen_flows.py --check",
             "uv run swarm/tools/gen_adapters.py --platform claude --mode check-all",
         ],
-        ac_ids=["AC-SELFTEST-INTROSPECTABLE", "AC-SELFTEST-FAILURE-HINTS", "AC-SELFTEST-DEGRADATION-TRACKED"],
+        ac_ids=[
+            "AC-SELFTEST-INTROSPECTABLE",
+            "AC-SELFTEST-FAILURE-HINTS",
+            "AC-SELFTEST-DEGRADATION-TRACKED",
+        ],
         allow_fail_in_degraded=True,
         dependencies=["core-checks"],
     ),
@@ -252,7 +280,11 @@ SELFTEST_STEPS = [
         command=[
             "echo 'Flow graph invariants: validated by check-flows step'",
         ],
-        ac_ids=["AC-SELFTEST-INTROSPECTABLE", "AC-SELFTEST-FAILURE-HINTS", "AC-SELFTEST-DEGRADATION-TRACKED"],
+        ac_ids=[
+            "AC-SELFTEST-INTROSPECTABLE",
+            "AC-SELFTEST-FAILURE-HINTS",
+            "AC-SELFTEST-DEGRADATION-TRACKED",
+        ],
         allow_fail_in_degraded=True,
         dependencies=["devex-contract"],
     ),
@@ -266,7 +298,11 @@ SELFTEST_STEPS = [
         command=[
             "uv run python -m swarm.tools.flow_studio_smoke",
         ],
-        ac_ids=["AC-SELFTEST-INTROSPECTABLE", "AC-SELFTEST-FAILURE-HINTS", "AC-SELFTEST-DEGRADATION-TRACKED"],
+        ac_ids=[
+            "AC-SELFTEST-INTROSPECTABLE",
+            "AC-SELFTEST-FAILURE-HINTS",
+            "AC-SELFTEST-DEGRADATION-TRACKED",
+        ],
         allow_fail_in_degraded=True,
         timeout=15,  # Fast in-process path; generous margin over ~5-10s typical
     ),
@@ -377,9 +413,19 @@ EXECUTION_WAVES = [
     # Wave 0: Kernel (must run first, sequential - blocking)
     ["core-checks"],
     # Wave 1: Independent GOVERNANCE steps (parallel after kernel)
-    ["skills-governance", "agents-governance", "bdd", "ac-status",
-     "policy-tests", "flowstudio-smoke", "gemini-stepwise-tests", "claude-stepwise-tests",
-     "runs-gc-dry-check", "provider-env-check", "wisdom-smoke"],
+    [
+        "skills-governance",
+        "agents-governance",
+        "bdd",
+        "ac-status",
+        "policy-tests",
+        "flowstudio-smoke",
+        "gemini-stepwise-tests",
+        "claude-stepwise-tests",
+        "runs-gc-dry-check",
+        "provider-env-check",
+        "wisdom-smoke",
+    ],
     # Wave 2: devex-contract (depends on core-checks, already satisfied)
     ["devex-contract"],
     # Wave 3: graph-invariants (depends on devex-contract)
@@ -412,21 +458,15 @@ def validate_wave_definitions() -> List[str]:
     for wave_idx, wave_steps in enumerate(EXECUTION_WAVES):
         for step_id in wave_steps:
             if step_id not in step_ids:
-                errors.append(
-                    f"Wave {wave_idx} references unknown step '{step_id}'"
-                )
+                errors.append(f"Wave {wave_idx} references unknown step '{step_id}'")
             if step_id in wave_steps_seen:
-                errors.append(
-                    f"Step '{step_id}' appears in multiple waves"
-                )
+                errors.append(f"Step '{step_id}' appears in multiple waves")
             wave_steps_seen.add(step_id)
 
     # Check all registry steps are in some wave
     for step in SELFTEST_STEPS:
         if step.id not in wave_steps_seen:
-            errors.append(
-                f"Step '{step.id}' is not assigned to any wave"
-            )
+            errors.append(f"Step '{step.id}' is not assigned to any wave")
 
     # Check dependency constraints are respected
     for step in SELFTEST_STEPS:
@@ -478,9 +518,7 @@ def validate_step_list() -> List[str]:
         if step.dependencies:
             for dep_id in step.dependencies:
                 if dep_id not in step_ids:
-                    errors.append(
-                        f"Step '{step.id}' has invalid dependency '{dep_id}'"
-                    )
+                    errors.append(f"Step '{step.id}' has invalid dependency '{dep_id}'")
 
     # Check for circular dependencies
     def has_circular_dependency(step_id: str, visited: set) -> bool:

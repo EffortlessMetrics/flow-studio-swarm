@@ -6,7 +6,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from swarm.utils.yaml_utils import load_yaml
 
@@ -388,7 +388,8 @@ class PackRegistry:
         if self._station_library is not None:
             return self._station_library
 
-        from swarm.runtime.station_library import StationLibrary, StationSpec as LibraryStationSpec
+        from swarm.runtime.station_library import StationLibrary
+        from swarm.runtime.station_library import StationSpec as LibraryStationSpec
 
         self.load()
 

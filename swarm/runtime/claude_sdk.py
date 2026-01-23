@@ -51,14 +51,15 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 # SDK availability and module access
-from swarm.runtime._claude_sdk.sdk_import import (
-    SDK_AVAILABLE,
-    _sdk_module,
-    check_sdk_available,
-    get_sdk_module,
-    get_sdk_module_name,
-    get_sdk_distribution,
-    get_sdk_version,
+# Compatibility helpers
+from swarm.runtime._claude_sdk.compat import (
+    _dict_to_normalized_tool_call,
+)
+
+# Hook factory functions
+from swarm.runtime._claude_sdk.hooks import (
+    create_dangerous_command_hook,
+    create_telemetry_hook,
 )
 
 # Options builder functions
@@ -68,10 +69,18 @@ from swarm.runtime._claude_sdk.options import (
     step_plan_to_agent_options,
 )
 
+# Tool policy and restriction helpers
+from swarm.runtime._claude_sdk.policy import (
+    ALL_STANDARD_TOOLS,
+    compute_disallowed_tools,
+    create_tool_policy_hook,
+    is_blocked_command,
+)
+
 # Query helpers
 from swarm.runtime._claude_sdk.query import (
-    query_with_options,
     query_simple,
+    query_with_options,
 )
 
 # Structured output schemas
@@ -79,19 +88,14 @@ from swarm.runtime._claude_sdk.schemas import (
     HANDOFF_ENVELOPE_SCHEMA,
     ROUTING_SIGNAL_SCHEMA,
 )
-
-# Tool policy and restriction helpers
-from swarm.runtime._claude_sdk.policy import (
-    ALL_STANDARD_TOOLS,
-    compute_disallowed_tools,
-    is_blocked_command,
-    create_tool_policy_hook,
-)
-
-# Hook factory functions
-from swarm.runtime._claude_sdk.hooks import (
-    create_dangerous_command_hook,
-    create_telemetry_hook,
+from swarm.runtime._claude_sdk.sdk_import import (
+    SDK_AVAILABLE,
+    _sdk_module,
+    check_sdk_available,
+    get_sdk_distribution,
+    get_sdk_module,
+    get_sdk_module_name,
+    get_sdk_version,
 )
 
 # Session management
@@ -99,18 +103,9 @@ from swarm.runtime._claude_sdk.session import (
     StepSessionClient,
 )
 
-# Telemetry data structures
-from swarm.runtime._claude_sdk.telemetry import (
-    TelemetryData,
-)
-
-# Compatibility helpers
-from swarm.runtime._claude_sdk.compat import (
-    _dict_to_normalized_tool_call,
-)
-
 # SDK surface shims (optional exports)
 from swarm.runtime._claude_sdk.shims import (
+    AssistantMessage,
     BaseHookInput,
     ContentBlock,
     HookCallback,
@@ -119,25 +114,29 @@ from swarm.runtime._claude_sdk.shims import (
     HookInput,
     HookJSONOutput,
     HookMatcher,
+    Message,
     MissingSdkFeatureError,
     PostToolUseHookInput,
     PreCompactHookInput,
     PreToolUseHookInput,
     ResultMessage,
+    StopHookInput,
     StreamEvent,
+    SubagentStopHookInput,
     SystemMessage,
     TextBlock,
     ThinkingBlock,
     ToolResultBlock,
     ToolUseBlock,
     UserMessage,
-    AssistantMessage,
-    Message,
     UserPromptSubmitHookInput,
-    StopHookInput,
-    SubagentStopHookInput,
     create_sdk_mcp_server,
     tool,
+)
+
+# Telemetry data structures
+from swarm.runtime._claude_sdk.telemetry import (
+    TelemetryData,
 )
 
 # =============================================================================
@@ -152,15 +151,16 @@ ClaudeSDKClient = StepSessionClient
 # Backward Compatibility: ClaudeCodeOptions
 # =============================================================================
 
+
 # The SDK now exports ClaudeAgentOptions instead of ClaudeCodeOptions.
 # For backward compatibility, we provide ClaudeCodeOptions as an alias.
 # This is a lazy import pattern - the class is only accessed when needed.
 def _get_claude_code_options_class():
     """Get the ClaudeCodeOptions class from the SDK module.
-    
+
     Returns:
         The ClaudeAgentOptions class (or ClaudeCodeOptions for legacy SDKs).
-    
+
     Raises:
         ImportError: If SDK is not available.
     """
@@ -174,25 +174,27 @@ def _get_claude_code_options_class():
         "Claude SDK does not expose ClaudeAgentOptions or ClaudeCodeOptions."
     )
 
+
 # For backward compatibility, provide ClaudeCodeOptions as a module-level attribute
 # that lazily resolves to the SDK's ClaudeAgentOptions class.
 class _ClaudeCodeOptionsProxy:
     """Proxy class for backward-compatible access to ClaudeCodeOptions."""
-    
+
     def __getattr__(self, name):
         """Delegate all attribute access to the actual SDK class."""
         actual_class = _get_claude_code_options_class()
         return getattr(actual_class, name)
-    
+
     def __call__(self, *args, **kwargs):
         """Delegate instantiation to the actual SDK class."""
         actual_class = _get_claude_code_options_class()
         return actual_class(*args, **kwargs)
-    
+
     @property
     def __class__(self):
         """Return the actual class for isinstance checks."""
         return _get_claude_code_options_class()
+
 
 # Create the proxy instance that will be used as ClaudeCodeOptions
 ClaudeCodeOptions = _ClaudeCodeOptionsProxy()

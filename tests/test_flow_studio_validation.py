@@ -24,7 +24,6 @@ from flow_studio_validation import (
     get_validation_summary,
 )
 
-
 # ============================================================================
 # Test Fixtures - Valid and Invalid Validation Data
 # ============================================================================

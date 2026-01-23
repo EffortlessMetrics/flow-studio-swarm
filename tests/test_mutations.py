@@ -222,8 +222,9 @@ class TestLevenshteinAlgorithm:
         # Should include: abd (distance 1), xab (distance 2)
         # Should NOT include: xyz (distance 3)
         assert "abc" not in suggestions or len(suggestions) > 0
-        assert "xyz" not in suggestions, \
+        assert "xyz" not in suggestions, (
             "Distance-3 candidate 'xyz' should NOT be suggested with max_dist=2"
+        )
 
     def test_case_sensitivity(self):
         """Verify algorithm is case-sensitive (our usage lowercases before calling)."""
@@ -334,7 +335,7 @@ Output to: RUN_BASE/signal/requirements.md
 # Now uses RUN_BASE placeholder
 """)
 
-        result = validate_runbase_paths()
+        validate_runbase_paths()
 
         # The comment on line 3 should be skipped (starts with #)
         # But we need to update the validator to handle HTML comments too
@@ -358,10 +359,7 @@ Use RUN_BASE/signal/file.md instead.
 
         # Should not find errors since the hardcoded path is in a comment
         # (line starting with #)
-        errors_for_this_file = [
-            e for e in result.errors
-            if "flow-test.md" in e.location
-        ]
+        errors_for_this_file = [e for e in result.errors if "flow-test.md" in e.location]
 
         # The line starting with # should be skipped
         assert len(errors_for_this_file) == 0
@@ -508,7 +506,7 @@ Agent prompt.
         # The validator MUST check for this required field.
         # This is a key requirement (FR-002): Required fields: name, description, color, model
         # Any mutation removing the color requirement check should be caught by this test.
-        result = ValidationResult()
+        ValidationResult()
 
         # Simulate what validate_frontmatter should do:
         # If this agent was being validated, it should fail on missing color
@@ -537,12 +535,14 @@ Agent prompt.
         suggestions = suggest_typos("abc", candidates, max_dist=2)
 
         # "xyz" has distance 3, should NOT be in suggestions
-        assert "xyz" not in suggestions, \
+        assert "xyz" not in suggestions, (
             "Distance-3 name 'xyz' should NOT be suggested with max_dist=2"
+        )
 
         # "xaa" has distance 2, should be suggested
-        assert "xaa" in suggestions or len(suggestions) > 0, \
+        assert "xaa" in suggestions or len(suggestions) > 0, (
             "Distance-2 names should be suggested if they exist"
+        )
 
     def test_yaml_unclosed_frontmatter(self):
         """

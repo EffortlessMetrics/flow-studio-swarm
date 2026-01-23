@@ -59,6 +59,7 @@ def parse_yaml_simple(content: str) -> Dict[str, Any]:
     """Parse YAML using PyYAML (standard library not sufficient for complex YAML)."""
     try:
         from swarm.utils.yaml_utils import load_yaml
+
         return load_yaml(content)
     except ImportError:
         # Fallback to a basic parser if yaml not available
@@ -232,9 +233,7 @@ def main():
         description="Generate CAPABILITIES.md from specs/capabilities.yaml"
     )
     parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Check if doc is up-to-date (exit 1 if not)"
+        "--check", action="store_true", help="Check if doc is up-to-date (exit 1 if not)"
     )
     args = parser.parse_args()
 

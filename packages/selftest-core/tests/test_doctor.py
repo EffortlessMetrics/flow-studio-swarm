@@ -1,6 +1,5 @@
 """Tests for the doctor diagnostic tool."""
 
-import pytest
 from selftest_core.doctor import (
     DiagnosticCheck,
     SelfTestDoctor,
@@ -101,11 +100,13 @@ class TestSelfTestDoctor:
     def test_add_check(self):
         """Test adding custom check."""
         doctor = SelfTestDoctor(checks=[])
-        doctor.add_check(DiagnosticCheck(
-            name="custom",
-            category="harness",
-            check_fn=lambda: ("OK", None),
-        ))
+        doctor.add_check(
+            DiagnosticCheck(
+                name="custom",
+                category="harness",
+                check_fn=lambda: ("OK", None),
+            )
+        )
         diagnosis = doctor.diagnose()
 
         assert "custom" in diagnosis["harness"]
@@ -173,6 +174,7 @@ class TestMakeEnvVarCheck:
     def test_existing_var(self):
         """Test check for existing env var."""
         import os
+
         os.environ["TEST_SELFTEST_VAR"] = "value"
         try:
             check = make_env_var_check("TEST_SELFTEST_VAR")
@@ -184,6 +186,7 @@ class TestMakeEnvVarCheck:
     def test_missing_required_var(self):
         """Test check for missing required var."""
         import os
+
         if "NONEXISTENT_VAR_XYZ" in os.environ:
             del os.environ["NONEXISTENT_VAR_XYZ"]
 
@@ -194,6 +197,7 @@ class TestMakeEnvVarCheck:
     def test_missing_optional_var(self):
         """Test check for missing optional var."""
         import os
+
         if "NONEXISTENT_VAR_XYZ" in os.environ:
             del os.environ["NONEXISTENT_VAR_XYZ"]
 

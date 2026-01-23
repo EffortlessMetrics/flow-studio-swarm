@@ -12,7 +12,6 @@ See docs/FLOW_STUDIO.md "Backends & Events Timeline" for documentation.
 
 import sys
 from pathlib import Path
-import pytest
 
 # Add repo root to path for imports
 repo_root = Path(__file__).resolve().parents[1]
@@ -86,9 +85,7 @@ class TestApiRunEventsEndpoint:
 
         # 404 would mean endpoint doesn't exist
         # We expect either 200, 500 (error getting events), or 503 (service unavailable)
-        assert response.status_code != 404, (
-            "Events endpoint should exist (got 404 Not Found)"
-        )
+        assert response.status_code != 404, "Events endpoint should exist (got 404 Not Found)"
 
     def test_api_run_events_response_structure(self):
         """Verify /api/runs/{id}/events returns correct structure."""

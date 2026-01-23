@@ -39,19 +39,18 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
+
+# Cross-platform file locking support
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple
 
-# Cross-platform file locking support
-import sys
-import os
-if sys.platform == 'win32':
+if sys.platform == "win32":
     import msvcrt
-    import ctypes
-    from ctypes import wintypes
 else:
     import fcntl
 
@@ -206,10 +205,10 @@ class ShadowFork:
             True if lock was acquired, False if lock is held by another process.
         """
         try:
-            if sys.platform == 'win32':
+            if sys.platform == "win32":
                 # Windows: Use msvcrt.locking with non-blocking mode
                 # Get the OS file handle
-                os_handle = msvcrt.get_osfhandle(file_handle.fileno())
+                msvcrt.get_osfhandle(file_handle.fileno())
                 # Lock the entire file (0 = start, 0 = length means entire file)
                 # _LK_NBLCK = non-blocking lock
                 msvcrt.locking(file_handle.fileno(), msvcrt.LK_NBLCK, 1)
@@ -229,7 +228,7 @@ class ShadowFork:
             file_handle: Open file handle to unlock.
         """
         try:
-            if sys.platform == 'win32':
+            if sys.platform == "win32":
                 # Windows: Unlock the file
                 msvcrt.locking(file_handle.fileno(), msvcrt.LK_UNLCK, 1)
             else:
@@ -304,13 +303,9 @@ class ShadowFork:
         self.shadow_branch = self._generate_shadow_branch_name()
 
         # Create and switch to shadow branch
-        success, _, stderr = self._run_git(
-            ["checkout", "-b", self.shadow_branch, base_ref]
-        )
+        success, _, stderr = self._run_git(["checkout", "-b", self.shadow_branch, base_ref])
         if not success:
-            raise RuntimeError(
-                f"Failed to create shadow branch '{self.shadow_branch}': {stderr}"
-            )
+            raise RuntimeError(f"Failed to create shadow branch '{self.shadow_branch}': {stderr}")
 
         # Install push guard
         self.block_upstream_push()
@@ -321,8 +316,8 @@ class ShadowFork:
         try:
             # Open the marker file, creating it if it doesn't exist
             # Use 'w+' mode to create and write
-            marker_file = open(marker_path, 'w+')
-            
+            marker_file = open(marker_path, "w+")
+
             # Try to acquire exclusive lock (non-blocking)
             if not self._acquire_marker_lock(marker_file):
                 # Lock is held by another process - shadow fork already active
@@ -330,7 +325,11 @@ class ShadowFork:
                 # Read the existing marker content for the error message
                 try:
                     existing_content = marker_path.read_text().strip()
-                    shadow_branch = existing_content.split('\n')[0].split('=')[1] if '=' in existing_content else "unknown"
+                    shadow_branch = (
+                        existing_content.split("\n")[0].split("=")[1]
+                        if "=" in existing_content
+                        else "unknown"
+                    )
                     raise RuntimeError(
                         f"Shadow fork already active. Existing shadow: {shadow_branch}. "
                         "Call cleanup() before creating a new shadow fork."
@@ -341,21 +340,25 @@ class ShadowFork:
                         "Shadow fork already active (marker file exists but unreadable). "
                         "Call cleanup() before creating a new shadow fork."
                     )
-            
+
             # Lock acquired - check if file was newly created or already had content
             marker_file.seek(0)
             existing_content = marker_file.read().strip()
-            
+
             if existing_content:
                 # File existed before we opened it - shadow fork already active
                 self._release_marker_lock(marker_file)
                 marker_file.close()
-                shadow_branch = existing_content.split('\n')[0].split('=')[1] if '=' in existing_content else "unknown"
+                shadow_branch = (
+                    existing_content.split("\n")[0].split("=")[1]
+                    if "=" in existing_content
+                    else "unknown"
+                )
                 raise RuntimeError(
                     f"Shadow fork already active. Existing shadow: {shadow_branch}. "
                     "Call cleanup() before creating a new shadow fork."
                 )
-            
+
             # File was newly created - write marker content
             marker_content = (
                 f"shadow_branch={self.shadow_branch}\n"
@@ -366,11 +369,11 @@ class ShadowFork:
             marker_file.write(marker_content)
             marker_file.flush()
             os.fsync(marker_file.fileno())
-            
+
             # Release the lock
             self._release_marker_lock(marker_file)
             marker_file.close()
-            
+
         except RuntimeError:
             # Re-raise RuntimeError (already active case)
             raise
@@ -450,9 +453,7 @@ class ShadowFork:
             raise RuntimeError("Failed to get current HEAD")
 
         # Create checkpoint commit
-        success, _, stderr = self._run_git(
-            ["commit", "-m", f"[checkpoint] {message}"]
-        )
+        success, _, stderr = self._run_git(["commit", "-m", f"[checkpoint] {message}"])
         if not success:
             raise RuntimeError(f"Failed to create checkpoint: {stderr}")
 
@@ -510,9 +511,7 @@ class ShadowFork:
             return False
 
         if not self._push_allowed:
-            logger.error(
-                "Push not allowed. Call allow_push() before bridging to main."
-            )
+            logger.error("Push not allowed. Call allow_push() before bridging to main.")
             return False
 
         # Switch to base branch
@@ -523,8 +522,13 @@ class ShadowFork:
 
         # Merge shadow branch
         success, _, stderr = self._run_git(
-            ["merge", "--no-ff", self.shadow_branch, "-m",
-             f"Merge {self.shadow_branch} into {self.base_branch}"]
+            [
+                "merge",
+                "--no-ff",
+                self.shadow_branch,
+                "-m",
+                f"Merge {self.shadow_branch} into {self.base_branch}",
+            ]
         )
         if not success:
             logger.error("Failed to merge shadow branch: %s", stderr)

@@ -1,15 +1,11 @@
 """Tests for the prompt compiler with fragment injection."""
 
 import pytest
-from pathlib import Path
-from unittest.mock import patch
-import tempfile
-import os
-
 from swarm.prompts.compiler import (
+    MAX_FRAGMENT_DEPTH,
+    clear_cache,
     compile_prompt,
     compile_prompt_with_metadata,
-    compile_step_prompt,
     find_fragment_markers,
     get_fragment_dirs,
     get_fragment_usage,
@@ -17,8 +13,6 @@ from swarm.prompts.compiler import (
     load_fragment,
     validate_all_prompts,
     validate_prompt,
-    clear_cache,
-    MAX_FRAGMENT_DEPTH,
 )
 
 
@@ -40,18 +34,12 @@ def temp_repo(tmp_path):
         "This is a test fragment.\n\nWith multiple lines."
     )
 
-    (fragments_dir / "nested_outer.md").write_text(
-        "Outer fragment with {{nested_inner}} inside."
-    )
+    (fragments_dir / "nested_outer.md").write_text("Outer fragment with {{nested_inner}} inside.")
 
-    (fragments_dir / "nested_inner.md").write_text(
-        "Inner fragment content."
-    )
+    (fragments_dir / "nested_inner.md").write_text("Inner fragment content.")
 
     (spec_fragments / "common" / "status_model.md").parent.mkdir(parents=True, exist_ok=True)
-    (spec_fragments / "common" / "status_model.md").write_text(
-        "Status model from spec fragments."
-    )
+    (spec_fragments / "common" / "status_model.md").write_text("Status model from spec fragments.")
 
     # Create test prompt
     (prompts_dir / "test-agent.md").write_text(
@@ -295,10 +283,7 @@ class TestValidatePrompt:
 
     def test_validate_all_prompts(self, temp_repo):
         """Test validating all prompts in a directory."""
-        results = validate_all_prompts(
-            "swarm/prompts/agentic_steps",
-            temp_repo
-        )
+        results = validate_all_prompts("swarm/prompts/agentic_steps", temp_repo)
 
         # Should find the broken agent
         assert any("broken-agent.md" in k for k in results.keys())
@@ -339,7 +324,7 @@ class TestDeepNesting:
             if i == MAX_FRAGMENT_DEPTH + 1:
                 (fragments_dir / f"deep_{i}.md").write_text("End of chain")
             else:
-                (fragments_dir / f"deep_{i}.md").write_text(f"Level {i} {{{{deep_{i+1}}}}}")
+                (fragments_dir / f"deep_{i}.md").write_text(f"Level {i} {{{{deep_{i + 1}}}}}")
 
         prompt_path = temp_repo / "swarm" / "prompts" / "agentic_steps" / "deep-test.md"
         prompt_path.write_text("{{deep_0}}")

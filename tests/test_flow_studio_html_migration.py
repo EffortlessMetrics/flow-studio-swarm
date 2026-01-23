@@ -28,7 +28,6 @@ if str(repo_root) not in sys.path:
 
 import pytest
 
-
 # ============================================================================
 # HTML Module Tests
 # ============================================================================
@@ -83,7 +82,6 @@ def test_html_is_well_formed():
 
 def test_html_module_path_exists():
     """Verify the HTML file exists on disk at expected location."""
-    from pathlib import Path
 
     # The HTML should be at swarm/tools/flow_studio_ui/index.html
     html_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "index.html"
@@ -105,9 +103,9 @@ def test_fastapi_serves_html(flowstudio_client):
     response = flowstudio_client.get("/")
 
     assert response.status_code == 200, "FastAPI should return 200 for root endpoint"
-    assert response.headers["content-type"].startswith(
-        "text/html"
-    ), "FastAPI should serve HTML content-type"
+    assert response.headers["content-type"].startswith("text/html"), (
+        "FastAPI should serve HTML content-type"
+    )
 
     html = response.text
     # HTML may start with generated file comment
@@ -176,9 +174,7 @@ def test_backends_serve_identical_html(flowstudio_client):
     fastapi_html = response.text
 
     # Compare
-    assert (
-        fastapi_html == expected_html
-    ), "FastAPI HTML doesn't match extracted template"
+    assert fastapi_html == expected_html, "FastAPI HTML doesn't match extracted template"
 
 
 @pytest.mark.skip(reason="Flask backend archived - FastAPI only")
@@ -225,20 +221,22 @@ def test_migration_goal_single_source_of_truth():
 def test_migration_goal_no_duplication():
     """Verify FastAPI doesn't duplicate HTML storage."""
     # Check FastAPI imports get_index_html
-    from swarm.tools import flow_studio_fastapi
     import inspect
 
+    from swarm.tools import flow_studio_fastapi
+
     fastapi_source = inspect.getsource(flow_studio_fastapi)
-    assert (
-        "from swarm.tools.flow_studio_ui import get_index_html" in fastapi_source
-    ), "FastAPI should import get_index_html from shared module"
+    assert "from swarm.tools.flow_studio_ui import get_index_html" in fastapi_source, (
+        "FastAPI should import get_index_html from shared module"
+    )
 
 
 @pytest.mark.skip(reason="Flask backend archived - FastAPI only")
 def test_migration_goal_backends_use_same_function():
     """Verify FastAPI uses the extracted get_index_html function."""
-    from swarm.tools import flow_studio_fastapi
     import inspect
+
+    from swarm.tools import flow_studio_fastapi
 
     fastapi_src = inspect.getsource(flow_studio_fastapi)
 
@@ -284,9 +282,7 @@ def test_html_has_no_server_side_templating():
     ]
 
     for marker in template_markers:
-        assert (
-            marker not in html
-        ), f"HTML should not contain server-side template marker: {marker}"
+        assert marker not in html, f"HTML should not contain server-side template marker: {marker}"
 
 
 def test_html_caching_not_broken():
@@ -308,8 +304,9 @@ def test_html_caching_not_broken():
 
 def test_html_loading_is_fast():
     """Verify HTML loading is reasonably fast."""
-    from swarm.tools.flow_studio_ui import get_index_html
     import time
+
+    from swarm.tools.flow_studio_ui import get_index_html
 
     start = time.time()
     html = get_index_html()

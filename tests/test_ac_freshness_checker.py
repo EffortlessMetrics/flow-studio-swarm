@@ -15,7 +15,6 @@ from pathlib import Path
 
 import pytest
 
-
 SCRIPT_PATH = Path("swarm/tools/check_selftest_ac_freshness.py")
 
 
@@ -28,6 +27,7 @@ def test_script_exists():
 def test_script_is_executable():
     """Verify the script has executable permissions."""
     import os
+
     assert os.access(SCRIPT_PATH, os.X_OK), f"Script is not executable: {SCRIPT_PATH}"
 
 
@@ -192,9 +192,9 @@ def test_parse_functions_are_idempotent():
     sys.path.insert(0, str(Path("swarm/tools")))
 
     from check_selftest_ac_freshness import (
+        parse_config_acs,
         parse_gherkin_acs,
         parse_matrix_acs,
-        parse_config_acs,
     )
 
     gherkin_acs = parse_gherkin_acs()

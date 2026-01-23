@@ -19,6 +19,7 @@ def get_modified_files() -> Optional[Set[str]]:
     Returns an empty set when the repo is clean.
     """
     try:
+
         def _ref_exists(ref: str) -> bool:
             """Check if a git ref exists (local or remote)."""
             result = subprocess.run(
@@ -39,7 +40,7 @@ def get_modified_files() -> Optional[Set[str]]:
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
             if result.returncode == 0:
                 # Result is like "refs/remotes/origin/main"
@@ -74,7 +75,7 @@ def get_modified_files() -> Optional[Set[str]]:
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
             if result.returncode == 0:
                 diff_output = result.stdout
@@ -89,11 +90,7 @@ def get_modified_files() -> Optional[Set[str]]:
         # Also include staged changes (already in git diff, but be explicit)
         # and any modified files from git status
         result_status = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-            timeout=5
+            ["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=5
         )
 
         if result_status.returncode == 0:

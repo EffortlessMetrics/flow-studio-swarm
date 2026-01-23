@@ -790,7 +790,6 @@ def validate_evolution_patch(
 def _apply_json_patch(target_path: Path, operations: List[Dict[str, Any]]) -> None:
     """Apply JSON patch operations to a file (YAML or JSON)."""
     import yaml
-
     from swarm.utils.yaml_utils import load_yaml
 
     # Read current content

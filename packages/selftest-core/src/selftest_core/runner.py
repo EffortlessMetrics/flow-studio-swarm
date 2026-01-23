@@ -32,21 +32,21 @@ Example usage:
     print(f"Status: {result['status']}")
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union
 import re
 import shlex
 import subprocess
 import time
-
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
 
 # Shell metacharacters that indicate potential command injection
 # These require explicit opt-in if the user truly needs shell features
-SHELL_METACHAR_PATTERN = re.compile(r'[|;&$`><]|\$\(')
+SHELL_METACHAR_PATTERN = re.compile(r"[|;&$`><]|\$\(")
 
 
-def parse_command(command: Union[str, List[str]]) -> List[str]:
+def parse_command(command: str | list[str]) -> list[str]:
     """
     Parse a command into an argv list for shell=False execution.
 
@@ -65,8 +65,9 @@ def parse_command(command: Union[str, List[str]]) -> List[str]:
     # Check for shell metacharacters that could indicate injection
     if SHELL_METACHAR_PATTERN.search(command):
         raise ValueError(
-            f"Command contains shell metacharacters which are not supported: {command!r}. "
-            "Use an argv list instead or redesign the step to avoid shell features."
+            f"Command contains shell metacharacters which are not supported: "
+            f"{command!r}. Use an argv list instead or redesign the step to "
+            "avoid shell features."
         )
 
     return shlex.split(command)
@@ -81,6 +82,7 @@ class Tier(Enum):
     - GOVERNANCE: Important checks that should pass; can be warnings in degraded mode
     - OPTIONAL: Nice-to-have checks; failures are purely informational
     """
+
     KERNEL = "kernel"
     GOVERNANCE = "governance"
     OPTIONAL = "optional"
@@ -95,6 +97,7 @@ class Severity(Enum):
     - WARNING: Should be addressed soon
     - INFO: Informational only
     """
+
     CRITICAL = "critical"
     WARNING = "warning"
     INFO = "info"
@@ -110,6 +113,7 @@ class Category(Enum):
     - CORRECTNESS: Code correctness checks (lint, type, test)
     - GOVERNANCE: Process and policy checks
     """
+
     SECURITY = "security"
     PERFORMANCE = "performance"
     CORRECTNESS = "correctness"
@@ -137,14 +141,15 @@ class Step:
         dependencies: List of step IDs that must pass before this step runs
         allow_fail_in_degraded: If True, failures become warnings in degraded mode
     """
+
     id: str
     tier: Tier
-    command: Union[str, List[str]]
+    command: str | list[str]
     description: str = ""
     severity: Severity = Severity.WARNING
     category: Category = Category.CORRECTNESS
     timeout: int = 60
-    dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
     allow_fail_in_degraded: bool = False
 
     def __post_init__(self):
@@ -175,6 +180,7 @@ class StepResult:
         severity: Severity of the step (copied for convenience)
         category: Category of the step (copied for convenience)
     """
+
     step_id: str
     status: str  # PASS, FAIL, SKIP
     duration_ms: int
@@ -185,7 +191,7 @@ class StepResult:
     severity: str = ""
     category: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "step_id": self.step_id,
@@ -224,11 +230,11 @@ class SelfTestRunner:
 
     def __init__(
         self,
-        steps: List[Step],
+        steps: list[Step],
         mode: str = "strict",
         verbose: bool = False,
-        on_step_start: Optional[Callable[[Step], None]] = None,
-        on_step_complete: Optional[Callable[[Step, StepResult], None]] = None,
+        on_step_start: Callable[[Step], None] | None = None,
+        on_step_complete: Callable[[Step, StepResult], None] | None = None,
     ):
         """
         Initialize the runner.
@@ -245,10 +251,10 @@ class SelfTestRunner:
         self.verbose = verbose
         self.on_step_start = on_step_start
         self.on_step_complete = on_step_complete
-        self.results: List[StepResult] = []
-        self._step_results: Dict[str, StepResult] = {}
+        self.results: list[StepResult] = []
+        self._step_results: dict[str, StepResult] = {}
 
-    def _filter_steps(self) -> List[Step]:
+    def _filter_steps(self) -> list[Step]:
         """Filter steps based on mode."""
         if self.mode == "kernel-only":
             return [s for s in self.steps if s.tier == Tier.KERNEL]
@@ -350,7 +356,7 @@ class SelfTestRunner:
 
         return result
 
-    def run(self) -> Dict[str, Any]:
+    def run(self) -> dict[str, Any]:
         """
         Run all steps and return summary.
 
@@ -373,10 +379,10 @@ class SelfTestRunner:
         """
         self.results = []
         self._step_results = {}
-        failed_steps: List[str] = []
-        kernel_failed: List[str] = []
-        governance_failed: List[str] = []
-        optional_failed: List[str] = []
+        failed_steps: list[str] = []
+        kernel_failed: list[str] = []
+        governance_failed: list[str] = []
+        optional_failed: list[str] = []
 
         steps = self._filter_steps()
 
@@ -411,11 +417,11 @@ class SelfTestRunner:
 
     def _build_summary(
         self,
-        failed_steps: List[str],
-        kernel_failed: List[str],
-        governance_failed: List[str],
-        optional_failed: List[str],
-    ) -> Dict[str, Any]:
+        failed_steps: list[str],
+        kernel_failed: list[str],
+        governance_failed: list[str],
+        optional_failed: list[str],
+    ) -> dict[str, Any]:
         """Build the run summary dictionary."""
         passed = sum(1 for r in self.results if r.status == "PASS")
         failed = sum(1 for r in self.results if r.status == "FAIL")
@@ -431,7 +437,7 @@ class SelfTestRunner:
             overall_status = "FAIL" if failed_steps else "PASS"
 
         # Build severity breakdown
-        by_severity: Dict[str, Dict[str, int]] = {}
+        by_severity: dict[str, dict[str, int]] = {}
         for sev in Severity:
             sev_results = [r for r in self.results if r.severity == sev.value]
             by_severity[sev.value] = {
@@ -441,7 +447,7 @@ class SelfTestRunner:
             }
 
         # Build category breakdown
-        by_category: Dict[str, Dict[str, int]] = {}
+        by_category: dict[str, dict[str, int]] = {}
         for cat in Category:
             cat_results = [r for r in self.results if r.category == cat.value]
             by_category[cat.value] = {
@@ -470,7 +476,7 @@ class SelfTestRunner:
             "by_category": by_category,
         }
 
-    def plan(self) -> Dict[str, Any]:
+    def plan(self) -> dict[str, Any]:
         """
         Get the execution plan without running.
 

@@ -34,7 +34,7 @@ Example usage:
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import yaml
 
@@ -56,7 +56,9 @@ def _parse_tier(value: str) -> Tier:
     elif value == "optional":
         return Tier.OPTIONAL
     else:
-        raise ValueError(f"Invalid tier: {value}. Must be kernel, governance, or optional.")
+        raise ValueError(
+            f"Invalid tier: {value}. Must be kernel, governance, or optional."
+        )
 
 
 def _parse_severity(value: str) -> Severity:
@@ -69,7 +71,9 @@ def _parse_severity(value: str) -> Severity:
     elif value == "info":
         return Severity.INFO
     else:
-        raise ValueError(f"Invalid severity: {value}. Must be critical, warning, or info.")
+        raise ValueError(
+            f"Invalid severity: {value}. Must be critical, warning, or info."
+        )
 
 
 def _parse_category(value: str) -> Category:
@@ -85,11 +89,12 @@ def _parse_category(value: str) -> Category:
         return Category.GOVERNANCE
     else:
         raise ValueError(
-            f"Invalid category: {value}. Must be security, performance, correctness, or governance."
+            f"Invalid category: {value}. "
+            "Must be security, performance, correctness, or governance."
         )
 
 
-def step_from_dict(data: Dict[str, Any]) -> Step:
+def step_from_dict(data: dict[str, Any]) -> Step:
     """
     Create a Step from a dictionary.
 
@@ -127,7 +132,7 @@ def step_from_dict(data: Dict[str, Any]) -> Step:
     )
 
 
-def load_steps_from_yaml(path: Union[str, Path]) -> List[Step]:
+def load_steps_from_yaml(path: str | Path) -> list[Step]:
     """
     Load step definitions from a YAML file.
 
@@ -167,7 +172,7 @@ def load_steps_from_yaml(path: Union[str, Path]) -> List[Step]:
     return steps
 
 
-def load_steps_from_list(steps_data: List[Dict[str, Any]]) -> List[Step]:
+def load_steps_from_list(steps_data: list[dict[str, Any]]) -> list[Step]:
     """
     Load steps from a list of dictionaries.
 
@@ -196,11 +201,11 @@ class SelftestConfig:
 
     def __init__(
         self,
-        steps: List[Step],
+        steps: list[Step],
         mode: str = "strict",
         verbose: bool = False,
         write_report: bool = True,
-        report_path: Optional[str] = None,
+        report_path: str | None = None,
     ):
         self.steps = steps
         self.mode = mode
@@ -209,7 +214,7 @@ class SelftestConfig:
         self.report_path = report_path or "selftest_report.json"
 
     @classmethod
-    def from_yaml(cls, path: Union[str, Path]) -> "SelftestConfig":
+    def from_yaml(cls, path: str | Path) -> "SelftestConfig":
         """
         Load configuration from a YAML file.
 
@@ -248,7 +253,7 @@ class SelftestConfig:
         )
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SelftestConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "SelftestConfig":
         """
         Create configuration from a dictionary.
 
@@ -269,7 +274,7 @@ class SelftestConfig:
         )
 
 
-def validate_steps(steps: List[Step]) -> List[str]:
+def validate_steps(steps: list[Step]) -> list[str]:
     """
     Validate a list of steps for consistency.
 
@@ -326,7 +331,7 @@ def validate_steps(steps: List[Step]) -> List[str]:
     return errors
 
 
-def load_config(source: Union[str, Path, Dict[str, Any]]) -> SelftestConfig:
+def load_config(source: str | Path | dict[str, Any]) -> SelftestConfig:
     """
     Load configuration from various sources.
 

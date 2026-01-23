@@ -1,4 +1,5 @@
 """Smoke tests for gen_adapters.py multi-platform generator."""
+
 import subprocess
 import sys
 import textwrap

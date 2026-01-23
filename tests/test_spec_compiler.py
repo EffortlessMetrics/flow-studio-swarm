@@ -5,15 +5,15 @@ Tests cover template resolution, fragment concatenation, verification requiremen
 merging, and prompt_hash computation.
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-from dataclasses import dataclass
-from typing import Dict, List, Optional
 import hashlib
 
 # Add swarm to path
 import sys
+from pathlib import Path
+from typing import Optional
+
+import pytest
+
 _SWARM_ROOT = Path(__file__).resolve().parent.parent
 if str(_SWARM_ROOT) not in sys.path:
     sys.path.insert(0, str(_SWARM_ROOT))
@@ -25,36 +25,34 @@ from swarm.spec.compiler import (
     StepIntent,
     StepPlan,
     StepPlanBuilder,
-    compile_prompt,
-    render_template,
     build_system_append,
     build_system_append_v2,
     build_user_prompt,
-    merge_verification_requirements,
-    resolve_handoff_contract,
+    compile_prompt,
     extract_flow_key,
-)
-from swarm.spec.types import (
-    PromptPlan,
-    StationSpec,
-    StationSDK,
-    StationIdentity,
-    StationIO,
-    StationHandoff,
-    StationRuntimePrompt,
-    StationRoutingHints,
-    StationSandbox,
-    StationContextBudget,
-    StationCategory,
-    FlowSpec,
-    FlowStep,
-    FlowDefaults,
-    RoutingConfig,
-    RoutingKind,
-    VerificationRequirements,
-    HandoffContract,
+    merge_verification_requirements,
+    render_template,
+    resolve_handoff_contract,
 )
 from swarm.spec.loader import list_flows, load_flow
+from swarm.spec.types import (
+    FlowStep,
+    HandoffContract,
+    PromptPlan,
+    RoutingConfig,
+    RoutingKind,
+    StationCategory,
+    StationContextBudget,
+    StationHandoff,
+    StationIdentity,
+    StationIO,
+    StationRoutingHints,
+    StationRuntimePrompt,
+    StationSandbox,
+    StationSDK,
+    StationSpec,
+    VerificationRequirements,
+)
 
 
 class TestExtractFlowKey:
@@ -105,7 +103,7 @@ class TestRenderTemplate:
         template = "Step: {{step.id}}, Station: {{station.title}}"
         variables = {
             "step": {"id": "implement", "objective": "Build code"},
-            "station": {"title": "Code Implementer"}
+            "station": {"title": "Code Implementer"},
         }
 
         result = render_template(template, variables)
@@ -154,9 +152,7 @@ class TestBuildSystemAppend:
 
     def test_build_system_append_includes_identity(self):
         """System append should include station identity."""
-        station = _create_test_station(
-            system_append="You are the Test Agent."
-        )
+        station = _create_test_station(system_append="You are the Test Agent.")
 
         result = build_system_append(station)
 
@@ -164,9 +160,7 @@ class TestBuildSystemAppend:
 
     def test_build_system_append_includes_invariants(self):
         """System append should include station invariants."""
-        station = _create_test_station(
-            invariants=("Rule 1", "Rule 2")
-        )
+        station = _create_test_station(invariants=("Rule 1", "Rule 2"))
 
         result = build_system_append(station)
 
@@ -200,9 +194,7 @@ class TestBuildSystemAppendV2:
 
     def test_build_system_append_v2_includes_identity(self):
         """V2 system append should include station identity."""
-        station = _create_test_station(
-            system_append="You are the V2 Test Agent."
-        )
+        station = _create_test_station(system_append="You are the V2 Test Agent.")
 
         result = build_system_append_v2(station)
 
@@ -210,9 +202,7 @@ class TestBuildSystemAppendV2:
 
     def test_build_system_append_v2_includes_invariants(self):
         """V2 system append should include station invariants."""
-        station = _create_test_station(
-            invariants=("V2 Rule 1", "V2 Rule 2")
-        )
+        station = _create_test_station(invariants=("V2 Rule 1", "V2 Rule 2"))
 
         result = build_system_append_v2(station)
 
@@ -258,9 +248,7 @@ class TestBuildUserPrompt:
 
     def test_build_user_prompt_includes_required_outputs(self):
         """User prompt should include required outputs."""
-        station = _create_test_station(
-            required_outputs=("build/output.md",)
-        )
+        station = _create_test_station(required_outputs=("build/output.md",))
         step = _create_test_step(outputs=("build/extra.md",))
         run_base = Path("swarm/runs/test")
 
@@ -275,9 +263,7 @@ class TestMergeVerificationRequirements:
 
     def test_merge_includes_station_outputs(self):
         """Merged requirements should include station required outputs."""
-        station = _create_test_station(
-            required_outputs=("build/station_output.md",)
-        )
+        station = _create_test_station(required_outputs=("build/station_output.md",))
         step = _create_test_step()
         run_base = Path("swarm/runs/test")
         variables = {"run": {"base": str(run_base)}, "step": {"id": step.id}}
@@ -299,9 +285,7 @@ class TestMergeVerificationRequirements:
 
     def test_merge_deduplicates_outputs(self):
         """Merged requirements should not duplicate outputs."""
-        station = _create_test_station(
-            required_outputs=("build/output.md",)
-        )
+        station = _create_test_station(required_outputs=("build/output.md",))
         step = _create_test_step(outputs=("build/output.md",))
         run_base = Path("swarm/runs/test")
         variables = {"run": {"base": str(run_base)}, "step": {"id": step.id}}
@@ -318,13 +302,8 @@ class TestResolveHandoffContract:
 
     def test_resolve_handoff_path(self):
         """Handoff path should be resolved with template variables."""
-        station = _create_test_station(
-            handoff_template="{{run.base}}/handoff/{{step.id}}.json"
-        )
-        variables = {
-            "run": {"base": "swarm/runs/test"},
-            "step": {"id": "implement"}
-        }
+        station = _create_test_station(handoff_template="{{run.base}}/handoff/{{step.id}}.json")
+        variables = {"run": {"base": "swarm/runs/test"}, "step": {"id": "implement"}}
 
         result = resolve_handoff_contract(station, variables)
 
@@ -332,9 +311,7 @@ class TestResolveHandoffContract:
 
     def test_resolve_handoff_required_fields(self):
         """Handoff required fields should be preserved."""
-        station = _create_test_station(
-            handoff_required_fields=("status", "summary", "artifacts")
-        )
+        station = _create_test_station(handoff_required_fields=("status", "summary", "artifacts"))
         variables = {"run": {"base": "test"}, "step": {"id": "test"}}
 
         result = resolve_handoff_contract(station, variables)
@@ -729,6 +706,7 @@ class TestStepPlanTraceability:
         traceability = plan.to_dict()["traceability"]
         assert "template_id" not in traceability
         assert "template_version" not in traceability
+
 
 class TestAllFlowsCompile:
     """Integration tests for compiling all flows."""

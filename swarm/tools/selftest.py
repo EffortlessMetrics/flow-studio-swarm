@@ -58,6 +58,7 @@ Default: Human-readable text with per-step status (PASS / FAIL / SKIP)
 import argparse
 import json
 import os
+import shlex
 import signal
 import socket
 import subprocess
@@ -79,10 +80,12 @@ class StepStatus(str, Enum):
     - SKIP: Step was explicitly skipped (user request or dependency failure)
     - TIMEOUT: Step exceeded time limit
     """
+
     PASS = "PASS"
     FAIL = "FAIL"
     SKIP = "SKIP"
     TIMEOUT = "TIMEOUT"
+
 
 # Import selftest config
 try:
@@ -119,46 +122,63 @@ try:
         SelfTestSummary,
     )
 except ImportError:
-    print("Error: Could not import selftest_report_schema or artifact_manager modules", file=sys.stderr)
+    print(
+        "Error: Could not import selftest_report_schema or artifact_manager modules",
+        file=sys.stderr,
+    )
     sys.exit(2)
 
 # Import observability backend manager (optional, graceful fallback if not available)
 try:
     from observability_backends import BackendManager
+
     OBSERVABILITY_AVAILABLE = True
 except ImportError:
     OBSERVABILITY_AVAILABLE = False
+
     # No-op backend manager
     class BackendManager:
         def __init__(self, *args, **kwargs):
             pass
+
         def emit_run_started(self, *args, **kwargs):
             pass
+
         def emit_step_completed(self, *args, **kwargs):
             pass
+
         def emit_step_failed(self, *args, **kwargs):
             pass
+
         def emit_run_completed(self, *args, **kwargs):
             pass
+
         def close(self):
             pass
+
 
 # Import metrics (optional, graceful fallback if not available)
 try:
     from selftest_metrics import SelftestMetrics
+
     METRICS_AVAILABLE = True
 except ImportError:
     METRICS_AVAILABLE = False
+
     # No-op metrics class
     class SelftestMetrics:
         def __init__(self, *args, **kwargs):
             pass
+
         def step_started(self, *args, **kwargs):
             pass
+
         def step_completed(self, *args, **kwargs):
             pass
+
         def degradation_logged(self, *args, **kwargs):
             pass
+
         def run_completed(self, *args, **kwargs):
             pass
 
@@ -333,8 +353,10 @@ class SelfTestRunner:
         self.json_v2 = json_v2
         self.write_report = write_report
         # Initialize skip_steps from parameter or environment variable
-        self.skip_steps = skip_steps if skip_steps is not None else parse_skip_steps(
-            os.environ.get("SELFTEST_SKIP_STEPS", "")
+        self.skip_steps = (
+            skip_steps
+            if skip_steps is not None
+            else parse_skip_steps(os.environ.get("SELFTEST_SKIP_STEPS", ""))
         )
         self.artifact_manager = ArtifactManager() if write_report else None
         self.results: List[SelfTestResult] = []
@@ -351,6 +373,7 @@ class SelfTestRunner:
         # Initialize observability backends (suppress warnings in JSON mode to avoid corrupting output)
         if json_output or json_v2:
             import logging
+
             old_level = logging.getLogger().level
             logging.getLogger().setLevel(logging.ERROR)
             self.backends = BackendManager()
@@ -412,7 +435,9 @@ class SelfTestRunner:
                 for step_id in self.governance_failed:
                     print(f"    Run: uv run swarm/tools/selftest.py --step {step_id}")
                 if not self.kernel_failed:
-                    print("  [*] Or try: uv run swarm/tools/selftest.py --degraded to work around governance failures")
+                    print(
+                        "  [*] Or try: uv run swarm/tools/selftest.py --degraded to work around governance failures"
+                    )
             print("  [>] See: docs/SELFTEST_SYSTEM.md for more information")
             print("  [>] Run: uv run swarm/tools/selftest.py --plan to see all steps")
 
@@ -433,12 +458,16 @@ class SelfTestRunner:
         print("\nBreakdown by Severity:")
         for sev in ["critical", "warning", "info"]:
             counts = summary_dict["by_severity"].get(sev, {})
-            print(f"  {sev:10s}: {counts.get('passed', 0):2d} passed, {counts.get('failed', 0):2d} failed")
+            print(
+                f"  {sev:10s}: {counts.get('passed', 0):2d} passed, {counts.get('failed', 0):2d} failed"
+            )
 
         print("\nBreakdown by Category:")
         for cat in ["security", "performance", "correctness", "governance"]:
             counts = summary_dict["by_category"].get(cat, {})
-            print(f"  {cat:12s}: {counts.get('passed', 0):2d} passed, {counts.get('failed', 0):2d} failed")
+            print(
+                f"  {cat:12s}: {counts.get('passed', 0):2d} passed, {counts.get('failed', 0):2d} failed"
+            )
 
     def show_plan(self, steps: List[SelfTestStep]) -> None:
         """Show execution plan without running (human-readable or JSON format)."""
@@ -458,7 +487,9 @@ class SelfTestRunner:
             severity_str = step.severity.value.upper()
             category_str = step.category.value.upper()
             deps_str = f" (depends: {', '.join(step.dependencies)})" if step.dependencies else ""
-            print(f"[{i}] {step.id:20s} [{tier_str:10s}] [{severity_str:8s}] [{category_str:12s}] {step.description}{deps_str}")
+            print(
+                f"[{i}] {step.id:20s} [{tier_str:10s}] [{severity_str:8s}] [{category_str:12s}] {step.description}{deps_str}"
+            )
         print()
         print(f"Total steps: {len(steps)}")
         print()
@@ -513,9 +544,13 @@ class SelfTestRunner:
             )
         except Exception as e:
             if self.verbose:
-                print(f"Warning: Failed to log degradation for {result.step.id}: {e}", file=sys.stderr)
+                print(
+                    f"Warning: Failed to log degradation for {result.step.id}: {e}", file=sys.stderr
+                )
 
-    def run_step(self, step: SelfTestStep, all_results: Dict[str, SelfTestResult]) -> SelfTestResult:  # noqa: C901
+    def run_step(
+        self, step: SelfTestStep, all_results: Dict[str, SelfTestResult]
+    ) -> SelfTestResult:  # noqa: C901
         """
         Execute a single selftest step.
 
@@ -551,6 +586,7 @@ class SelfTestRunner:
         # Check for override
         try:
             from override_manager import OverrideManager
+
             override_mgr = OverrideManager()
             if override_mgr.is_override_active(step.id):
                 if not self.json_output and not self.json_v2:
@@ -679,7 +715,11 @@ class SelfTestRunner:
             "passed": sum(1 for r in self.results if r.passed),
             "failed": sum(1 for r in self.results if not r.passed and not r.skipped),
             "skipped": sum(1 for r in self.results if r.skipped),
-            "mode": "degraded" if self.degraded else "kernel-only" if self.kernel_only else "strict",
+            "mode": "degraded"
+            if self.degraded
+            else "kernel-only"
+            if self.kernel_only
+            else "strict",
             "kernel_ok": len(self.kernel_failed) == 0,
             "governance_ok": len(self.governance_failed) == 0,
             "optional_ok": len(self.optional_failed) == 0,
@@ -730,9 +770,7 @@ class SelfTestRunner:
 
         # Mode-level hints
         if self.degraded and (self.governance_failed or self.optional_failed):
-            hints.append(
-                "Governance checks failed in degraded mode; see selftest_degradations.log"
-            )
+            hints.append("Governance checks failed in degraded mode; see selftest_degradations.log")
         elif not self.degraded and self.governance_failed:
             hints.append(
                 "Try: uv run swarm/tools/selftest.py --degraded to work around governance failures"
@@ -740,9 +778,7 @@ class SelfTestRunner:
 
         # Kernel failure hints (always critical)
         if self.kernel_failed:
-            hints.append(
-                "KERNEL failure(s) block all merges; fix before proceeding"
-            )
+            hints.append("KERNEL failure(s) block all merges; fix before proceeding")
 
         # Documentation hint
         if hints:
@@ -775,25 +811,31 @@ class SelfTestRunner:
             "git_branch": self._get_git_branch(),
             "git_commit": self._get_git_commit(),
             "user": os.environ.get("USER", "unknown"),
-            "mode": "degraded" if self.degraded else "kernel-only" if self.kernel_only else "strict",
+            "mode": "degraded"
+            if self.degraded
+            else "kernel-only"
+            if self.kernel_only
+            else "strict",
         }
 
         # Build step results
         step_results = []
         for result in self.results:
-            step_results.append({
-                "step_id": result.step.id,
-                "description": result.step.description,
-                "tier": result.step.tier.value,
-                "severity": result.severity.value,
-                "category": result.category.value,
-                "status": "PASS" if result.passed else "SKIP" if result.skipped else "FAIL",
-                "exit_code": result.exit_code,
-                "duration_ms": result.duration_ms,
-                "command": result.step.full_command(),
-                "timestamp_start": result.timestamp_start,
-                "timestamp_end": result.timestamp_end,
-            })
+            step_results.append(
+                {
+                    "step_id": result.step.id,
+                    "description": result.step.description,
+                    "tier": result.step.tier.value,
+                    "severity": result.severity.value,
+                    "category": result.category.value,
+                    "status": "PASS" if result.passed else "SKIP" if result.skipped else "FAIL",
+                    "exit_code": result.exit_code,
+                    "duration_ms": result.duration_ms,
+                    "command": result.step.full_command(),
+                    "timestamp_start": result.timestamp_start,
+                    "timestamp_end": result.timestamp_end,
+                }
+            )
 
         # Build summary using canonical build_summary() for consistency
         # This ensures CLI JSON, report file, and /platform/status all share the same shape
@@ -842,10 +884,7 @@ class SelfTestRunner:
             # Emit step completed event to observability backends
             step_result = "PASS" if result.passed else "SKIP" if result.skipped else "FAIL"
             self.backends.emit_step_completed(
-                step.id,
-                result.duration_ms,
-                step_result,
-                step.tier.value
+                step.id, result.duration_ms, step_result, step.tier.value
             )
 
             # Determine if we should continue
@@ -855,10 +894,7 @@ class SelfTestRunner:
                 # Emit step failed event to observability backends
                 error_msg = result.stderr or result.stdout or "(no output)"
                 self.backends.emit_step_failed(
-                    step.id,
-                    step.severity.value,
-                    error_msg,
-                    step.tier.value
+                    step.id, step.severity.value, error_msg, step.tier.value
                 )
 
                 # Track tier-aware failures for status API
@@ -892,7 +928,11 @@ class SelfTestRunner:
             else:
                 # Legacy format (unchanged for backward compatibility)
                 report = {
-                    "mode": "degraded" if self.degraded else "kernel-only" if self.kernel_only else "strict",
+                    "mode": "degraded"
+                    if self.degraded
+                    else "kernel-only"
+                    if self.kernel_only
+                    else "strict",
                     "passed": sum(1 for r in self.results if r.passed),
                     "failed": sum(1 for r in self.results if not r.passed and not r.skipped),
                     "skipped": sum(1 for r in self.results if r.skipped),
@@ -914,27 +954,37 @@ class SelfTestRunner:
                     git_branch=self._get_git_branch(),
                     git_commit=self._get_git_commit(),
                     user=os.environ.get("USER", "unknown"),
-                    mode="degraded" if self.degraded else "kernel-only" if self.kernel_only else "strict",
+                    mode="degraded"
+                    if self.degraded
+                    else "kernel-only"
+                    if self.kernel_only
+                    else "strict",
                 )
 
                 # Build step results
                 step_results = []
                 for result in self.results:
-                    step_results.append(SelfTestStepResult(
-                        step_id=result.step.id,
-                        description=result.step.description,
-                        tier=result.step.tier.value,
-                        severity=result.severity.value,
-                        category=result.category.value,
-                        status="PASS" if result.passed else "SKIP" if result.skipped else "FAIL",
-                        exit_code=result.exit_code,
-                        duration_ms=result.duration_ms,
-                        command=result.step.full_command(),
-                        timestamp_start=result.timestamp_start,
-                        timestamp_end=result.timestamp_end,
-                        stdout=result.stdout[:500] if result.stdout else None,
-                        stderr=result.stderr[:500] if result.stderr else None,
-                    ))
+                    step_results.append(
+                        SelfTestStepResult(
+                            step_id=result.step.id,
+                            description=result.step.description,
+                            tier=result.step.tier.value,
+                            severity=result.severity.value,
+                            category=result.category.value,
+                            status="PASS"
+                            if result.passed
+                            else "SKIP"
+                            if result.skipped
+                            else "FAIL",
+                            exit_code=result.exit_code,
+                            duration_ms=result.duration_ms,
+                            command=result.step.full_command(),
+                            timestamp_start=result.timestamp_start,
+                            timestamp_end=result.timestamp_end,
+                            stdout=result.stdout[:500] if result.stdout else None,
+                            stderr=result.stderr[:500] if result.stderr else None,
+                        )
+                    )
 
                 # Build summary
                 summary_dict = self._build_summary()
@@ -943,26 +993,48 @@ class SelfTestRunner:
                     failed=summary_dict["failed"],
                     skipped=summary_dict["skipped"],
                     total=len(self.results),
-                    critical_passed=summary_dict["by_severity"].get("critical", {}).get("passed", 0),
-                    critical_failed=summary_dict["by_severity"].get("critical", {}).get("failed", 0),
+                    critical_passed=summary_dict["by_severity"]
+                    .get("critical", {})
+                    .get("passed", 0),
+                    critical_failed=summary_dict["by_severity"]
+                    .get("critical", {})
+                    .get("failed", 0),
                     warning_passed=summary_dict["by_severity"].get("warning", {}).get("passed", 0),
                     warning_failed=summary_dict["by_severity"].get("warning", {}).get("failed", 0),
                     info_passed=summary_dict["by_severity"].get("info", {}).get("passed", 0),
                     info_failed=summary_dict["by_severity"].get("info", {}).get("failed", 0),
-                    category_security_passed=summary_dict["by_category"].get("security", {}).get("passed", 0),
-                    category_security_failed=summary_dict["by_category"].get("security", {}).get("failed", 0),
-                    category_performance_passed=summary_dict["by_category"].get("performance", {}).get("passed", 0),
-                    category_performance_failed=summary_dict["by_category"].get("performance", {}).get("failed", 0),
-                    category_correctness_passed=summary_dict["by_category"].get("correctness", {}).get("passed", 0),
-                    category_correctness_failed=summary_dict["by_category"].get("correctness", {}).get("failed", 0),
-                    category_governance_passed=summary_dict["by_category"].get("governance", {}).get("passed", 0),
-                    category_governance_failed=summary_dict["by_category"].get("governance", {}).get("failed", 0),
+                    category_security_passed=summary_dict["by_category"]
+                    .get("security", {})
+                    .get("passed", 0),
+                    category_security_failed=summary_dict["by_category"]
+                    .get("security", {})
+                    .get("failed", 0),
+                    category_performance_passed=summary_dict["by_category"]
+                    .get("performance", {})
+                    .get("passed", 0),
+                    category_performance_failed=summary_dict["by_category"]
+                    .get("performance", {})
+                    .get("failed", 0),
+                    category_correctness_passed=summary_dict["by_category"]
+                    .get("correctness", {})
+                    .get("passed", 0),
+                    category_correctness_failed=summary_dict["by_category"]
+                    .get("correctness", {})
+                    .get("failed", 0),
+                    category_governance_passed=summary_dict["by_category"]
+                    .get("governance", {})
+                    .get("passed", 0),
+                    category_governance_failed=summary_dict["by_category"]
+                    .get("governance", {})
+                    .get("failed", 0),
                     total_duration_ms=int(sum(r.duration_ms for r in self.results)),
                 )
 
                 # Create and write report
                 report = SelfTestReport(metadata=metadata, results=step_results, summary=summary)
-                report_path = self.artifact_manager.write_artifact("build", "selftest_report.json", report.to_dict())
+                report_path = self.artifact_manager.write_artifact(
+                    "build", "selftest_report.json", report.to_dict()
+                )
 
                 if not self.json_output and not self.json_v2:
                     print(f"\nReport written to: {report_path}")
@@ -1154,14 +1226,20 @@ class DistributedSelfTestRunner:
         try:
             result = subprocess.run(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                shell=False, capture_output=True, text=True, timeout=5,
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0:
                 branch = result.stdout.strip()
 
             result = subprocess.run(
                 ["git", "rev-parse", "--short", "HEAD"],
-                shell=False, capture_output=True, text=True, timeout=5,
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0:
                 commit = result.stdout.strip()
@@ -1191,16 +1269,15 @@ class DistributedSelfTestRunner:
             # Multiple steps, run in parallel
             self._print(f"Wave {wave_idx}: Running {len(step_ids)} steps in parallel...")
             with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-                futures = {
-                    executor.submit(_run_step_in_process, sd): sd
-                    for sd in step_data_list
-                }
+                futures = {executor.submit(_run_step_in_process, sd): sd for sd in step_data_list}
                 for future in as_completed(futures):
                     try:
                         result = future.result(timeout=60)
                         wave_results.append(result)
                         status = "PASS" if result["passed"] else "FAIL"
-                        self._print(f"  {result['step_id']:20s} {status} ({result['duration_ms']}ms)")
+                        self._print(
+                            f"  {result['step_id']:20s} {status} ({result['duration_ms']}ms)"
+                        )
                     except Exception as e:
                         step_data = futures[future]
                         error_result = {
@@ -1496,7 +1573,10 @@ def main() -> int:
         # Distributed mode runs all steps using wave-based parallelization
         # It does not support --step, --until, or --degraded flags
         if args.step or args.until or args.degraded or args.kernel_only:
-            print("ERROR: --distributed cannot be combined with --step, --until, --degraded, or --kernel-only", file=sys.stderr)
+            print(
+                "ERROR: --distributed cannot be combined with --step, --until, --degraded, or --kernel-only",
+                file=sys.stderr,
+            )
             return 2
 
         runner = DistributedSelfTestRunner(

@@ -203,9 +203,7 @@ class WisdomSummarizer:
 
         return flows
 
-    def _infer_flow_status_from_artifacts(
-        self, run_path: Path
-    ) -> dict[str, FlowSummary]:
+    def _infer_flow_status_from_artifacts(self, run_path: Path) -> dict[str, FlowSummary]:
         """
         Infer flow statuses from presence of decision artifacts.
 
@@ -237,9 +235,7 @@ class WisdomSummarizer:
                 continue
 
             decision_files = decision_artifacts.get(flow_key, [])
-            has_decision = any(
-                (flow_dir / df).exists() for df in decision_files
-            )
+            has_decision = any((flow_dir / df).exists() for df in decision_files)
             if has_decision:
                 flows[flow_key] = FlowSummary(status="succeeded")
             else:
@@ -366,9 +362,7 @@ class WisdomSummarizer:
             labels.append("risk-managed")
 
         # Check for conditional approval
-        if learnings and re.search(
-            r"conditional\s+approv", learnings, re.IGNORECASE
-        ):
+        if learnings and re.search(r"conditional\s+approv", learnings, re.IGNORECASE):
             labels.append("conditional-approval")
 
         # Check artifact completeness
@@ -411,9 +405,7 @@ class WisdomSummarizer:
 
         # Count artifacts present
         artifacts_present = sum(
-            1
-            for artifact in self.WISDOM_ARTIFACTS
-            if (wisdom_dir / artifact).exists()
+            1 for artifact in self.WISDOM_ARTIFACTS if (wisdom_dir / artifact).exists()
         )
 
         # Count regressions
@@ -497,9 +489,7 @@ class WisdomSummarizer:
 
 def main() -> int:
     """CLI entrypoint for wisdom summarizer."""
-    parser = argparse.ArgumentParser(
-        description="Generate wisdom summary from run artifacts"
-    )
+    parser = argparse.ArgumentParser(description="Generate wisdom summary from run artifacts")
     parser.add_argument(
         "run_id",
         help="Run identifier (e.g., health-check-risky-deploy)",

@@ -62,8 +62,7 @@ class BDDValidator:
                             scenario_name = line.split(":", 1)[1].strip()
                             scenario_steps = 0
                         elif in_scenario and any(
-                            kw in line
-                            for kw in ["Given ", "When ", "Then ", "And ", "But "]
+                            kw in line for kw in ["Given ", "When ", "Then ", "And ", "But "]
                         ):
                             scenario_steps += 1
 

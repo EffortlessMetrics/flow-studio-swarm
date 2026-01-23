@@ -5,33 +5,31 @@ are valid, flow steps reference valid stations, and station fragment refs
 point to existing files.
 """
 
-import pytest
-from pathlib import Path
-from typing import Dict, List, Set
-
 # Add swarm to path
 import sys
+from pathlib import Path
+from typing import Set
+
+import pytest
+
 _SWARM_ROOT = Path(__file__).resolve().parent.parent
 if str(_SWARM_ROOT) not in sys.path:
     sys.path.insert(0, str(_SWARM_ROOT))
 
-from swarm.spec.loader import (
-    load_station,
-    load_flow,
-    load_fragment,
-    list_stations,
-    list_flows,
-    list_fragments,
-    get_spec_root,
-    validate_specs,
-)
 from swarm.spec.compiler import (
     SpecCompiler,
-    compile_prompt,
+)
+from swarm.spec.loader import (
+    get_spec_root,
+    list_flows,
+    list_fragments,
+    list_stations,
+    load_flow,
+    load_fragment,
+    load_station,
+    validate_specs,
 )
 from swarm.spec.types import (
-    StationSpec,
-    FlowSpec,
     RoutingKind,
 )
 
@@ -53,41 +51,42 @@ class TestAllStationYAMLsValid:
                 errors.append(f"{station_id}: {e}")
 
         if errors:
-            pytest.fail(f"Station parsing errors:\n" + "\n".join(errors))
+            pytest.fail("Station parsing errors:\n" + "\n".join(errors))
 
     def test_all_stations_have_valid_id(self):
         """All stations should have an ID matching their filename."""
         for station_id in list_stations():
             station = load_station(station_id)
 
-            assert station.id == station_id, \
-                f"Station {station_id} has mismatched id: {station.id}"
+            assert station.id == station_id, f"Station {station_id} has mismatched id: {station.id}"
 
     def test_all_stations_have_version(self):
         """All stations should have a positive version number."""
         for station_id in list_stations():
             station = load_station(station_id)
 
-            assert station.version >= 1, \
+            assert station.version >= 1, (
                 f"Station {station_id} has invalid version: {station.version}"
+            )
 
     def test_all_stations_have_title(self):
         """All stations should have a non-empty title."""
         for station_id in list_stations():
             station = load_station(station_id)
 
-            assert station.title != "", \
-                f"Station {station_id} has empty title"
+            assert station.title != "", f"Station {station_id} has empty title"
 
     def test_all_stations_have_valid_sdk_config(self):
         """All stations should have valid SDK configuration."""
         for station_id in list_stations():
             station = load_station(station_id)
 
-            assert station.sdk.model in ("sonnet", "haiku", "opus", "inherit"), \
+            assert station.sdk.model in ("sonnet", "haiku", "opus", "inherit"), (
                 f"Station {station_id} has invalid model: {station.sdk.model}"
-            assert station.sdk.max_turns >= 1, \
+            )
+            assert station.sdk.max_turns >= 1, (
                 f"Station {station_id} has invalid max_turns: {station.sdk.max_turns}"
+            )
             assert len(station.sdk.allowed_tools) >= 0  # Can be empty for some stations
 
 
@@ -108,31 +107,28 @@ class TestAllFlowYAMLsValid:
                 errors.append(f"{flow_id}: {e}")
 
         if errors:
-            pytest.fail(f"Flow parsing errors:\n" + "\n".join(errors))
+            pytest.fail("Flow parsing errors:\n" + "\n".join(errors))
 
     def test_all_flows_have_valid_id(self):
         """All flows should have an ID matching their filename."""
         for flow_id in list_flows():
             flow = load_flow(flow_id)
 
-            assert flow.id == flow_id, \
-                f"Flow {flow_id} has mismatched id: {flow.id}"
+            assert flow.id == flow_id, f"Flow {flow_id} has mismatched id: {flow.id}"
 
     def test_all_flows_have_version(self):
         """All flows should have a positive version number."""
         for flow_id in list_flows():
             flow = load_flow(flow_id)
 
-            assert flow.version >= 1, \
-                f"Flow {flow_id} has invalid version: {flow.version}"
+            assert flow.version >= 1, f"Flow {flow_id} has invalid version: {flow.version}"
 
     def test_all_flows_have_steps(self):
         """All flows should have at least one step."""
         for flow_id in list_flows():
             flow = load_flow(flow_id)
 
-            assert len(flow.steps) > 0, \
-                f"Flow {flow_id} has no steps"
+            assert len(flow.steps) > 0, f"Flow {flow_id} has no steps"
 
 
 class TestFlowStepsReferenceValidStations:
@@ -156,8 +152,10 @@ class TestFlowStepsReferenceValidStations:
 
             for step in flow.steps:
                 if step.station not in available_stations:
-                    missing.append(f"Flow {flow_id}, step {step.id}: "
-                                   f"references unknown station '{step.station}'")
+                    missing.append(
+                        f"Flow {flow_id}, step {step.id}: "
+                        f"references unknown station '{step.station}'"
+                    )
 
         if missing:
             # Report as warnings, not failures - spec system is still evolving
@@ -177,8 +175,9 @@ class TestFlowStepsReferenceValidStations:
 
             for station_id in flow.cross_cutting_stations:
                 if station_id not in available_stations:
-                    missing.append(f"Flow {flow_id}: cross-cutting station "
-                                   f"'{station_id}' not found")
+                    missing.append(
+                        f"Flow {flow_id}: cross-cutting station '{station_id}' not found"
+                    )
 
         if missing:
             # Report as warnings, not failures
@@ -210,8 +209,9 @@ class TestStationFragmentRefsExist:
                     try:
                         load_fragment(fragment_path)
                     except FileNotFoundError:
-                        missing.append(f"Station {station_id}: "
-                                       f"fragment '{fragment_path}' not found")
+                        missing.append(
+                            f"Station {station_id}: fragment '{fragment_path}' not found"
+                        )
 
         if missing:
             # Report as warnings, not failures
@@ -232,11 +232,13 @@ class TestRoutingConsistency:
 
             for step in flow.steps:
                 if step.routing.next and step.routing.next not in step_ids:
-                    errors.append(f"Flow {flow_id}, step {step.id}: "
-                                  f"routing.next '{step.routing.next}' not found")
+                    errors.append(
+                        f"Flow {flow_id}, step {step.id}: "
+                        f"routing.next '{step.routing.next}' not found"
+                    )
 
         if errors:
-            pytest.fail(f"Invalid routing.next references:\n" + "\n".join(errors))
+            pytest.fail("Invalid routing.next references:\n" + "\n".join(errors))
 
     def test_routing_loop_target_refs_valid_steps(self):
         """Routing 'loop_target' should reference valid step IDs."""
@@ -248,11 +250,13 @@ class TestRoutingConsistency:
 
             for step in flow.steps:
                 if step.routing.loop_target and step.routing.loop_target not in step_ids:
-                    errors.append(f"Flow {flow_id}, step {step.id}: "
-                                  f"routing.loop_target '{step.routing.loop_target}' not found")
+                    errors.append(
+                        f"Flow {flow_id}, step {step.id}: "
+                        f"routing.loop_target '{step.routing.loop_target}' not found"
+                    )
 
         if errors:
-            pytest.fail(f"Invalid routing.loop_target references:\n" + "\n".join(errors))
+            pytest.fail("Invalid routing.loop_target references:\n" + "\n".join(errors))
 
     def test_microloop_has_loop_target(self):
         """MICROLOOP routing must have a loop_target."""
@@ -264,11 +268,13 @@ class TestRoutingConsistency:
             for step in flow.steps:
                 if step.routing.kind == RoutingKind.MICROLOOP:
                     if not step.routing.loop_target:
-                        errors.append(f"Flow {flow_id}, step {step.id}: "
-                                      f"MICROLOOP routing requires loop_target")
+                        errors.append(
+                            f"Flow {flow_id}, step {step.id}: "
+                            f"MICROLOOP routing requires loop_target"
+                        )
 
         if errors:
-            pytest.fail(f"MICROLOOP routing errors:\n" + "\n".join(errors))
+            pytest.fail("MICROLOOP routing errors:\n" + "\n".join(errors))
 
     def test_branch_has_branches_dict(self):
         """BRANCH routing should have a branches dictionary."""
@@ -278,8 +284,9 @@ class TestRoutingConsistency:
             for step in flow.steps:
                 if step.routing.kind == RoutingKind.BRANCH:
                     # Branches dict exists (may be empty but should be dict)
-                    assert isinstance(step.routing.branches, dict), \
+                    assert isinstance(step.routing.branches, dict), (
                         f"Flow {flow_id}, step {step.id}: BRANCH routing has invalid branches"
+                    )
 
 
 class TestCompilerIntegration:
@@ -333,7 +340,7 @@ class TestCompilerIntegration:
 
         # Fail on actual compilation errors (not missing stations)
         if errors:
-            pytest.fail(f"Compilation errors:\n" + "\n".join(errors))
+            pytest.fail("Compilation errors:\n" + "\n".join(errors))
 
     def test_compiled_plans_have_valid_hashes(self):
         """All compiled plans should have non-empty prompt hashes."""
@@ -352,10 +359,10 @@ class TestCompilerIntegration:
                         context_pack=None,
                         run_base=run_base,
                     )
-                    assert plan.prompt_hash != "", \
-                        f"{flow_id}/{step.id}: empty prompt_hash"
-                    assert len(plan.prompt_hash) == 16, \
+                    assert plan.prompt_hash != "", f"{flow_id}/{step.id}: empty prompt_hash"
+                    assert len(plan.prompt_hash) == 16, (
                         f"{flow_id}/{step.id}: invalid prompt_hash length"
+                    )
                 except FileNotFoundError:
                     # Skip if station not found
                     continue
@@ -413,7 +420,7 @@ class TestValidateSpecsIntegration:
 
         # Only fail on critical structural errors
         if critical_errors:
-            pytest.fail(f"Critical validation errors:\n" + "\n".join(critical_errors))
+            pytest.fail("Critical validation errors:\n" + "\n".join(critical_errors))
 
 
 class TestSpecDirectoryStructure:
@@ -488,13 +495,14 @@ class TestStationIOContracts:
 
             for output_path in station.io.required_outputs:
                 # Paths should not be empty
-                assert output_path != "", \
-                    f"Station {station_id} has empty required_output"
+                assert output_path != "", f"Station {station_id} has empty required_output"
                 # Paths should use relative paths (not absolute)
-                assert not output_path.startswith("/"), \
+                assert not output_path.startswith("/"), (
                     f"Station {station_id} has absolute path: {output_path}"
-                assert not output_path.startswith("C:"), \
+                )
+                assert not output_path.startswith("C:"), (
                     f"Station {station_id} has Windows absolute path: {output_path}"
+                )
 
     def test_stations_with_inputs_have_valid_paths(self):
         """Station required inputs should use valid path patterns."""
@@ -502,10 +510,10 @@ class TestStationIOContracts:
             station = load_station(station_id)
 
             for input_path in station.io.required_inputs:
-                assert input_path != "", \
-                    f"Station {station_id} has empty required_input"
-                assert not input_path.startswith("/"), \
+                assert input_path != "", f"Station {station_id} has empty required_input"
+                assert not input_path.startswith("/"), (
                     f"Station {station_id} has absolute input path: {input_path}"
+                )
 
 
 class TestHandoffContracts:
@@ -516,18 +524,21 @@ class TestHandoffContracts:
         for station_id in list_stations():
             station = load_station(station_id)
 
-            assert station.handoff.path_template != "", \
+            assert station.handoff.path_template != "", (
                 f"Station {station_id} has empty handoff.path_template"
-            assert "{{" in station.handoff.path_template or "/" in station.handoff.path_template, \
+            )
+            assert "{{" in station.handoff.path_template or "/" in station.handoff.path_template, (
                 f"Station {station_id} has invalid handoff.path_template"
+            )
 
     def test_all_stations_require_status_in_handoff(self):
         """All stations should require 'status' in handoff."""
         for station_id in list_stations():
             station = load_station(station_id)
 
-            assert "status" in station.handoff.required_fields, \
+            assert "status" in station.handoff.required_fields, (
                 f"Station {station_id} handoff missing required 'status' field"
+            )
 
 
 class TestFlowStepInputOutputChaining:
@@ -539,8 +550,7 @@ class TestFlowStepInputOutputChaining:
             flow = load_flow(flow_id)
 
             for step in flow.steps:
-                assert step.objective != "", \
-                    f"Flow {flow_id}, step {step.id} has empty objective"
+                assert step.objective != "", f"Flow {flow_id}, step {step.id} has empty objective"
 
     def test_downstream_steps_can_access_upstream_outputs(self):
         """Later steps in a flow should be able to access outputs from earlier steps."""

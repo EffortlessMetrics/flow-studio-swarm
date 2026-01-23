@@ -16,12 +16,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
-
-from swarm.runtime.types.tool_call import (
-    NormalizedToolCall,
-    truncate_output,
-)
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from swarm.runtime._claude_sdk.constants import DEFAULT_MODEL
 from swarm.runtime._claude_sdk.hooks import (
@@ -45,6 +40,10 @@ from swarm.runtime._claude_sdk.session_types import (
     WorkPhaseResult,
 )
 from swarm.runtime._claude_sdk.telemetry import TelemetryData
+from swarm.runtime.types.tool_call import (
+    NormalizedToolCall,
+    truncate_output,
+)
 
 # Module logger
 logger = logging.getLogger(__name__)

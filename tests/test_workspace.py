@@ -7,24 +7,22 @@ Tests the Workspace abstraction, boundary enforcement, and StepContext integrati
 from pathlib import Path
 
 import pytest
-
-from swarm.runtime.workspace import (
-    RealWorkspace,
-    ShadowForkWorkspace,
-    ForensicsSnapshot,
-    PromotionResult,
-    create_workspace,
-)
 from swarm.runtime.boundary_enforcement import (
     BoundaryScanner,
-    WorkspaceState,
     Violation,
-    ViolationType,
     ViolationSeverity,
+    ViolationType,
+    WorkspaceState,
 )
 from swarm.runtime.engines.models import StepContext
 from swarm.runtime.types import RunSpec
-
+from swarm.runtime.workspace import (
+    ForensicsSnapshot,
+    PromotionResult,
+    RealWorkspace,
+    ShadowForkWorkspace,
+    create_workspace,
+)
 
 # =============================================================================
 # Fixtures
@@ -255,15 +253,13 @@ class TestBoundaryScanner:
 
         # Capture state with the new file
         import subprocess
+
         subprocess.run(["git", "add", ".env"], cwd=str(temp_repo), capture_output=True)
 
         violations = scanner.scan()
 
         # Should detect secret exposure
-        secret_violations = [
-            v for v in violations
-            if v.type == ViolationType.SECRET_EXPOSURE
-        ]
+        secret_violations = [v for v in violations if v.type == ViolationType.SECRET_EXPOSURE]
         assert len(secret_violations) > 0
 
 

@@ -37,7 +37,7 @@ def get_validation_data():
             ["uv", "run", "swarm/tools/validate_swarm.py", "--json"],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=30,
         )
         if result.returncode == 0:
             return json.loads(result.stdout)
@@ -77,7 +77,7 @@ def get_agent_fr_status(validation_data, agent_key):
         "checks": agent.get("checks", {}),
         "has_issues": agent.get("has_issues", False),
         "has_warnings": agent.get("has_warnings", False),
-        "issues": agent.get("issues", [])
+        "issues": agent.get("issues", []),
     }
 
 
@@ -107,7 +107,7 @@ def get_flow_fr_status(validation_data, flow_key):
         "checks": flow.get("checks", {}),
         "has_issues": flow.get("has_issues", False),
         "has_warnings": flow.get("has_warnings", False),
-        "issues": flow.get("issues", [])
+        "issues": flow.get("issues", []),
     }
 
 
@@ -155,9 +155,7 @@ def format_fr_badges_html(checks):
         status = check.get("status", "unknown")
         message = check.get("message", fr_id)
         title = f'title="{message}"' if message else ""
-        badges_html.append(
-            f'<span class="fr-badge fr-{status}" {title}>{fr_id}</span>'
-        )
+        badges_html.append(f'<span class="fr-badge fr-{status}" {title}>{fr_id}</span>')
 
     return f'<div class="fr-badges">{" ".join(badges_html)}</div>'
 

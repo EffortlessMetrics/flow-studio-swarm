@@ -8,23 +8,24 @@ prioritize_history sorting. These tests ensure that:
 4. Utility agents (reporters, historians, post-flight) get LOW priority
 """
 
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
 
 _SWARM_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_SWARM_ROOT))
 
 from swarm.runtime.history_priority import (
+    CRITICAL_AGENT_PATTERNS,
+    HIGH_AGENT_PATTERNS,
+    LOW_AGENT_PATTERNS,
+    MEDIUM_AGENT_PATTERNS,
     HistoryPriority,
     classify_history_item,
     get_priority_label,
     prioritize_history,
     summarize_priority_distribution,
-    CRITICAL_AGENT_PATTERNS,
-    HIGH_AGENT_PATTERNS,
-    MEDIUM_AGENT_PATTERNS,
-    LOW_AGENT_PATTERNS,
 )
 
 
@@ -54,69 +55,81 @@ class TestClassifyHistoryItem:
     """Tests for classify_history_item function."""
 
     # CRITICAL agents
-    @pytest.mark.parametrize("agent_key", [
-        "merge-decider",
-        "deploy-decider",
-        "requirements-critic",
-        "design-critic",
-        "test-critic",
-        "code-critic",
-        "code-implementer",
-        "test-author",
-        "self-reviewer",
-    ])
+    @pytest.mark.parametrize(
+        "agent_key",
+        [
+            "merge-decider",
+            "deploy-decider",
+            "requirements-critic",
+            "design-critic",
+            "test-critic",
+            "code-critic",
+            "code-implementer",
+            "test-author",
+            "self-reviewer",
+        ],
+    )
     def test_critical_agents(self, agent_key: str):
         """Critical agents are classified as CRITICAL."""
         item = {"agent_key": agent_key, "step_id": "test", "output": "test output"}
         assert classify_history_item(item) == HistoryPriority.CRITICAL
 
     # HIGH agents
-    @pytest.mark.parametrize("agent_key", [
-        "requirements-author",
-        "bdd-author",
-        "adr-author",
-        "interface-designer",
-        "observability-designer",
-        "receipt-checker",
-        "contract-enforcer",
-        "security-scanner",
-        "coverage-enforcer",
-        "smoke-verifier",
-    ])
+    @pytest.mark.parametrize(
+        "agent_key",
+        [
+            "requirements-author",
+            "bdd-author",
+            "adr-author",
+            "interface-designer",
+            "observability-designer",
+            "receipt-checker",
+            "contract-enforcer",
+            "security-scanner",
+            "coverage-enforcer",
+            "smoke-verifier",
+        ],
+    )
     def test_high_agents(self, agent_key: str):
         """Foundation agents are classified as HIGH."""
         item = {"agent_key": agent_key, "step_id": "test", "output": "test output"}
         assert classify_history_item(item) == HistoryPriority.HIGH
 
     # MEDIUM agents
-    @pytest.mark.parametrize("agent_key", [
-        "clarifier",
-        "risk-analyst",
-        "policy-analyst",
-        "impact-analyzer",
-        "context-loader",
-        "fixer",
-        "mutator",
-    ])
+    @pytest.mark.parametrize(
+        "agent_key",
+        [
+            "clarifier",
+            "risk-analyst",
+            "policy-analyst",
+            "impact-analyzer",
+            "context-loader",
+            "fixer",
+            "mutator",
+        ],
+    )
     def test_medium_agents(self, agent_key: str):
         """Analysis agents are classified as MEDIUM."""
         item = {"agent_key": agent_key, "step_id": "test", "output": "test output"}
         assert classify_history_item(item) == HistoryPriority.MEDIUM
 
     # LOW agents
-    @pytest.mark.parametrize("agent_key", [
-        "signal-normalizer",
-        "problem-framer",
-        "scope-assessor",
-        "gh-reporter",
-        "doc-writer",
-        "flow-historian",
-        "artifact-auditor",
-        "regression-analyst",
-        "learning-synthesizer",
-        "feedback-applier",
-        "repo-operator",
-    ])
+    @pytest.mark.parametrize(
+        "agent_key",
+        [
+            "signal-normalizer",
+            "problem-framer",
+            "scope-assessor",
+            "gh-reporter",
+            "doc-writer",
+            "flow-historian",
+            "artifact-auditor",
+            "regression-analyst",
+            "learning-synthesizer",
+            "feedback-applier",
+            "repo-operator",
+        ],
+    )
     def test_low_agents(self, agent_key: str):
         """Utility agents are classified as LOW."""
         item = {"agent_key": agent_key, "step_id": "test", "output": "test output"}
@@ -172,10 +185,10 @@ class TestPrioritizeHistory:
     def test_sorting_by_priority(self):
         """Items are sorted by priority descending."""
         history = [
-            {"agent_key": "gh-reporter", "step_id": "s1", "output": ""},      # LOW
-            {"agent_key": "code-implementer", "step_id": "s2", "output": ""}, # CRITICAL
-            {"agent_key": "risk-analyst", "step_id": "s3", "output": ""},     # MEDIUM
-            {"agent_key": "adr-author", "step_id": "s4", "output": ""},       # HIGH
+            {"agent_key": "gh-reporter", "step_id": "s1", "output": ""},  # LOW
+            {"agent_key": "code-implementer", "step_id": "s2", "output": ""},  # CRITICAL
+            {"agent_key": "risk-analyst", "step_id": "s3", "output": ""},  # MEDIUM
+            {"agent_key": "adr-author", "step_id": "s4", "output": ""},  # HIGH
         ]
         result = prioritize_history(history)
 
@@ -192,8 +205,8 @@ class TestPrioritizeHistory:
         """Items with same priority maintain chronological order."""
         history = [
             {"agent_key": "code-implementer", "step_id": "impl1", "output": ""},  # CRITICAL (idx 0)
-            {"agent_key": "test-author", "step_id": "test1", "output": ""},       # CRITICAL (idx 1)
-            {"agent_key": "code-critic", "step_id": "critic1", "output": ""},     # CRITICAL (idx 2)
+            {"agent_key": "test-author", "step_id": "test1", "output": ""},  # CRITICAL (idx 1)
+            {"agent_key": "code-critic", "step_id": "critic1", "output": ""},  # CRITICAL (idx 2)
         ]
         result = prioritize_history(history, preserve_order_within_priority=True)
 
@@ -204,8 +217,8 @@ class TestPrioritizeHistory:
     def test_original_index_preserved(self):
         """Original index is preserved in result tuple."""
         history = [
-            {"agent_key": "gh-reporter", "step_id": "s1", "output": ""},      # LOW at idx 0
-            {"agent_key": "code-implementer", "step_id": "s2", "output": ""}, # CRITICAL at idx 1
+            {"agent_key": "gh-reporter", "step_id": "s1", "output": ""},  # LOW at idx 0
+            {"agent_key": "code-implementer", "step_id": "s2", "output": ""},  # CRITICAL at idx 1
         ]
         result = prioritize_history(history)
 
@@ -239,11 +252,11 @@ class TestSummarizePriorityDistribution:
         """Counts are correct for mixed priorities."""
         history = [
             {"agent_key": "code-implementer", "step_id": "s1", "output": ""},  # CRITICAL
-            {"agent_key": "code-critic", "step_id": "s2", "output": ""},       # CRITICAL
-            {"agent_key": "adr-author", "step_id": "s3", "output": ""},        # HIGH
-            {"agent_key": "risk-analyst", "step_id": "s4", "output": ""},      # MEDIUM
-            {"agent_key": "gh-reporter", "step_id": "s5", "output": ""},       # LOW
-            {"agent_key": "doc-writer", "step_id": "s6", "output": ""},        # LOW
+            {"agent_key": "code-critic", "step_id": "s2", "output": ""},  # CRITICAL
+            {"agent_key": "adr-author", "step_id": "s3", "output": ""},  # HIGH
+            {"agent_key": "risk-analyst", "step_id": "s4", "output": ""},  # MEDIUM
+            {"agent_key": "gh-reporter", "step_id": "s5", "output": ""},  # LOW
+            {"agent_key": "doc-writer", "step_id": "s6", "output": ""},  # LOW
         ]
         result = summarize_priority_distribution(history)
         assert result == {"CRITICAL": 2, "HIGH": 1, "MEDIUM": 1, "LOW": 2}
@@ -299,10 +312,10 @@ class TestAgentTaxonomyCoverage:
 
         # Get all explicitly classified agents
         classified_agents = (
-            CRITICAL_AGENT_PATTERNS |
-            HIGH_AGENT_PATTERNS |
-            MEDIUM_AGENT_PATTERNS |
-            LOW_AGENT_PATTERNS
+            CRITICAL_AGENT_PATTERNS
+            | HIGH_AGENT_PATTERNS
+            | MEDIUM_AGENT_PATTERNS
+            | LOW_AGENT_PATTERNS
         )
 
         # Find agents that are NOT explicitly classified
@@ -334,10 +347,10 @@ class TestAgentTaxonomyCoverage:
 
         # Get all explicitly classified agents
         classified_agents = (
-            CRITICAL_AGENT_PATTERNS |
-            HIGH_AGENT_PATTERNS |
-            MEDIUM_AGENT_PATTERNS |
-            LOW_AGENT_PATTERNS
+            CRITICAL_AGENT_PATTERNS
+            | HIGH_AGENT_PATTERNS
+            | MEDIUM_AGENT_PATTERNS
+            | LOW_AGENT_PATTERNS
         )
 
         # Find classified agents that don't exist in config
@@ -349,10 +362,11 @@ class TestAgentTaxonomyCoverage:
         if stale_references:
             # Just warn, don't fail - patterns can be intentionally broader
             import warnings
+
             warnings.warn(
                 f"Priority patterns include {len(stale_references)} key(s) not in config/agents/: "
                 f"{sorted(stale_references)}. This may be intentional for future agents.",
-                UserWarning
+                UserWarning,
             )
 
     def test_critical_agents_complete(self):

@@ -9,7 +9,6 @@ Tests cover:
 """
 
 import pytest
-
 from swarm.runtime.macro_navigator import (
     ConstraintContext,
     ConstraintEvaluator,
@@ -17,23 +16,17 @@ from swarm.runtime.macro_navigator import (
     ConstraintViolation,
     MacroNavigator,
     ParsedConstraint,
-    extract_flow_result,
 )
 from swarm.runtime.types import (
     FlowOutcome,
     FlowResult,
     GateVerdict,
-    HumanPolicy,
     MacroAction,
     MacroPolicy,
     MacroRoutingRule,
     RunPlanSpec,
     RunState,
-    RoutingDecision,
-    RoutingSignal,
-    HandoffEnvelope,
 )
-
 
 # =============================================================================
 # ConstraintEvaluator Parsing Tests
@@ -46,9 +39,7 @@ class TestConstraintParsing:
     def test_parse_never_deploy_unless_merge(self):
         """Parse 'never deploy unless gate verdict is MERGE'."""
         evaluator = ConstraintEvaluator()
-        constraint = evaluator.parse_constraint(
-            "never deploy unless gate verdict is MERGE"
-        )
+        constraint = evaluator.parse_constraint("never deploy unless gate verdict is MERGE")
 
         assert constraint.constraint_type == ConstraintType.NEVER_UNLESS
         assert constraint.action == "deploy"
@@ -125,15 +116,11 @@ class TestConstraintParsing:
         evaluator = ConstraintEvaluator()
 
         # All caps
-        c1 = evaluator.parse_constraint(
-            "NEVER DEPLOY UNLESS GATE VERDICT IS MERGE"
-        )
+        c1 = evaluator.parse_constraint("NEVER DEPLOY UNLESS GATE VERDICT IS MERGE")
         assert c1.constraint_type == ConstraintType.NEVER_UNLESS
 
         # Mixed case
-        c2 = evaluator.parse_constraint(
-            "Max 3 Bounces From Gate To Build"
-        )
+        c2 = evaluator.parse_constraint("Max 3 Bounces From Gate To Build")
         assert c2.constraint_type == ConstraintType.MAX_COUNT
 
 
@@ -148,9 +135,7 @@ class TestNeverUnlessEvaluation:
     def test_deploy_blocked_without_merge_verdict(self):
         """Deploy is blocked if gate verdict is not MERGE."""
         evaluator = ConstraintEvaluator()
-        constraint = evaluator.parse_constraint(
-            "never deploy unless gate verdict is MERGE"
-        )
+        constraint = evaluator.parse_constraint("never deploy unless gate verdict is MERGE")
 
         # Gate verdict is BOUNCE_BUILD
         flow_result = FlowResult(
@@ -175,9 +160,7 @@ class TestNeverUnlessEvaluation:
     def test_deploy_allowed_with_merge_verdict(self):
         """Deploy is allowed if gate verdict is MERGE."""
         evaluator = ConstraintEvaluator()
-        constraint = evaluator.parse_constraint(
-            "never deploy unless gate verdict is MERGE"
-        )
+        constraint = evaluator.parse_constraint("never deploy unless gate verdict is MERGE")
 
         flow_result = FlowResult(
             flow_key="gate",
@@ -223,9 +206,7 @@ class TestNeverUnlessEvaluation:
     def test_constraint_not_applicable_to_other_flows(self):
         """Deploy constraint doesn't apply to non-deploy transitions."""
         evaluator = ConstraintEvaluator()
-        constraint = evaluator.parse_constraint(
-            "never deploy unless gate verdict is MERGE"
-        )
+        constraint = evaluator.parse_constraint("never deploy unless gate verdict is MERGE")
 
         flow_result = FlowResult(
             flow_key="build",
@@ -246,9 +227,7 @@ class TestNeverUnlessEvaluation:
     def test_deploy_blocked_with_no_verdict(self):
         """Deploy is blocked if no gate verdict is available."""
         evaluator = ConstraintEvaluator()
-        constraint = evaluator.parse_constraint(
-            "never deploy unless gate verdict is MERGE"
-        )
+        constraint = evaluator.parse_constraint("never deploy unless gate verdict is MERGE")
 
         flow_result = FlowResult(
             flow_key="gate",

@@ -75,10 +75,10 @@ def test_audit_logging():
     cp = ControlPlane()
 
     # Make some decisions (including one with default)
-    cp.resolve_model("agent-a", "inherit", None)        # source: config
-    cp.resolve_model("agent-b", "haiku", None)          # source: config
-    cp.resolve_model("agent-c", "sonnet", "haiku")      # source: override
-    cp.resolve_model("agent-d", None, None)             # source: default
+    cp.resolve_model("agent-a", "inherit", None)  # source: config
+    cp.resolve_model("agent-b", "haiku", None)  # source: config
+    cp.resolve_model("agent-c", "sonnet", "haiku")  # source: override
+    cp.resolve_model("agent-d", None, None)  # source: default
 
     # Generate audit log
     log = cp.audit_log()
@@ -150,9 +150,9 @@ def test_summary_statistics():
     cp = ControlPlane()
 
     # Create mix of decision sources
-    cp.resolve_model("agent-inherit", "inherit", None)          # config
-    cp.resolve_model("agent-haiku", "haiku", None)              # config
-    cp.resolve_model("agent-override", "sonnet", "haiku")       # override
+    cp.resolve_model("agent-inherit", "inherit", None)  # config
+    cp.resolve_model("agent-haiku", "haiku", None)  # config
+    cp.resolve_model("agent-override", "sonnet", "haiku")  # override
 
     summary = cp.summary()
 
@@ -230,6 +230,7 @@ def main():
         except Exception as e:
             print(f"\n[FAIL] Test {test_fn.__name__} crashed: {e}")
             import traceback
+
             traceback.print_exc()
             results.append((test_fn.__name__, False))
 

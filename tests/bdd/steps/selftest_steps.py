@@ -156,10 +156,11 @@ def build_tools_available():
     # This is a precondition assertion; in practice, pytest running means tools are available
     # We could add more sophisticated checks but the basic check is that python/pytest work
     import sys
+
     assert sys.version_info >= (3, 8), "Python 3.8+ required"
 
 
-@given(parsers.parse('a file {path} exists'))
+@given(parsers.parse("a file {path} exists"))
 def file_exists(path: str):
     """Check that a specific file exists."""
     file_path = Path(path)
@@ -184,7 +185,7 @@ def log_file_exists(bdd_context: Dict[str, Any]):
             "step_id": "agents-governance",
             "tier": "GOVERNANCE",
             "status": "FAIL",
-            "message": "Sample degradation entry for testing"
+            "message": "Sample degradation entry for testing",
         }
         log_file.write_text(json.dumps(sample_entry) + "\n")
 
@@ -208,7 +209,7 @@ def log_file_has_entries(bdd_context: Dict[str, Any]):
             "step_id": "agents-governance",
             "tier": "GOVERNANCE",
             "status": "FAIL",
-            "message": "Initial entry before test run"
+            "message": "Initial entry before test run",
         }
         log_file.write_text(json.dumps(sample_entry) + "\n")
 
@@ -262,7 +263,7 @@ def run_command_with_env(
     bdd_context["parsed_lines"] = proc.stdout.splitlines()
 
 
-@when(parsers.parse('I run `{command}`'))
+@when(parsers.parse("I run `{command}`"))
 def run_command(bdd_context: Dict[str, Any], command: str):
     """
     Execute a shell command and store results in context.
@@ -396,18 +397,18 @@ def assert_exit_code_one_of(bdd_context: Dict[str, Any], expected: int, expected
 def assert_exit_0_if_healthy(bdd_context: Dict[str, Any]):
     """Context-dependent: if HEALTHY in output, exit code must be 0."""
     if "HEALTHY" in bdd_context["combined_output"]:
-        assert (
-            bdd_context["exit_code"] == 0
-        ), f"Output says HEALTHY but exit code is {bdd_context['exit_code']}"
+        assert bdd_context["exit_code"] == 0, (
+            f"Output says HEALTHY but exit code is {bdd_context['exit_code']}"
+        )
 
 
 @then("the exit code should be 1 if kernel is broken")
 def assert_exit_1_if_broken(bdd_context: Dict[str, Any]):
     """Context-dependent: if BROKEN in output, exit code must be 1."""
     if "BROKEN" in bdd_context["combined_output"]:
-        assert (
-            bdd_context["exit_code"] == 1
-        ), f"Output says BROKEN but exit code is {bdd_context['exit_code']}"
+        assert bdd_context["exit_code"] == 1, (
+            f"Output says BROKEN but exit code is {bdd_context['exit_code']}"
+        )
 
 
 @then("the exit code should reflect only that step's status")
@@ -431,8 +432,7 @@ def assert_exit_code_depends_on_kernel(bdd_context: Dict[str, Any]):
     """Exit code should be 0 or 1, depending on KERNEL step outcome."""
     actual = bdd_context["exit_code"]
     assert actual in (0, 1), (
-        f"Expected exit code 0 or 1, got {actual}\n"
-        f"Output: {bdd_context['combined_output'][:500]}"
+        f"Expected exit code 0 or 1, got {actual}\nOutput: {bdd_context['combined_output'][:500]}"
     )
 
 
@@ -450,15 +450,11 @@ def assert_output_contains(bdd_context: Dict[str, Any], text: str):
         Then the output should contain "core-checks"
     """
     output = bdd_context["combined_output"]
-    assert text in output, (
-        f'Expected "{text}" in output, got:\n{output[:1000]}'
-    )
+    assert text in output, f'Expected "{text}" in output, got:\n{output[:1000]}'
 
 
 @then(parsers.parse('the output should contain either "{text1}" or "{text2}"'))
-def assert_output_contains_one_of(
-    bdd_context: Dict[str, Any], text1: str, text2: str
-):
+def assert_output_contains_one_of(bdd_context: Dict[str, Any], text1: str, text2: str):
     """
     Assert at least one of two substrings exists in output.
 
@@ -466,12 +462,12 @@ def assert_output_contains_one_of(
         Then the output should contain either "HEALTHY" or "BROKEN"
     """
     output = bdd_context["combined_output"]
-    assert (text1 in output) or (
-        text2 in output
-    ), f'Expected "{text1}" or "{text2}" in output, got:\n{output[:1000]}'
+    assert (text1 in output) or (text2 in output), (
+        f'Expected "{text1}" or "{text2}" in output, got:\n{output[:1000]}'
+    )
 
 
-@then(parsers.parse('the output should mention that {statement}'))
+@then(parsers.parse("the output should mention that {statement}"))
 def assert_output_mentions(bdd_context: Dict[str, Any], statement: str):
     """
     Flexible assertion: check if output addresses the statement.
@@ -488,7 +484,7 @@ def assert_output_mentions(bdd_context: Dict[str, Any], statement: str):
     found = any(kw in output for kw in key_words)
     assert found, (
         f'Expected output to address "{statement}", '
-        f'keywords to find: {key_words}, got:\n{output[:500]}'
+        f"keywords to find: {key_words}, got:\n{output[:500]}"
     )
 
 
@@ -506,9 +502,7 @@ def assert_output_shows_components(bdd_context: Dict[str, Any]):
     # Should mention at least one component check
     components = ["ruff", "compile", "check", "python", "lint"]
     found = any(c in output for c in components)
-    assert found, (
-        f"Expected component status in output, got:\n{output[:500]}"
-    )
+    assert found, f"Expected component status in output, got:\n{output[:500]}"
 
 
 @then("the output should list at least 16 steps with clearly identified IDs")
@@ -527,9 +521,7 @@ def assert_output_lists_steps(bdd_context: Dict[str, Any]):
         "graph-invariants",
     ]
     found_steps = [s for s in steps if s in output]
-    assert (
-        len(found_steps) >= 8
-    ), f"Expected at least 8 of {steps}, found {found_steps}"
+    assert len(found_steps) >= 8, f"Expected at least 8 of {steps}, found {found_steps}"
 
 
 @then("the output should show step IDs and dependency information")
@@ -593,16 +585,13 @@ def assert_output_json_valid(bdd_context: Dict[str, Any]):
         try:
             # Find the first '{' and try to parse from there
             output = output_to_parse
-            json_start = output.find('{')
+            json_start = output.find("{")
             if json_start >= 0:
                 bdd_context["json_output"] = json.loads(output[json_start:])
             else:
                 raise
         except json.JSONDecodeError:
-            pytest.fail(
-                f"Output is not valid JSON:\n{output_to_parse[:500]}\n"
-                f"Error: {e}"
-            )
+            pytest.fail(f"Output is not valid JSON:\n{output_to_parse[:500]}\nError: {e}")
 
 
 @then("each line should be valid JSON")
@@ -677,9 +666,7 @@ def assert_output_shows_table(bdd_context: Dict[str, Any], datatable: list[list[
         # Each row is a dict; check that at least the 'step' column value appears
         for key, value in row.items():
             if key == "step" or "step" in key.lower():
-                assert value in output, (
-                    f'Expected "{value}" in output, got:\n{output[:500]}'
-                )
+                assert value in output, f'Expected "{value}" in output, got:\n{output[:500]}'
 
 
 @then("the output should include:")
@@ -729,8 +716,7 @@ def assert_output_includes_table(bdd_context: Dict[str, Any], datatable: list[li
             found = True
 
         assert found, (
-            f"Expected field '{field}' or example '{example}' in output, "
-            f"got:\n{output[:500]}"
+            f"Expected field '{field}' or example '{example}' in output, got:\n{output[:500]}"
         )
 
 
@@ -748,7 +734,7 @@ def assert_degraded_indicated(bdd_context: Dict[str, Any]):
 # ============================================================================
 
 
-@then("the JSON should have a \"steps\" array with at least 16 items")
+@then('the JSON should have a "steps" array with at least 16 items')
 def assert_json_steps_array(bdd_context: Dict[str, Any]):
     """
     Assert JSON has a 'steps' key with list of 16+ items.
@@ -764,7 +750,7 @@ def assert_json_steps_array(bdd_context: Dict[str, Any]):
     assert len(steps) >= 16, f"Expected at least 16 steps, got {len(steps)}"
 
 
-@then("the JSON should have a \"steps\" array with exactly 16 items")
+@then('the JSON should have a "steps" array with exactly 16 items')
 def assert_json_steps_exact(bdd_context: Dict[str, Any]):
     """Assert JSON has exactly 16 steps."""
     data = cast(Dict[str, Any], bdd_context["json_output"])
@@ -772,7 +758,7 @@ def assert_json_steps_exact(bdd_context: Dict[str, Any]):
     assert len(steps) == 16, f"Expected exactly 16 steps, got {len(steps)}"
 
 
-@then('each step in JSON should have: id, tier, description, depends_on')
+@then("each step in JSON should have: id, tier, description, depends_on")
 def assert_json_steps_have_required_fields(bdd_context: Dict[str, Any]):
     """
     Assert each step object has required fields: id, tier, description, depends_on.
@@ -786,9 +772,7 @@ def assert_json_steps_have_required_fields(bdd_context: Dict[str, Any]):
 
     for step in steps:
         for field in required:
-            assert field in step, (
-                f"Step missing field '{field}': {step}"
-            )
+            assert field in step, f"Step missing field '{field}': {step}"
         # depends_on is optional, so we don't require it
 
 
@@ -820,9 +804,7 @@ def assert_json_each_step_table(bdd_context: Dict[str, Any], datatable: list[lis
 
     for step_obj in steps:
         for field in required_fields:
-            assert field in step_obj, (
-                f"Step missing field '{field}': {step_obj}"
-            )
+            assert field in step_obj, f"Step missing field '{field}': {step_obj}"
 
 
 # ============================================================================
@@ -830,7 +812,7 @@ def assert_json_each_step_table(bdd_context: Dict[str, Any], datatable: list[lis
 # ============================================================================
 
 
-@then(parsers.parse('a file {path} should exist'))
+@then(parsers.parse("a file {path} should exist"))
 def assert_file_exists(bdd_context: Dict[str, Any], path: str):
     """
     Assert a file exists after command execution.
@@ -918,7 +900,7 @@ def assert_conditional_output(bdd_context: Dict[str, Any], code: int, text: str)
     if bdd_context["exit_code"] == code:
         assert text in bdd_context["combined_output"], (
             f'When exit code is {code}, expected "{text}" in output, '
-            f'got:\n{bdd_context["combined_output"][:500]}'
+            f"got:\n{bdd_context['combined_output'][:500]}"
         )
 
 
@@ -1137,9 +1119,7 @@ def assert_log_fields(bdd_context: Dict[str, Any]):
     required_fields = ["timestamp", "step_id", "tier", "message"]
     for entry in entries:
         for field in required_fields:
-            assert field in entry, (
-                f"Log entry missing field '{field}': {entry}"
-            )
+            assert field in entry, f"Log entry missing field '{field}': {entry}"
 
 
 @then("selftest_degradations.log should contain multiple entries")
@@ -1187,4 +1167,9 @@ def assert_log_clear_structure(bdd_context: Dict[str, Any]):
         log_text = log_file.read_text(encoding="utf-8")
 
     # Should have some structure (timestamps, step ids, messages)
-    assert "[" in log_text or "timestamp" in log_text.lower() or "step" in log_text.lower() or len(log_text) > 50
+    assert (
+        "[" in log_text
+        or "timestamp" in log_text.lower()
+        or "step" in log_text.lower()
+        or len(log_text) > 50
+    )

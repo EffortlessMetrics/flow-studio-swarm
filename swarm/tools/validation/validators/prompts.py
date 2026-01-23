@@ -16,12 +16,14 @@ Checks for presence of these required headings after frontmatter:
 import re
 from typing import Any, Dict, List
 
-from swarm.validator import ValidationResult
-from swarm.tools.validation.helpers import ROOT, AGENTS_DIR
 from swarm.tools.validation.constants import BUILT_IN_AGENTS
+from swarm.tools.validation.helpers import AGENTS_DIR, ROOT
+from swarm.validator import ValidationResult
 
 
-def validate_prompt_sections(registry: Dict[str, Dict[str, Any]], strict_mode: bool = False) -> ValidationResult:
+def validate_prompt_sections(
+    registry: Dict[str, Dict[str, Any]], strict_mode: bool = False
+) -> ValidationResult:
     """
     Validate that agent prompt bodies include required sections.
 
@@ -85,7 +87,7 @@ def validate_prompt_sections(registry: Dict[str, Dict[str, Any]], strict_mode: b
             # Find the closing ---
             end_idx = content.find("---", 3)
             if end_idx != -1:
-                body = content[end_idx + 3:].strip()
+                body = content[end_idx + 3 :].strip()
             else:
                 body = ""
         else:
@@ -105,23 +107,13 @@ def validate_prompt_sections(registry: Dict[str, Dict[str, Any]], strict_mode: b
         if missing_sections:
             location = str(rel_path)
             problem = f"missing required prompt sections: {', '.join(missing_sections)}"
-            fix_action = f"Add the following sections to agent prompt: {', '.join(missing_sections)}"
+            fix_action = (
+                f"Add the following sections to agent prompt: {', '.join(missing_sections)}"
+            )
 
             if strict_mode:
-                result.add_error(
-                    "PROMPT",
-                    location,
-                    problem,
-                    fix_action,
-                    file_path=str(path)
-                )
+                result.add_error("PROMPT", location, problem, fix_action, file_path=str(path))
             else:
-                result.add_warning(
-                    "PROMPT",
-                    location,
-                    problem,
-                    fix_action,
-                    file_path=str(path)
-                )
+                result.add_warning("PROMPT", location, problem, fix_action, file_path=str(path))
 
     return result

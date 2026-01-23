@@ -375,7 +375,9 @@ class RoutingSignal:
     # Candidate-set pattern fields (audit trail for Navigator decisions)
     chosen_candidate_id: Optional[str] = None  # ID of selected candidate
     routing_candidates: List[RoutingCandidate] = field(default_factory=list)  # Available candidates
-    routing_source: str = "navigator"  # "navigator" | "fast_path" | "deterministic_fallback" | "config_default"
+    routing_source: str = (
+        "navigator"  # "navigator" | "fast_path" | "deterministic_fallback" | "config_default"
+    )
     # Structured routing explanation (optional, for audit/debug)
     explanation: Optional[RoutingExplanation] = None
     # Why-now justification for off-path routing (required for DETOUR/INJECT_*)

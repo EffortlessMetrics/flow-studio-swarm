@@ -38,6 +38,7 @@ from fastapi.testclient import TestClient
 def fastapi_client():
     """Create FastAPI test client."""
     from swarm.tools.flow_studio_fastapi import app
+
     return TestClient(app)
 
 
@@ -96,9 +97,7 @@ class TestSelfTestPlanStatusCoherence:
             status_step_ids = set(status_selftest["steps"].keys())
             # Verify no step in status contradicts the plan
             invalid_status_steps = status_step_ids - plan_step_ids
-            assert not invalid_status_steps, (
-                f"Status has steps not in plan: {invalid_status_steps}"
-            )
+            assert not invalid_status_steps, f"Status has steps not in plan: {invalid_status_steps}"
 
     def test_plan_and_status_step_counts_align(self, fastapi_client):
         """
@@ -178,7 +177,7 @@ class TestSelfTestPlanStatusCoherence:
         by_tier = plan_data["summary"]["by_tier"]
         has_kernel = by_tier["kernel"] > 0
         has_governance = by_tier["governance"] > 0
-        has_optional = by_tier["optional"] > 0
+        by_tier["optional"] > 0
 
         # Assert: Plan has proper tier structure
         assert has_kernel, "Plan should have KERNEL tier steps"
@@ -244,9 +243,7 @@ class TestSelfTestPlanStatusCoherence:
             assert "description" in plan_step, (
                 f"Plan entry for '{status_step_id}' missing description"
             )
-            assert "tier" in plan_step, (
-                f"Plan entry for '{status_step_id}' missing tier"
-            )
+            assert "tier" in plan_step, f"Plan entry for '{status_step_id}' missing tier"
             assert "depends_on" in plan_step, (
                 f"Plan entry for '{status_step_id}' missing depends_on"
             )
@@ -284,9 +281,7 @@ class TestSelfTestPlanStatusCoherence:
             step_id = step["id"]
             for dep_id in step.get("depends_on", []):
                 dep_idx = step_index.get(dep_id, -1)
-                assert dep_idx >= 0, (
-                    f"Step '{step_id}' depends on '{dep_id}' which is not in plan"
-                )
+                assert dep_idx >= 0, f"Step '{step_id}' depends on '{dep_id}' which is not in plan"
                 assert dep_idx < i, (
                     f"Step '{step_id}' (position {i}) depends on '{dep_id}' "
                     f"(position {dep_idx}), which comes later (forward reference)"

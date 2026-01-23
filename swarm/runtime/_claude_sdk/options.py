@@ -20,10 +20,9 @@ from typing import Any, Dict, Optional, Union
 from typing_extensions import TYPE_CHECKING
 
 from swarm.runtime._claude_sdk.constants import (
-    DEFAULT_MODEL,
+    _SANDBOX_WARNING_LOGGED,
     SANDBOX_ENABLED,
     SYSTEM_PROMPT_PRESET,
-    _SANDBOX_WARNING_LOGGED,
 )
 from swarm.runtime._claude_sdk.policy import compute_disallowed_tools
 from swarm.runtime._claude_sdk.sdk_import import get_sdk_module

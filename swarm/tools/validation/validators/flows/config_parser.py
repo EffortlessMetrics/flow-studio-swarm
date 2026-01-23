@@ -26,7 +26,7 @@ def parse_flow_config(flow_path: Path) -> Dict[str, Any]:
         "description": "",
         "steps": [],
         "cross_cutting": [],
-        "errors": []
+        "errors": [],
     }
 
     try:
@@ -84,13 +84,15 @@ def parse_flow_config(flow_path: Path) -> Dict[str, Any]:
                         key, value = item.split(":", 1)
                         if key.strip() == "id":
                             step_id = value.strip().strip("'\"")
-                            result["steps"].append({  # type: ignore[union-attr]
-                                "id": step_id,
-                                "agents": [],
-                                "role": "",
-                                "human_only": False,
-                                "line": i
-                            })
+                            result["steps"].append(
+                                {  # type: ignore[union-attr]
+                                    "id": step_id,
+                                    "agents": [],
+                                    "role": "",
+                                    "human_only": False,
+                                    "line": i,
+                                }
+                            )
                             in_step = True
                 elif current_list == "cross_cutting":
                     # cross_cutting items are just agent names
@@ -111,13 +113,15 @@ def parse_flow_config(flow_path: Path) -> Dict[str, Any]:
                         key, value = item.split(":", 1)
                         if key.strip() == "id":
                             step_id = value.strip().strip("'\"")
-                            result["steps"].append({  # type: ignore[union-attr]
-                                "id": step_id,
-                                "agents": [],
-                                "role": "",
-                                "human_only": False,
-                                "line": i
-                            })
+                            result["steps"].append(
+                                {  # type: ignore[union-attr]
+                                    "id": step_id,
+                                    "agents": [],
+                                    "role": "",
+                                    "human_only": False,
+                                    "line": i,
+                                }
+                            )
                             in_step = True
                             in_agents_list = False
                         else:

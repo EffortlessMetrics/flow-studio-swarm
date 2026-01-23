@@ -42,7 +42,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 # Add repo root to path
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -50,7 +50,6 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 import pytest
-
 
 # ============================================================================
 # Helper Functions
@@ -124,7 +123,9 @@ def create_mocked_provider(tmp_path, kernel_ok=True, selftest_status="GREEN", go
         kernel_ok=kernel_ok,
         governance_ok=governance_ok,
     )
-    validation_status_obj = ValidationStatus(last_run="", status="PASS", error_count=0, warning_count=0)
+    validation_status_obj = ValidationStatus(
+        last_run="", status="PASS", error_count=0, warning_count=0
+    )
     flows_status_obj = FlowsStatus(total=0, healthy=0, degraded=0, broken=0)
     agents_status_obj = AgentsStatus(total=0)
 
@@ -295,7 +296,9 @@ class TestStatusStateReflectsLogSeverity:
 
         write_degradation_log(log_path, entries)
 
-        provider = create_mocked_provider(tmp_path, kernel_ok=False, selftest_status="RED", governance_ok=False)
+        provider = create_mocked_provider(
+            tmp_path, kernel_ok=False, selftest_status="RED", governance_ok=False
+        )
 
         status_report = provider.get_status(force_refresh=True)
         status = status_report.to_dict()
@@ -318,7 +321,9 @@ class TestStatusStateReflectsLogSeverity:
 
         write_degradation_log(log_path, entries)
 
-        provider = create_mocked_provider(tmp_path, kernel_ok=True, selftest_status="YELLOW", governance_ok=False)
+        provider = create_mocked_provider(
+            tmp_path, kernel_ok=True, selftest_status="YELLOW", governance_ok=False
+        )
 
         status_report = provider.get_status(force_refresh=True)
         status = status_report.to_dict()
@@ -546,12 +551,14 @@ class TestStatusEndpointFullContract:
 
         # Verify top-level structure
         required_top = {"timestamp", "service", "governance", "flows", "agents", "hints"}
-        assert set(status.keys()) >= required_top, f"Missing top-level fields"
+        assert set(status.keys()) >= required_top, "Missing top-level fields"
 
         # Verify governance structure
         gov = status["governance"]
         required_gov = {"kernel", "selftest", "validation", "state", "degradations", "ac"}
-        assert set(gov.keys()) >= required_gov, f"Missing governance fields: {required_gov - set(gov.keys())}"
+        assert set(gov.keys()) >= required_gov, (
+            f"Missing governance fields: {required_gov - set(gov.keys())}"
+        )
 
         # Verify degradations structure
         assert isinstance(gov["degradations"], list), "Degradations should be a list"
@@ -566,7 +573,7 @@ class TestStatusEndpointFullContract:
                 "severity",
                 "remediation",
             }
-            assert set(deg.keys()) >= required_deg, f"Missing degradation fields"
+            assert set(deg.keys()) >= required_deg, "Missing degradation fields"
 
         # Verify AC structure
         assert isinstance(gov["ac"], dict), "AC should be a dict"

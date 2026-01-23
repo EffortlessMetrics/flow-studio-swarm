@@ -19,12 +19,12 @@ from .cel_evaluator import CELEvaluator
 from .factory import get_router
 from .graph_router import SmartRouter, create_router, route_step
 from .step_router import (
+    StepRouter,
     attach_routing_audit,
     convert_to_wp4_explanation,
     emit_routing_event,
     route_from_step,
     store_routing_audit,
-    StepRouter,
 )
 
 __all__ = [

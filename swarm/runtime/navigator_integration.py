@@ -44,6 +44,14 @@ from typing import Any, Callable, Dict, List, Optional
 # Import MAX_DETOUR_DEPTH from orchestrator
 from swarm.runtime.stepwise.orchestrator import MAX_DETOUR_DEPTH
 
+# Forensic comparator imports for Semantic Handoff Injection
+from .forensic_comparator import (
+    compare_claim_vs_evidence,
+    forensic_verdict_to_dict,
+)
+from .forensic_types import (
+    diff_scan_result_from_dict,
+)
 from .navigator import (
     DetourRequest,
     FileChangesSummary,
@@ -56,7 +64,6 @@ from .navigator import (
     RouteIntent,
     RouteProposal,
     StallSignals,
-    UtilityFlowRequest,
     VerificationSummary,
     extract_candidate_edges_from_graph,
     navigator_output_to_dict,
@@ -79,19 +86,10 @@ from .types import (
     handoff_envelope_to_dict,
 )
 
-# Forensic comparator imports for Semantic Handoff Injection
-from .forensic_comparator import (
-    compare_claim_vs_evidence,
-    forensic_verdict_to_dict,
-)
-from .forensic_types import (
-    DiffScanResult,
-    diff_scan_result_from_dict,
-)
 # Utility flow injection imports for INJECT_FLOW handling
 from .utility_flow_injection import (
-    UtilityFlowRegistry,
     UtilityFlowInjector,
+    UtilityFlowRegistry,
 )
 
 logger = logging.getLogger(__name__)

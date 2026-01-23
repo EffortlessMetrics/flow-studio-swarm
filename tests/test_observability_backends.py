@@ -13,13 +13,13 @@ Tests:
 import json
 import os
 import sys
-import tempfile
 import time
 from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+
 import yaml
 
 # Add swarm/tools to path for imports
@@ -52,9 +52,7 @@ class TestConfigLoading:
         config_file = tmp_path / "test_config.yaml"
         config_data = {
             "version": "1.0",
-            "backends": {
-                "logs": {"enabled": True, "format": "json", "output": "stdout"}
-            },
+            "backends": {"logs": {"enabled": True, "format": "json", "output": "stdout"}},
             "global": {"enabled": True, "strict_mode": False},
         }
         with open(config_file, "w") as f:
@@ -102,8 +100,12 @@ class TestLogBackend:
 
             backend.emit_run_started("test-run-1", "kernel", time.time())
             backend.emit_step_completed("core-checks", 1500, "PASS", "kernel")
-            backend.emit_step_failed("agents-governance", "warning", "Agent foo not found", "governance")
-            backend.emit_run_completed("test-run-1", "FAIL", 5000, {"passed": 2, "failed": 1, "skipped": 0})
+            backend.emit_step_failed(
+                "agents-governance", "warning", "Agent foo not found", "governance"
+            )
+            backend.emit_run_completed(
+                "test-run-1", "FAIL", 5000, {"passed": 2, "failed": 1, "skipped": 0}
+            )
 
         output_lines = output.getvalue().strip().split("\n")
         assert len(output_lines) == 4
@@ -213,7 +215,7 @@ class TestPrometheusBackend:
         config = {"enabled": True, "pushgateway_url": None, "serve_port": 9999, "job_name": "test"}
 
         try:
-            from prometheus_client import CollectorRegistry
+            import prometheus_client  # noqa: F401 - availability check
 
             backend = PrometheusBackend(config)
             assert backend.enabled is True
@@ -233,7 +235,9 @@ class TestPrometheusBackend:
 
             backend.emit_step_completed("core-checks", 1500, "PASS", "kernel")
             backend.emit_step_failed("agents-governance", "warning", "error", "governance")
-            backend.emit_run_completed("test-run", "PASS", 5000, {"mode": "strict", "passed": 3, "failed": 0})
+            backend.emit_run_completed(
+                "test-run", "PASS", 5000, {"mode": "strict", "passed": 3, "failed": 0}
+            )
 
             # Metrics should be updated (no exceptions)
             backend.close()
@@ -257,7 +261,6 @@ class TestDatadogBackend:
     def test_datadog_backend_initializes_with_api_key(self, mock_init):
         """DatadogBackend should initialize when DATADOG_API_KEY is set."""
         mock_init.return_value = None
-        config = {"enabled": True, "api_key": None}
 
         # Should detect API key from environment
         api_key = os.environ.get("DATADOG_API_KEY")
@@ -288,10 +291,14 @@ class TestDatadogBackend:
                     backend.emit_run_started("test-run", "kernel", time.time())
                     backend.emit_step_completed("core-checks", 1500, "PASS", "kernel")
                     backend.emit_step_failed("test-step", "critical", "error", "kernel")
-                    backend.emit_run_completed("test-run", "FAIL", 5000, {"mode": "strict", "passed": 2, "failed": 1})
+                    backend.emit_run_completed(
+                        "test-run", "FAIL", 5000, {"mode": "strict", "passed": 2, "failed": 1}
+                    )
 
                     # Verify API calls were made
-                    assert mock_event_create.call_count >= 2  # run_started, step_failed, run_completed events
+                    assert (
+                        mock_event_create.call_count >= 2
+                    )  # run_started, step_failed, run_completed events
                     assert mock_metric_send.call_count >= 4  # step and run metrics
 
 
@@ -345,7 +352,9 @@ class TestCloudWatchBackend:
 
             backend.emit_step_completed("core-checks", 1500, "PASS", "kernel")
             backend.emit_step_failed("test-step", "warning", "error", "governance")
-            backend.emit_run_completed("test-run", "PASS", 5000, {"mode": "strict", "passed": 3, "failed": 0})
+            backend.emit_run_completed(
+                "test-run", "PASS", 5000, {"mode": "strict", "passed": 3, "failed": 0}
+            )
 
             # Verify put_metric_data was called
             assert mock_cw.put_metric_data.call_count >= 3
@@ -392,7 +401,9 @@ class TestBackendManager:
         manager.emit_run_started("test-run", "kernel", time.time())
         manager.emit_step_completed("core-checks", 1500, "PASS", "kernel")
         manager.emit_step_failed("test-step", "critical", "error", "kernel")
-        manager.emit_run_completed("test-run", "FAIL", 5000, {"passed": 1, "failed": 1, "skipped": 0})
+        manager.emit_run_completed(
+            "test-run", "FAIL", 5000, {"passed": 1, "failed": 1, "skipped": 0}
+        )
         manager.close()
 
         # Verify events were written to log file
@@ -504,7 +515,9 @@ class TestEndToEndIntegration:
         # Simulate events
         mock_manager.emit_run_started("test-run", "kernel", time.time())
         mock_manager.emit_step_completed("core-checks", 1000, "PASS", "kernel")
-        mock_manager.emit_run_completed("test-run", "PASS", 1500, {"passed": 1, "failed": 0, "skipped": 0, "mode": "kernel"})
+        mock_manager.emit_run_completed(
+            "test-run", "PASS", 1500, {"passed": 1, "failed": 0, "skipped": 0, "mode": "kernel"}
+        )
         mock_manager.close()
 
         # Verify events were logged

@@ -38,8 +38,6 @@ import re
 import sys
 from pathlib import Path
 
-import pytest
-
 # Add repo root to path so swarm imports work
 repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
@@ -54,6 +52,7 @@ if str(repo_root) not in sys.path:
 def get_flow_studio_html() -> str:
     """Load the Flow Studio HTML from the UI module."""
     from swarm.tools.flow_studio_ui import get_index_html
+
     return get_index_html()
 
 
@@ -86,34 +85,28 @@ class TestSDKExport:
         """window.__flowStudio should be set during initialization."""
         app_ts = get_ts_source("flow-studio-app.ts")
 
-        assert "window.__flowStudio" in app_ts, (
-            "SDK should be exported on window.__flowStudio"
-        )
+        assert "window.__flowStudio" in app_ts, "SDK should be exported on window.__flowStudio"
 
     def test_sdk_has_typed_interface(self):
         """FlowStudioSDK interface should be defined in domain.ts."""
         domain_ts = get_ts_source("domain.ts")
 
-        assert "interface FlowStudioSDK" in domain_ts, (
-            "SDK should have a typed interface"
-        )
+        assert "interface FlowStudioSDK" in domain_ts, "SDK should have a typed interface"
 
     def test_sdk_interface_includes_required_methods(self):
         """SDK interface should include the required methods for automation."""
         domain_ts = get_ts_source("domain.ts")
 
         required_methods = [
-            "getState",       # Get current UI state
+            "getState",  # Get current UI state
             "setActiveFlow",  # Navigate to a flow
-            "selectStep",     # Select a step in the current flow
-            "selectAgent",    # Select an agent
-            "clearSelection", # Clear current selection
+            "selectStep",  # Select a step in the current flow
+            "selectAgent",  # Select an agent
+            "clearSelection",  # Clear current selection
         ]
 
         for method in required_methods:
-            assert method in domain_ts, (
-                f"SDK should expose '{method}' method"
-            )
+            assert method in domain_ts, f"SDK should expose '{method}' method"
 
 
 # ============================================================================
@@ -128,20 +121,14 @@ class TestSDKStateContract:
         """SDK state should include current flow key."""
         domain_ts = get_ts_source("domain.ts")
 
-        assert "currentFlowKey" in domain_ts, (
-            "SDK state should include currentFlowKey"
-        )
+        assert "currentFlowKey" in domain_ts, "SDK state should include currentFlowKey"
 
     def test_state_includes_selection(self):
         """SDK state should include selection information."""
         domain_ts = get_ts_source("domain.ts")
 
-        assert "selectedNodeId" in domain_ts, (
-            "SDK state should include selectedNodeId"
-        )
-        assert "selectedNodeType" in domain_ts, (
-            "SDK state should include selectedNodeType"
-        )
+        assert "selectedNodeId" in domain_ts, "SDK state should include selectedNodeId"
+        assert "selectedNodeType" in domain_ts, "SDK state should include selectedNodeType"
 
     def test_state_includes_run_info(self):
         """SDK state should include run information."""
@@ -208,9 +195,7 @@ class TestSDKHelperMethods:
         """
         domain_ts = get_ts_source("domain.ts")
 
-        assert "qsByUiid" in domain_ts, (
-            "SDK should expose qsByUiid helper"
-        )
+        assert "qsByUiid" in domain_ts, "SDK should expose qsByUiid helper"
 
     def test_sdk_has_uiid_prefix_query_helper(self):
         """SDK should expose helper to query by data-uiid prefix.
@@ -219,9 +204,7 @@ class TestSDKHelperMethods:
         """
         domain_ts = get_ts_source("domain.ts")
 
-        assert "qsAllByUiidPrefix" in domain_ts, (
-            "SDK should expose qsAllByUiidPrefix helper"
-        )
+        assert "qsAllByUiidPrefix" in domain_ts, "SDK should expose qsAllByUiidPrefix helper"
 
 
 # ============================================================================
@@ -238,22 +221,16 @@ class TestUIReadyHandshake:
         Playwright wait: await page.wait_for_selector('html[data-ui-ready="ready"]')
         """
         html = get_flow_studio_html()
-        assert 'data-ui-ready=' in html
+        assert "data-ui-ready=" in html
 
     def test_ready_state_is_set_on_success(self):
         """UI should set data-ui-ready="ready" when initialization succeeds."""
         all_ts = get_all_ts_sources()
 
         # Check that ready state helpers exist
-        assert "function markUiLoading" in all_ts, (
-            "UI should define a markUiLoading helper"
-        )
-        assert "function markUiReady" in all_ts, (
-            "UI should define a markUiReady helper"
-        )
-        assert "function markUiError" in all_ts, (
-            "UI should define a markUiError helper"
-        )
+        assert "function markUiLoading" in all_ts, "UI should define a markUiLoading helper"
+        assert "function markUiReady" in all_ts, "UI should define a markUiReady helper"
+        assert "function markUiError" in all_ts, "UI should define a markUiError helper"
 
 
 # ============================================================================
@@ -297,7 +274,7 @@ class TestGoldenPathContract:
         app_ts = get_ts_source("flow-studio-app.ts")
 
         # 1. UI ready handshake
-        assert 'data-ui-ready=' in html, "UI ready attribute missing"
+        assert "data-ui-ready=" in html, "UI ready attribute missing"
 
         # 2. SDK export
         assert "window.__flowStudio" in app_ts, "SDK not exported"
@@ -314,9 +291,7 @@ class TestGoldenPathContract:
         """Step selection should update URL for shareability."""
         selection_ts = get_ts_source("selection.ts")
 
-        assert "updateURL" in selection_ts, (
-            "Step selection should update URL"
-        )
+        assert "updateURL" in selection_ts, "Step selection should update URL"
 
     def test_selection_module_is_unified(self):
         """There should be a unified selection module.
@@ -409,4 +384,4 @@ class TestPlaywrightScriptDocumentation:
         ```
         """
         html = get_flow_studio_html()
-        assert 'data-ui-ready=' in html
+        assert "data-ui-ready=" in html

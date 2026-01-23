@@ -37,6 +37,7 @@ from fastapi.testclient import TestClient
 def fastapi_client():
     """Create FastAPI test client."""
     from swarm.tools.flow_studio_fastapi import app
+
     return TestClient(app)
 
 
@@ -45,9 +46,7 @@ def test_selftest_plan_endpoint_returns_200(fastapi_client):
     resp = fastapi_client.get("/api/selftest/plan")
 
     # Either 200 with plan or 503 if selftest module disabled (both acceptable)
-    assert resp.status_code in (200, 503), (
-        f"Expected 200 or 503, got {resp.status_code}"
-    )
+    assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}"
 
     if resp.status_code == 200:
         data = resp.json()
@@ -61,9 +60,7 @@ def test_selftest_plan_has_version(fastapi_client):
     if resp.status_code == 200:
         data = resp.json()
         assert "version" in data, "Response missing 'version' field"
-        assert data["version"] == "1.0", (
-            f"Expected version '1.0', got {data['version']}"
-        )
+        assert data["version"] == "1.0", f"Expected version '1.0', got {data['version']}"
 
 
 def test_selftest_plan_has_steps_array(fastapi_client):
@@ -146,8 +143,7 @@ def test_selftest_plan_tier_values(fastapi_client):
         for step in steps:
             tier = step["tier"]
             assert tier in valid_tiers, (
-                f"Step '{step['id']}' has invalid tier '{tier}', "
-                f"expected one of {valid_tiers}"
+                f"Step '{step['id']}' has invalid tier '{tier}', expected one of {valid_tiers}"
             )
 
 
@@ -268,13 +264,12 @@ def test_selftest_plan_summary_counts_correct(fastapi_client):
 
         # Verify total matches
         total_by_tier = (
-            summary["by_tier"]["kernel"] +
-            summary["by_tier"]["governance"] +
-            summary["by_tier"]["optional"]
+            summary["by_tier"]["kernel"]
+            + summary["by_tier"]["governance"]
+            + summary["by_tier"]["optional"]
         )
         assert summary["total"] == len(steps), (
-            f"Total count mismatch: summary says {summary['total']}, "
-            f"actual is {len(steps)}"
+            f"Total count mismatch: summary says {summary['total']}, actual is {len(steps)}"
         )
         assert summary["total"] == total_by_tier, (
             f"Total doesn't match tier breakdown: total={summary['total']}, "

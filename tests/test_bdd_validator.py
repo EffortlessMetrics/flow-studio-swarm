@@ -5,14 +5,12 @@ Tests the BDDValidator class which validates Gherkin .feature files
 for correct structure (Feature, Scenario, steps).
 """
 
-import pytest
-from pathlib import Path
-
 # Import the module under test
 import sys
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "swarm" / "tools"))
 from bdd_validator import BDDValidator
-
 
 # ============================================================================
 # Happy Path Tests

@@ -401,9 +401,7 @@ class ContextBudgetEnforcer:
             Tuple of (loaded_items, dropped_items)
         """
         # Sort by priority (highest first), preserving original order within priority
-        sorted_items = sorted(
-            enumerate(items), key=lambda x: (-x[1].priority.value, x[0])
-        )
+        sorted_items = sorted(enumerate(items), key=lambda x: (-x[1].priority.value, x[0]))
 
         loaded: List[ContentItem] = []
         dropped: List[ContentItem] = []
@@ -663,15 +661,11 @@ def enforce_context_budget(
 
     # Teaching notes are CRITICAL - never dropped
     if teaching_notes:
-        items.append(
-            create_content_item("teaching_notes", teaching_notes, Priority.CRITICAL)
-        )
+        items.append(create_content_item("teaching_notes", teaching_notes, Priority.CRITICAL))
 
     # Previous output is HIGH - may be truncated
     if previous_output:
-        items.append(
-            create_content_item("previous_output", previous_output, Priority.HIGH)
-        )
+        items.append(create_content_item("previous_output", previous_output, Priority.HIGH))
 
     # Artifacts are MEDIUM - dropped before previous output
     for name, content in artifacts.items():
@@ -930,10 +924,7 @@ def classify_content_priority(key: str) -> Priority:
         return Priority.HIGH
 
     # LOW: Historical and summary content
-    if any(
-        term in key_lower
-        for term in ["history", "summary", "older", "archive", "learnings"]
-    ):
+    if any(term in key_lower for term in ["history", "summary", "older", "archive", "learnings"]):
         return Priority.LOW
 
     # MEDIUM: Default for artifacts and other content

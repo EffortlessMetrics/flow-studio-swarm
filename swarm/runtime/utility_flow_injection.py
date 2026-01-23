@@ -43,11 +43,9 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional
 
-from swarm.config.flow_registry import FlowDefinition
 from swarm.runtime.types import (
     InjectedNodeSpec,
     InterruptionFrame,
@@ -293,9 +291,7 @@ class UtilityFlowRegistry:
 
         # Find nodes that have no incoming edges (entry points)
         all_node_ids = {n.get("node_id") for n in nodes if n.get("node_id")}
-        nodes_with_incoming = {
-            e.get("to") for e in edges if e.get("to") in all_node_ids
-        }
+        nodes_with_incoming = {e.get("to") for e in edges if e.get("to") in all_node_ids}
         entry_nodes = all_node_ids - nodes_with_incoming
 
         if entry_nodes:
@@ -633,11 +629,7 @@ class InjectionTriggerDetector:
             + file_changes.get("added", [])
             + file_changes.get("deleted", [])
         )
-        sensitive_files = [
-            f
-            for f in all_files
-            if any(p in f.lower() for p in sensitive_patterns)
-        ]
+        sensitive_files = [f for f in all_files if any(p in f.lower() for p in sensitive_patterns)]
 
         if sensitive_files:
             flow = self._registry.get_by_trigger(InjectionTrigger.SECURITY_CONCERN)
@@ -702,15 +694,11 @@ class InjectionTriggerDetector:
         - Repeated test failures with same test name
         """
         verification = context.get("verification_result", {})
-        run_state: RunState = context.get("run_state")
+        context.get("run_state")
 
         # Check for flaky test markers
         checks = verification.get("checks", [])
-        flaky_tests = [
-            c
-            for c in checks
-            if not c.get("passed", True) and c.get("flaky", False)
-        ]
+        flaky_tests = [c for c in checks if not c.get("passed", True) and c.get("flaky", False)]
 
         if flaky_tests:
             flow = self._registry.get_by_trigger(InjectionTrigger.TEST_FLAKE)

@@ -33,67 +33,66 @@ Usage:
     new_etag = manager.save_flow_graph("build-flow", data, etag=old_etag)
 """
 
-from .types import (
-    StationSpec,
-    StationSDK,
-    StationIdentity,
-    StationIO,
-    StationHandoff,
-    StationRuntimePrompt,
-    FlowSpec,
-    FlowStep,
-    FlowDefaults,
-    RoutingConfig,
-    PromptPlan,
-)
-
-from .loader import (
-    load_station,
-    load_flow,
-    load_fragment,
-    list_stations,
-    list_flows,
-    validate_specs,
-)
-
 from .compiler import (
-    compile_prompt,
+    ExpandedTemplate,
     SpecCompiler,
+    TemplateMetadata,
+    compile_prompt,
+    expand_flow_graph,
+    expand_template,
+    get_template_categories,
     # Template library functions (WP2)
     list_templates,
     load_template,
-    expand_template,
-    expand_flow_graph,
-    get_template_categories,
-    TemplateMetadata,
-    ExpandedTemplate,
 )
-
+from .loader import (
+    list_flows,
+    list_stations,
+    load_flow,
+    load_fragment,
+    load_station,
+    validate_specs,
+)
 from .manager import (
-    # Main class
-    SpecManager,
-    # FlowGraph Manager (WP3)
-    FlowSpecManager,
+    ConcurrencyError,
     # Data types
     FlowGraph,
+    # FlowGraph Manager (WP3)
+    FlowSpecManager,
+    # Errors
+    SpecError,
+    # Main class
+    SpecManager,
+    SpecNotFoundError,
+    SpecValidationError,
     StepTemplate,
     ValidationError,
     ValidationResult,
-    # Errors
-    SpecError,
-    SpecNotFoundError,
-    SpecValidationError,
-    ConcurrencyError,
-    # Convenience functions
-    get_manager,
-    reset_manager,
     # FlowGraph merge/shred functions (WP3)
     get_flow_manager,
-    merge_flow_with_overlay,
-    shred_flow_update,
+    # Convenience functions
+    get_manager,
     load_flow_graph,
     load_ui_overlay,
+    merge_flow_with_overlay,
+    reset_manager,
+    shred_flow_update,
+)
+from .manager import (
     list_flows as list_flow_graphs,  # Alias for WP3 API
+)
+from .types import (
+    FlowDefaults,
+    FlowSpec,
+    FlowStep,
+    PromptPlan,
+    RoutingConfig,
+    StationHandoff,
+    StationIdentity,
+    StationIO,
+    StationRuntimePrompt,
+    StationSDK,
+    StationSpec,
 )
 
 __all__ = [

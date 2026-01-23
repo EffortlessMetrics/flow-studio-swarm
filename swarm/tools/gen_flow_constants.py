@@ -27,7 +27,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 FLOWS_YAML = PROJECT_ROOT / "swarm" / "config" / "flows.yaml"
 OUTPUT_TS = PROJECT_ROOT / "swarm" / "tools" / "flow_studio_ui" / "src" / "flow_constants.ts"
 
-TEMPLATE = '''// AUTO-GENERATED from swarm/config/flows.yaml
+TEMPLATE = """// AUTO-GENERATED from swarm/config/flows.yaml
 // Do not edit manually. Run: make gen-flow-constants
 
 import type {{ FlowKey }} from "./domain.js";
@@ -49,7 +49,7 @@ export const FLOW_TITLES: Record<FlowKey, string> = {{
 export const FLOW_DESCRIPTIONS: Record<FlowKey, string> = {{
 {description_entries}
 }};
-'''
+"""
 
 
 def load_flows() -> List[Dict[str, Any]]:
@@ -84,7 +84,7 @@ def generate_typescript(flows: List[Dict[str, Any]]) -> str:
     index_entries = []
     for f in flows:
         k = quote_key(f["key"])
-        index_entries.append(f'  {k}: {f["index"]},')
+        index_entries.append(f"  {k}: {f['index']},")
 
     # Build FLOW_TITLES entries
     title_entries = []
@@ -144,7 +144,7 @@ def main():
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Check if generated file is up-to-date (don't regenerate)"
+        help="Check if generated file is up-to-date (don't regenerate)",
     )
     args = parser.parse_args()
 

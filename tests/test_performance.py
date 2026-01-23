@@ -40,7 +40,6 @@ import os
 import time
 
 import pytest
-
 from conftest import (
     add_agent_to_registry,
     assert_validator_passed,
@@ -59,6 +58,7 @@ _SUBPROCESS_OVERHEAD_ESTIMATE = 4.5  # Conservative estimate for Windows uv run
 # Check if we're in CI (where Linux runners are typically faster)
 _IN_CI = os.environ.get("CI", "").lower() in ("true", "1", "yes")
 _ON_WINDOWS = os.name == "nt"
+
 
 # Adjusted thresholds that account for subprocess overhead on different platforms
 # CI (Linux): Use original tight thresholds
@@ -131,7 +131,9 @@ def test_small_repo_fast_validation(valid_repo, run_validator):
     threshold = _adjusted_threshold(0.5)
     assert_validator_passed(result)
     # Small repo (3 agents) should be very fast (plus subprocess overhead)
-    assert elapsed < threshold, f"Small repo validation took {elapsed:.2f}s (expected < {threshold:.1f}s)"
+    assert elapsed < threshold, (
+        f"Small repo validation took {elapsed:.2f}s (expected < {threshold:.1f}s)"
+    )
 
 
 def test_validation_performance_consistent(valid_repo, run_validator):
@@ -193,6 +195,7 @@ def test_incremental_mode_faster_than_baseline(git_repo, run_validator):
 
     # Commit initial state
     import subprocess
+
     subprocess.run(["git", "add", "."], cwd=git_repo, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Initial agents"], cwd=git_repo, capture_output=True)
 
@@ -209,17 +212,20 @@ def test_incremental_mode_faster_than_baseline(git_repo, run_validator):
 
     # Incremental: check only modified
     start_incr = time.time()
-    result_incr = run_validator(git_repo, flags=["--check-modified"])
+    run_validator(git_repo, flags=["--check-modified"])
     incr_time = time.time() - start_incr
 
     # Incremental should not be significantly slower than baseline
     # (on small repos, overhead may negate gains, so we allow up to 1.2x)
-    assert incr_time <= baseline_time * 1.2, \
+    assert incr_time <= baseline_time * 1.2, (
         f"Incremental ({incr_time:.2f}s) significantly slower than baseline ({baseline_time:.2f}s)"
+    )
 
     # Incremental should still be reasonably fast (plus subprocess overhead)
     incr_threshold = _adjusted_threshold(1.0)
-    assert incr_time < incr_threshold, f"Incremental mode took {incr_time:.2f}s (expected < {incr_threshold:.1f}s)"
+    assert incr_time < incr_threshold, (
+        f"Incremental mode took {incr_time:.2f}s (expected < {incr_threshold:.1f}s)"
+    )
 
 
 def test_incremental_mode_detects_modified_files(git_repo, run_validator):
@@ -235,6 +241,7 @@ def test_incremental_mode_detects_modified_files(git_repo, run_validator):
     create_agent_file(git_repo, "test-agent")
 
     import subprocess
+
     subprocess.run(["git", "add", "."], cwd=git_repo, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Add test-agent"], cwd=git_repo, capture_output=True)
 
@@ -270,6 +277,7 @@ def test_incremental_mode_reports_all_errors_in_modified_files(git_repo, run_val
         create_agent_file(git_repo, name)
 
     import subprocess
+
     subprocess.run(["git", "add", "."], cwd=git_repo, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Add agents"], cwd=git_repo, capture_output=True)
 
@@ -335,8 +343,9 @@ def test_performance_scales_linearly(temp_repo, run_validator):
 
     # Time should scale roughly linearly (not exponentially)
     # Allow 15x time for 10x data (some overhead is acceptable)
-    assert time_large < time_small * 15, \
+    assert time_large < time_small * 15, (
         f"Non-linear scaling: {time_small:.2f}s -> {time_large:.2f}s"
+    )
 
 
 def test_many_agents_performance(temp_repo, run_validator):
@@ -358,7 +367,9 @@ def test_many_agents_performance(temp_repo, run_validator):
     threshold = _adjusted_threshold(2.0)
     assert_validator_passed(result)
     # Should still be under threshold for 50 agents (plus subprocess overhead)
-    assert elapsed < threshold, f"Many agents validation took {elapsed:.2f}s (expected < {threshold:.1f}s)"
+    assert elapsed < threshold, (
+        f"Many agents validation took {elapsed:.2f}s (expected < {threshold:.1f}s)"
+    )
 
 
 def test_many_flows_performance(temp_repo, run_validator):
@@ -383,7 +394,9 @@ def test_many_flows_performance(temp_repo, run_validator):
 
     threshold = _adjusted_threshold(2.0)
     assert_validator_passed(result)
-    assert elapsed < threshold, f"Many flows validation took {elapsed:.2f}s (expected < {threshold:.1f}s)"
+    assert elapsed < threshold, (
+        f"Many flows validation took {elapsed:.2f}s (expected < {threshold:.1f}s)"
+    )
 
 
 # ============================================================================
@@ -506,6 +519,7 @@ def test_benchmark_incremental_mode(git_repo, run_validator):
         create_agent_file(git_repo, agent_name)
 
     import subprocess
+
     subprocess.run(["git", "add", "."], cwd=git_repo, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Initial"], cwd=git_repo, capture_output=True)
 
@@ -517,7 +531,7 @@ def test_benchmark_incremental_mode(git_repo, run_validator):
     times = []
     for _ in range(10):
         start = time.time()
-        result = run_validator(git_repo, flags=["--check-modified"])
+        run_validator(git_repo, flags=["--check-modified"])
         elapsed = time.time() - start
         times.append(elapsed)
 

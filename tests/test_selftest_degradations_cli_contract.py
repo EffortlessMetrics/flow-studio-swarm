@@ -19,12 +19,11 @@ Breaking changes require version bumps and deprecation notices.
 import json
 import subprocess
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CLI_TOOL = REPO_ROOT / "swarm" / "tools" / "show_selftest_degradations.py"
@@ -226,10 +225,20 @@ class TestCLIJSONOutput:
         assert len(data) == 3, f"Should have 3 entries, got {len(data)}"
 
         # Validate each entry has required fields
-        required_fields = {"timestamp", "step_id", "step_name", "tier", "message", "severity", "remediation"}
+        required_fields = {
+            "timestamp",
+            "step_id",
+            "step_name",
+            "tier",
+            "message",
+            "severity",
+            "remediation",
+        }
         for entry in data:
             assert isinstance(entry, dict), "Each entry should be a dict"
-            assert required_fields.issubset(entry.keys()), f"Entry missing fields: {required_fields - entry.keys()}"
+            assert required_fields.issubset(entry.keys()), (
+                f"Entry missing fields: {required_fields - entry.keys()}"
+            )
 
     def test_cli_json_output_preserves_entry_order(self):
         """JSON output preserves chronological order of entries."""
@@ -346,10 +355,20 @@ class TestCLIJSONv2Output:
         data = json.loads(stdout)
 
         entries_data = data["entries"]
-        required_fields = {"timestamp", "step_id", "step_name", "tier", "message", "severity", "remediation"}
+        required_fields = {
+            "timestamp",
+            "step_id",
+            "step_name",
+            "tier",
+            "message",
+            "severity",
+            "remediation",
+        }
 
         for entry in entries_data:
-            assert required_fields.issubset(entry.keys()), f"Entry missing fields: {required_fields - entry.keys()}"
+            assert required_fields.issubset(entry.keys()), (
+                f"Entry missing fields: {required_fields - entry.keys()}"
+            )
 
 
 # ============================================================================
@@ -556,7 +575,8 @@ class TestCLIOutputSnapshot:
         # Verify stable schema contract
         assert len(data) == 2
         assert all(
-            set(entry.keys()) >= {"timestamp", "step_id", "step_name", "tier", "message", "severity", "remediation"}
+            set(entry.keys())
+            >= {"timestamp", "step_id", "step_name", "tier", "message", "severity", "remediation"}
             for entry in data
         )
 

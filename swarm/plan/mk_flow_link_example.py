@@ -30,12 +30,59 @@ def _load_flow_config(flow_key: str) -> dict:
     # In real implementation, would load and parse YAML
     # For now, return mock data
     MOCK_FLOWS = {
-        "signal": {"steps": ["normalize_input", "frame_problem", "author_requirements", "critique_requirements", "bdd_scenarios", "scope_risk"]},
-        "plan": {"steps": ["impact_analysis", "design_options", "adr_draft", "interface_design", "observability_spec", "test_strategy", "work_plan", "design_critique"]},
-        "build": {"steps": ["context_load", "test_microloop", "code_microloop", "mutation_hardening", "doc_update", "self_review"]},
-        "gate": {"steps": ["receipt_audit", "contract_check", "security_scan", "coverage_check", "gate_fixes", "merge_decision"]},
+        "signal": {
+            "steps": [
+                "normalize_input",
+                "frame_problem",
+                "author_requirements",
+                "critique_requirements",
+                "bdd_scenarios",
+                "scope_risk",
+            ]
+        },
+        "plan": {
+            "steps": [
+                "impact_analysis",
+                "design_options",
+                "adr_draft",
+                "interface_design",
+                "observability_spec",
+                "test_strategy",
+                "work_plan",
+                "design_critique",
+            ]
+        },
+        "build": {
+            "steps": [
+                "context_load",
+                "test_microloop",
+                "code_microloop",
+                "mutation_hardening",
+                "doc_update",
+                "self_review",
+            ]
+        },
+        "gate": {
+            "steps": [
+                "receipt_audit",
+                "contract_check",
+                "security_scan",
+                "coverage_check",
+                "gate_fixes",
+                "merge_decision",
+            ]
+        },
         "deploy": {"steps": ["deploy_trigger", "health_check", "deploy_decision"]},
-        "wisdom": {"steps": ["artifact_audit", "regression_analysis", "flow_history", "learning_synthesis", "feedback_application", "wisdom_summary"]},
+        "wisdom": {
+            "steps": [
+                "artifact_audit",
+                "regression_analysis",
+                "flow_history",
+                "learning_synthesis",
+                "feedback_application",
+                "wisdom_summary",
+            ]
+        },
     }
     return MOCK_FLOWS.get(flow_key, {"steps": []})
 
@@ -114,15 +161,21 @@ class FlowStudioLinkGenerator:
 
         # Validate flow is valid
         if flow and flow not in self.VALID_FLOWS:
-            raise ValueError(f"Invalid flow '{flow}'. Must be one of: {', '.join(self.VALID_FLOWS)}")
+            raise ValueError(
+                f"Invalid flow '{flow}'. Must be one of: {', '.join(self.VALID_FLOWS)}"
+            )
 
         # Validate mode is valid
         if mode and mode not in self.VALID_MODES:
-            raise ValueError(f"Invalid mode '{mode}'. Must be one of: {', '.join(self.VALID_MODES)}")
+            raise ValueError(
+                f"Invalid mode '{mode}'. Must be one of: {', '.join(self.VALID_MODES)}"
+            )
 
         # Validate view is valid
         if view and view not in self.VALID_VIEWS:
-            raise ValueError(f"Invalid view '{view}'. Must be one of: {', '.join(self.VALID_VIEWS)}")
+            raise ValueError(
+                f"Invalid view '{view}'. Must be one of: {', '.join(self.VALID_VIEWS)}"
+            )
 
         # Validate step exists in flow (if both specified)
         if flow and step:
@@ -219,66 +272,47 @@ Examples:
 Valid flows: signal, plan, build, gate, deploy, wisdom
 Valid modes: author, operator
 Valid views: agents, artifacts
-        """
+        """,
     )
 
     parser.add_argument(
-        "--run", "-r",
-        required=True,
-        help="Run ID (e.g., health-check, pr-123-abc123)"
+        "--run", "-r", required=True, help="Run ID (e.g., health-check, pr-123-abc123)"
     )
 
     parser.add_argument(
-        "--flow", "-f",
-        choices=FlowStudioLinkGenerator.VALID_FLOWS,
-        help="Flow key"
+        "--flow", "-f", choices=FlowStudioLinkGenerator.VALID_FLOWS, help="Flow key"
     )
 
-    parser.add_argument(
-        "--step", "-s",
-        help="Step ID within flow (requires --flow)"
-    )
+    parser.add_argument("--step", "-s", help="Step ID within flow (requires --flow)")
 
     parser.add_argument(
-        "--mode", "-m",
+        "--mode",
+        "-m",
         choices=FlowStudioLinkGenerator.VALID_MODES,
-        help="Mode (author or operator)"
+        help="Mode (author or operator)",
     )
 
     parser.add_argument(
-        "--view", "-v",
+        "--view",
+        "-v",
         choices=FlowStudioLinkGenerator.VALID_VIEWS,
-        help="View mode (agents or artifacts)"
+        help="View mode (agents or artifacts)",
     )
 
-    parser.add_argument(
-        "--tab", "-t",
-        help="Tab in step details (requires --step)"
-    )
+    parser.add_argument("--tab", "-t", help="Tab in step details (requires --step)")
 
     parser.add_argument(
-        "--base-url", "-b",
+        "--base-url",
+        "-b",
         default="http://localhost:5000",
-        help="Base URL for Flow Studio (default: http://localhost:5000)"
+        help="Base URL for Flow Studio (default: http://localhost:5000)",
     )
 
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output as JSON instead of plain URL"
-    )
+    parser.add_argument("--json", action="store_true", help="Output as JSON instead of plain URL")
 
-    parser.add_argument(
-        "--list-flows",
-        action="store_true",
-        help="List available flows and exit"
-    )
+    parser.add_argument("--list-flows", action="store_true", help="List available flows and exit")
 
-    parser.add_argument(
-        "--list-steps",
-        metavar="FLOW",
-        help="List steps for a flow and exit"
-    )
+    parser.add_argument("--list-steps", metavar="FLOW", help="List steps for a flow and exit")
 
     args = parser.parse_args()
 
@@ -326,7 +360,7 @@ Valid views: agents, artifacts
                 "url": url,
                 "params": {
                     "run": args.run,
-                }
+                },
             }
             if args.flow:
                 output["params"]["flow"] = args.flow
@@ -377,6 +411,6 @@ if __name__ == "__main__":
         step="merge_decision",
         mode="operator",
         view="artifacts",
-        tab="run"
+        tab="run",
     )
     print(f"Full link: {url4}")

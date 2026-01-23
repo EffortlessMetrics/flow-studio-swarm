@@ -19,8 +19,8 @@ import pytest
 
 def test_fastapi_health():
     """Test /api/health endpoint returns 200 with valid status."""
-    from swarm.tools.flow_studio_fastapi import app
     from fastapi.testclient import TestClient
+    from swarm.tools.flow_studio_fastapi import app
 
     client = TestClient(app)
     resp = client.get("/api/health")
@@ -33,8 +33,8 @@ def test_fastapi_health():
 
 def test_fastapi_flows():
     """Test /api/flows endpoint returns list of flows."""
-    from swarm.tools.flow_studio_fastapi import app
     from fastapi.testclient import TestClient
+    from swarm.tools.flow_studio_fastapi import app
 
     client = TestClient(app)
     resp = client.get("/api/flows")
@@ -47,8 +47,8 @@ def test_fastapi_flows():
 
 def test_fastapi_graph():
     """Test /api/graph/{flow} endpoint returns graph structure."""
-    from swarm.tools.flow_studio_fastapi import app
     from fastapi.testclient import TestClient
+    from swarm.tools.flow_studio_fastapi import app
 
     client = TestClient(app)
 
@@ -68,8 +68,8 @@ def test_fastapi_graph():
 
 def test_fastapi_runs():
     """Test /api/runs endpoint returns list of runs."""
-    from swarm.tools.flow_studio_fastapi import app
     from fastapi.testclient import TestClient
+    from swarm.tools.flow_studio_fastapi import app
 
     client = TestClient(app)
     resp = client.get("/api/runs")
@@ -85,8 +85,8 @@ def test_fastapi_runs():
 
 def test_fastapi_root():
     """Test root endpoint returns HTML."""
-    from swarm.tools.flow_studio_fastapi import app
     from fastapi.testclient import TestClient
+    from swarm.tools.flow_studio_fastapi import app
 
     client = TestClient(app)
     resp = client.get("/")
@@ -97,8 +97,8 @@ def test_fastapi_root():
 
 def test_fastapi_layout_screens():
     """Test /api/layout_screens endpoint returns valid screen registry."""
-    from swarm.tools.flow_studio_fastapi import app
     from fastapi.testclient import TestClient
+    from swarm.tools.flow_studio_fastapi import app
 
     client = TestClient(app)
     resp = client.get("/api/layout_screens")
@@ -137,8 +137,8 @@ def test_fastapi_layout_screens():
 
 def test_fastapi_selftest_plan():
     """Test /api/selftest/plan endpoint returns valid plan structure."""
-    from swarm.tools.flow_studio_fastapi import app
     from fastapi.testclient import TestClient
+    from swarm.tools.flow_studio_fastapi import app
 
     client = TestClient(app)
     resp = client.get("/api/selftest/plan")
@@ -178,7 +178,10 @@ def test_fastapi_selftest_plan():
         assert "kernel" in by_tier
         assert "governance" in by_tier
         assert "optional" in by_tier
-        assert by_tier["kernel"] + by_tier["governance"] + by_tier["optional"] == data["summary"]["total"]
+        assert (
+            by_tier["kernel"] + by_tier["governance"] + by_tier["optional"]
+            == data["summary"]["total"]
+        )
 
 
 # ============================================================================
@@ -200,8 +203,8 @@ def test_fastapi_matches_flask_flows():
 
 def test_fastapi_matches_flask_graph():
     """Test FastAPI /api/graph/{flow} returns valid graph structure."""
-    from swarm.tools.flow_studio_fastapi import app as fastapi_app
     from fastapi.testclient import TestClient
+    from swarm.tools.flow_studio_fastapi import app as fastapi_app
 
     # Test with signal flow
     flow_key = "signal"
@@ -227,26 +230,19 @@ def test_fastapi_matches_flask_graph():
 
 def test_backend_toggle_no_regression():
     """Test backend toggle doesn't break existing endpoints."""
-    from swarm.tools.flow_studio_fastapi import app as fastapi_app
     from fastapi.testclient import TestClient
+    from swarm.tools.flow_studio_fastapi import app as fastapi_app
 
     client = TestClient(fastapi_app)
 
     # All core endpoints should still work
-    endpoints = [
-        "/api/health",
-        "/api/flows",
-        "/api/runs",
-        "/"
-    ]
+    endpoints = ["/api/health", "/api/flows", "/api/runs", "/"]
 
     for endpoint in endpoints:
         resp = client.get(endpoint)
 
         # Should not return 500 (server error)
-        assert resp.status_code != 500, (
-            f"Endpoint {endpoint} returned 500 (server error)"
-        )
+        assert resp.status_code != 500, f"Endpoint {endpoint} returned 500 (server error)"
 
         # Should return valid response (200, 404, or 503 are all acceptable)
         assert resp.status_code in (200, 404, 503), (
@@ -262,23 +258,18 @@ def test_old_flask_endpoints_unchanged():
 
 def test_fastapi_new_endpoints_dont_break_old():
     """Test new FastAPI endpoints don't interfere with old ones."""
-    from swarm.tools.flow_studio_fastapi import app as fastapi_app
     from fastapi.testclient import TestClient
+    from swarm.tools.flow_studio_fastapi import app as fastapi_app
 
     client = TestClient(fastapi_app)
 
     # Test that old endpoints still work
-    old_endpoints = {
-        "/api/health": 200,
-        "/api/flows": 200,
-        "/": 200
-    }
+    old_endpoints = {"/api/health": 200, "/api/flows": 200, "/": 200}
 
     for endpoint, expected_status in old_endpoints.items():
         resp = client.get(endpoint)
         assert resp.status_code == expected_status, (
-            f"Old endpoint {endpoint} broken: expected {expected_status}, "
-            f"got {resp.status_code}"
+            f"Old endpoint {endpoint} broken: expected {expected_status}, got {resp.status_code}"
         )
 
     # Test that new endpoint also works

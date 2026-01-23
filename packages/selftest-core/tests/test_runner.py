@@ -1,6 +1,7 @@
 """Tests for the selftest runner."""
 
 import pytest
+
 from selftest_core import (
     Category,
     SelfTestRunner,
@@ -182,7 +183,9 @@ class TestSelfTestRunner:
     def test_plan_returns_steps(self):
         """Test plan method returns step information."""
         steps = [
-            Step(id="lint", tier=Tier.KERNEL, command="ruff check .", description="Lint"),
+            Step(
+                id="lint", tier=Tier.KERNEL, command="ruff check .", description="Lint"
+            ),
             Step(id="test", tier=Tier.KERNEL, command="pytest", description="Test"),
         ]
         runner = SelfTestRunner(steps)
@@ -233,8 +236,15 @@ class TestSelfTestRunner:
     def test_severity_breakdown(self):
         """Test severity breakdown in results."""
         steps = [
-            Step(id="crit", tier=Tier.KERNEL, command="true", severity=Severity.CRITICAL),
-            Step(id="warn", tier=Tier.GOVERNANCE, command="true", severity=Severity.WARNING),
+            Step(
+                id="crit", tier=Tier.KERNEL, command="true", severity=Severity.CRITICAL
+            ),
+            Step(
+                id="warn",
+                tier=Tier.GOVERNANCE,
+                command="true",
+                severity=Severity.WARNING,
+            ),
             Step(id="info", tier=Tier.OPTIONAL, command="true", severity=Severity.INFO),
         ]
         runner = SelfTestRunner(steps)
@@ -248,9 +258,21 @@ class TestSelfTestRunner:
     def test_category_breakdown(self):
         """Test category breakdown in results."""
         steps = [
-            Step(id="sec", tier=Tier.KERNEL, command="true", category=Category.SECURITY),
-            Step(id="perf", tier=Tier.KERNEL, command="true", category=Category.PERFORMANCE),
-            Step(id="correct", tier=Tier.KERNEL, command="true", category=Category.CORRECTNESS),
+            Step(
+                id="sec", tier=Tier.KERNEL, command="true", category=Category.SECURITY
+            ),
+            Step(
+                id="perf",
+                tier=Tier.KERNEL,
+                command="true",
+                category=Category.PERFORMANCE,
+            ),
+            Step(
+                id="correct",
+                tier=Tier.KERNEL,
+                command="true",
+                category=Category.CORRECTNESS,
+            ),
         ]
         runner = SelfTestRunner(steps)
         result = runner.run()

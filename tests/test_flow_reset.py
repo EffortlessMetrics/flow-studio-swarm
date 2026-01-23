@@ -5,13 +5,12 @@ Tests that Flow 8 is properly registered, configured, and loadable.
 """
 
 import pytest
-
 from swarm.config.flow_registry import (
     FlowRegistry,
     get_flow_index,
+    get_flow_keys,
     get_flow_steps,
     get_sdlc_flow_keys,
-    get_flow_keys,
 )
 
 
@@ -123,9 +122,7 @@ class TestFlow8Reset:
         steps = get_flow_steps("reset")
 
         for step in steps:
-            assert step.teaching_notes is not None, (
-                f"Step {step.id} is missing teaching_notes"
-            )
+            assert step.teaching_notes is not None, f"Step {step.id} is missing teaching_notes"
             assert len(step.teaching_notes.inputs) > 0 or step.id == "diagnose", (
                 f"Step {step.id} should have input specifications"
             )

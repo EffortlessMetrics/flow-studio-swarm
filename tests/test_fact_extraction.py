@@ -12,21 +12,17 @@ These tests verify:
 from __future__ import annotations
 
 import json
-import tempfile
-from pathlib import Path
-from typing import List
 
 import pytest
-
 from swarm.runtime.fact_extraction import (
     MARKER_PATTERNS,
     MARKER_TYPES,
     ExtractedFact,
     ExtractionResult,
-    extract_facts_from_text,
     extract_facts_from_file,
-    extract_facts_from_step,
     extract_facts_from_run,
+    extract_facts_from_step,
+    extract_facts_from_text,
 )
 
 
@@ -391,10 +387,13 @@ class TestDuckDBIntegration:
     def db(self, tmp_path):
         """Create a test DuckDB instance with projection mode disabled."""
         import os
+
         os.environ["SWARM_DB_PROJECTION_ONLY"] = "false"
 
         import importlib
+
         import swarm.runtime.db as db_module
+
         importlib.reload(db_module)
 
         db_path = tmp_path / "test.duckdb"

@@ -44,8 +44,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 # Add repo root to path for imports
 repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
@@ -54,7 +52,6 @@ if str(repo_root) not in sys.path:
 from swarm.runtime.engines.claude.router import route_from_routing_config
 from swarm.runtime.types import RoutingDecision
 from swarm.spec.types import RoutingConfig, RoutingKind
-
 
 # -----------------------------------------------------------------------------
 # Test Class: Terminal Routing

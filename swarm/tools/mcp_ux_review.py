@@ -23,6 +23,7 @@ Depends on:
     - run_layout_review.py (for capturing artifacts)
     - Flow Studio running at http://localhost:5000 (for live captures)
 """
+
 from __future__ import annotations
 
 import json
@@ -54,9 +55,11 @@ UI_REVIEW_DIR = REPO_ROOT / "swarm" / "runs" / "ui-review"
 # Data Types
 # ============================================================================
 
+
 @dataclass
 class ScreenSnapshot:
     """Captured artifacts for a single screen."""
+
     run_id: str
     screen_id: str
     route: str = ""
@@ -84,6 +87,7 @@ class ScreenSnapshot:
 @dataclass
 class ReviewRun:
     """Summary of a layout review run."""
+
     run_id: str
     timestamp: str
     base_url: str
@@ -102,13 +106,14 @@ class ReviewRun:
 # Core Functions
 # ============================================================================
 
+
 def list_review_runs() -> List[str]:
     """List all available review run IDs (timestamps)."""
     if not UI_REVIEW_DIR.exists():
         return []
     return sorted(
         [d.name for d in UI_REVIEW_DIR.iterdir() if d.is_dir()],
-        reverse=True  # Most recent first
+        reverse=True,  # Most recent first
     )
 
 
@@ -230,6 +235,7 @@ def run_layout_review_script() -> Dict[str, Any]:
 # MCP Server
 # ============================================================================
 
+
 def create_server() -> Server:
     """Create and configure the MCP server."""
     server = Server("ux_review")
@@ -324,14 +330,19 @@ def create_server() -> Server:
                 if latest:
                     summary = load_review_summary(latest)
                     if summary:
-                        return [TextContent(
-                            type="text",
-                            text=json.dumps({
-                                "reused": True,
-                                "run_id": latest,
-                                "summary": summary.to_dict(),
-                            }, indent=2),
-                        )]
+                        return [
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    {
+                                        "reused": True,
+                                        "run_id": latest,
+                                        "summary": summary.to_dict(),
+                                    },
+                                    indent=2,
+                                ),
+                            )
+                        ]
 
             # Run fresh capture
             result = run_layout_review_script()
@@ -339,10 +350,12 @@ def create_server() -> Server:
 
         elif name == "list_review_runs":
             runs = list_review_runs()
-            return [TextContent(
-                type="text",
-                text=json.dumps({"runs": runs}, indent=2),
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"runs": runs}, indent=2),
+                )
+            ]
 
         elif name == "get_screen_snapshot":
             run_id = arguments["run_id"]
@@ -361,14 +374,18 @@ def create_server() -> Server:
             run_id = arguments["run_id"]
             summary = load_review_summary(run_id)
             if summary:
-                return [TextContent(
+                return [
+                    TextContent(
+                        type="text",
+                        text=json.dumps(summary.to_dict(), indent=2),
+                    )
+                ]
+            return [
+                TextContent(
                     type="text",
-                    text=json.dumps(summary.to_dict(), indent=2),
-                )]
-            return [TextContent(
-                type="text",
-                text=json.dumps({"error": f"Run '{run_id}' not found"}, indent=2),
-            )]
+                    text=json.dumps({"error": f"Run '{run_id}' not found"}, indent=2),
+                )
+            ]
 
         return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}"}))]
 
@@ -384,4 +401,5 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

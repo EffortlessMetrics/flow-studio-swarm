@@ -278,7 +278,15 @@ class IncidentPackCollector:
 
             # Get latest workflow run
             result = subprocess.run(
-                ["gh", "run", "list", "--limit", "5", "--json", "databaseId,status,conclusion,name"],
+                [
+                    "gh",
+                    "run",
+                    "list",
+                    "--limit",
+                    "5",
+                    "--json",
+                    "databaseId,status,conclusion,name",
+                ],
                 cwd=self._get_repo_root(),
                 capture_output=True,
                 text=True,
@@ -490,6 +498,7 @@ class IncidentPackCollector:
         """Remove temporary directory."""
         if self.temp_dir and self.temp_dir.exists():
             import shutil
+
             shutil.rmtree(self.temp_dir)
 
     def _get_repo_root(self) -> Path:
@@ -546,6 +555,7 @@ Output:
     except Exception as e:
         print(f"\n[FAIL] Error creating incident pack: {e}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         return 1
 

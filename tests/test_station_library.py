@@ -8,29 +8,24 @@ These tests verify:
 4. InjectedNodeSpec handling
 """
 
-import pytest
 from pathlib import Path
-from typing import Dict, Any
 
 from swarm.runtime.station_library import (
+    DEFAULT_STATIONS,
     StationLibrary,
     StationSpec,
     load_station_library,
-    station_spec_to_dict,
     station_spec_from_dict,
-    DEFAULT_STATIONS,
+    station_spec_to_dict,
 )
 from swarm.runtime.types import (
     InjectedNodeSpec,
     RunState,
-    RoutingSignal,
-    RoutingDecision,
-    injected_node_spec_to_dict,
     injected_node_spec_from_dict,
-    run_state_to_dict,
+    injected_node_spec_to_dict,
     run_state_from_dict,
+    run_state_to_dict,
 )
-
 
 # =============================================================================
 # StationSpec Tests
@@ -398,7 +393,7 @@ class TestRoutingInfrastructureIntegration:
                 node_id=f"sq-{sidequest_id}-{i}",
                 station_id="context-loader" if i == 0 else "research",
                 agent_key="context-loader" if i == 0 else "research",
-                role=f"Sidequest {sidequest_id} step {i+1}/{total_steps}",
+                role=f"Sidequest {sidequest_id} step {i + 1}/{total_steps}",
                 params={"objective": "Gather context"},
                 sidequest_origin=sidequest_id,
                 sequence_index=i,

@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from swarm.spec.loader import load_flow, load_station
 from swarm.spec.types import (
@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FlowNode:
     """A node in the FlowGraph (from flow_graph.schema.json)."""
+
     node_id: str
     template_id: str
     params: Dict[str, Any] = field(default_factory=dict)
@@ -50,6 +51,7 @@ class FlowNode:
 @dataclass
 class StepTemplate:
     """A step template (from step_template.schema.json)."""
+
     id: str
     version: int
     title: str
@@ -283,6 +285,7 @@ class SpecCompiler:
 
         try:
             from swarm.utils.yaml_utils import load_yaml
+
             with open(template_path, "r", encoding="utf-8") as handle:
                 data = load_yaml(handle)
 
@@ -378,6 +381,7 @@ class SpecCompiler:
 @dataclass(frozen=True)
 class MultiStepPromptPlan:
     """Compiled plan for a complete flow with multiple steps."""
+
     flow_id: str
     steps: List[StepPlan]
     spec_hash: str

@@ -177,9 +177,7 @@ class ForensicVerdict:
     reward_hacking_flags: List[RewardHackingFlag] = field(default_factory=list)
     recommendation: VerdictRecommendation = VerdictRecommendation.TRUST
     summary: str = ""
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z"
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
     evidence_hashes: Dict[str, str] = field(default_factory=dict)
 
 

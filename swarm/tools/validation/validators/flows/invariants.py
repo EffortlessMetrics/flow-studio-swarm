@@ -8,8 +8,8 @@ Validates structural invariants that all flows must satisfy:
 
 from typing import Any, Dict
 
-from swarm.validator import ValidationResult
 from swarm.tools.validation.helpers import FLOWS_CONFIG_DIR
+from swarm.validator import ValidationResult
 
 
 def validate_no_empty_flows(flow_configs: Dict[str, Dict[str, Any]]) -> ValidationResult:
@@ -30,7 +30,7 @@ def validate_no_empty_flows(flow_configs: Dict[str, Dict[str, Any]]) -> Validati
                 location,
                 f"Flow '{flow_id}' has no steps",
                 f"Add at least one step to {location}, or remove the flow definition",
-                file_path=str(flow_file)
+                file_path=str(flow_file),
             )
 
     return result
@@ -56,7 +56,7 @@ def validate_no_agentless_steps(flow_configs: Dict[str, Dict[str, Any]]) -> Vali
                     f"Step '{flow_id}/{step['id']}' has no agents and is not marked 'kind: human_only'",
                     "Either add agents to the step or mark it with 'kind: human_only'",
                     file_path=str(flow_file),
-                    line_number=step.get("line")
+                    line_number=step.get("line"),
                 )
 
     return result

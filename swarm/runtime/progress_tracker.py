@@ -501,7 +501,10 @@ def should_suggest_sidequest(tracker: ProgressTracker) -> Tuple[bool, str]:
         return False, "Not stalled"
 
     if info.recommendation == "escalate":
-        return True, f"Stalled for {info.stall_count} iterations with same error, escalation recommended"
+        return (
+            True,
+            f"Stalled for {info.stall_count} iterations with same error, escalation recommended",
+        )
 
     if info.recommendation == "investigate":
         return True, f"Stalled for {info.stall_count} iterations, investigation sidequest suggested"
@@ -559,9 +562,7 @@ def tracker_from_dict(data: Dict[str, Any]) -> ProgressTracker:
         error_signatures=list(data.get("error_signatures", [])),
         stall_threshold=data.get("stall_threshold", 3),
     )
-    tracker._timestamps = [
-        datetime.fromisoformat(ts) for ts in data.get("timestamps", [])
-    ]
+    tracker._timestamps = [datetime.fromisoformat(ts) for ts in data.get("timestamps", [])]
     tracker._categories = list(data.get("categories", []))
     if data.get("stall_started_at"):
         tracker._stall_started_at = datetime.fromisoformat(data["stall_started_at"])

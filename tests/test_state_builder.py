@@ -12,13 +12,12 @@ Tests cover:
 from datetime import datetime, timezone
 
 import pytest
-
 from swarm.runtime import storage
 from swarm.runtime.state_builder import (
+    _apply_event,
     rebuild_run_state,
     recover_run_state,
     verify_run_state,
-    _apply_event,
 )
 from swarm.runtime.types import (
     HandoffEnvelope,
@@ -357,10 +356,7 @@ class TestFlowEvents:
 
         assert state.flow_key == "build"
         # Check transition was recorded
-        assert any(
-            t.get("reason") == "BOUNCE_BUILD"
-            for t in state.flow_transition_history
-        )
+        assert any(t.get("reason") == "BOUNCE_BUILD" for t in state.flow_transition_history)
 
 
 class TestDetourEvents:

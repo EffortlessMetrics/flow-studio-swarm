@@ -229,7 +229,7 @@ def extract_json_from_text(text: str) -> Tuple[Optional[Dict[str, Any]], Optiona
             if isinstance(data, dict):
                 return data, None
             return None, f"Expected JSON object, got {type(data).__name__}"
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             # Continue to try other strategies
             pass
 
@@ -239,7 +239,9 @@ def extract_json_from_text(text: str) -> Tuple[Optional[Dict[str, Any]], Optiona
     if generic_fence_match:
         json_str = generic_fence_match.group(1).strip()
         # Skip if it looks like code (common language markers)
-        if not json_str.startswith(("def ", "class ", "function ", "import ", "const ", "let ", "var ")):
+        if not json_str.startswith(
+            ("def ", "class ", "function ", "import ", "const ", "let ", "var ")
+        ):
             try:
                 data = json.loads(json_str)
                 if isinstance(data, dict):
@@ -400,7 +402,11 @@ def validate_against_schema(
                 expected_python_type = type_map[expected_type]
                 if not isinstance(value, expected_python_type):
                     # Special case: integer type accepts int but not float
-                    if expected_type == "integer" and isinstance(value, float) and value.is_integer():
+                    if (
+                        expected_type == "integer"
+                        and isinstance(value, float)
+                        and value.is_integer()
+                    ):
                         # Accept whole-number floats as integers
                         pass
                     else:
@@ -629,9 +635,11 @@ def extract_structured_output_with_errors(
     # Path 2: Parse from JSON fences in response text
     extracted, parse_error = extract_json_from_text(response_text)
     if extracted is None:
-        return None, "failed", [
-            ValidationError(path="$", message=parse_error or "Failed to extract JSON")
-        ]
+        return (
+            None,
+            "failed",
+            [ValidationError(path="$", message=parse_error or "Failed to extract JSON")],
+        )
 
     if schema:
         validation_errors = validate_against_schema(extracted, schema)

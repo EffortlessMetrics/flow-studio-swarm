@@ -36,6 +36,7 @@ if str(repo_root) not in sys.path:
 def get_flow_studio_html() -> str:
     """Load the Flow Studio HTML from the UI module."""
     from swarm.tools.flow_studio_ui import get_index_html
+
     return get_index_html()
 
 
@@ -80,7 +81,7 @@ class TestLandmarks:
         """Page should have a banner landmark (header)."""
         html = get_flow_studio_html()
         # Either <header> or role="banner"
-        assert '<header' in html or 'role="banner"' in html, (
+        assert "<header" in html or 'role="banner"' in html, (
             "Page should have a banner landmark for the header region"
         )
 
@@ -88,7 +89,7 @@ class TestLandmarks:
         """Page should have a main landmark."""
         html = get_flow_studio_html()
         # Either <main> or role="main"
-        assert '<main' in html or 'role="main"' in html, (
+        assert "<main" in html or 'role="main"' in html, (
             "Page should have a main landmark for primary content"
         )
 
@@ -96,7 +97,7 @@ class TestLandmarks:
         """Page should have a navigation landmark."""
         html = get_flow_studio_html()
         # Either <nav> or role="navigation"
-        assert '<nav' in html or 'role="navigation"' in html, (
+        assert "<nav" in html or 'role="navigation"' in html, (
             "Page should have a navigation landmark for the sidebar"
         )
 
@@ -104,7 +105,7 @@ class TestLandmarks:
         """Page should have a complementary landmark (aside/inspector)."""
         html = get_flow_studio_html()
         # Either <aside> or role="complementary"
-        assert '<aside' in html or 'role="complementary"' in html, (
+        assert "<aside" in html or 'role="complementary"' in html, (
             "Page should have a complementary landmark for the inspector panel"
         )
 
@@ -124,9 +125,7 @@ class TestARIAReferences:
         refs = extract_aria_refs(html, "aria-labelledby")
 
         missing = [ref for ref in refs if ref not in ids]
-        assert not missing, (
-            f"aria-labelledby references non-existent IDs: {missing}"
-        )
+        assert not missing, f"aria-labelledby references non-existent IDs: {missing}"
 
     def test_aria_controls_references_exist(self):
         """All aria-controls references should point to existing IDs."""
@@ -135,9 +134,7 @@ class TestARIAReferences:
         refs = extract_aria_refs(html, "aria-controls")
 
         missing = [ref for ref in refs if ref not in ids]
-        assert not missing, (
-            f"aria-controls references non-existent IDs: {missing}"
-        )
+        assert not missing, f"aria-controls references non-existent IDs: {missing}"
 
     def test_aria_describedby_references_exist(self):
         """All aria-describedby references should point to existing IDs."""
@@ -146,9 +143,7 @@ class TestARIAReferences:
         refs = extract_aria_refs(html, "aria-describedby")
 
         missing = [ref for ref in refs if ref not in ids]
-        assert not missing, (
-            f"aria-describedby references non-existent IDs: {missing}"
-        )
+        assert not missing, f"aria-describedby references non-existent IDs: {missing}"
 
 
 # ============================================================================
@@ -168,7 +163,7 @@ class TestModalAccessibility:
         dialogs = dialog_pattern.findall(html)
 
         for dialog in dialogs:
-            assert 'aria-modal=' in dialog, (
+            assert "aria-modal=" in dialog, (
                 f"Dialog should have aria-modal attribute: {dialog[:100]}"
             )
 
@@ -180,7 +175,7 @@ class TestModalAccessibility:
         dialogs = dialog_pattern.findall(html)
 
         for dialog in dialogs:
-            assert 'aria-labelledby=' in dialog, (
+            assert "aria-labelledby=" in dialog, (
                 f"Dialog should have aria-labelledby: {dialog[:100]}"
             )
 
@@ -216,18 +211,18 @@ class TestInteractiveElements:
         html = get_flow_studio_html()
 
         # Find <button> elements
-        button_pattern = re.compile(r'<button[^>]*>.*?</button>', re.DOTALL)
+        button_pattern = re.compile(r"<button[^>]*>.*?</button>", re.DOTALL)
         buttons = button_pattern.findall(html)
 
         for button in buttons:
             # Check for text content (including nested spans)
             # Strip all tags and check for remaining text
-            text_only = re.sub(r'<[^>]+>', ' ', button)
-            text_content = ' '.join(text_only.split()).strip()
+            text_only = re.sub(r"<[^>]+>", " ", button)
+            text_content = " ".join(text_only.split()).strip()
 
-            has_aria_label = 'aria-label=' in button
-            has_aria_labelledby = 'aria-labelledby=' in button
-            has_title = 'title=' in button  # title is acceptable fallback
+            has_aria_label = "aria-label=" in button
+            has_aria_labelledby = "aria-labelledby=" in button
+            has_title = "title=" in button  # title is acceptable fallback
 
             assert has_aria_label or has_aria_labelledby or text_content or has_title, (
                 f"Button should have accessible name: {button[:100]}"
@@ -238,7 +233,7 @@ class TestInteractiveElements:
         html = get_flow_studio_html()
 
         # Find all <select> elements with their full opening tag
-        select_pattern = re.compile(r'<select[^>]*>')
+        select_pattern = re.compile(r"<select[^>]*>")
         selects = select_pattern.findall(html)
 
         for select_tag in selects:
@@ -247,7 +242,7 @@ class TestInteractiveElements:
             select_id = id_match.group(1) if id_match else "unknown"
 
             # Check for aria-label directly on the element
-            has_aria_label = 'aria-label=' in select_tag
+            has_aria_label = "aria-label=" in select_tag
 
             # Check for label[for=id] in the HTML
             has_label = False
@@ -272,9 +267,7 @@ class TestKeyboardNavigation:
         """Keyboard shortcuts should be documented in TypeScript."""
         sources = get_ts_sources()
 
-        assert "shortcuts.ts" in sources, (
-            "Shortcuts module should exist for keyboard navigation"
-        )
+        assert "shortcuts.ts" in sources, "Shortcuts module should exist for keyboard navigation"
 
     def test_shortcuts_include_common_keys(self):
         """Common keyboard shortcuts should be implemented."""
@@ -318,11 +311,9 @@ class TestLiveRegions:
 
         # Either role="status" or aria-live
         has_status = 'role="status"' in html
-        has_live = 'aria-live=' in html
+        has_live = "aria-live=" in html
 
-        assert has_status or has_live, (
-            "Page should have a live region for status announcements"
-        )
+        assert has_status or has_live, "Page should have a live region for status announcements"
 
     def test_governance_badge_announces_changes(self):
         """Governance badge should be in a live region."""
@@ -331,8 +322,7 @@ class TestLiveRegions:
         # The governance badge area should announce changes
         # Look for role="status" near governance-related elements
         governance_pattern = re.compile(
-            r'<[^>]*(governance|selftest)[^>]*role="status"[^>]*>',
-            re.IGNORECASE
+            r'<[^>]*(governance|selftest)[^>]*role="status"[^>]*>', re.IGNORECASE
         )
 
         # Also check if there's a general status region
@@ -360,9 +350,7 @@ class TestColorAccessibility:
         css_content = css_file.read_text(encoding="utf-8")
 
         # Check for color token definitions
-        assert '--fs-color-' in css_content, (
-            "CSS should use design tokens for consistent colors"
-        )
+        assert "--fs-color-" in css_content, "CSS should use design tokens for consistent colors"
 
     def test_status_not_color_only(self):
         """Status indicators should not rely on color alone."""
@@ -377,7 +365,7 @@ class TestColorAccessibility:
         # (This is a heuristic - full check requires visual inspection)
         if matches:
             non_empty = [m for m in matches if m.strip()]
-            assert len(non_empty) > 0 or 'aria-label' in html, (
+            assert len(non_empty) > 0 or "aria-label" in html, (
                 "Status indicators should have text labels, not color alone"
             )
 
@@ -394,7 +382,7 @@ class TestUIReadyHandshake:
         """HTML should have data-ui-ready attribute for initialization tracking."""
         html = get_flow_studio_html()
 
-        assert 'data-ui-ready=' in html, (
+        assert "data-ui-ready=" in html, (
             "HTML should have data-ui-ready attribute for readiness tracking. "
             "A11y tools should wait for data-ui-ready='ready' before testing."
         )
@@ -406,12 +394,6 @@ class TestUIReadyHandshake:
         # Check any TypeScript file for the states
         all_ts = " ".join(sources.values())
 
-        assert '"loading"' in all_ts or "'loading'" in all_ts, (
-            "UI should have 'loading' state"
-        )
-        assert '"ready"' in all_ts or "'ready'" in all_ts, (
-            "UI should have 'ready' state"
-        )
-        assert '"error"' in all_ts or "'error'" in all_ts, (
-            "UI should have 'error' state"
-        )
+        assert '"loading"' in all_ts or "'loading'" in all_ts, "UI should have 'loading' state"
+        assert '"ready"' in all_ts or "'ready'" in all_ts, "UI should have 'ready' state"
+        assert '"error"' in all_ts or "'error'" in all_ts, "UI should have 'error' state"

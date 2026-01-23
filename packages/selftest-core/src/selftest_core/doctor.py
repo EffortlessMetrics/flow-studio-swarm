@@ -27,8 +27,9 @@ Example usage:
 import os
 import subprocess
 import sys
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Union
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -42,6 +43,7 @@ class DiagnosticCheck:
         check_fn: Function that returns (status, recommendation)
         required: If True, failure makes this category fail
     """
+
     name: str
     category: str  # 'harness' or 'service'
     check_fn: Callable[[], tuple]  # Returns (status, recommendation)
@@ -65,13 +67,15 @@ class SelfTestDoctor:
         doctor.add_check(DiagnosticCheck(
             name="database",
             category="service",
-            check_fn=lambda: ("OK", None) if db_is_up() else ("ERROR", "Start database"),
+            check_fn=lambda: (
+                ("OK", None) if db_is_up() else ("ERROR", "Start database")
+            ),
         ))
 
         diagnosis = doctor.diagnose()
     """
 
-    def __init__(self, checks: Optional[List[DiagnosticCheck]] = None):
+    def __init__(self, checks: list[DiagnosticCheck] | None = None):
         """
         Initialize the doctor.
 
@@ -80,7 +84,7 @@ class SelfTestDoctor:
         """
         self.checks = checks or self._default_checks()
 
-    def _default_checks(self) -> List[DiagnosticCheck]:
+    def _default_checks(self) -> list[DiagnosticCheck]:
         """Return the default diagnostic checks."""
         return [
             DiagnosticCheck(
@@ -112,8 +116,6 @@ class SelfTestDoctor:
     def _check_python_env(self) -> tuple:
         """Check Python environment."""
         try:
-            if sys.version_info < (3, 10):
-                return ("ERROR", "Upgrade to Python 3.10+")
             return ("OK", None)
         except Exception as e:
             return ("ERROR", f"Python error: {e}")
@@ -162,7 +164,7 @@ class SelfTestDoctor:
         except Exception as e:
             return ("ERROR", f"Python syntax check failed: {e}")
 
-    def diagnose(self) -> Dict[str, Any]:
+    def diagnose(self) -> dict[str, Any]:
         """
         Run all diagnostic checks.
 
@@ -173,7 +175,7 @@ class SelfTestDoctor:
             - summary: Overall status (HEALTHY, HARNESS_ISSUE, SERVICE_ISSUE)
             - recommendations: List of recommended actions
         """
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "harness": {},
             "service": {},
             "recommendations": [],
@@ -202,7 +204,7 @@ class SelfTestDoctor:
 
         return results
 
-    def print_diagnosis(self, diagnosis: Optional[Dict[str, Any]] = None):
+    def print_diagnosis(self, diagnosis: dict[str, Any] | None = None):
         """
         Print diagnosis results to console.
 
@@ -244,10 +246,10 @@ class SelfTestDoctor:
 
 def make_command_check(
     name: str,
-    command: Union[str, List[str]],
+    command: str | list[str],
     category: str = "harness",
     timeout: int = 5,
-    error_message: Optional[str] = None,
+    error_message: str | None = None,
 ) -> DiagnosticCheck:
     """
     Create a diagnostic check that runs a command.
@@ -299,7 +301,7 @@ def make_command_check(
 
 def make_python_package_check(
     package: str,
-    import_name: Optional[str] = None,
+    import_name: str | None = None,
 ) -> DiagnosticCheck:
     """
     Create a diagnostic check for a Python package.
@@ -348,6 +350,7 @@ def make_env_var_check(
     Returns:
         DiagnosticCheck instance
     """
+
     def check_fn() -> tuple:
         if os.environ.get(var_name):
             return ("OK", None)

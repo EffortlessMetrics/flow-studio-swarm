@@ -41,9 +41,7 @@ from typing import (
 
 from .port import (
     CLAUDE_SDK_CAPABILITIES,
-    StepSessionProtocol,
     TransportCapabilities,
-    TransportProtocol,
 )
 
 if TYPE_CHECKING:

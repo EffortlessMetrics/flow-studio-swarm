@@ -62,43 +62,43 @@ SCAN_FILES = [
 OUTDATED_PATTERNS: List[Tuple[re.Pattern, str, str]] = [
     # Selftest step counts (excluding Flow 7 which is intentionally 10 steps)
     (
-        re.compile(r'\b10[-\s]?step\s+selftest\b', re.IGNORECASE),
+        re.compile(r"\b10[-\s]?step\s+selftest\b", re.IGNORECASE),
         "Outdated selftest step count (10 instead of 16)",
-        "Replace with '16-step selftest'"
+        "Replace with '16-step selftest'",
     ),
     (
-        re.compile(r'\ball\s+10\s+steps?\b(?!.*(?:flow\s*7|stepwise[-\s]?demo))', re.IGNORECASE),
+        re.compile(r"\ball\s+10\s+steps?\b(?!.*(?:flow\s*7|stepwise[-\s]?demo))", re.IGNORECASE),
         "Outdated 'all 10 steps' reference",
-        "Replace with 'all 16 steps'"
+        "Replace with 'all 16 steps'",
     ),
     (
-        re.compile(r'\b10\s+selftest\s+steps?\b', re.IGNORECASE),
+        re.compile(r"\b10\s+selftest\s+steps?\b", re.IGNORECASE),
         "Outdated '10 selftest steps' reference",
-        "Replace with '16 selftest steps'"
+        "Replace with '16 selftest steps'",
     ),
     # Agent counts
     (
-        re.compile(r'\b42\s+(?:domain\s+)?agents?\b', re.IGNORECASE),
+        re.compile(r"\b42\s+(?:domain\s+)?agents?\b", re.IGNORECASE),
         "Outdated agent count (42 instead of 45 domain)",
-        "Replace with '45 domain agents' or '48 total agents'"
+        "Replace with '45 domain agents' or '48 total agents'",
     ),
     (
-        re.compile(r'\b44\s+agents?\b', re.IGNORECASE),
+        re.compile(r"\b44\s+agents?\b", re.IGNORECASE),
         "Outdated agent count (44 instead of 48 total)",
-        "Replace with '48 agents'"
+        "Replace with '48 agents'",
     ),
     (
-        re.compile(r'\b45\s*\(\s*3\s+built-in\s*\+\s*42\s+domain\s*\)', re.IGNORECASE),
+        re.compile(r"\b45\s*\(\s*3\s+built-in\s*\+\s*42\s+domain\s*\)", re.IGNORECASE),
         "Outdated total calculation (3+42=45 instead of 3+45=48)",
-        "Replace with '48 (3 built-in + 45 domain)'"
+        "Replace with '48 (3 built-in + 45 domain)'",
     ),
 ]
 
 # Patterns that are OK (false positive exclusions)
 FALSE_POSITIVE_PATTERNS = [
-    re.compile(r'flow\s*7.*10[-\s]?step', re.IGNORECASE),  # Flow 7 is intentionally 10 steps
-    re.compile(r'stepwise[-\s]?demo.*10', re.IGNORECASE),  # stepwise-demo flow
-    re.compile(r'line\s+\d+', re.IGNORECASE),  # Line number references
+    re.compile(r"flow\s*7.*10[-\s]?step", re.IGNORECASE),  # Flow 7 is intentionally 10 steps
+    re.compile(r"stepwise[-\s]?demo.*10", re.IGNORECASE),  # stepwise-demo flow
+    re.compile(r"line\s+\d+", re.IGNORECASE),  # Line number references
 ]
 
 
@@ -127,7 +127,7 @@ def scan_file(file_path: Path) -> List[Dict[str, Any]]:
         return issues
 
     try:
-        content = file_path.read_text(encoding='utf-8')
+        content = file_path.read_text(encoding="utf-8")
         lines = content.splitlines()
     except Exception as e:
         return [{"error": str(e), "file": str(file_path)}]
@@ -140,15 +140,17 @@ def scan_file(file_path: Path) -> List[Dict[str, Any]]:
         for pattern, description, suggestion in OUTDATED_PATTERNS:
             match = pattern.search(line)
             if match:
-                issues.append({
-                    "file": str(file_path),
-                    "line": line_num,
-                    "column": match.start() + 1,
-                    "match": match.group(),
-                    "context": line.strip()[:100],
-                    "description": description,
-                    "suggestion": suggestion,
-                })
+                issues.append(
+                    {
+                        "file": str(file_path),
+                        "line": line_num,
+                        "column": match.start() + 1,
+                        "match": match.group(),
+                        "context": line.strip()[:100],
+                        "description": description,
+                        "suggestion": suggestion,
+                    }
+                )
 
     return issues
 
@@ -173,7 +175,9 @@ def print_human_readable(issues: List[Dict[str, Any]], repo_root: Path) -> None:
         print()
         print("  Authoritative counts (computed from config):")
         print(f"    - Selftest: {SELFTEST_STEPS} steps")
-        print(f"    - Agents: {TOTAL_AGENTS} total ({DOMAIN_AGENTS} domain + {_META['agents']['built_in']} built-in)")
+        print(
+            f"    - Agents: {TOTAL_AGENTS} total ({DOMAIN_AGENTS} domain + {_META['agents']['built_in']} built-in)"
+        )
         print(f"    - Skills: {SKILLS_COUNT}")
         return
 
@@ -229,16 +233,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Check documentation for outdated count references"
     )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output results in JSON format"
-    )
-    parser.add_argument(
-        "--fix",
-        action="store_true",
-        help="Show detailed fix suggestions"
-    )
+    parser.add_argument("--json", action="store_true", help="Output results in JSON format")
+    parser.add_argument("--fix", action="store_true", help="Show detailed fix suggestions")
     args = parser.parse_args()
 
     repo_root = get_repo_root()

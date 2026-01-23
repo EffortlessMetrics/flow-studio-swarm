@@ -35,6 +35,7 @@ from fastapi.testclient import TestClient
 def fastapi_client():
     """Create FastAPI test client."""
     from swarm.tools.flow_studio_fastapi import app
+
     return TestClient(app)
 
 
@@ -46,9 +47,7 @@ def test_selftest_plan_api_returns_data(fastapi_client):
     if resp.status_code == 503:
         pytest.skip("Selftest module not available")
 
-    assert resp.status_code == 200, (
-        f"API should return 200, got {resp.status_code}"
-    )
+    assert resp.status_code == 200, f"API should return 200, got {resp.status_code}"
 
     data = resp.json()
 
@@ -82,9 +81,9 @@ def test_tier_colors_mapping():
     """Test tier colors are correctly mapped for UI rendering."""
     # Expected tier -> color mapping for UI
     TIER_COLORS = {
-        "kernel": "red",      # Critical tier
+        "kernel": "red",  # Critical tier
         "governance": "orange",  # Warning tier
-        "optional": "gray"    # Info tier
+        "optional": "gray",  # Info tier
     }
 
     # Verify mapping exists and is complete
@@ -96,22 +95,12 @@ def test_tier_colors_mapping():
     # Verify color values are valid CSS colors
     valid_colors = {"red", "orange", "gray", "blue", "green", "yellow"}
     for tier, color in TIER_COLORS.items():
-        assert color in valid_colors, (
-            f"Tier {tier} has invalid color {color}"
-        )
+        assert color in valid_colors, f"Tier {tier} has invalid color {color}"
 
 
 def test_hint_generation_structure():
     """Test hints have correct structure for UI rendering."""
     # Mock governance status with failures
-    governance_status = {
-        "governance": {
-            "selftest": {
-                "failed_steps": ["core-checks"],
-                "degraded_steps": []
-            }
-        }
-    }
 
     # Expected hint structure
     expected_fields = {"type", "step", "root_cause", "command", "docs"}
@@ -123,7 +112,7 @@ def test_hint_generation_structure():
         "step": "core-checks",
         "root_cause": "Python lint or compile errors in swarm/ directory",
         "command": "ruff check swarm/ && python -m compileall -q swarm/",
-        "docs": "docs/SELFTEST_SYSTEM.md"
+        "docs": "docs/SELFTEST_SYSTEM.md",
     }
 
     # Verify all expected fields present
@@ -146,7 +135,7 @@ def test_commands_are_copyable():
         "ruff check swarm/ && python -m compileall -q swarm/",
         "uv run swarm/tools/validate_swarm.py --check-agents",
         "make policy-tests",
-        "uv run pytest tests/test_flow_studio_fastapi_smoke.py -v"
+        "uv run pytest tests/test_flow_studio_fastapi_smoke.py -v",
     ]
 
     for cmd in commands:
@@ -171,7 +160,7 @@ def test_docs_links_present():
         "docs/SELFTEST_SYSTEM.md",
         "CLAUDE.md § Agent Ops",
         "CLAUDE.md § Skills",
-        "swarm/policies/README.md"
+        "swarm/policies/README.md",
     ]
 
     for link in docs_links:
@@ -180,22 +169,13 @@ def test_docs_links_present():
         assert len(link) > 0, "Link should not be empty"
 
         # Verify link has valid format
-        assert "/" in link or "§" in link, (
-            f"Link should be file path or section reference: {link}"
-        )
+        assert "/" in link or "§" in link, f"Link should be file path or section reference: {link}"
 
 
 def test_empty_plan_handled(fastapi_client):
     """Test empty plan is handled gracefully."""
     # Create empty-looking governance status
-    governance_status = {
-        "governance": {
-            "selftest": {
-                "failed_steps": [],
-                "degraded_steps": []
-            }
-        }
-    }
+    governance_status = {"governance": {"selftest": {"failed_steps": [], "degraded_steps": []}}}
 
     # Should produce no hints
     # (In real UI, this would show "no issues" or hide the section)
@@ -206,36 +186,25 @@ def test_empty_plan_handled(fastapi_client):
 def test_degraded_mode_hints():
     """Test degraded mode generates advisory hints."""
     governance_status = {
-        "governance": {
-            "selftest": {
-                "failed_steps": [],
-                "degraded_steps": ["bdd", "ac-status"]
-            }
-        }
+        "governance": {"selftest": {"failed_steps": [], "degraded_steps": ["bdd", "ac-status"]}}
     }
 
     # Should have degraded steps
     assert len(governance_status["governance"]["selftest"]["degraded_steps"]) > 0
 
     # Expected hint type for degraded mode
-    expected_hint_type = "advisory"
 
     # Verify degraded mode would generate advisory hints
     for step in governance_status["governance"]["selftest"]["degraded_steps"]:
         # In UI, these would be rendered as advisory/warning hints
-        assert step in ["bdd", "ac-status"], (
-            f"Unexpected degraded step: {step}"
-        )
+        assert step in ["bdd", "ac-status"], f"Unexpected degraded step: {step}"
 
 
 def test_failure_mode_hints():
     """Test failure mode generates failure hints."""
     governance_status = {
         "governance": {
-            "selftest": {
-                "failed_steps": ["core-checks", "agents-governance"],
-                "degraded_steps": []
-            }
+            "selftest": {"failed_steps": ["core-checks", "agents-governance"], "degraded_steps": []}
         }
     }
 
@@ -243,13 +212,10 @@ def test_failure_mode_hints():
     assert len(governance_status["governance"]["selftest"]["failed_steps"]) > 0
 
     # Expected hint type for failures
-    expected_hint_type = "failure"
 
     # Verify failures would generate failure hints
     for step in governance_status["governance"]["selftest"]["failed_steps"]:
-        assert step in ["core-checks", "agents-governance"], (
-            f"Unexpected failed step: {step}"
-        )
+        assert step in ["core-checks", "agents-governance"], f"Unexpected failed step: {step}"
 
 
 def test_api_selftest_plan_json_format(fastapi_client):
@@ -289,9 +255,7 @@ def test_step_dependencies_for_graph_rendering(fastapi_client):
 
     # Each step should have depends_on field (even if empty)
     for step in steps:
-        assert "depends_on" in step, (
-            f"Step {step.get('id')} missing depends_on field"
-        )
+        assert "depends_on" in step, f"Step {step.get('id')} missing depends_on field"
         assert isinstance(step["depends_on"], list), (
             f"Step {step.get('id')} depends_on should be list"
         )
@@ -300,6 +264,4 @@ def test_step_dependencies_for_graph_rendering(fastapi_client):
         if len(step["depends_on"]) > 0:
             all_step_ids = {s["id"] for s in steps}
             for dep in step["depends_on"]:
-                assert dep in all_step_ids, (
-                    f"Step {step['id']} depends on unknown step {dep}"
-                )
+                assert dep in all_step_ids, f"Step {step['id']} depends on unknown step {dep}"

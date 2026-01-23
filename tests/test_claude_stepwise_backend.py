@@ -72,7 +72,6 @@ from swarm.runtime.types import (
     SDLCStatus,
 )
 
-
 # -----------------------------------------------------------------------------
 # Stub Orchestrator for Synchronous Contract Tests
 # -----------------------------------------------------------------------------
@@ -256,9 +255,7 @@ class TestClaudeStepwiseBackendCapabilities:
         backend = ClaudeStepwiseBackend()
         caps = backend.capabilities()
 
-        assert caps.supports_streaming is True, (
-            "Backend should support streaming"
-        )
+        assert caps.supports_streaming is True, "Backend should support streaming"
 
     def test_capabilities_events_support(self) -> None:
         """Backend should support events."""
@@ -267,9 +264,7 @@ class TestClaudeStepwiseBackendCapabilities:
         backend = ClaudeStepwiseBackend()
         caps = backend.capabilities()
 
-        assert caps.supports_events is True, (
-            "Backend should support events"
-        )
+        assert caps.supports_events is True, "Backend should support events"
 
     def test_capabilities_cancel_support(self) -> None:
         """Backend should support cancellation."""
@@ -278,9 +273,7 @@ class TestClaudeStepwiseBackendCapabilities:
         backend = ClaudeStepwiseBackend()
         caps = backend.capabilities()
 
-        assert caps.supports_cancel is True, (
-            "Backend should support cancellation"
-        )
+        assert caps.supports_cancel is True, "Backend should support cancellation"
 
     def test_capabilities_no_replay_support(self) -> None:
         """Stepwise backend should not support replay."""
@@ -289,9 +282,7 @@ class TestClaudeStepwiseBackendCapabilities:
         backend = ClaudeStepwiseBackend()
         caps = backend.capabilities()
 
-        assert caps.supports_replay is False, (
-            "Stepwise backend should not support replay"
-        )
+        assert caps.supports_replay is False, "Stepwise backend should not support replay"
 
 
 # -----------------------------------------------------------------------------
@@ -359,18 +350,14 @@ class TestClaudeStepwiseBackendRunCreation:
 
         # Verify run_id format
         assert run_id is not None, "start() should return a run_id"
-        assert run_id.startswith("run-"), (
-            f"run_id should start with 'run-', got '{run_id}'"
-        )
+        assert run_id.startswith("run-"), f"run_id should start with 'run-', got '{run_id}'"
 
         # All synchronous work is complete - no polling needed!
         # The summary and events were written before start() returned.
 
         # Verify summary can be read back via the backend
         summary = backend.get_summary(run_id)
-        assert summary is not None, (
-            f"Summary should be readable after start() (run_id={run_id})"
-        )
+        assert summary is not None, f"Summary should be readable after start() (run_id={run_id})"
         assert summary.id == run_id, "Summary should have correct run_id"
         assert summary.status in [
             RunStatus.PENDING,
@@ -433,8 +420,8 @@ class TestClaudeStepwiseBackendTranscripts:
         Note: This test uses a mock flow registry to ensure steps are defined,
         since the isolated environment may not have real flow definitions.
         """
-        from swarm.runtime.backends import ClaudeStepwiseBackend
         from swarm.config.flow_registry import FlowDefinition, StepDefinition
+        from swarm.runtime.backends import ClaudeStepwiseBackend
 
         env = isolated_runs_env
 
@@ -666,9 +653,7 @@ class TestClaudeStepwiseBackendSummary:
         assert summary is not None, "get_summary should return a RunSummary"
 
         # Verify run_id matches
-        assert summary.id == run_id, (
-            f"Summary run_id mismatch: expected {run_id}, got {summary.id}"
-        )
+        assert summary.id == run_id, f"Summary run_id mismatch: expected {run_id}, got {summary.id}"
 
         # Verify status is valid
         assert summary.status in [

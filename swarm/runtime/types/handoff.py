@@ -130,9 +130,7 @@ def handoff_envelope_to_dict(envelope: HandoffEnvelope) -> Dict[str, Any]:
         result["routing_audit"] = envelope.routing_audit
     elif envelope.routing_signal.explanation:
         # Auto-populate routing audit from explanation if not explicitly set
-        result["routing_audit"] = routing_explanation_to_dict(
-            envelope.routing_signal.explanation
-        )
+        result["routing_audit"] = routing_explanation_to_dict(envelope.routing_signal.explanation)
 
     # Serialize assumptions and decisions
     if envelope.assumptions_made:
@@ -143,9 +141,7 @@ def handoff_envelope_to_dict(envelope: HandoffEnvelope) -> Dict[str, Any]:
         result["assumptions_made"] = []
 
     if envelope.decisions_made:
-        result["decisions_made"] = [
-            decision_log_entry_to_dict(d) for d in envelope.decisions_made
-        ]
+        result["decisions_made"] = [decision_log_entry_to_dict(d) for d in envelope.decisions_made]
     else:
         result["decisions_made"] = []
 
@@ -188,14 +184,10 @@ def handoff_envelope_from_dict(data: Dict[str, Any]) -> HandoffEnvelope:
     routing_signal = routing_signal_from_dict(data.get("routing_signal", {}))
 
     # Parse assumptions
-    assumptions_made = [
-        assumption_entry_from_dict(a) for a in data.get("assumptions_made", [])
-    ]
+    assumptions_made = [assumption_entry_from_dict(a) for a in data.get("assumptions_made", [])]
 
     # Parse decisions
-    decisions_made = [
-        decision_log_entry_from_dict(d) for d in data.get("decisions_made", [])
-    ]
+    decisions_made = [decision_log_entry_from_dict(d) for d in data.get("decisions_made", [])]
 
     # Parse observations
     observations = []

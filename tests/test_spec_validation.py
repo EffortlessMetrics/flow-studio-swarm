@@ -4,43 +4,28 @@ This module tests schema validation for StationSpecs and FlowSpecs,
 routing configuration validation, and macro-routing configuration.
 """
 
-import pytest
-from pathlib import Path
-from typing import Any, Dict, List
-
 # Add swarm to path
 import sys
+from pathlib import Path
+
+import pytest
+
 _SWARM_ROOT = Path(__file__).resolve().parent.parent
 if str(_SWARM_ROOT) not in sys.path:
     sys.path.insert(0, str(_SWARM_ROOT))
 
-from swarm.spec.types import (
-    StationSpec,
-    StationSDK,
-    StationIdentity,
-    StationIO,
-    StationHandoff,
-    StationRuntimePrompt,
-    StationRoutingHints,
-    StationSandbox,
-    StationContextBudget,
-    StationCategory,
-    FlowSpec,
-    FlowStep,
-    FlowDefaults,
-    RoutingConfig,
-    RoutingKind,
-    ContextPackConfig,
-    StepTeaching,
-    station_spec_from_dict,
-    flow_spec_from_dict,
-)
 from swarm.spec.loader import (
-    load_station,
-    load_flow,
-    list_stations,
     list_flows,
+    list_stations,
+    load_flow,
+    load_station,
     validate_specs,
+)
+from swarm.spec.types import (
+    RoutingKind,
+    StationCategory,
+    flow_spec_from_dict,
+    station_spec_from_dict,
 )
 
 
@@ -93,9 +78,16 @@ class TestStationSpecSchemaValidation:
     def test_station_spec_category_valid_values(self):
         """Category must be a valid StationCategory."""
         valid_categories = [
-            "shaping", "spec", "design", "implementation",
-            "critic", "verification", "analytics", "reporter",
-            "infra", "router"
+            "shaping",
+            "spec",
+            "design",
+            "implementation",
+            "critic",
+            "verification",
+            "analytics",
+            "reporter",
+            "infra",
+            "router",
         ]
 
         for cat in valid_categories:
@@ -131,7 +123,7 @@ class TestStationSpecSchemaValidation:
                 "permission_mode": "default",
                 "max_turns": 20,
                 "allowed_tools": ["Read", "Write"],
-            }
+            },
         }
 
         station = station_spec_from_dict(data)
@@ -151,7 +143,7 @@ class TestStationSpecSchemaValidation:
                     "auto_allow_bash": False,
                     "excluded_commands": ["rm", "sudo"],
                 }
-            }
+            },
         }
 
         station = station_spec_from_dict(data)
@@ -170,7 +162,7 @@ class TestStationSpecSchemaValidation:
                     "recent_chars": 100000,
                     "older_chars": 20000,
                 }
-            }
+            },
         }
 
         station = station_spec_from_dict(data)
@@ -186,7 +178,7 @@ class TestStationSpecSchemaValidation:
             "identity": {
                 "system_append": "You are a helpful agent.",
                 "tone": "analytical",
-            }
+            },
         }
 
         station = station_spec_from_dict(data)
@@ -203,7 +195,7 @@ class TestStationSpecSchemaValidation:
                 "optional_inputs": ["plan/api_contracts.yaml"],
                 "required_outputs": ["build/impl.md"],
                 "optional_outputs": ["build/notes.md"],
-            }
+            },
         }
 
         station = station_spec_from_dict(data)
@@ -220,7 +212,7 @@ class TestStationSpecSchemaValidation:
             "handoff": {
                 "path_template": "{{run.base}}/handoff/{{step.id}}.json",
                 "required_fields": ["status", "summary", "artifacts", "blockers"],
-            }
+            },
         }
 
         station = station_spec_from_dict(data)
@@ -236,7 +228,7 @@ class TestStationSpecSchemaValidation:
             "runtime_prompt": {
                 "fragments": ["common/invariants.md", "common/evidence.md"],
                 "template": "Work on: {{step.objective}}",
-            }
+            },
         }
 
         station = station_spec_from_dict(data)
@@ -252,7 +244,7 @@ class TestStationSpecSchemaValidation:
                 "Never delete tests",
                 "Always run tests before claiming success",
                 "Document assumptions",
-            ]
+            ],
         }
 
         station = station_spec_from_dict(data)
@@ -269,7 +261,7 @@ class TestStationSpecSchemaValidation:
                 "on_unverified": "loop",
                 "on_partial": "advance_with_concerns",
                 "on_blocked": "escalate",
-            }
+            },
         }
 
         station = station_spec_from_dict(data)
@@ -344,7 +336,7 @@ class TestFlowSpecSchemaValidation:
                     "include_scent_trail": False,
                 },
                 "sdk_overrides": {"model": "opus"},
-            }
+            },
         }
 
         flow = flow_spec_from_dict(data)
@@ -368,7 +360,7 @@ class TestFlowSpecSchemaValidation:
                     "station": "station-b",
                     "objective": "Do step 2",
                 },
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -404,9 +396,9 @@ class TestRoutingConfigValidation:
                     "routing": {
                         "kind": "linear",
                         "next": "step-2",
-                    }
+                    },
                 }
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -430,9 +422,9 @@ class TestRoutingConfigValidation:
                         "loop_condition_field": "status",
                         "loop_success_values": ["VERIFIED", "verified"],
                         "max_iterations": 5,
-                    }
+                    },
                 }
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -459,10 +451,10 @@ class TestRoutingConfigValidation:
                         "branches": {
                             "success": "step-a",
                             "failure": "step-b",
-                        }
-                    }
+                        },
+                    },
                 }
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -482,9 +474,9 @@ class TestRoutingConfigValidation:
                     "objective": "Complete",
                     "routing": {
                         "kind": "terminal",
-                    }
+                    },
                 }
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -503,9 +495,9 @@ class TestRoutingConfigValidation:
                     "objective": "Test",
                     "routing": {
                         "kind": "invalid-kind",
-                    }
+                    },
                 }
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -526,7 +518,7 @@ class TestStepConfigValidation:
                     "station": "test-station",
                     "objective": "Test",
                 }
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -543,7 +535,7 @@ class TestStepConfigValidation:
                     "station": "my-station",
                     "objective": "Test",
                 }
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -561,7 +553,7 @@ class TestStepConfigValidation:
                     "objective": "Test",
                     "scope": "Only module A",
                 }
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -580,7 +572,7 @@ class TestStepConfigValidation:
                     "inputs": ["input1.md", "input2.md"],
                     "outputs": ["output1.md"],
                 }
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -600,9 +592,9 @@ class TestStepConfigValidation:
                     "sdk_overrides": {
                         "model": "opus",
                         "max_turns": 20,
-                    }
+                    },
                 }
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -622,9 +614,9 @@ class TestStepConfigValidation:
                     "teaching": {
                         "highlight": True,
                         "note": "This is an important step",
-                    }
+                    },
                 }
-            ]
+            ],
         }
 
         flow = flow_spec_from_dict(data)
@@ -645,7 +637,7 @@ class TestMacroRoutingConfiguration:
             "on_complete": {
                 "next_flow": "next-flow",
                 "reason": "Flow complete",
-            }
+            },
         }
 
         flow = flow_spec_from_dict(data)
@@ -660,7 +652,7 @@ class TestMacroRoutingConfiguration:
             "on_failure": {
                 "next_flow": "bounce-flow",
                 "reason": "Need to bounce back",
-            }
+            },
         }
 
         flow = flow_spec_from_dict(data)
@@ -762,11 +754,14 @@ class TestAllLoadedSpecsValid:
             flow = load_flow(flow_id)
 
             for step in flow.steps:
-                assert isinstance(step.routing.kind, RoutingKind), \
+                assert isinstance(step.routing.kind, RoutingKind), (
                     f"{flow_id}/{step.id} has invalid routing kind"
+                )
 
                 if step.routing.kind == RoutingKind.MICROLOOP:
-                    assert step.routing.loop_target is not None, \
+                    assert step.routing.loop_target is not None, (
                         f"{flow_id}/{step.id} is MICROLOOP but has no loop_target"
-                    assert step.routing.max_iterations >= 1, \
+                    )
+                    assert step.routing.max_iterations >= 1, (
                         f"{flow_id}/{step.id} has invalid max_iterations"
+                    )

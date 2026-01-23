@@ -5,20 +5,17 @@ Verifies the unified handoff envelope persistence layer.
 
 import json
 import os
-import tempfile
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
 import pytest
-
 from swarm.runtime.handoff_io import (
-    write_handoff_envelope,
-    update_envelope_routing,
-    read_handoff_envelope,
-    validate_envelope,
-    is_strict_validation_enabled,
-    EnvelopeValidationError,
     FILE_CHANGES_EXTRACTION_THRESHOLD,
+    is_strict_validation_enabled,
+    read_handoff_envelope,
+    update_envelope_routing,
+    validate_envelope,
+    write_handoff_envelope,
 )
 
 
@@ -74,9 +71,7 @@ class TestWriteHandoffEnvelope:
         assert draft_data["step_id"] == "test_step"
         assert committed_data["step_id"] == "test_step"
 
-    def test_skips_draft_when_disabled(
-        self, run_base: Path, valid_envelope_data: Dict[str, Any]
-    ):
+    def test_skips_draft_when_disabled(self, run_base: Path, valid_envelope_data: Dict[str, Any]):
         """Verify draft is skipped when write_draft=False."""
         write_handoff_envelope(
             run_base=run_base,
@@ -152,9 +147,7 @@ class TestWriteHandoffEnvelope:
 class TestUpdateEnvelopeRouting:
     """Tests for update_envelope_routing function."""
 
-    def test_updates_existing_envelope(
-        self, run_base: Path, valid_envelope_data: Dict[str, Any]
-    ):
+    def test_updates_existing_envelope(self, run_base: Path, valid_envelope_data: Dict[str, Any]):
         """Verify routing signal is added to existing envelope."""
         # First write an envelope
         write_handoff_envelope(
@@ -180,9 +173,7 @@ class TestUpdateEnvelopeRouting:
         result = update_envelope_routing(run_base, "nonexistent", {"decision": "advance"})
         assert result is None
 
-    def test_persists_update_to_disk(
-        self, run_base: Path, valid_envelope_data: Dict[str, Any]
-    ):
+    def test_persists_update_to_disk(self, run_base: Path, valid_envelope_data: Dict[str, Any]):
         """Verify updates are persisted to disk."""
         write_handoff_envelope(
             run_base=run_base,
@@ -201,9 +192,7 @@ class TestUpdateEnvelopeRouting:
 class TestReadHandoffEnvelope:
     """Tests for read_handoff_envelope function."""
 
-    def test_reads_committed_by_default(
-        self, run_base: Path, valid_envelope_data: Dict[str, Any]
-    ):
+    def test_reads_committed_by_default(self, run_base: Path, valid_envelope_data: Dict[str, Any]):
         """Verify committed envelope is read by default."""
         write_handoff_envelope(
             run_base=run_base,
@@ -264,7 +253,7 @@ class TestValidateEnvelope:
     def test_invalid_envelope_returns_errors(self):
         """Verify invalid envelope returns error messages."""
         invalid_data = {}  # Completely empty
-        errors = validate_envelope(invalid_data)
+        validate_envelope(invalid_data)
         # May return errors if jsonschema is available
         # The function gracefully handles missing dependencies
 
@@ -308,14 +297,17 @@ class TestFileChangesExtraction:
 
     def test_small_file_changes_remain_inline(self, run_base: Path):
         """Verify small file_changes are kept inline in the envelope."""
-        small_file_changes = [
-            {"path": "src/main.py", "change_type": "modified", "lines_added": 5}
-        ]
+        small_file_changes = [{"path": "src/main.py", "change_type": "modified", "lines_added": 5}]
         envelope_data = {
             "step_id": "test_step",
             "status": "VERIFIED",
             "summary": "Test",
-            "routing_signal": {"decision": "advance", "reason": "done", "confidence": 0.9, "needs_human": False},
+            "routing_signal": {
+                "decision": "advance",
+                "reason": "done",
+                "confidence": 0.9,
+                "needs_human": False,
+            },
             "file_changes": small_file_changes,
         }
 
@@ -354,7 +346,12 @@ class TestFileChangesExtraction:
             "step_id": "test_step",
             "status": "VERIFIED",
             "summary": "Test",
-            "routing_signal": {"decision": "advance", "reason": "done", "confidence": 0.9, "needs_human": False},
+            "routing_signal": {
+                "decision": "advance",
+                "reason": "done",
+                "confidence": 0.9,
+                "needs_human": False,
+            },
             "file_changes": large_file_changes,
         }
 
@@ -393,7 +390,12 @@ class TestFileChangesExtraction:
             "step_id": "test_step",
             "status": "VERIFIED",
             "summary": "Test",
-            "routing_signal": {"decision": "advance", "reason": "done", "confidence": 0.9, "needs_human": False},
+            "routing_signal": {
+                "decision": "advance",
+                "reason": "done",
+                "confidence": 0.9,
+                "needs_human": False,
+            },
             "file_changes": large_file_changes,
         }
 
@@ -424,7 +426,12 @@ class TestFileChangesExtraction:
             "step_id": "test_step",
             "status": "VERIFIED",
             "summary": "Test",
-            "routing_signal": {"decision": "advance", "reason": "done", "confidence": 0.9, "needs_human": False},
+            "routing_signal": {
+                "decision": "advance",
+                "reason": "done",
+                "confidence": 0.9,
+                "needs_human": False,
+            },
             "file_changes": large_file_changes,
         }
 
@@ -469,7 +476,12 @@ class TestFileChangesExtraction:
             "step_id": "test_step",
             "status": "VERIFIED",
             "summary": "Test",
-            "routing_signal": {"decision": "advance", "reason": "done", "confidence": 0.9, "needs_human": False},
+            "routing_signal": {
+                "decision": "advance",
+                "reason": "done",
+                "confidence": 0.9,
+                "needs_human": False,
+            },
             "file_changes": [],
         }
 
@@ -491,7 +503,12 @@ class TestFileChangesExtraction:
             "step_id": "test_step",
             "status": "VERIFIED",
             "summary": "Test",
-            "routing_signal": {"decision": "advance", "reason": "done", "confidence": 0.9, "needs_human": False},
+            "routing_signal": {
+                "decision": "advance",
+                "reason": "done",
+                "confidence": 0.9,
+                "needs_human": False,
+            },
         }
 
         result = write_handoff_envelope(

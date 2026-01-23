@@ -18,7 +18,9 @@ from .paths import get_pack_lock_path
 logger = logging.getLogger(__name__)
 
 
-def generate_pack_lock(pack: Pack, resolved_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def generate_pack_lock(
+    pack: Pack, resolved_config: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Generate lock file content from a pack."""
     pack_hash = compute_pack_hash(pack)
     timestamp = datetime.now(timezone.utc).isoformat()

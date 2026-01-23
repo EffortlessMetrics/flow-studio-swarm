@@ -684,9 +684,7 @@ class ScentTrailBuilder:
         for assumption_data in assumptions:
             if isinstance(assumption_data, dict):
                 # Handle structured assumption format
-                statement = assumption_data.get(
-                    "statement", assumption_data.get("assumption", "")
-                )
+                statement = assumption_data.get("statement", assumption_data.get("assumption", ""))
                 impact = assumption_data.get("impact_if_wrong", "Unknown impact")
                 made_at = assumption_data.get("step_introduced", step_id)
 
@@ -700,9 +698,7 @@ class ScentTrailBuilder:
             elif isinstance(assumption_data, str):
                 # Handle simple string format
                 existing = [
-                    a
-                    for a in self._trail.assumptions_in_effect
-                    if a.assumption == assumption_data
+                    a for a in self._trail.assumptions_in_effect if a.assumption == assumption_data
                 ]
                 if not existing:
                     self._trail.add_assumption(

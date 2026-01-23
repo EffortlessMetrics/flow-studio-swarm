@@ -10,7 +10,6 @@ import sys
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
-
 SHIM_PATTERNS = [
     "swarm.runtime.router",
     "swarm.config.pack_registry",

@@ -16,17 +16,27 @@ For determinism in specific runs, set environment variables:
 - ANTHROPIC_DEFAULT_OPUS_MODEL
 """
 
+import json
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Optional, Literal
-import json
+from typing import Dict, Literal, Optional
 
 # Type aliases for clarity
 ModelTier = Literal["haiku", "sonnet", "opus", "inherit"]
-StationCategory = Literal["shaping", "spec", "design", "implementation",
-                          "critic", "verification", "analytics", "reporter",
-                          "infra", "router", "wisdom"]
+StationCategory = Literal[
+    "shaping",
+    "spec",
+    "design",
+    "implementation",
+    "critic",
+    "verification",
+    "analytics",
+    "reporter",
+    "infra",
+    "router",
+    "wisdom",
+]
 
 # Valid tier aliases that the SDK accepts
 VALID_TIERS = frozenset(["haiku", "sonnet", "opus"])
@@ -38,6 +48,7 @@ _POLICY_PATH = Path(__file__).parent / "model_policy.json"
 @dataclass
 class ModelSpec:
     """Specification for a model's context window."""
+
     model_id: str
     context_tokens: int
     description: str = ""
@@ -51,14 +62,17 @@ class ModelSpec:
 @dataclass
 class BudgetFractions:
     """Fraction-based budget configuration."""
-    history_total: float = 0.25      # 25% of window
-    history_recent: float = 0.075    # 7.5% for recent step
-    history_older: float = 0.025     # 2.5% per older step
+
+    history_total: float = 0.25  # 25% of window
+    history_recent: float = 0.075  # 7.5% for recent step
+    history_older: float = 0.025  # 2.5% per older step
 
 
 # Built-in model specs
 BUILTIN_MODELS: Dict[str, ModelSpec] = {
-    "claude-sonnet-4-5-20250929": ModelSpec("claude-sonnet-4-5-20250929", 200000, "Claude Sonnet 4.5"),
+    "claude-sonnet-4-5-20250929": ModelSpec(
+        "claude-sonnet-4-5-20250929", 200000, "Claude Sonnet 4.5"
+    ),
     "claude-haiku-4-5-20251001": ModelSpec("claude-haiku-4-5-20251001", 200000, "Claude Haiku 4.5"),
     "claude-opus-4-5-20251101": ModelSpec("claude-opus-4-5-20251101", 200000, "Claude Opus 4.5"),
     "gemini-3-pro-preview": ModelSpec("gemini-3-pro-preview", 1048576, "Gemini 3 Pro"),
@@ -121,9 +135,11 @@ def list_known_models() -> Dict[str, ModelSpec]:
 # Model Policy System
 # =============================================================================
 
+
 @dataclass
 class ModelPolicy:
     """Loaded model policy configuration."""
+
     user_primary: str  # User's preferred model (sonnet or opus)
     tiers: Dict[str, str]  # tier_name → resolved_alias
     group_assignments: Dict[str, str]  # category → tier_name
@@ -133,7 +149,7 @@ class ModelPolicy:
 def _load_policy_from_disk() -> dict:
     """Load the raw policy JSON from disk (cached)."""
     if _POLICY_PATH.exists():
-        with open(_POLICY_PATH, 'r') as f:
+        with open(_POLICY_PATH, "r") as f:
             return json.load(f)
     return {}
 
@@ -152,34 +168,36 @@ def load_model_policy() -> ModelPolicy:
     user_primary = user_prefs.get("primary_model", "sonnet")
 
     # Extract tier mappings
-    tiers = raw.get("tiers", {
-        "primary": "inherit_user_primary",
-        "economy": "haiku",
-        "standard": "sonnet",
-        "elite": "opus",
-        "edge": "sonnet"
-    })
+    tiers = raw.get(
+        "tiers",
+        {
+            "primary": "inherit_user_primary",
+            "economy": "haiku",
+            "standard": "sonnet",
+            "elite": "opus",
+            "edge": "sonnet",
+        },
+    )
 
     # Extract group assignments
-    group_assignments = raw.get("group_assignments", {
-        "shaping": "economy",
-        "spec": "standard",
-        "design": "primary",
-        "implementation": "primary",
-        "critic": "edge",
-        "verification": "economy",
-        "analytics": "standard",
-        "reporter": "economy",
-        "infra": "economy",
-        "router": "primary",
-        "wisdom": "elite"
-    })
-
-    return ModelPolicy(
-        user_primary=user_primary,
-        tiers=tiers,
-        group_assignments=group_assignments
+    group_assignments = raw.get(
+        "group_assignments",
+        {
+            "shaping": "economy",
+            "spec": "standard",
+            "design": "primary",
+            "implementation": "primary",
+            "critic": "edge",
+            "verification": "economy",
+            "analytics": "standard",
+            "reporter": "economy",
+            "infra": "economy",
+            "router": "primary",
+            "wisdom": "elite",
+        },
     )
+
+    return ModelPolicy(user_primary=user_primary, tiers=tiers, group_assignments=group_assignments)
 
 
 def reload_model_policy() -> ModelPolicy:
@@ -263,26 +281,21 @@ def resolve_model_tier(model_value: str) -> str:
 # These defaults are used when a station's model is "inherit"
 STATION_CLASS_DEFAULTS: Dict[str, str] = {
     # Curator-class stations (fast, low-stakes work)
-    "shaping": "haiku",      # Signal normalization, problem framing
-    "reporter": "haiku",     # Report generation, summaries
-
+    "shaping": "haiku",  # Signal normalization, problem framing
+    "reporter": "haiku",  # Report generation, summaries
     # Worker-class stations (main implementation work)
-    "spec": "sonnet",        # Requirements authoring
-    "design": "sonnet",      # ADR, interface design
+    "spec": "sonnet",  # Requirements authoring
+    "design": "sonnet",  # ADR, interface design
     "implementation": "sonnet",  # Code/test writing
-
     # Critic-class stations (verification, review)
-    "critic": "sonnet",      # Code/test critique
-    "verification": "sonnet", # Gate checks, contract enforcement
-
+    "critic": "sonnet",  # Code/test critique
+    "verification": "sonnet",  # Gate checks, contract enforcement
     # Navigator-class stations (routing decisions)
-    "router": "sonnet",      # Routing resolution
-
+    "router": "sonnet",  # Routing resolution
     # Analytics-class stations (wisdom, learning)
-    "analytics": "sonnet",   # Pattern analysis, regression detection
-
+    "analytics": "sonnet",  # Pattern analysis, regression detection
     # Infra-class stations (git, CI operations)
-    "infra": "haiku",        # Mechanical operations
+    "infra": "haiku",  # Mechanical operations
 }
 
 
@@ -318,10 +331,7 @@ def get_station_class_default(category: str) -> str:
 
 
 def resolve_station_model(
-    model_value: str,
-    category: Optional[str] = None,
-    *,
-    return_tier_alias: bool = True
+    model_value: str, category: Optional[str] = None, *, return_tier_alias: bool = True
 ) -> str:
     """Resolve a station's model specification to a tier alias or full model ID.
 

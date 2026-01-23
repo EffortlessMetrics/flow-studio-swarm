@@ -14,9 +14,9 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from swarm.validator import ValidationResult
-from swarm.tools.validation.helpers import ROOT, FLOW_SPECS_DIR
 from swarm.tools.validation.constants import BUILT_IN_AGENTS
+from swarm.tools.validation.helpers import FLOW_SPECS_DIR, ROOT
+from swarm.validator import ValidationResult
 
 
 def levenshtein_distance(s1: str, s2: str) -> int:
@@ -169,7 +169,7 @@ def validate_flow_references(registry: Dict[str, Dict[str, Any]]) -> ValidationR
                     problem,
                     fix_action,
                     line_number=line_num,
-                    file_path=str(flow_path)
+                    file_path=str(flow_path),
                 )
 
     return result

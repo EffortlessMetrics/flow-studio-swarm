@@ -18,12 +18,14 @@ Checks:
 
 from typing import Any, Dict
 
-from swarm.validator import SimpleYAMLParser, ValidationResult
-from swarm.tools.validation.helpers import AGENTS_DIR, ROOT, safe_get_stripped
 from swarm.tools.validation.constants import VALID_MODELS
+from swarm.tools.validation.helpers import AGENTS_DIR, ROOT, safe_get_stripped
+from swarm.validator import SimpleYAMLParser, ValidationResult
 
 
-def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool = False) -> ValidationResult:
+def validate_frontmatter(
+    _registry: Dict[str, Dict[str, Any]], strict_mode: bool = False
+) -> ValidationResult:
     """
     Validate YAML frontmatter in all agent files.
 
@@ -67,7 +69,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                 str(rel_path),
                 f"YAML parse error: {e}",
                 "Check YAML syntax; ensure frontmatter starts and ends with '---'",
-                file_path=str(path)
+                file_path=str(path),
             )
             continue
         except Exception as e:
@@ -76,7 +78,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                 str(rel_path),
                 f"unexpected error: {e}",
                 "Check file encoding and YAML syntax",
-                file_path=str(path)
+                file_path=str(path),
             )
             continue
 
@@ -88,7 +90,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                 str(rel_path),
                 "missing required field 'name'",
                 f"Add `name: {filename_key}` to frontmatter",
-                file_path=str(path)
+                file_path=str(path),
             )
 
         description_value = safe_get_stripped(fm.get("description"))
@@ -98,7 +100,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                 str(rel_path),
                 "missing required field 'description'",
                 "Add `description: <one-line description>` to frontmatter",
-                file_path=str(path)
+                file_path=str(path),
             )
 
         model_value = safe_get_stripped(fm.get("model"))
@@ -108,7 +110,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                 str(rel_path),
                 "missing required field 'model'",
                 "Add `model: inherit` to frontmatter",
-                file_path=str(path)
+                file_path=str(path),
             )
 
         # Name must match filename
@@ -118,7 +120,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                 str(rel_path),
                 f"frontmatter 'name' field '{name_value}' does not match filename '{filename_key}'",
                 f"Change `name: {name_value}` to `name: {filename_key}`, or rename file to {name_value}.md",
-                file_path=str(path)
+                file_path=str(path),
             )
 
         # Model must be valid
@@ -128,7 +130,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                 str(rel_path),
                 f"invalid model value '{model_value}' (must be one of {VALID_MODELS})",
                 f"Change `model: {model_value}` to one of: {', '.join(VALID_MODELS)}",
-                file_path=str(path)
+                file_path=str(path),
             )
 
         # Swarm design constraint fields (Layer 2 constraint)
@@ -143,7 +145,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                     str(rel_path),
                     "field 'tools' violates swarm design constraint (use --strict to enforce)",
                     "Remove 'tools:' field; this swarm uses prompt-based constraints, not tool denial",
-                    file_path=str(path)
+                    file_path=str(path),
                 )
             else:
                 result.add_warning(
@@ -151,7 +153,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                     str(rel_path),
                     "field 'tools' found (swarm design guideline: omit this field)",
                     "Consider removing 'tools:' field; this swarm uses prompt-based constraints",
-                    file_path=str(path)
+                    file_path=str(path),
                 )
 
         if "permissionMode" in fm:
@@ -161,7 +163,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                     str(rel_path),
                     "field 'permissionMode' violates swarm design constraint (use --strict to enforce)",
                     "Remove 'permissionMode:' field; this swarm enforces permissions at repo level",
-                    file_path=str(path)
+                    file_path=str(path),
                 )
             else:
                 result.add_warning(
@@ -169,7 +171,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                     str(rel_path),
                     "field 'permissionMode' found (swarm design guideline: omit this field)",
                     "Consider removing 'permissionMode:' field; this swarm enforces permissions at repo level",
-                    file_path=str(path)
+                    file_path=str(path),
                 )
 
         # Skills must be a list
@@ -181,7 +183,7 @@ def validate_frontmatter(_registry: Dict[str, Dict[str, Any]], strict_mode: bool
                     str(rel_path),
                     f"'skills' must be a list (got {type(skills).__name__})",
                     "Change skills to list format: `skills: [skill1, skill2]` or use multi-line list",
-                    file_path=str(path)
+                    file_path=str(path),
                 )
 
     return result

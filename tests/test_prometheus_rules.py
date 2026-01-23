@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 
 import pytest
+
 import yaml
 
 # Paths to rule files
@@ -32,7 +33,9 @@ class TestPrometheusRecordingRules:
     @pytest.fixture
     def recording_rules(self):
         """Load recording rules YAML."""
-        assert RECORDING_RULES_FILE.exists(), f"Recording rules file not found: {RECORDING_RULES_FILE}"
+        assert RECORDING_RULES_FILE.exists(), (
+            f"Recording rules file not found: {RECORDING_RULES_FILE}"
+        )
         with open(RECORDING_RULES_FILE) as f:
             return yaml.safe_load(f)
 
@@ -249,7 +252,9 @@ class TestKubernetesManifests:
     @pytest.fixture
     def k8s_manifests(self):
         """Load Kubernetes manifests (multi-document YAML)."""
-        assert SERVICE_MONITOR_FILE.exists(), f"ServiceMonitor file not found: {SERVICE_MONITOR_FILE}"
+        assert SERVICE_MONITOR_FILE.exists(), (
+            f"ServiceMonitor file not found: {SERVICE_MONITOR_FILE}"
+        )
         with open(SERVICE_MONITOR_FILE) as f:
             # Load all documents from multi-doc YAML
             docs = list(yaml.safe_load_all(f))
@@ -262,17 +267,13 @@ class TestKubernetesManifests:
     def test_service_monitor_present(self, k8s_manifests):
         """ServiceMonitor CRD should be present."""
         service_monitors = [
-            doc for doc in k8s_manifests
-            if doc and doc.get("kind") == "ServiceMonitor"
+            doc for doc in k8s_manifests if doc and doc.get("kind") == "ServiceMonitor"
         ]
         assert len(service_monitors) >= 1, "ServiceMonitor resource not found"
 
     def test_prometheus_rule_present(self, k8s_manifests):
         """PrometheusRule CRD should be present."""
-        prom_rules = [
-            doc for doc in k8s_manifests
-            if doc and doc.get("kind") == "PrometheusRule"
-        ]
+        prom_rules = [doc for doc in k8s_manifests if doc and doc.get("kind") == "PrometheusRule"]
         assert len(prom_rules) >= 1, "PrometheusRule resource not found"
 
     def test_service_monitor_has_required_fields(self, k8s_manifests):
@@ -320,11 +321,13 @@ class TestPromQLExpressions:
                     for rule in group.get("rules", []):
                         expr = rule.get("expr", "")
                         if expr:
-                            expressions.append({
-                                "source": "recording_rules.yaml",
-                                "name": rule.get("record", "unknown"),
-                                "expr": expr
-                            })
+                            expressions.append(
+                                {
+                                    "source": "recording_rules.yaml",
+                                    "name": rule.get("record", "unknown"),
+                                    "expr": expr,
+                                }
+                            )
 
         if ALERT_RULES_FILE.exists():
             with open(ALERT_RULES_FILE) as f:
@@ -333,11 +336,13 @@ class TestPromQLExpressions:
                     for rule in group.get("rules", []):
                         expr = rule.get("expr", "")
                         if expr:
-                            expressions.append({
-                                "source": "alert_rules.yaml",
-                                "name": rule.get("alert", "unknown"),
-                                "expr": expr
-                            })
+                            expressions.append(
+                                {
+                                    "source": "alert_rules.yaml",
+                                    "name": rule.get("alert", "unknown"),
+                                    "expr": expr,
+                                }
+                            )
 
         return expressions
 
@@ -349,6 +354,7 @@ class TestPromQLExpressions:
 
     def test_expressions_have_balanced_brackets(self, all_expressions):
         """Expressions should have balanced brackets and parentheses."""
+
         def check_balanced(expr, open_char, close_char):
             count = 0
             for char in expr:
@@ -413,6 +419,7 @@ class TestInstallScript:
     def test_script_is_executable(self, install_script):
         """Install script should be executable."""
         import os
+
         assert os.access(install_script, os.X_OK), "Install script should be executable"
 
     def test_script_has_shebang(self, install_script):
@@ -425,10 +432,7 @@ class TestInstallScript:
         """Install script should have safety options (set -e, set -u, set -o pipefail)."""
         content = install_script.read_text(encoding="utf-8")
         # Check for either combined or individual set options
-        has_safety = (
-            "set -euo pipefail" in content or
-            ("set -e" in content and "set -u" in content)
-        )
+        has_safety = "set -euo pipefail" in content or ("set -e" in content and "set -u" in content)
         assert has_safety, "Script should have 'set -e' and 'set -u' for safety"
 
     def test_script_has_help_option(self, install_script):

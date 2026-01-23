@@ -42,6 +42,7 @@ from selftest import DEGRADATION_LOG_SCHEMA
 # Test Fixtures
 # ============================================================================
 
+
 @dataclass
 class DegradationEntry:
     """
@@ -49,6 +50,7 @@ class DegradationEntry:
 
     This dataclass enforces the schema at the type level for test fixtures.
     """
+
     timestamp: str
     step_id: str
     step_name: str
@@ -104,6 +106,7 @@ def build_valid_degradation_entry(
 # ============================================================================
 # FR-DEGRADE-SCHEMA-1: Required Fields Presence
 # ============================================================================
+
 
 class TestDegradationSchemaRequiredFields:
     """Validate all required fields are present in schema definition."""
@@ -178,6 +181,7 @@ class TestDegradationSchemaRequiredFields:
 # FR-DEGRADE-SCHEMA-2: Timestamp ISO 8601 Format
 # ============================================================================
 
+
 class TestDegradationTimestampFormat:
     """Validate timestamp field conforms to ISO 8601."""
 
@@ -213,9 +217,7 @@ class TestDegradationTimestampFormat:
         # Date-only timestamps parse to midnight (00:00:00), which is
         # insufficient for degradation logging (we need explicit time)
         # In production, validation should reject timestamps without 'T' separator
-        assert 'T' not in entry.timestamp, (
-            "Date-only timestamp should not include 'T' separator"
-        )
+        assert "T" not in entry.timestamp, "Date-only timestamp should not include 'T' separator"
 
         # Verify the validation function in test_selftest_degradation_log.py
         # would catch this (it checks for time component)
@@ -236,6 +238,7 @@ class TestDegradationTimestampFormat:
 # FR-DEGRADE-SCHEMA-3: Tier Constraint (NEVER kernel)
 # ============================================================================
 
+
 class TestDegradationTierConstraint:
     """Validate tier field constraint: NEVER "kernel"."""
 
@@ -254,9 +257,7 @@ class TestDegradationTierConstraint:
             assert entry.tier in valid_tiers, (
                 f"Tier '{entry.tier}' should be valid for degradation log"
             )
-            assert entry.tier != "kernel", (
-                "KERNEL tier should NEVER appear in degradation log"
-            )
+            assert entry.tier != "kernel", "KERNEL tier should NEVER appear in degradation log"
 
     def test_degradation_log_schema_documents_tier_constraint(self):
         """
@@ -266,8 +267,7 @@ class TestDegradationTierConstraint:
         """
         example_entry = DEGRADATION_LOG_SCHEMA["example"]
         assert example_entry["tier"] in ["governance", "optional"], (
-            f"Schema example should use governance or optional tier, "
-            f"got '{example_entry['tier']}'"
+            f"Schema example should use governance or optional tier, got '{example_entry['tier']}'"
         )
         assert example_entry["tier"] != "kernel", (
             "Schema example must not use kernel tier (design invariant)"
@@ -289,6 +289,7 @@ class TestDegradationTierConstraint:
 # FR-DEGRADE-SCHEMA-4: Severity Enum Validation
 # ============================================================================
 
+
 class TestDegradationSeverityEnum:
     """Validate severity field enum constraint."""
 
@@ -302,9 +303,7 @@ class TestDegradationSeverityEnum:
 
         for severity in valid_severities:
             entry = build_valid_degradation_entry(severity=severity)
-            assert entry.severity in valid_severities, (
-                f"Severity '{severity}' should be valid"
-            )
+            assert entry.severity in valid_severities, f"Severity '{severity}' should be valid"
 
     def test_degradation_severity_rejects_invalid_values(self):
         """Severity validation rejects non-enum values."""
@@ -336,6 +335,7 @@ class TestDegradationSeverityEnum:
 # ============================================================================
 # FR-DEGRADE-SCHEMA-5: Schema Version Frozen
 # ============================================================================
+
 
 class TestDegradationSchemaVersion:
     """Validate schema version is frozen at 1.1."""
@@ -388,6 +388,7 @@ class TestDegradationSchemaVersion:
 # ============================================================================
 # FR-DEGRADE-SCHEMA-6: Pre-write Validation
 # ============================================================================
+
 
 class TestDegradationWriterValidation:
     """Validate that log_degradation() validates before writing."""
@@ -498,6 +499,7 @@ class TestDegradationWriterValidation:
 # FR-DEGRADE-SCHEMA-7: Error Messages Guide Users
 # ============================================================================
 
+
 class TestDegradationSchemaErrorMessages:
     """Validate error messages guide users to schema documentation."""
 
@@ -554,9 +556,7 @@ class TestDegradationSchemaErrorMessages:
         )
 
         # Verify example uses realistic values
-        assert example["tier"] in ["governance", "optional"], (
-            "Example should use valid tier"
-        )
+        assert example["tier"] in ["governance", "optional"], "Example should use valid tier"
         assert example["severity"] in ["critical", "warning", "info"], (
             "Example should use valid severity"
         )
@@ -565,21 +565,15 @@ class TestDegradationSchemaErrorMessages:
         assert example["status"] in ["PASS", "FAIL", "SKIP", "TIMEOUT"], (
             "Example should use valid status"
         )
-        assert "reason" in example and example["reason"], (
-            "Example should have a reason field"
-        )
+        assert "reason" in example and example["reason"], "Example should have a reason field"
 
         # Verify schema has documentation comments (in code comments)
         # The actual schema dict doesn't need to contain "ISO 8601" string,
         # but it should be documented in the module docstring
         # This test verifies the example timestamp is in ISO 8601 format
         example_ts = example["timestamp"]
-        assert 'T' in example_ts, (
-            "Example timestamp should use ISO 8601 format with 'T' separator"
-        )
-        assert '+' in example_ts or 'Z' in example_ts, (
-            "Example timestamp should include timezone"
-        )
+        assert "T" in example_ts, "Example timestamp should use ISO 8601 format with 'T' separator"
+        assert "+" in example_ts or "Z" in example_ts, "Example timestamp should include timezone"
 
 
 if __name__ == "__main__":

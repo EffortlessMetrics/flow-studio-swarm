@@ -43,11 +43,23 @@ def build_detailed_json_output(
             continue
 
         agent_file = AGENTS_DIR / f"{agent_key}.md"
-        rel_path = str(agent_file.relative_to(ROOT)) if agent_file.exists() else f".claude/agents/{agent_key}.md"
+        rel_path = (
+            str(agent_file.relative_to(ROOT))
+            if agent_file.exists()
+            else f".claude/agents/{agent_key}.md"
+        )
 
         # Collect all errors/warnings for this agent
-        agent_errors = [e for e in result.errors if agent_key in e.location or (e.file_path and agent_key in e.file_path)]
-        agent_warnings = [w for w in result.warnings if agent_key in w.location or (w.file_path and agent_key in w.file_path)]
+        agent_errors = [
+            e
+            for e in result.errors
+            if agent_key in e.location or (e.file_path and agent_key in e.file_path)
+        ]
+        agent_warnings = [
+            w
+            for w in result.warnings
+            if agent_key in w.location or (w.file_path and agent_key in w.file_path)
+        ]
 
         checks: Dict[str, Any] = {}
 
@@ -120,6 +132,7 @@ def build_detailed_json_output(
     # Lazy import to support running validator in test repos without swarm/config/
     try:
         from swarm.config.flow_registry import get_flow_keys
+
         flow_keys = get_flow_keys()
     except ImportError:
         # Fallback: use canonical 7-flow keys if registry not available
@@ -127,10 +140,18 @@ def build_detailed_json_output(
 
     for flow_id in flow_keys:
         flow_file = FLOW_SPECS_DIR / f"flow-{flow_id}.md"
-        rel_path = str(flow_file.relative_to(ROOT)) if flow_file.exists() else f"swarm/flows/flow-{flow_id}.md"
+        rel_path = (
+            str(flow_file.relative_to(ROOT))
+            if flow_file.exists()
+            else f"swarm/flows/flow-{flow_id}.md"
+        )
 
         # Collect all errors for this flow
-        flow_errors = [e for e in result.errors if flow_id in e.location or (e.file_path and flow_id in e.file_path)]
+        flow_errors = [
+            e
+            for e in result.errors
+            if flow_id in e.location or (e.file_path and flow_id in e.file_path)
+        ]
 
         checks = {}  # type: ignore[no-redef]
 
@@ -188,8 +209,9 @@ def build_detailed_json_output(
                 full_step_id = f"{flow_id}:{step_id}"
 
                 # Check for step-specific issues (agentless steps, invalid agent refs)
-                step_errors = [e for e in result.errors
-                               if (e.error_type == "FLOW" and step_id in e.problem)]
+                step_errors = [
+                    e for e in result.errors if (e.error_type == "FLOW" and step_id in e.problem)
+                ]
 
                 if step_errors:
                     steps_data[full_step_id] = {
@@ -275,25 +297,29 @@ def build_report_json(result: ValidationResult) -> Dict[str, Any]:
 
     errors_list: list[dict[str, Any]] = []
     for error in result.sorted_errors():
-        errors_list.append({
-            "type": error.error_type,
-            "file": error.file_path or error.location,
-            "location": error.location,
-            "line": error.line_number,
-            "message": error.problem,
-            "suggestions": [error.fix_action] if error.fix_action else [],
-        })
+        errors_list.append(
+            {
+                "type": error.error_type,
+                "file": error.file_path or error.location,
+                "location": error.location,
+                "line": error.line_number,
+                "message": error.problem,
+                "suggestions": [error.fix_action] if error.fix_action else [],
+            }
+        )
 
     warnings_list: list[dict[str, Any]] = []
     for warning in result.sorted_warnings():
-        warnings_list.append({
-            "type": warning.error_type,
-            "file": warning.file_path or warning.location,
-            "location": warning.location,
-            "line": warning.line_number,
-            "message": warning.problem,
-            "suggestions": [warning.fix_action] if warning.fix_action else [],
-        })
+        warnings_list.append(
+            {
+                "type": warning.error_type,
+                "file": warning.file_path or warning.location,
+                "location": warning.location,
+                "line": warning.line_number,
+                "message": warning.problem,
+                "suggestions": [warning.fix_action] if warning.fix_action else [],
+            }
+        )
 
     total_checks = len(result.errors) + len(result.warnings)
     passed = len(result.warnings)  # Warnings don't fail

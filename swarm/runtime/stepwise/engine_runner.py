@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from swarm.runtime.diff_scanner import scan_file_changes_sync
 from swarm.runtime.engines import StepContext, StepEngine
 from swarm.runtime.engines.base import LifecycleCapableEngine
-from swarm.runtime.types import RunEvent, RoutingSignal
+from swarm.runtime.types import RoutingSignal, RunEvent
 
 if TYPE_CHECKING:
     pass

@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 try:
     from swarm.runtime.spec_system.canonical import canonical_json, spec_hash
+
     CANONICAL_AVAILABLE = True
 except ImportError:
     CANONICAL_AVAILABLE = False

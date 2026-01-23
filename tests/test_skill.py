@@ -14,7 +14,6 @@ BDD Scenarios covered:
 import sys
 
 import pytest
-
 from conftest import (
     add_agent_to_registry,
     assert_error_contains,
@@ -399,7 +398,7 @@ Shares skill with other agents.
 
 @pytest.mark.skipif(
     sys.platform == "win32",
-    reason="Windows file system is case-insensitive; skill path lookup finds 'test-runner' for 'Test-Runner'"
+    reason="Windows file system is case-insensitive; skill path lookup finds 'test-runner' for 'Test-Runner'",
 )
 def test_case_sensitive_skill_matching(temp_repo, run_validator):
     """Skill names should be case-sensitive.

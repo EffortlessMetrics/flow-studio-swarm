@@ -13,12 +13,11 @@ Note: If swarm/config/agents/ directory doesn't exist, this check is skipped.
 This allows the validator to work on repos that don't use the config system.
 """
 
-from pathlib import Path
 from typing import Any, Dict
 
-from swarm.validator import ValidationResult
-from swarm.tools.validation.helpers import ROOT, AGENTS_MD
 from swarm.tools.validation.constants import BUILT_IN_AGENTS
+from swarm.tools.validation.helpers import AGENTS_MD, ROOT
+from swarm.validator import ValidationResult
 
 
 def _parse_raw_yaml(content: str) -> Dict[str, Any]:
@@ -113,7 +112,9 @@ def validate_config_coverage(registry: Dict[str, Dict[str, Any]]) -> ValidationR
 
         if key not in configs:
             location = f"swarm/AGENTS.md:line {meta.get('line', '?')}"
-            problem = f"Agent '{key}' is registered but swarm/config/agents/{key}.yaml does not exist"
+            problem = (
+                f"Agent '{key}' is registered but swarm/config/agents/{key}.yaml does not exist"
+            )
             fix_action = f"Create swarm/config/agents/{key}.yaml with agent metadata, or remove entry from AGENTS.md"
 
             result.add_error(
@@ -122,7 +123,7 @@ def validate_config_coverage(registry: Dict[str, Dict[str, Any]]) -> ValidationR
                 problem,
                 fix_action,
                 line_number=meta.get("line"),
-                file_path=str(AGENTS_MD)
+                file_path=str(AGENTS_MD),
             )
             continue
 
@@ -137,11 +138,7 @@ def validate_config_coverage(registry: Dict[str, Dict[str, Any]]) -> ValidationR
             fix_action = "Update 'category' in config to match role_family in AGENTS.md"
 
             result.add_error(
-                "CONFIG",
-                location,
-                problem,
-                fix_action,
-                file_path=config.get("file_path")
+                "CONFIG", location, problem, fix_action, file_path=config.get("file_path")
             )
 
         registry_color = meta.get("color")
@@ -149,15 +146,13 @@ def validate_config_coverage(registry: Dict[str, Dict[str, Any]]) -> ValidationR
 
         if config_color != registry_color:
             location = f"swarm/config/agents/{key}.yaml"
-            problem = f"config 'color' is '{config_color}' but AGENTS.md color is '{registry_color}'"
+            problem = (
+                f"config 'color' is '{config_color}' but AGENTS.md color is '{registry_color}'"
+            )
             fix_action = "Update 'color' in config to match AGENTS.md"
 
             result.add_error(
-                "CONFIG",
-                location,
-                problem,
-                fix_action,
-                file_path=config.get("file_path")
+                "CONFIG", location, problem, fix_action, file_path=config.get("file_path")
             )
 
     # Check config → registry
@@ -166,14 +161,16 @@ def validate_config_coverage(registry: Dict[str, Dict[str, Any]]) -> ValidationR
             key = config_file.stem
             if key not in registry:
                 problem = f"config exists for '{key}' but agent is not in swarm/AGENTS.md"
-                fix_action = f"Add entry for '{key}' to AGENTS.md or delete swarm/config/agents/{key}.yaml"
+                fix_action = (
+                    f"Add entry for '{key}' to AGENTS.md or delete swarm/config/agents/{key}.yaml"
+                )
 
                 result.add_error(
                     "CONFIG",
                     f"swarm/config/agents/{key}.yaml",
                     problem,
                     fix_action,
-                    file_path=str(config_file)
+                    file_path=str(config_file),
                 )
 
     return result

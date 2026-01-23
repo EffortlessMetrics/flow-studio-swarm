@@ -71,7 +71,7 @@ __all__ = [
 
 # Expose routers for custom integration (no app creation side effects)
 try:
-    from .routes import events_router, runs_router, specs_router
+    from .routes import events_router, runs_router, specs_router  # noqa: F401
 
     __all__.extend(["specs_router", "runs_router", "events_router"])
 except ImportError:

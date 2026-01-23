@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import List, Tuple
 
 import yaml
-
 from swarm.utils.yaml_utils import load_yaml
 
 
@@ -42,12 +41,16 @@ class SkillsValidator:
 
                     # Extract frontmatter between --- markers
                     if not content.startswith("---"):
-                        errors.append(f"{skill_name}: Missing YAML frontmatter (must start with ---)")
+                        errors.append(
+                            f"{skill_name}: Missing YAML frontmatter (must start with ---)"
+                        )
                         continue
 
                     end_marker = content.find("---", 3)
                     if end_marker == -1:
-                        errors.append(f"{skill_name}: Unterminated YAML frontmatter (missing closing ---)")
+                        errors.append(
+                            f"{skill_name}: Unterminated YAML frontmatter (missing closing ---)"
+                        )
                         continue
 
                     frontmatter_str = content[3:end_marker]

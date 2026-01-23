@@ -42,9 +42,7 @@ class TestGeminiCliBackendStubMode:
         cmd_str = " ".join(cmd)
         assert " gemini " not in cmd_str
 
-    def test_uses_stub_when_cli_not_available(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_uses_stub_when_cli_not_available(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Backend uses stub when gemini CLI is not on PATH."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "0")
         monkeypatch.setenv("SWARM_GEMINI_CLI", "nonexistent-gemini-cli-xyz")
@@ -68,9 +66,7 @@ class TestGeminiCliBackendStubMode:
         assert cmd[1] == "-c"
         assert "test-run-002" in env["RUN_ID"]
 
-    def test_stub_command_includes_flow_key(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_stub_command_includes_flow_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Stub command includes the flow key in output."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "1")
         backend = GeminiCliBackend()
@@ -88,9 +84,7 @@ class TestGeminiCliBackendStubMode:
         assert "gate" in cmd_str
         assert "test-run-003" in env["RUN_ID"]
 
-    def test_custom_command_ignored_for_security(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_custom_command_ignored_for_security(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Custom command parameter is IGNORED for security (RCE prevention).
 
         Previously, this test verified that the command param was honored.
@@ -275,9 +269,7 @@ class TestGeminiCliBackendRealCli:
     These tests are skipped in CI where gemini is not available.
     """
 
-    def test_builds_real_command_when_stub_disabled(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_builds_real_command_when_stub_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Backend builds real gemini command when stub mode disabled."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "0")
 
@@ -301,9 +293,7 @@ class TestGeminiCliBackendRealCli:
         assert "stream-json" in cmd
         assert "test-run-123" in env["RUN_ID"]
 
-    def test_prompt_includes_flow_context(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_prompt_includes_flow_context(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Real CLI prompt includes flow and run context."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "0")
 

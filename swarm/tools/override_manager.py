@@ -17,6 +17,7 @@ from typing import List, Optional
 @dataclass
 class Override:
     """Represents a single override approval."""
+
     step_id: str
     reason: str
     approver: str

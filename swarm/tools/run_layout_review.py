@@ -35,6 +35,7 @@ Dependencies:
 
 Issue: #21
 """
+
 from __future__ import annotations
 
 import json
@@ -66,6 +67,7 @@ UX_MANIFEST_PATH = REPO_ROOT / "ux_manifest.json"
 @dataclass
 class ScreenCapture:
     """Captured artifacts for a single screen."""
+
     screen_id: str
     route: str
     dom_html: Optional[str] = None
@@ -77,6 +79,7 @@ class ScreenCapture:
 # ============================================================================
 # Core Functions
 # ============================================================================
+
 
 def load_screens_from_manifest() -> List[Dict[str, Any]]:
     """
@@ -167,6 +170,7 @@ def fetch_sdk_state(client: httpx.Client) -> Optional[Dict[str, Any]]:
 @dataclass
 class PlaywrightCaptureResult:
     """Result from Playwright-based capture."""
+
     screenshot_captured: bool = False
     sdk_state: Optional[Dict[str, Any]] = None
     dom_html: Optional[str] = None
@@ -189,7 +193,9 @@ def capture_with_playwright(route: str, screenshot_path: Path) -> PlaywrightCapt
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        result.errors.append("Playwright not installed. Install with: uv add playwright && playwright install chromium")
+        result.errors.append(
+            "Playwright not installed. Install with: uv add playwright && playwright install chromium"
+        )
         return result
 
     try:
@@ -261,7 +267,9 @@ def capture_screenshot_playwright(route: str, dest_path: Path) -> bool:
     return result.screenshot_captured
 
 
-def capture_screen(client: Optional[httpx.Client], screen: Dict[str, Any], use_playwright: bool = True) -> ScreenCapture:
+def capture_screen(
+    client: Optional[httpx.Client], screen: Dict[str, Any], use_playwright: bool = True
+) -> ScreenCapture:
     """
     Capture all artifacts for a single screen.
 
@@ -295,8 +303,7 @@ def capture_screen(client: Optional[httpx.Client], screen: Dict[str, Any], use_p
         if pw_result.sdk_state:
             capture.state_json = pw_result.sdk_state
             (dest / "state.json").write_text(
-                json.dumps(capture.state_json, indent=2),
-                encoding="utf-8"
+                json.dumps(capture.state_json, indent=2), encoding="utf-8"
             )
 
         # Screenshot
@@ -321,8 +328,7 @@ def capture_screen(client: Optional[httpx.Client], screen: Dict[str, Any], use_p
             capture.state_json = fetch_sdk_state(client)
             if capture.state_json:
                 (dest / "state.json").write_text(
-                    json.dumps(capture.state_json, indent=2),
-                    encoding="utf-8"
+                    json.dumps(capture.state_json, indent=2), encoding="utf-8"
                 )
         except Exception as e:
             capture.errors.append(f"Failed to fetch state via API: {e}")
@@ -334,10 +340,7 @@ def capture_screen(client: Optional[httpx.Client], screen: Dict[str, Any], use_p
         )
 
     # Write screen metadata
-    (dest / "screen_spec.json").write_text(
-        json.dumps(screen, indent=2),
-        encoding="utf-8"
-    )
+    (dest / "screen_spec.json").write_text(json.dumps(screen, indent=2), encoding="utf-8")
 
     return capture
 
@@ -348,7 +351,7 @@ def write_summary(captures: List[ScreenCapture]) -> None:
         "run_id": RUN_ID,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "base_url": BASE_URL,
-        "screens": []
+        "screens": [],
     }
 
     for capture in captures:
@@ -358,14 +361,11 @@ def write_summary(captures: List[ScreenCapture]) -> None:
             "has_dom": capture.dom_html is not None,
             "has_state": capture.state_json is not None,
             "has_screenshot": capture.screenshot_path is not None,
-            "errors": capture.errors
+            "errors": capture.errors,
         }
         summary["screens"].append(screen_summary)
 
-    (OUT_DIR / "summary.json").write_text(
-        json.dumps(summary, indent=2),
-        encoding="utf-8"
-    )
+    (OUT_DIR / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
 
 def main() -> int:
@@ -378,12 +378,12 @@ def main() -> int:
     parser.add_argument(
         "--use-manifest",
         action="store_true",
-        help="Use ux_manifest.json fallback screens instead of fetching from API"
+        help="Use ux_manifest.json fallback screens instead of fetching from API",
     )
     parser.add_argument(
         "--no-playwright",
         action="store_true",
-        help="Disable Playwright-based capture (HTTP only, no screenshots/SDK state)"
+        help="Disable Playwright-based capture (HTTP only, no screenshots/SDK state)",
     )
     args = parser.parse_args()
 
@@ -430,11 +430,7 @@ def main() -> int:
     for screen in screens:
         screen_id = screen["id"]
         print(f"[ui-review] Capturing screen: {screen_id} ({screen['route']})")
-        capture = capture_screen(
-            client,
-            screen,
-            use_playwright=not args.no_playwright
-        )
+        capture = capture_screen(client, screen, use_playwright=not args.no_playwright)
         captures.append(capture)
 
         if capture.errors:
@@ -464,7 +460,9 @@ def main() -> int:
         has_screenshot = "+" if capture.screenshot_path else "-"
         has_state = "+" if capture.state_json else "-"
         has_dom = "+" if capture.dom_html else "-"
-        print(f"  {capture.screen_id}: [{status}] dom:{has_dom} state:{has_state} screenshot:{has_screenshot}")
+        print(
+            f"  {capture.screen_id}: [{status}] dom:{has_dom} state:{has_state} screenshot:{has_screenshot}"
+        )
 
     return 0
 

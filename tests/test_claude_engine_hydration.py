@@ -25,20 +25,19 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 # Add repo root to path for imports
 repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from swarm.runtime.engines.claude.engine import ClaudeStepEngine
-from swarm.runtime.engines import StepContext
-from swarm.runtime.context_pack import ContextPack
-from swarm.runtime.types import HandoffEnvelope, RunSpec
 from datetime import datetime, timezone
+
+from swarm.runtime.context_pack import ContextPack
+from swarm.runtime.engines import StepContext
+from swarm.runtime.engines.claude.engine import ClaudeStepEngine
+from swarm.runtime.types import HandoffEnvelope, RunSpec
 
 
 def make_test_step_context(tmp_path, **overrides):
@@ -137,7 +136,10 @@ def test_hydrate_context_handles_build_failure(tmp_path):
         hydrated_ctx = engine._hydrate_context(ctx)
 
         # Verify context_pack was NOT injected (fallback to raw history)
-        assert "context_pack" not in hydrated_ctx.extra or hydrated_ctx.extra.get("context_pack") is None
+        assert (
+            "context_pack" not in hydrated_ctx.extra
+            or hydrated_ctx.extra.get("context_pack") is None
+        )
 
 
 def test_hydrate_context_populates_envelopes_and_artifacts(tmp_path):

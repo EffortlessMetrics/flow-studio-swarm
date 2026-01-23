@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -42,35 +42,41 @@ PROPOSALS_DIR = "proposals"
 DECISIONS_FILE = "decisions.jsonl"
 
 # Valid decision types
-VALID_DECISIONS = frozenset({
-    "CONTINUE",
-    "LOOP",
-    "DETOUR",
-    "INJECT_FLOW",
-    "INJECT_NODES",
-    "ESCALATE",
-    "TERMINATE",
-    "EXTEND_GRAPH",
-})
+VALID_DECISIONS = frozenset(
+    {
+        "CONTINUE",
+        "LOOP",
+        "DETOUR",
+        "INJECT_FLOW",
+        "INJECT_NODES",
+        "ESCALATE",
+        "TERMINATE",
+        "EXTEND_GRAPH",
+    }
+)
 
 # Valid confidence levels
 VALID_CONFIDENCE = frozenset({"HIGH", "MEDIUM", "LOW"})
 
 # Valid injection statuses
-VALID_INJECTION_STATUS = frozenset({
-    "pending",
-    "in_progress",
-    "completed",
-    "failed",
-})
+VALID_INJECTION_STATUS = frozenset(
+    {
+        "pending",
+        "in_progress",
+        "completed",
+        "failed",
+    }
+)
 
 # Valid proposal statuses
-VALID_PROPOSAL_STATUS = frozenset({
-    "pending_review",
-    "approved",
-    "rejected",
-    "implemented",
-})
+VALID_PROPOSAL_STATUS = frozenset(
+    {
+        "pending_review",
+        "approved",
+        "rejected",
+        "implemented",
+    }
+)
 
 
 def _format_iso(dt: datetime) -> str:
@@ -712,14 +718,10 @@ def create_routing_decision(
         ValueError: If decision or confidence is invalid.
     """
     if decision not in VALID_DECISIONS:
-        raise ValueError(
-            f"Invalid decision '{decision}'. "
-            f"Valid values: {sorted(VALID_DECISIONS)}"
-        )
+        raise ValueError(f"Invalid decision '{decision}'. Valid values: {sorted(VALID_DECISIONS)}")
     if confidence not in VALID_CONFIDENCE:
         raise ValueError(
-            f"Invalid confidence '{confidence}'. "
-            f"Valid values: {sorted(VALID_CONFIDENCE)}"
+            f"Invalid confidence '{confidence}'. Valid values: {sorted(VALID_CONFIDENCE)}"
         )
 
     return RoutingDecisionRecord(

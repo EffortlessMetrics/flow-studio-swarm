@@ -5,14 +5,12 @@ Tests the dry-run checker for swarm flows which parses flow specs,
 extracts artifact references, and reports whether artifacts exist.
 """
 
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Import the module under test
 sys.path.insert(0, str(Path(__file__).parent.parent / "swarm" / "tools"))
-from run_flow_dry import parse_flow, extract_artifacts, run_flow, main
-
+from run_flow_dry import extract_artifacts, parse_flow, run_flow
 
 # ============================================================================
 # Unit Tests - parse_flow
@@ -145,6 +143,7 @@ def test_run_flow_missing_flow_file(tmp_path, monkeypatch):
     """
     # Patch FLOW_DIR to use tmp_path
     import run_flow_dry
+
     monkeypatch.setattr(run_flow_dry, "FLOW_DIR", tmp_path)
     monkeypatch.setattr(run_flow_dry, "OUT_DIR", tmp_path / "reports")
 

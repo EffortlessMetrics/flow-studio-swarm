@@ -21,10 +21,9 @@ import json
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import yaml
-
 from swarm.utils.yaml_utils import load_yaml
 
 from .types import (
@@ -135,15 +134,14 @@ def load_station(station_id: str, repo_root: Optional[Path] = None) -> StationSp
             data = _load_yaml_file(yaml_path)
             logger.debug(
                 "Loaded station %s from YAML (migrate to JSON with migrate_yaml_to_json())",
-                station_id
+                station_id,
             )
             return station_spec_from_dict(data)
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML in station spec {yaml_path}: {e}")
 
     raise FileNotFoundError(
-        f"Station spec not found: {station_id} "
-        f"(checked {json_path} and {yaml_path})"
+        f"Station spec not found: {station_id} (checked {json_path} and {yaml_path})"
     )
 
 
@@ -227,17 +225,13 @@ def load_flow(flow_id: str, repo_root: Optional[Path] = None) -> FlowSpec:
         try:
             data = _load_yaml_file(yaml_path)
             logger.debug(
-                "Loaded flow %s from YAML (migrate to JSON with migrate_yaml_to_json())",
-                flow_id
+                "Loaded flow %s from YAML (migrate to JSON with migrate_yaml_to_json())", flow_id
             )
             return flow_spec_from_dict(data)
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML in flow spec {yaml_path}: {e}")
 
-    raise FileNotFoundError(
-        f"Flow spec not found: {flow_id} "
-        f"(checked {json_path} and {yaml_path})"
-    )
+    raise FileNotFoundError(f"Flow spec not found: {flow_id} (checked {json_path} and {yaml_path})")
 
 
 @lru_cache(maxsize=16)
@@ -331,8 +325,7 @@ def load_fragment(fragment_path: str, repo_root: Optional[Path] = None) -> str:
         return legacy_path.read_text(encoding="utf-8")
 
     raise FileNotFoundError(
-        f"Fragment not found: {fragment_path} "
-        f"(checked {new_path} and {legacy_path})"
+        f"Fragment not found: {fragment_path} (checked {new_path} and {legacy_path})"
     )
 
 
@@ -531,6 +524,7 @@ def validate_specs(repo_root: Optional[Path] = None) -> Dict[str, List[str]]:
     # Load schema for validation if jsonschema is available
     try:
         import jsonschema
+
         schema_available = True
 
         # Try new specs location first, then legacy
@@ -621,15 +615,21 @@ def validate_specs(repo_root: Optional[Path] = None) -> Dict[str, List[str]]:
             # Check station references
             for step in flow.steps:
                 if step.station not in station_ids:
-                    errors.append(f"Flow {flow_id}, step {step.id}: Unknown station - {step.station}")
+                    errors.append(
+                        f"Flow {flow_id}, step {step.id}: Unknown station - {step.station}"
+                    )
 
             # Check routing consistency
             step_ids = {s.id for s in flow.steps}
             for step in flow.steps:
                 if step.routing.next and step.routing.next not in step_ids:
-                    errors.append(f"Flow {flow_id}, step {step.id}: Unknown next step - {step.routing.next}")
+                    errors.append(
+                        f"Flow {flow_id}, step {step.id}: Unknown next step - {step.routing.next}"
+                    )
                 if step.routing.loop_target and step.routing.loop_target not in step_ids:
-                    errors.append(f"Flow {flow_id}, step {step.id}: Unknown loop_target - {step.routing.loop_target}")
+                    errors.append(
+                        f"Flow {flow_id}, step {step.id}: Unknown loop_target - {step.routing.loop_target}"
+                    )
 
         except FileNotFoundError as e:
             errors.append(f"Flow {flow_id}: {e}")
@@ -650,15 +650,16 @@ def main():
     import sys
 
     parser = argparse.ArgumentParser(description="Spec loader CLI")
-    parser.add_argument("command", choices=["lint", "list", "render", "migrate"],
-                        help="Command to run")
-    parser.add_argument("--type", choices=["stations", "flows", "fragments"],
-                        help="Type to list")
+    parser.add_argument(
+        "command", choices=["lint", "list", "render", "migrate"], help="Command to run"
+    )
+    parser.add_argument("--type", choices=["stations", "flows", "fragments"], help="Type to list")
     parser.add_argument("--station", help="Station ID for render")
     parser.add_argument("--flow", help="Flow ID for render")
     parser.add_argument("--step", help="Step ID for render")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="For migrate: show what would be migrated")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="For migrate: show what would be migrated"
+    )
 
     args = parser.parse_args()
 

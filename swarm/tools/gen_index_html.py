@@ -32,12 +32,12 @@ OUTPUT_HTML = UI_DIR / "index.html"
 
 # Fragment assembly order (files in fragments/ directory)
 FRAGMENT_ORDER = [
-    "00-head.html",      # DOCTYPE, head, body start, app div start
-    "10-header.html",    # Header region
+    "00-head.html",  # DOCTYPE, head, body start, app div start
+    "10-header.html",  # Header region
     "20-sdlc-bar.html",  # SDLC progress bar
-    "30-sidebar.html",   # Sidebar with flow list, run history
-    "40-canvas.html",    # Main graph canvas
-    "50-inspector.html", # Details/inspector panel
+    "30-sidebar.html",  # Sidebar with flow list, run history
+    "40-canvas.html",  # Main graph canvas
+    "50-inspector.html",  # Details/inspector panel
 ]
 
 # Modal/overlay fragments to include after main content
@@ -224,7 +224,7 @@ def main():
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Check if generated file is up-to-date (don't regenerate)"
+        help="Check if generated file is up-to-date (don't regenerate)",
     )
     args = parser.parse_args()
 

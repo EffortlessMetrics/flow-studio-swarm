@@ -5,11 +5,11 @@ during agent execution. These utilities wrap the lower-level handoff_io function
 with convenience features like auto-generated IDs and context extraction.
 """
 
-import pytest
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
+
+import pytest
 
 # Ensure swarm modules are importable
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -17,20 +17,19 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from swarm.runtime.agent_logging import (
-    log_assumption,
-    log_decision,
+    _extract_context,
+    _generate_assumption_id,
+    _generate_decision_id,
+    format_assumption_for_prompt,
+    format_decision_for_prompt,
     get_assumption_by_id,
+    get_assumptions_for_decision,
     get_decision_by_id,
     list_assumptions,
     list_decisions,
-    get_assumptions_for_decision,
-    format_assumption_for_prompt,
-    format_decision_for_prompt,
-    _generate_assumption_id,
-    _generate_decision_id,
-    _extract_context,
+    log_assumption,
+    log_decision,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -212,7 +211,7 @@ class TestLogAssumption:
 
     def test_log_assumption_with_confidence(self, empty_envelope):
         """Logs assumption with custom confidence level."""
-        asm_id = log_assumption(
+        log_assumption(
             empty_envelope,
             statement="System handles 1000 concurrent users",
             rationale="Based on similar systems",
@@ -225,7 +224,7 @@ class TestLogAssumption:
 
     def test_log_assumption_with_tags(self, empty_envelope):
         """Logs assumption with categorization tags."""
-        asm_id = log_assumption(
+        log_assumption(
             empty_envelope,
             statement="Authentication uses OAuth2",
             rationale="Industry standard for web apps",
@@ -310,7 +309,7 @@ class TestLogDecision:
 
     def test_log_decision_with_evidence(self, empty_envelope):
         """Logs decision with supporting evidence."""
-        dec_id = log_decision(
+        log_decision(
             empty_envelope,
             decision_type="implementation",
             subject="API framework",
@@ -324,7 +323,7 @@ class TestLogDecision:
 
     def test_log_decision_with_conditions(self, empty_envelope):
         """Logs decision with conditions."""
-        dec_id = log_decision(
+        log_decision(
             empty_envelope,
             decision_type="design",
             subject="Caching strategy",
@@ -338,7 +337,7 @@ class TestLogDecision:
 
     def test_log_decision_with_assumptions(self, envelope_with_assumptions):
         """Logs decision that applies assumptions."""
-        dec_id = log_decision(
+        log_decision(
             envelope_with_assumptions,
             decision_type="integration",
             subject="API endpoint design",

@@ -228,7 +228,7 @@ def main() -> None:
             sys.exit(1)
 
         print_banner(
-            f"Applying profile \"{args.profile_id}\" -- backing up and writing files.",
+            f'Applying profile "{args.profile_id}" -- backing up and writing files.',
             style="apply",
         )
 

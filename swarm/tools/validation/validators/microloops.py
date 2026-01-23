@@ -24,8 +24,8 @@ Checks:
 import re
 from pathlib import Path
 
+from swarm.tools.validation.helpers import ROOT
 from swarm.validator import ValidationResult
-from swarm.tools.validation.helpers import ROOT, FLOW_SPECS_DIR, AGENTS_DIR
 
 
 def validate_microloop_phrases() -> ValidationResult:
@@ -91,7 +91,7 @@ def validate_microloop_phrases() -> ValidationResult:
                             f"uses banned microloop phrase '{banned_phrase}' (old iteration logic)",
                             "Replace with explicit 'can_further_iteration_help: yes/no' or Status-based exit logic",
                             line_number=i,
-                            file_path=str(file_path)
+                            file_path=str(file_path),
                         )
         except (OSError, UnicodeDecodeError):
             pass  # Skip files that can't be read

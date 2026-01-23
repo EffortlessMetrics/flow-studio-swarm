@@ -29,6 +29,7 @@ class TeachingNotes:
         emphasizes: Key behaviors or patterns to focus on
         constraints: Limitations or prohibitions for this step
     """
+
     inputs: Tuple[str, ...] = ()
     outputs: Tuple[str, ...] = ()
     emphasizes: Tuple[str, ...] = ()
@@ -55,6 +56,7 @@ class StepRouting:
         max_iterations: Safety limit on loop iterations (default 5)
         branches: For branch routing, maps condition values to step IDs
     """
+
     kind: str  # "linear" | "microloop" | "branch"
     next: Optional[str] = None  # next step ID for linear, or after loop exits
     loop_target: Optional[str] = None  # step to loop back to
@@ -71,6 +73,7 @@ class ContextBudgetOverride:
     None values mean 'inherit from parent level' in the resolution cascade:
     Step override > Flow override > Profile override > Global defaults
     """
+
     context_budget_chars: Optional[int] = None
     history_max_recent_chars: Optional[int] = None
     history_max_older_chars: Optional[int] = None
@@ -78,9 +81,15 @@ class ContextBudgetOverride:
     def merge_with(self, parent: "ContextBudgetOverride") -> "ContextBudgetOverride":
         """Merge with parent, preferring non-None values from self."""
         return ContextBudgetOverride(
-            context_budget_chars=self.context_budget_chars if self.context_budget_chars is not None else parent.context_budget_chars,
-            history_max_recent_chars=self.history_max_recent_chars if self.history_max_recent_chars is not None else parent.history_max_recent_chars,
-            history_max_older_chars=self.history_max_older_chars if self.history_max_older_chars is not None else parent.history_max_older_chars,
+            context_budget_chars=self.context_budget_chars
+            if self.context_budget_chars is not None
+            else parent.context_budget_chars,
+            history_max_recent_chars=self.history_max_recent_chars
+            if self.history_max_recent_chars is not None
+            else parent.history_max_recent_chars,
+            history_max_older_chars=self.history_max_older_chars
+            if self.history_max_older_chars is not None
+            else parent.history_max_older_chars,
         )
 
 
@@ -99,6 +108,7 @@ class EngineProfile:
         timeout_ms: Step timeout in milliseconds (default 300000 = 5 min)
         context_budgets: Optional context budget overrides for this step (v2.4.0)
     """
+
     engine: str = "claude-step"
     mode: str = "stub"
     model: Optional[str] = None
@@ -119,6 +129,7 @@ class StepDefinition:
         routing: Optional routing configuration for non-linear flow execution
         engine_profile: Optional engine configuration for this step (v2.4.0)
     """
+
     id: str
     index: int  # 1-based within flow
     agents: Tuple[str, ...]
@@ -131,6 +142,7 @@ class StepDefinition:
 @dataclass
 class FlowDefinition:
     """A single flow definition from the registry."""
+
     key: str
     index: int
     title: str
@@ -181,9 +193,7 @@ class FlowRegistry:
                 for agent in step.agents:
                     if agent not in self._agent_index:
                         self._agent_index[agent] = []
-                    self._agent_index[agent].append(
-                        (flow_key, step.id, flow_index, step.index)
-                    )
+                    self._agent_index[agent].append((flow_key, step.id, flow_index, step.index))
 
             # Index cross-cutting agents (not tied to specific steps)
             for agent in cross_cutting:
@@ -290,9 +300,7 @@ class FlowRegistry:
                 return step.index
         return 0
 
-    def get_agent_positions(
-        self, agent_key: str
-    ) -> List[Tuple[str, Optional[str], int, int]]:
+    def get_agent_positions(self, agent_key: str) -> List[Tuple[str, Optional[str], int, int]]:
         """Get all positions for an agent.
 
         Returns list of (flow_key, step_id, flow_idx, step_idx) tuples.

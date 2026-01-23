@@ -11,8 +11,8 @@ Checks:
 
 from typing import Set
 
+from swarm.tools.validation.helpers import AGENTS_DIR, ROOT, SKILLS_DIR
 from swarm.validator import SimpleYAMLParser, ValidationResult
-from swarm.tools.validation.helpers import ROOT, AGENTS_DIR, SKILLS_DIR
 
 
 def validate_skills() -> ValidationResult:
@@ -55,7 +55,7 @@ def validate_skills() -> ValidationResult:
                 f"skill '{skill_name}'",
                 f"declared by agents but {skill_file.relative_to(ROOT)} does not exist",
                 f"Create {skill_file.relative_to(ROOT)} with valid frontmatter (name, description)",
-                file_path=str(skill_file)
+                file_path=str(skill_file),
             )
             continue
 
@@ -70,7 +70,7 @@ def validate_skills() -> ValidationResult:
                     str(skill_file.relative_to(ROOT)),
                     "missing required field 'name'",
                     f"Add `name: {skill_name}` to frontmatter",
-                    file_path=str(skill_file)
+                    file_path=str(skill_file),
                 )
 
             if "description" not in fm or not fm.get("description", "").strip():
@@ -79,7 +79,7 @@ def validate_skills() -> ValidationResult:
                     str(skill_file.relative_to(ROOT)),
                     "missing required field 'description'",
                     "Add `description: <skill description>` to frontmatter",
-                    file_path=str(skill_file)
+                    file_path=str(skill_file),
                 )
         except ValueError as e:
             result.add_error(
@@ -87,7 +87,7 @@ def validate_skills() -> ValidationResult:
                 str(skill_file.relative_to(ROOT)),
                 f"malformed YAML in skill frontmatter: {e}",
                 "Check YAML syntax in skill frontmatter",
-                file_path=str(skill_file)
+                file_path=str(skill_file),
             )
 
     return result

@@ -40,32 +40,36 @@ GeminiStepOrchestrator = StepwiseOrchestrator
 # =============================================================================
 # Public API: Types and Models
 # =============================================================================
-from .types import (
-    StepTxnInput,
-    StepTxnOutput,
-    VerificationCheck,
-    VerificationResult,
-)
-from .models import (
-    FlowExecutionResult,
-    FlowStepwiseSummary,
-    ResolvedNode,
-    # Note: RoutingOutcome is now imported from .routing (driver.py version)
-)
-
-# =============================================================================
-# Public API: Spec Loading
-# =============================================================================
-from .spec_facade import SpecFacade, load_flow_spec, load_station_spec
-
 # =============================================================================
 # Internal helpers (re-exported for backwards compatibility)
 # Keep imports minimal - most code should use routing/ subpackage directly
 # =============================================================================
 from .envelope import ensure_step_envelope
 from .graph_bridge import build_flow_graph_from_definition
+from .models import (
+    FlowExecutionResult,
+    FlowStepwiseSummary,
+    ResolvedNode,
+    # Note: RoutingOutcome is now imported from .routing (driver.py version)
+)
 from .node_resolver import find_step_index, get_next_node_id, resolve_node
 from .receipt_compat import read_receipt_field, update_receipt_routing
+from .routing import (
+    # Elephant Protocol
+    ProgressDelta,
+    ProgressEvidence,
+    # Driver's RoutingOutcome type
+    RoutingOutcome,  # From driver.py - use with driver's route_step
+    StallAnalysis,
+    compute_error_signature,
+    # Legacy routing signal creation
+    create_routing_signal,
+    create_stall_routing_signal,
+    detect_stall,
+    # Candidate-set pattern
+    generate_routing_candidates,
+    record_progress_evidence,
+)
 
 # Routing re-exports
 # Note: There are TWO route_step functions with different signatures:
@@ -79,20 +83,17 @@ from .receipt_compat import read_receipt_field, update_receipt_routing
 from .routing import (
     # Re-export legacy route_step for backwards compatibility
     route_step_legacy as route_step,  # Legacy signature - for existing code
-    # Driver's RoutingOutcome type
-    RoutingOutcome,  # From driver.py - use with driver's route_step
-    # Legacy routing signal creation
-    create_routing_signal,
-    # Elephant Protocol
-    ProgressDelta,
-    ProgressEvidence,
-    StallAnalysis,
-    detect_stall,
-    record_progress_evidence,
-    create_stall_routing_signal,
-    compute_error_signature,
-    # Candidate-set pattern
-    generate_routing_candidates,
+)
+
+# =============================================================================
+# Public API: Spec Loading
+# =============================================================================
+from .spec_facade import SpecFacade, load_flow_spec, load_station_spec
+from .types import (
+    StepTxnInput,
+    StepTxnOutput,
+    VerificationCheck,
+    VerificationResult,
 )
 
 __all__ = [

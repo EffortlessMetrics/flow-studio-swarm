@@ -8,29 +8,26 @@ This module tests the evolution loop functionality including:
 """
 
 import json
-import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-import tempfile
 import shutil
-
 import sys
+import tempfile
+from pathlib import Path
+
+import pytest
+
 _SWARM_ROOT = Path(__file__).resolve().parent.parent
 if str(_SWARM_ROOT) not in sys.path:
     sys.path.insert(0, str(_SWARM_ROOT))
 
 from swarm.runtime.evolution import (
+    ConfidenceLevel,
     EvolutionPatch,
     PatchType,
-    ConfidenceLevel,
-    PatchValidationResult,
-    PatchApplicationResult,
-    generate_evolution_patch,
     apply_evolution_patch,
-    validate_evolution_patch,
+    generate_evolution_patch,
     list_pending_patches,
+    validate_evolution_patch,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -149,18 +146,14 @@ class TestGenerateEvolutionPatch:
                     "target_flow": "swarm/spec/flows/3-build.yaml",
                     "reason": "Add security scan step",
                     "evidence": ["run-001/events.jsonl"],
-                    "operations": [
-                        {"op": "add", "path": "/steps/-", "value": {"id": "security"}}
-                    ],
+                    "operations": [{"op": "add", "path": "/steps/-", "value": {"id": "security"}}],
                     "risk": "low",
                     "human_review_required": True,
                 }
             ],
         }
 
-        (wisdom_dir / "flow_evolution.patch").write_text(
-            json.dumps(patch_data), encoding="utf-8"
-        )
+        (wisdom_dir / "flow_evolution.patch").write_text(json.dumps(patch_data), encoding="utf-8")
 
         patches = generate_evolution_patch(wisdom_dir)
 
@@ -464,9 +457,7 @@ class TestApplyEvolutionPatch:
             content="",
             confidence=ConfidenceLevel.HIGH,
             reasoning="Add step",
-            operations=[
-                {"op": "add", "path": "/steps/-", "value": {"id": "new_step"}}
-            ],
+            operations=[{"op": "add", "path": "/steps/-", "value": {"id": "new_step"}}],
         )
 
         result = apply_evolution_patch(patch, dry_run=False, repo_root=repo_root)
@@ -476,6 +467,7 @@ class TestApplyEvolutionPatch:
 
         # Verify file was modified
         import yaml
+
         updated = yaml.safe_load(target.read_text(encoding="utf-8"))
         assert len(updated["steps"]) == 1
         assert updated["steps"][0]["id"] == "new_step"
@@ -537,9 +529,7 @@ class TestListPendingPatches:
         wisdom1.mkdir(parents=True)
         patch_data = {
             "schema_version": "flow_evolution_v1",
-            "patches": [
-                {"id": "PATCH-001", "target_flow": "test.yaml", "reason": "Test"}
-            ],
+            "patches": [{"id": "PATCH-001", "target_flow": "test.yaml", "reason": "Test"}],
         }
         (wisdom1 / "flow_evolution.patch").write_text(json.dumps(patch_data))
 
@@ -562,9 +552,7 @@ class TestListPendingPatches:
 
         patch_data = {
             "schema_version": "flow_evolution_v1",
-            "patches": [
-                {"id": "PATCH-001", "target_flow": "test.yaml", "reason": "Test"}
-            ],
+            "patches": [{"id": "PATCH-001", "target_flow": "test.yaml", "reason": "Test"}],
         }
         (wisdom / "flow_evolution.patch").write_text(json.dumps(patch_data))
 

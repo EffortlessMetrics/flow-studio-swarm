@@ -61,12 +61,13 @@ import logging
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
 from typing_extensions import TypedDict
 
 from swarm.runtime.types import RoutingCandidate
 from swarm.runtime.utility_flow_injection import (
-    UtilityFlowRegistry,
     InjectionTriggerDetector,
+    UtilityFlowRegistry,
 )
 
 if TYPE_CHECKING:
@@ -373,9 +374,7 @@ def get_utility_flow_candidates(
                 "repo_root is required in strict mode (get_utility_flow_candidates). "
                 "Either pass repo_root explicitly or unset SWARM_STRICT_REPO_ROOT."
             )
-        logger.debug(
-            "get_utility_flow_candidates called without repo_root; returning empty list"
-        )
+        logger.debug("get_utility_flow_candidates called without repo_root; returning empty list")
         return []
 
     detector = get_utility_flow_detector(repo_root)

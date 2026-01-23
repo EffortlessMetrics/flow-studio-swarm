@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-
 DEFAULT_SPEC_DIR = "swarm/spec"  # Legacy YAML location
 DEFAULT_SPECS_DIR = "swarm/specs"  # New JSON location (runtime truth)
 DEFAULT_FLOWS_SUBDIR = "flows"

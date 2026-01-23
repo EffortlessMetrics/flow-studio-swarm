@@ -16,8 +16,6 @@ BDD Scenarios covered:
 - Scenario 14: Detect invalid skills format (not a list)
 """
 
-import pytest
-
 from conftest import (
     add_agent_to_registry,
     assert_error_contains,
@@ -394,7 +392,9 @@ Agent prompt.
     # Default mode: passes with warning
     result = run_validator(temp_repo)
     assert_validator_passed(result)  # Should pass (warnings don't fail)
-    assert "permissionMode" in result.stderr or "permissionMode" in result.stdout  # Warning should be mentioned
+    assert (
+        "permissionMode" in result.stderr or "permissionMode" in result.stdout
+    )  # Warning should be mentioned
 
     # Strict mode: fails with error
     result_strict = run_validator(temp_repo, flags=["--strict"])
@@ -628,7 +628,7 @@ Agent prompt.
 """)
 
     # Extra fields not explicitly disallowed should be ignored
-    result = run_validator(temp_repo)
+    run_validator(temp_repo)
     # This test documents current behavior - may need adjustment based on validator design
 
 
@@ -1010,7 +1010,9 @@ Agent prompt.
     # 1. Pass if validator accepts null description, OR
     # 2. Fail with FRONTMATTER error (missing description requirement)
     # But should NOT crash (return code 2 = crash)
-    assert result.returncode in [0, 1], f"Validator crashed with return code {result.returncode}. Error: {result.stderr}"
+    assert result.returncode in [0, 1], (
+        f"Validator crashed with return code {result.returncode}. Error: {result.stderr}"
+    )
 
 
 def test_yaml_tilde_null_in_model(temp_repo, run_validator):

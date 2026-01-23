@@ -13,7 +13,6 @@ Validates:
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -23,12 +22,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from swarm.tools.selftest_remediate_execute import (
     ALLOWLISTED_PATTERNS,
-    BLOCKLISTED_PATTERNS,
     ApprovalResult,
     ApprovalStatus,
-    AuditLogEntry,
     DryRunResult,
-    ExecuteResult,
     ExecutionStatus,
     Remediation,
     dry_run,
@@ -168,7 +164,9 @@ class TestBlocklistCheck:
 
         for cmd, should_block in test_commands:
             blocked, _ = is_blocklisted(cmd)
-            assert blocked == should_block, f"Command '{cmd}' should {'be' if should_block else 'not be'} blocked"
+            assert blocked == should_block, (
+                f"Command '{cmd}' should {'be' if should_block else 'not be'} blocked"
+            )
 
 
 class TestDryRun:
@@ -297,9 +295,7 @@ class TestApproval:
 class TestExecution:
     """Tests for command execution."""
 
-    def test_execution_blocked_without_approval(
-        self, sample_remediation: Remediation
-    ) -> None:
+    def test_execution_blocked_without_approval(self, sample_remediation: Remediation) -> None:
         """Should refuse to execute without approval."""
         approval = ApprovalResult(
             remediation_id=sample_remediation.id,
@@ -314,9 +310,7 @@ class TestExecution:
         assert result.status == ExecutionStatus.SKIPPED
         assert "not approved" in result.stderr.lower()
 
-    def test_execution_blocked_for_blocklisted(
-        self, sample_approval: ApprovalResult
-    ) -> None:
+    def test_execution_blocked_for_blocklisted(self, sample_approval: ApprovalResult) -> None:
         """Should refuse to execute blocklisted commands even if approved."""
         bad_remediation = Remediation(
             id="rem-bad",
@@ -476,7 +470,6 @@ class TestCLI:
 
     def test_cli_dry_run_flag(self) -> None:
         """CLI should accept --dry-run flag."""
-        from swarm.tools.selftest_remediate_execute import main
         import argparse
 
         # Test that --dry-run is a valid argument
@@ -487,7 +480,6 @@ class TestCLI:
 
     def test_cli_auto_approve_flag(self) -> None:
         """CLI should accept --auto-approve flag."""
-        from swarm.tools.selftest_remediate_execute import main
         import argparse
 
         parser = argparse.ArgumentParser()
@@ -503,10 +495,6 @@ class TestEndToEnd:
         """Test full flow from suggestion to execution."""
         from swarm.tools.selftest_remediate_execute import (
             get_pending_remediations,
-            dry_run,
-            request_approval,
-            execute,
-            write_audit_log,
         )
 
         # Create a mock degradation log
@@ -547,9 +535,7 @@ class TestEndToEnd:
         """Should return empty list when no degradation log exists."""
         from swarm.tools.selftest_remediate_execute import get_pending_remediations
 
-        remediations = get_pending_remediations(
-            degradation_log=tmp_path / "nonexistent.log"
-        )
+        remediations = get_pending_remediations(degradation_log=tmp_path / "nonexistent.log")
 
         assert len(remediations) == 0
 

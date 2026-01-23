@@ -69,18 +69,14 @@ class RemediationSuggestionEngine:
     def _load_patterns(self) -> List[RemediationPattern]:
         """Load remediation patterns from YAML map."""
         if not self.remediation_map_path.exists():
-            raise FileNotFoundError(
-                f"Remediation map not found: {self.remediation_map_path}"
-            )
+            raise FileNotFoundError(f"Remediation map not found: {self.remediation_map_path}")
 
         with open(self.remediation_map_path) as f:
             data = load_yaml(f)
 
         return [RemediationPattern(p) for p in data["remediation_patterns"]]
 
-    def match_degradation(
-        self, degradation: DegradationEntry
-    ) -> Optional[RemediationPattern]:
+    def match_degradation(self, degradation: DegradationEntry) -> Optional[RemediationPattern]:
         """Find the first pattern matching this degradation."""
         for pattern in self.patterns:
             if pattern.matches(degradation.error):
@@ -272,12 +268,14 @@ def main() -> int:
         if not args.json:
             print(f"No degradations found in {log_path}")
         else:
-            print_json_output({
-                "total_degradations": 0,
-                "actionable_suggestions": 0,
-                "unmatched": 0,
-                "suggestions": [],
-            })
+            print_json_output(
+                {
+                    "total_degradations": 0,
+                    "actionable_suggestions": 0,
+                    "unmatched": 0,
+                    "suggestions": [],
+                }
+            )
         return 0
 
     # Load remediation engine and generate suggestions

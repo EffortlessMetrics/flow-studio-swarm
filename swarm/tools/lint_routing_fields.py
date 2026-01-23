@@ -55,34 +55,55 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from pathlib import Path
 from dataclasses import dataclass
-from typing import Callable, List, Match, Tuple
+from pathlib import Path
+from typing import List, Tuple
 
 # =============================================================================
 # LEGACY PATTERNS - These indicate deprecated routing vocabulary (violations)
 # =============================================================================
 LEGACY_VIOLATION_PATTERNS = [
     # Enum-style route_to_flow with numbers
-    (r'route_to_flow:\s*[1-7]', 'route_to_flow with numeric value (use routing: INJECT_FLOW + target instead)'),
-    (r'route_to_flow:\s*\d+', 'route_to_flow with numeric value (use routing: INJECT_FLOW + target instead)'),
+    (
+        r"route_to_flow:\s*[1-7]",
+        "route_to_flow with numeric value (use routing: INJECT_FLOW + target instead)",
+    ),
+    (
+        r"route_to_flow:\s*\d+",
+        "route_to_flow with numeric value (use routing: INJECT_FLOW + target instead)",
+    ),
     # Pattern in schema definitions
-    (r'route_to_flow:\s*1\|2\|3\|4\|5\|6\|7', 'route_to_flow enum schema (deprecated; use V3 routing decisions)'),
+    (
+        r"route_to_flow:\s*1\|2\|3\|4\|5\|6\|7",
+        "route_to_flow enum schema (deprecated; use V3 routing decisions)",
+    ),
     # route_to_agent with specific agent name (not null)
-    (r'route_to_agent:\s*[a-z]+-[a-z]+', 'route_to_agent with specific agent (use routing: DETOUR + target instead)'),
+    (
+        r"route_to_agent:\s*[a-z]+-[a-z]+",
+        "route_to_agent with specific agent (use routing: DETOUR + target instead)",
+    ),
     # Backtick-quoted versions (in docs)
-    (r'`route_to_flow:\s*\d+`', 'route_to_flow example with number (update docs to V3 routing)'),
-    (r'`route_to_agent:\s*[a-z]+-', 'route_to_agent example with agent (update docs to V3 routing)'),
+    (r"`route_to_flow:\s*\d+`", "route_to_flow example with number (update docs to V3 routing)"),
+    (
+        r"`route_to_agent:\s*[a-z]+-",
+        "route_to_agent example with agent (update docs to V3 routing)",
+    ),
 ]
 
 # Legacy patterns that are warnings (acceptable in transition docs but should be removed)
 LEGACY_WARNING_PATTERNS = [
     # Generic mentions that might be documentation of deprecation
-    (r'"route_to_flow":\s*null', 'route_to_flow null in JSON (remove field entirely)'),
-    (r'"route_to_agent":\s*null', 'route_to_agent null in JSON (remove field entirely)'),
+    (r'"route_to_flow":\s*null', "route_to_flow null in JSON (remove field entirely)"),
+    (r'"route_to_agent":\s*null', "route_to_agent null in JSON (remove field entirely)"),
     # Bare mentions of the old field names (might be intentional deprecation docs)
-    (r'route_to_flow', 'mention of deprecated route_to_flow (verify this is deprecation documentation)'),
-    (r'route_to_agent', 'mention of deprecated route_to_agent (verify this is deprecation documentation)'),
+    (
+        r"route_to_flow",
+        "mention of deprecated route_to_flow (verify this is deprecation documentation)",
+    ),
+    (
+        r"route_to_agent",
+        "mention of deprecated route_to_agent (verify this is deprecation documentation)",
+    ),
 ]
 
 # =============================================================================
@@ -90,7 +111,7 @@ LEGACY_WARNING_PATTERNS = [
 # =============================================================================
 
 # Valid routing decision values
-VALID_ROUTING_DECISIONS = {'CONTINUE', 'DETOUR', 'INJECT_FLOW', 'INJECT_NODES', 'EXTEND_GRAPH'}
+VALID_ROUTING_DECISIONS = {"CONTINUE", "DETOUR", "INJECT_FLOW", "INJECT_NODES", "EXTEND_GRAPH"}
 
 # Valid recommended_action values
 # NOTE: recommended_action can use either:
@@ -99,9 +120,16 @@ VALID_ROUTING_DECISIONS = {'CONTINUE', 'DETOUR', 'INJECT_FLOW', 'INJECT_NODES', 
 # This flexibility allows agents to recommend routing decisions directly
 VALID_RECOMMENDED_ACTIONS = {
     # Action vocabulary
-    'PROCEED', 'RERUN', 'BOUNCE', 'FIX_ENV',
+    "PROCEED",
+    "RERUN",
+    "BOUNCE",
+    "FIX_ENV",
     # Routing vocabulary (agents can recommend routing decisions)
-    'CONTINUE', 'DETOUR', 'INJECT_FLOW', 'INJECT_NODES', 'EXTEND_GRAPH',
+    "CONTINUE",
+    "DETOUR",
+    "INJECT_FLOW",
+    "INJECT_NODES",
+    "EXTEND_GRAPH",
 }
 
 # Patterns to validate new routing vocabulary is well-formed
@@ -111,49 +139,56 @@ NEW_ROUTING_VALIDATION_PATTERNS = [
     # Only matches when decision appears to be a routing decision (has routing-like context)
     (
         r'"decision":\s*"([^"]+)"(?=.*"(target|justification|offroad|source_node)")',
-        'decision_field',
+        "decision_field",
         lambda m: m.group(1) not in VALID_ROUTING_DECISIONS,
-        'invalid decision value (must be CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)'
+        "invalid decision value (must be CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)",
     ),
     # routing field with explicit routing decision value (YAML style in prompts/specs)
     # Must be followed by a recognized routing decision value, not just any word
     # Pattern: `routing: VALUE` where VALUE is ALL_CAPS
     (
-        r'^\s*[-*]?\s*routing:\s*([A-Z][A-Z_]+)\s*(?:,|$|\()',
-        'routing_field_yaml',
-        lambda m: m.group(1) not in VALID_ROUTING_DECISIONS and m.group(1) not in {'MERGE', 'SKIP', 'NULL'},
-        'invalid routing value (must be CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)'
+        r"^\s*[-*]?\s*routing:\s*([A-Z][A-Z_]+)\s*(?:,|$|\()",
+        "routing_field_yaml",
+        lambda m: m.group(1) not in VALID_ROUTING_DECISIONS
+        and m.group(1) not in {"MERGE", "SKIP", "NULL"},
+        "invalid routing value (must be CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)",
     ),
     # routing field in JSON format
     (
         r'"routing":\s*"([A-Z][A-Z_]+)"',
-        'routing_field_json',
+        "routing_field_json",
         lambda m: m.group(1) not in VALID_ROUTING_DECISIONS,
-        'invalid routing value (must be CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)'
+        "invalid routing value (must be CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)",
     ),
     # recommended_action with invalid value (both YAML and JSON contexts)
     (
-        r'recommended_action:\s*(PROCEED|RERUN|BOUNCE|FIX_ENV|[A-Z][A-Z_]+)',
-        'recommended_action_field',
+        r"recommended_action:\s*(PROCEED|RERUN|BOUNCE|FIX_ENV|[A-Z][A-Z_]+)",
+        "recommended_action_field",
         lambda m: m.group(1) not in VALID_RECOMMENDED_ACTIONS,
-        'invalid recommended_action value (must be PROCEED|RERUN|BOUNCE|FIX_ENV)'
+        "invalid recommended_action value (must be PROCEED|RERUN|BOUNCE|FIX_ENV)",
     ),
     # recommended_action in JSON format
     (
         r'"recommended_action":\s*"([A-Z][A-Z_]+)"',
-        'recommended_action_json',
+        "recommended_action_json",
         lambda m: m.group(1) not in VALID_RECOMMENDED_ACTIONS,
-        'invalid recommended_action value (must be PROCEED|RERUN|BOUNCE|FIX_ENV)'
+        "invalid recommended_action value (must be PROCEED|RERUN|BOUNCE|FIX_ENV)",
     ),
 ]
 
 # Patterns that indicate correct NEW routing usage (for info/stats)
 NEW_ROUTING_VALID_PATTERNS = [
-    (r'"decision":\s*"(CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)"', 'valid decision field'),
-    (r'routing:\s*(CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)\b', 'valid routing field'),
-    (r'recommended_action:\s*(PROCEED|RERUN|BOUNCE|FIX_ENV)\b', 'valid recommended_action field'),
-    (r'"target":\s*"[a-z]+-?[a-z]*"', 'target field for routing'),
-    (r'inject_flow:\s*[a-z]+', 'inject_flow target'),
+    (
+        r'"decision":\s*"(CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)"',
+        "valid decision field",
+    ),
+    (
+        r"routing:\s*(CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)\b",
+        "valid routing field",
+    ),
+    (r"recommended_action:\s*(PROCEED|RERUN|BOUNCE|FIX_ENV)\b", "valid recommended_action field"),
+    (r'"target":\s*"[a-z]+-?[a-z]*"', "target field for routing"),
+    (r"inject_flow:\s*[a-z]+", "inject_flow target"),
 ]
 
 # Combine legacy patterns for backward compatibility with existing code
@@ -162,17 +197,17 @@ WARNING_PATTERNS = LEGACY_WARNING_PATTERNS
 
 # Files/directories to skip
 SKIP_PATTERNS = [
-    '**/node_modules/**',
-    '**/.git/**',
-    '**/dist/**',
-    '**/__pycache__/**',
-    '**/lint_routing_fields.py',  # Don't lint ourselves
-    '**/swarm/runs/**',  # Run artifacts use different state machine vocabulary
-    '**/run_state.json',  # Stepwise state machine uses advance/terminate/error/loop
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/dist/**",
+    "**/__pycache__/**",
+    "**/lint_routing_fields.py",  # Don't lint ourselves
+    "**/swarm/runs/**",  # Run artifacts use different state machine vocabulary
+    "**/run_state.json",  # Stepwise state machine uses advance/terminate/error/loop
 ]
 
 # File extensions to check
-CHECK_EXTENSIONS = {'.md', '.yaml', '.yml', '.json', '.py', '.ts', '.tsx'}
+CHECK_EXTENSIONS = {".md", ".yaml", ".yml", ".json", ".py", ".ts", ".tsx"}
 
 
 @dataclass
@@ -186,12 +221,13 @@ class Violation:
 
     def safe_line(self) -> str:
         """Return line with non-ASCII chars replaced for console output."""
-        return self.line.encode('ascii', 'replace').decode('ascii')
+        return self.line.encode("ascii", "replace").decode("ascii")
 
 
 @dataclass
 class RoutingUsage:
     """Track usage of new routing patterns for statistics."""
+
     file: Path
     line_num: int
     pattern_type: str
@@ -202,12 +238,14 @@ def should_skip_file(file_path: Path) -> bool:
     """Check if file should be skipped based on skip patterns."""
     path_str = str(file_path)
     for pattern in SKIP_PATTERNS:
-        if pattern.replace('**/', '').replace('/**', '') in path_str:
+        if pattern.replace("**/", "").replace("/**", "") in path_str:
             return True
     return False
 
 
-def check_file(file_path: Path, check_new: bool = False) -> Tuple[List[Violation], List[RoutingUsage]]:
+def check_file(
+    file_path: Path, check_new: bool = False
+) -> Tuple[List[Violation], List[RoutingUsage]]:
     """Check a single file for routing field violations and new pattern usage.
 
     Args:
@@ -227,24 +265,26 @@ def check_file(file_path: Path, check_new: bool = False) -> Tuple[List[Violation
     usages = []
 
     try:
-        content = file_path.read_text(encoding='utf-8')
+        content = file_path.read_text(encoding="utf-8")
     except (UnicodeDecodeError, PermissionError):
         return [], []
 
-    lines = content.split('\n')
+    lines = content.split("\n")
 
     for line_num, line in enumerate(lines, start=1):
         # Check legacy violation patterns
         for pattern, desc in LEGACY_VIOLATION_PATTERNS:
             if re.search(pattern, line, re.IGNORECASE):
-                violations.append(Violation(
-                    file=file_path,
-                    line_num=line_num,
-                    line=line.strip()[:100],  # Truncate long lines
-                    pattern_desc=desc,
-                    is_warning=False,
-                    is_new_pattern_issue=False,
-                ))
+                violations.append(
+                    Violation(
+                        file=file_path,
+                        line_num=line_num,
+                        line=line.strip()[:100],  # Truncate long lines
+                        pattern_desc=desc,
+                        is_warning=False,
+                        is_new_pattern_issue=False,
+                    )
+                )
 
         # Check legacy warning patterns (only if not already matched as violation)
         # Skip warnings if the line already has a violation to avoid duplicates
@@ -252,39 +292,45 @@ def check_file(file_path: Path, check_new: bool = False) -> Tuple[List[Violation
         if not line_has_violation:
             for pattern, desc in LEGACY_WARNING_PATTERNS:
                 if re.search(pattern, line, re.IGNORECASE):
-                    violations.append(Violation(
-                        file=file_path,
-                        line_num=line_num,
-                        line=line.strip()[:100],
-                        pattern_desc=desc,
-                        is_warning=True,
-                        is_new_pattern_issue=False,
-                    ))
+                    violations.append(
+                        Violation(
+                            file=file_path,
+                            line_num=line_num,
+                            line=line.strip()[:100],
+                            pattern_desc=desc,
+                            is_warning=True,
+                            is_new_pattern_issue=False,
+                        )
+                    )
 
         # Check new routing patterns for validity (if enabled)
         if check_new:
             for pattern, name, is_invalid, desc in NEW_ROUTING_VALIDATION_PATTERNS:
                 match = re.search(pattern, line)
                 if match and is_invalid(match):
-                    violations.append(Violation(
-                        file=file_path,
-                        line_num=line_num,
-                        line=line.strip()[:100],
-                        pattern_desc=desc,
-                        is_warning=False,
-                        is_new_pattern_issue=True,
-                    ))
+                    violations.append(
+                        Violation(
+                            file=file_path,
+                            line_num=line_num,
+                            line=line.strip()[:100],
+                            pattern_desc=desc,
+                            is_warning=False,
+                            is_new_pattern_issue=True,
+                        )
+                    )
 
         # Track valid new routing pattern usage (for stats)
         for pattern, pattern_type in NEW_ROUTING_VALID_PATTERNS:
             match = re.search(pattern, line)
             if match:
-                usages.append(RoutingUsage(
-                    file=file_path,
-                    line_num=line_num,
-                    pattern_type=pattern_type,
-                    value=match.group(1) if match.lastindex else match.group(0),
-                ))
+                usages.append(
+                    RoutingUsage(
+                        file=file_path,
+                        line_num=line_num,
+                        pattern_type=pattern_type,
+                        value=match.group(1) if match.lastindex else match.group(0),
+                    )
+                )
 
     return violations, usages
 
@@ -293,13 +339,13 @@ def find_files(root: Path) -> List[Path]:
     """Find all files to check."""
     files = []
     for ext in CHECK_EXTENSIONS:
-        files.extend(root.rglob(f'*{ext}'))
+        files.extend(root.rglob(f"*{ext}"))
     return files
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Lint for deprecated routing patterns and validate V3 routing vocabulary',
+        description="Lint for deprecated routing patterns and validate V3 routing vocabulary",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 V3 Routing Vocabulary:
@@ -312,38 +358,38 @@ V3 Routing Vocabulary:
     Routing vocabulary: CONTINUE, DETOUR, INJECT_FLOW, INJECT_NODES, EXTEND_GRAPH
 
 See docs/ROUTING_PROTOCOL.md for the full routing contract.
-        """
+        """,
     )
     parser.add_argument(
-        '--strict',
-        action='store_true',
-        help='Treat warnings as errors',
+        "--strict",
+        action="store_true",
+        help="Treat warnings as errors",
     )
     parser.add_argument(
-        '--check-new',
-        action='store_true',
-        help='Also validate that V3 routing patterns are well-formed',
+        "--check-new",
+        action="store_true",
+        help="Also validate that V3 routing patterns are well-formed",
     )
     parser.add_argument(
-        '--show-usage',
-        action='store_true',
-        help='Show statistics about V3 routing pattern usage',
+        "--show-usage",
+        action="store_true",
+        help="Show statistics about V3 routing pattern usage",
     )
     parser.add_argument(
-        '--root',
+        "--root",
         type=Path,
         default=Path.cwd(),
-        help='Root directory to scan',
+        help="Root directory to scan",
     )
     args = parser.parse_args()
 
     # Find repo root (look for CLAUDE.md or .git)
     root = args.root
-    if not (root / 'CLAUDE.md').exists() and not (root / '.git').exists():
+    if not (root / "CLAUDE.md").exists() and not (root / ".git").exists():
         print(f"Warning: {root} doesn't look like repo root", file=sys.stderr)
 
     # Scan specific directories
-    scan_dirs = ['swarm', 'docs', '.claude']
+    scan_dirs = ["swarm", "docs", ".claude"]
     all_violations = []
     all_usages = []
 
@@ -363,11 +409,11 @@ See docs/ROUTING_PROTOCOL.md for the full routing contract.
 
     # Print legacy errors
     if legacy_errors:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("ERRORS: Legacy routing field patterns found")
         print("These deprecated patterns must be removed before merge.")
         print("Use V3 routing vocabulary instead (see --help for reference).")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         for v in legacy_errors:
             rel_path = v.file.relative_to(root)
@@ -378,10 +424,10 @@ See docs/ROUTING_PROTOCOL.md for the full routing contract.
 
     # Print new pattern errors (malformed V3 patterns)
     if new_pattern_errors:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("ERRORS: Malformed V3 routing patterns found")
         print("These patterns use V3 vocabulary but with invalid values.")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         for v in new_pattern_errors:
             rel_path = v.file.relative_to(root)
@@ -392,10 +438,10 @@ See docs/ROUTING_PROTOCOL.md for the full routing contract.
 
     # Print warnings
     if warnings:
-        print(f"\n{'-'*60}")
+        print(f"\n{'-' * 60}")
         print("WARNINGS: Transitional/legacy patterns found")
         print("Consider removing these fields entirely.")
-        print(f"{'-'*60}\n")
+        print(f"{'-' * 60}\n")
 
         for v in warnings:
             rel_path = v.file.relative_to(root)
@@ -405,9 +451,9 @@ See docs/ROUTING_PROTOCOL.md for the full routing contract.
 
     # Print usage statistics if requested
     if args.show_usage and all_usages:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("V3 ROUTING PATTERN USAGE")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Group by pattern type
         usage_by_type: dict = {}
@@ -428,7 +474,9 @@ See docs/ROUTING_PROTOCOL.md for the full routing contract.
 
     # Summary
     total_errors = len(legacy_errors) + len(new_pattern_errors)
-    print(f"\nSummary: {len(legacy_errors)} legacy errors, {len(new_pattern_errors)} malformed V3 errors, {len(warnings)} warnings")
+    print(
+        f"\nSummary: {len(legacy_errors)} legacy errors, {len(new_pattern_errors)} malformed V3 errors, {len(warnings)} warnings"
+    )
 
     if all_usages:
         print(f"V3 routing patterns found: {len(all_usages)} valid usages")
@@ -450,5 +498,5 @@ See docs/ROUTING_PROTOCOL.md for the full routing contract.
         return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

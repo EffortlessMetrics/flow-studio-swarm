@@ -34,25 +34,23 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Dict, Any
-
-import pytest
 
 # Add repo root to path for imports
 repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from swarm.runtime.engines.claude.prompt_builder import (
-    load_scent_trail,
-    load_agent_persona,
-    build_context_from_pack,
-    build_artifact_pointers,
-)
-from swarm.runtime.context_pack import ContextPack
-from swarm.runtime.types import HandoffEnvelope, RoutingSignal, RoutingDecision, RunSpec
-from swarm.runtime.engines import StepContext
 from datetime import datetime, timezone
+
+from swarm.runtime.context_pack import ContextPack
+from swarm.runtime.engines import StepContext
+from swarm.runtime.engines.claude.prompt_builder import (
+    build_artifact_pointers,
+    build_context_from_pack,
+    load_agent_persona,
+    load_scent_trail,
+)
+from swarm.runtime.types import HandoffEnvelope, RoutingDecision, RoutingSignal, RunSpec
 
 
 def make_test_step_context(tmp_path, **overrides):
@@ -159,8 +157,11 @@ Write production-quality code."""
 
     # Use monkeypatch to mock flow_loader.load_agent_step_prompt
     from unittest.mock import patch
+
     with patch("swarm.runtime.engines.claude.prompt_builder.load_agent_step_prompt") as mock_load:
-        expected_body = "You are the Code Implementer.\n\n## Behavior\nWrite production-quality code."
+        expected_body = (
+            "You are the Code Implementer.\n\n## Behavior\nWrite production-quality code."
+        )
         mock_load.return_value = expected_body
 
         result = load_agent_persona(tmp_path, "code-implementer")
@@ -189,6 +190,7 @@ Review test coverage."""
 
     # Mock flow_loader to return None (simulating agentic_steps not found)
     from unittest.mock import patch
+
     with patch("swarm.runtime.engines.claude.prompt_builder.load_agent_step_prompt") as mock_load:
         mock_load.return_value = None
 
@@ -217,6 +219,7 @@ This should be returned."""
     claude_file.write_text(claude_content, encoding="utf-8")
 
     from unittest.mock import patch
+
     with patch("swarm.runtime.engines.claude.prompt_builder.load_agent_step_prompt") as mock_load:
         mock_load.return_value = None
 
@@ -231,6 +234,7 @@ This should be returned."""
 def test_load_agent_persona_returns_none_when_not_found(tmp_path):
     """Test that load_agent_persona returns None when agent not found anywhere."""
     from unittest.mock import patch
+
     with patch("swarm.runtime.engines.claude.prompt_builder.load_agent_step_prompt") as mock_load:
         mock_load.return_value = None
 

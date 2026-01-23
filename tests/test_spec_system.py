@@ -9,72 +9,56 @@ Test categories follow the spec-first architecture contract.
 """
 
 import hashlib
-import json
-import pytest
 import sys
-import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, patch
+from typing import Any, Dict, List
+
+import pytest
 
 # Ensure swarm modules are importable
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from swarm.spec.types import (
-    FlowSpec,
-    FlowStep,
-    RoutingConfig,
-    RoutingKind,
-    StationSpec,
-    StationCategory,
-    StationIdentity,
-    StationIO,
-    StationSDK,
-    StationSandbox,
-    StationContextBudget,
-    StationHandoff,
-    StationRuntimePrompt,
-    StationRoutingHints,
-    PromptPlan,
-    VerificationRequirements,
-    HandoffContract,
-    flow_spec_from_dict,
-    station_spec_from_dict,
+from swarm.runtime.engines.claude.router import (
+    check_microloop_termination,
+    route_from_routing_config,
+    route_step_stub,
 )
-from swarm.spec.loader import (
-    load_station,
-    load_flow,
-    load_fragment,
-    load_fragments,
-    list_stations,
-    list_flows,
-    list_fragments,
-    validate_specs,
-    get_spec_root,
-)
+from swarm.runtime.types import RoutingDecision, RoutingSignal
 from swarm.spec.compiler import (
     SpecCompiler,
-    compile_prompt,
-    render_template,
     build_system_append,
     build_system_append_v2,
     build_user_prompt,
     extract_flow_key,
     merge_verification_requirements,
+    render_template,
     resolve_handoff_contract,
 )
-from swarm.runtime.engines.claude.router import (
-    route_from_routing_config,
-    route_step_stub,
-    check_microloop_termination,
-    ROUTER_PROMPT_TEMPLATE,
+from swarm.spec.loader import (
+    list_flows,
+    list_fragments,
+    list_stations,
+    load_flow,
+    load_fragment,
+    load_fragments,
+    load_station,
+    validate_specs,
 )
-from swarm.runtime.types import RoutingDecision, RoutingSignal
-
+from swarm.spec.types import (
+    FlowStep,
+    HandoffContract,
+    PromptPlan,
+    RoutingConfig,
+    RoutingKind,
+    StationCategory,
+    VerificationRequirements,
+    flow_spec_from_dict,
+    station_spec_from_dict,
+)
 
 # =============================================================================
 # Fixtures
@@ -270,7 +254,9 @@ def temp_spec_repo(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def populated_spec_repo(temp_spec_repo: Path, sample_station_dict: Dict, sample_flow_dict: Dict) -> Path:
+def populated_spec_repo(
+    temp_spec_repo: Path, sample_station_dict: Dict, sample_flow_dict: Dict
+) -> Path:
     """Create a temp spec repo with sample specs."""
     import yaml
 
@@ -296,6 +282,7 @@ def populated_spec_repo(temp_spec_repo: Path, sample_station_dict: Dict, sample_
 @pytest.fixture
 def mock_context_pack():
     """Create a mock ContextPack for testing."""
+
     @dataclass
     class MockEnvelope:
         step_id: str
@@ -347,7 +334,6 @@ class TestSpecManagerLoadStation:
 
     def test_load_station_invalid_yaml(self, temp_spec_repo: Path):
         """Test loading invalid YAML raises ValueError."""
-        import yaml
 
         spec_dir = temp_spec_repo / "swarm" / "spec" / "stations"
         bad_station = spec_dir / "bad-station.yaml"
@@ -489,8 +475,9 @@ class TestSpecCompilerSimpleFlow:
         assert plan.flow_id == "test-flow"
         # Model is a tier alias (haiku, sonnet, opus) or full model ID
         # The SDK accepts tier aliases and resolves them to full model IDs
-        assert plan.model in ("haiku", "sonnet", "opus") or plan.model.startswith("claude-"), \
+        assert plan.model in ("haiku", "sonnet", "opus") or plan.model.startswith("claude-"), (
             f"Expected tier alias or model ID, got: {plan.model}"
+        )
         assert len(plan.prompt_hash) == 16  # Truncated SHA256
 
     def test_compile_with_context_pack(self, populated_spec_repo: Path, mock_context_pack):
@@ -1282,7 +1269,9 @@ class TestSmartRoutingWithExplanations:
             loop_success_values=("VERIFIED",),
             max_iterations=3,
         )
-        signal = smart_route(config, {"status": "UNVERIFIED", "can_further_iteration_help": True}, iteration_count=1)
+        signal = smart_route(
+            config, {"status": "UNVERIFIED", "can_further_iteration_help": True}, iteration_count=1
+        )
 
         assert signal.decision == RoutingDecision.LOOP
         assert signal.next_step_id == "author"
@@ -1294,7 +1283,6 @@ class TestSmartRoutingWithExplanations:
     def test_smart_route_branch(self):
         """Test smart_route produces explanation for branch routing."""
         from swarm.runtime.engines.claude.router import smart_route
-        from swarm.runtime.types import DecisionType
 
         config = RoutingConfig(
             kind=RoutingKind.BRANCH,
@@ -1346,11 +1334,15 @@ class TestRoutingExplanationSerialization:
     def test_routing_explanation_round_trip(self):
         """Test RoutingExplanation survives serialization."""
         from swarm.runtime.types import (
-            routing_explanation_to_dict, routing_explanation_from_dict,
-            RoutingExplanation, DecisionType, EdgeOption, Elimination,
-            MicroloopContext, DecisionMetrics,
+            DecisionMetrics,
+            DecisionType,
+            EdgeOption,
+            Elimination,
+            MicroloopContext,
+            RoutingExplanation,
+            routing_explanation_from_dict,
+            routing_explanation_to_dict,
         )
-        from datetime import datetime, timezone
 
         original = RoutingExplanation(
             decision_type=DecisionType.DETERMINISTIC,
@@ -1366,7 +1358,9 @@ class TestRoutingExplanationSerialization:
                 Elimination(edge_id="e2", reason_code="condition_false", detail="Status mismatch"),
             ],
             microloop_context=MicroloopContext(
-                iteration=2, max_iterations=5, loop_target="author",
+                iteration=2,
+                max_iterations=5,
+                loop_target="author",
             ),
             metrics=DecisionMetrics(total_time_ms=10, edges_total=2, edges_eliminated=1),
         )
@@ -1387,11 +1381,15 @@ class TestRoutingExplanationSerialization:
 
     def test_routing_signal_with_explanation_round_trip(self):
         """Test RoutingSignal with explanation survives serialization."""
-        from swarm.runtime.types import (
-            routing_signal_to_dict, routing_signal_from_dict,
-            RoutingSignal, RoutingDecision, RoutingExplanation, DecisionType,
-        )
         from datetime import datetime, timezone
+
+        from swarm.runtime.types import (
+            DecisionType,
+            RoutingDecision,
+            RoutingExplanation,
+            routing_signal_from_dict,
+            routing_signal_to_dict,
+        )
 
         explanation = RoutingExplanation(
             decision_type=DecisionType.LLM_TIEBREAKER,
@@ -1424,12 +1422,16 @@ class TestHandoffEnvelopeWithAudit:
 
     def test_handoff_envelope_with_routing_audit(self):
         """Test HandoffEnvelope serialization includes routing audit."""
-        from swarm.runtime.types import (
-            HandoffEnvelope, RoutingSignal, RoutingDecision,
-            RoutingExplanation, DecisionType,
-            handoff_envelope_to_dict, handoff_envelope_from_dict,
-        )
         from datetime import datetime, timezone
+
+        from swarm.runtime.types import (
+            DecisionType,
+            HandoffEnvelope,
+            RoutingDecision,
+            RoutingExplanation,
+            handoff_envelope_from_dict,
+            handoff_envelope_to_dict,
+        )
 
         explanation = RoutingExplanation(
             decision_type=DecisionType.DETERMINISTIC,

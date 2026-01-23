@@ -9,7 +9,6 @@ is detected.
 import inspect
 
 import pytest
-
 from swarm.tools import vendor_agent_sdk
 
 
@@ -45,9 +44,9 @@ def test_sdk_has_required_symbols(sdk_available):
 
     sdk = get_sdk_module()
     assert hasattr(sdk, "query"), "SDK missing required export: query"
-    assert (
-        hasattr(sdk, "ClaudeAgentOptions") or hasattr(sdk, "ClaudeCodeOptions")
-    ), "SDK missing options class (ClaudeAgentOptions/ClaudeCodeOptions)"
+    assert hasattr(sdk, "ClaudeAgentOptions") or hasattr(sdk, "ClaudeCodeOptions"), (
+        "SDK missing options class (ClaudeAgentOptions/ClaudeCodeOptions)"
+    )
 
 
 def test_sdk_options_accept_disallowed_tools(sdk_available):
@@ -80,9 +79,7 @@ def test_sdk_options_accept_disallowed_tools(sdk_available):
         )
         assert options is not None
     except Exception as e:
-        pytest.fail(
-            f"SDK accepts disallowed_tools but options creation failed: {e}"
-        )
+        pytest.fail(f"SDK accepts disallowed_tools but options creation failed: {e}")
 
 
 def test_all_standard_tools_covers_sdk_tools(sdk_available):

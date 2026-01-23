@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
@@ -692,9 +692,7 @@ class DetourMatcher:
             Confidence level: "HIGH", "MEDIUM", or "LOW".
         """
         # Count how many patterns match
-        match_count = sum(
-            1 for p in signature._compiled_patterns if p.search(search_text)
-        )
+        match_count = sum(1 for p in signature._compiled_patterns if p.search(search_text))
 
         # Multiple pattern matches = high confidence
         if match_count >= 2:
@@ -841,9 +839,7 @@ class DetourMatcher:
                     Otherwise, reset all attempts.
         """
         if step_id:
-            keys_to_remove = [
-                k for k in self._attempt_tracker if k.startswith(f"{step_id}:")
-            ]
+            keys_to_remove = [k for k in self._attempt_tracker if k.startswith(f"{step_id}:")]
             for key in keys_to_remove:
                 del self._attempt_tracker[key]
             logger.debug("Reset attempts for step: %s", step_id)
@@ -859,9 +855,7 @@ class DetourMatcher:
         """
         return {
             "total_tracked": len(self._attempt_tracker),
-            "attempts": {
-                k: v.to_dict() for k, v in self._attempt_tracker.items()
-            },
+            "attempts": {k: v.to_dict() for k, v in self._attempt_tracker.items()},
         }
 
 

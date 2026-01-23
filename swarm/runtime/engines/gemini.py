@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import logging
-import shlex
 import shutil
 import subprocess
 from datetime import datetime, timezone
@@ -43,7 +42,6 @@ from swarm.runtime.types import RunEvent
 from swarm.runtime.types.tool_call import (
     NormalizedToolCall,
     from_gemini_events,
-    truncate_output,
 )
 
 from .base import StepEngine
@@ -513,7 +511,9 @@ class GeminiStepEngine(StepEngine):
                                 # Create a tool call with just the result info
                                 tool_call = from_gemini_events(
                                     {
-                                        "name": event_data.get("tool") or event_data.get("name") or "unknown",
+                                        "name": event_data.get("tool")
+                                        or event_data.get("name")
+                                        or "unknown",
                                         "args": {},
                                     },
                                     event_data,

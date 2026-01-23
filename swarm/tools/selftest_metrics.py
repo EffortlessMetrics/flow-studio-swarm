@@ -92,31 +92,39 @@ from typing import Optional
 # Prometheus client is optional (graceful fallback if not available)
 try:
     from prometheus_client import Counter, Gauge, Histogram, start_http_server
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
+
     # Define no-op classes for when prometheus_client is not available
     class Counter:
         def __init__(self, *args, **kwargs):
             pass
+
         def labels(self, *args, **kwargs):
             return self
+
         def inc(self, *args, **kwargs):
             pass
 
     class Histogram:
         def __init__(self, *args, **kwargs):
             pass
+
         def labels(self, *args, **kwargs):
             return self
+
         def observe(self, *args, **kwargs):
             pass
 
     class Gauge:
         def __init__(self, *args, **kwargs):
             pass
+
         def labels(self, *args, **kwargs):
             return self
+
         def set(self, *args, **kwargs):
             pass
 
@@ -347,7 +355,9 @@ class SelftestMetrics:
         if self.backend == "prometheus" and PROMETHEUS_AVAILABLE:
             self.prom_step_duration.labels(**duration_labels).observe(duration_seconds)
 
-        self._emit_local("selftest_step_duration_seconds", "histogram", duration_seconds, duration_labels)
+        self._emit_local(
+            "selftest_step_duration_seconds", "histogram", duration_seconds, duration_labels
+        )
 
         # Failure counter
         if not passed:
@@ -426,7 +436,9 @@ class SelftestMetrics:
         if self.backend == "prometheus" and PROMETHEUS_AVAILABLE:
             self.prom_run_duration.labels(**duration_labels).observe(duration_seconds)
 
-        self._emit_local("selftest_run_duration_seconds", "histogram", duration_seconds, duration_labels)
+        self._emit_local(
+            "selftest_run_duration_seconds", "histogram", duration_seconds, duration_labels
+        )
 
         # Governance pass rate gauge
         governance_labels = {"environment": self.environment}
@@ -434,7 +446,9 @@ class SelftestMetrics:
         if self.backend == "prometheus" and PROMETHEUS_AVAILABLE:
             self.prom_governance_pass_rate.labels(**governance_labels).set(governance_pass_rate)
 
-        self._emit_local("selftest_governance_pass_rate", "gauge", governance_pass_rate, governance_labels)
+        self._emit_local(
+            "selftest_governance_pass_rate", "gauge", governance_pass_rate, governance_labels
+        )
 
         # Overall status gauge
         status_map = {"HEALTHY": 1.0, "DEGRADED": 0.5, "BROKEN": 0.0}
@@ -456,4 +470,6 @@ class SelftestMetrics:
         if self.backend == "prometheus" and PROMETHEUS_AVAILABLE:
             self.prom_last_run_timestamp.labels(**timestamp_labels).set(current_timestamp)
 
-        self._emit_local("selftest_last_run_timestamp", "gauge", current_timestamp, timestamp_labels)
+        self._emit_local(
+            "selftest_last_run_timestamp", "gauge", current_timestamp, timestamp_labels
+        )

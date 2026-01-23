@@ -70,22 +70,24 @@ route_step_unified = route_step
 #   from .routing import create_routing_signal, build_routing_context
 # continue to work unchanged.
 from swarm.runtime.stepwise._routing_legacy import (
-    # Routing signal creation
-    create_routing_signal,
-    route_step as route_step_legacy,  # Renamed to avoid collision
-    build_routing_context,
-    ReceiptReader,
     # Elephant Protocol: Stall detection types
     ProgressDelta,
     ProgressEvidence,
+    ReceiptReader,
     StallAnalysis,
+    build_routing_context,
+    compute_error_signature,
+    # Routing signal creation
+    create_routing_signal,
+    create_stall_routing_signal,
     # Elephant Protocol: Stall detection functions
     detect_stall,
-    record_progress_evidence,
-    create_stall_routing_signal,
-    compute_error_signature,
     # Candidate-set pattern
     generate_routing_candidates,
+    record_progress_evidence,
+)
+from swarm.runtime.stepwise._routing_legacy import (
+    route_step as route_step_legacy,  # Renamed to avoid collision
 )
 
 __all__ = [

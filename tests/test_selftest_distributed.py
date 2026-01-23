@@ -143,14 +143,16 @@ class TestDistributedCLI:
             elif start_idx is not None and line.strip() == "}":
                 # Try to parse from start_idx to here
                 try:
-                    json_str = "\n".join(lines[start_idx:i+1])
+                    json_str = "\n".join(lines[start_idx : i + 1])
                     json_report = json.loads(json_str)
                     if "version" in json_report:
                         break  # Found the main report
                 except json.JSONDecodeError:
                     pass
                 start_idx = None
-        assert json_report is not None, f"Could not find JSON report in output. Output length: {len(output)}"
+        assert json_report is not None, (
+            f"Could not find JSON report in output. Output length: {len(output)}"
+        )
         # Sequential mode should not have execution_mode or should have execution_mode != "distributed"
         assert json_report.get("execution_mode") != "distributed"
 
@@ -199,9 +201,7 @@ class TestDistributedExecution:
         # If wave 0 failed, we should have limited waves
         if data["waves"][0]["all_passed"] is False:
             # Should only have wave 0
-            assert len(data["waves"]) == 1, (
-                "KERNEL failure should stop execution after wave 0"
-            )
+            assert len(data["waves"]) == 1, "KERNEL failure should stop execution after wave 0"
 
 
 class TestPerformance:

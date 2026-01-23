@@ -71,9 +71,7 @@ class ValidationResult:
     ):
         """Add a validation error."""
         self.errors.append(
-            ValidationError(
-                error_type, location, problem, fix_action, line_number, file_path
-            )
+            ValidationError(error_type, location, problem, fix_action, line_number, file_path)
         )
 
     def add_warning(
@@ -87,9 +85,7 @@ class ValidationResult:
     ):
         """Add a validation warning (design guideline violation, not an error)."""
         self.warnings.append(
-            ValidationError(
-                error_type, location, problem, fix_action, line_number, file_path
-            )
+            ValidationError(error_type, location, problem, fix_action, line_number, file_path)
         )
 
     def extend(self, other: "ValidationResult"):

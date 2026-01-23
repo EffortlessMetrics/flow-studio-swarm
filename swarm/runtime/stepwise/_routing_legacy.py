@@ -238,9 +238,7 @@ def detect_stall(
             stall_indicators.append("same_error_repeating")
 
     # Indicator 3: Zero net progress (no lines added/removed)
-    zero_net_progress = all(
-        e.delta.lines_added == 0 and e.delta.lines_removed == 0 for e in recent
-    )
+    zero_net_progress = all(e.delta.lines_added == 0 and e.delta.lines_removed == 0 for e in recent)
     if zero_net_progress:
         stall_indicators.append("zero_line_changes")
 
@@ -291,8 +289,7 @@ def detect_stall(
         recommendation = "inject_clarifier"
 
     reason = (
-        f"Stall detected after {max_stall_iterations} iterations: "
-        f"{', '.join(stall_indicators)}"
+        f"Stall detected after {max_stall_iterations} iterations: {', '.join(stall_indicators)}"
     )
 
     analysis = StallAnalysis(
@@ -672,14 +669,16 @@ def _handle_microloop_routing(
             needs_human=False,
             routing_source="microloop_routing",
             chosen_candidate_id=candidate_id,
-            routing_candidates=[RoutingCandidate(
-                candidate_id=candidate_id,
-                action=decision.value if hasattr(decision, 'value') else str(decision),
-                target_node=next_step_id,
-                reason=reason,
-                priority=60,
-                source="microloop_state",
-            )],
+            routing_candidates=[
+                RoutingCandidate(
+                    candidate_id=candidate_id,
+                    action=decision.value if hasattr(decision, "value") else str(decision),
+                    target_node=next_step_id,
+                    reason=reason,
+                    priority=60,
+                    source="microloop_state",
+                )
+            ],
         )
 
     # Check loop condition from receipt
@@ -709,14 +708,16 @@ def _handle_microloop_routing(
                 needs_human=False,
                 routing_source="microloop_routing",
                 chosen_candidate_id=candidate_id,
-                routing_candidates=[RoutingCandidate(
-                    candidate_id=candidate_id,
-                    action=decision.value if hasattr(decision, 'value') else str(decision),
-                    target_node=next_step_id,
-                    reason=reason,
-                    priority=60,
-                    source="microloop_state",
-                )],
+                routing_candidates=[
+                    RoutingCandidate(
+                        candidate_id=candidate_id,
+                        action=decision.value if hasattr(decision, "value") else str(decision),
+                        target_node=next_step_id,
+                        reason=reason,
+                        priority=60,
+                        source="microloop_state",
+                    )
+                ],
             )
 
         # Check can_further_iteration_help field as fallback
@@ -740,14 +741,16 @@ def _handle_microloop_routing(
                 needs_human=False,
                 routing_source="microloop_routing",
                 chosen_candidate_id=candidate_id,
-                routing_candidates=[RoutingCandidate(
-                    candidate_id=candidate_id,
-                    action=decision.value if hasattr(decision, 'value') else str(decision),
-                    target_node=next_step_id,
-                    reason=reason,
-                    priority=60,
-                    source="microloop_state",
-                )],
+                routing_candidates=[
+                    RoutingCandidate(
+                        candidate_id=candidate_id,
+                        action=decision.value if hasattr(decision, "value") else str(decision),
+                        target_node=next_step_id,
+                        reason=reason,
+                        priority=60,
+                        source="microloop_state",
+                    )
+                ],
             )
 
     # Loop back to target
@@ -768,14 +771,16 @@ def _handle_microloop_routing(
         needs_human=False,
         routing_source="microloop_routing",
         chosen_candidate_id=candidate_id,
-        routing_candidates=[RoutingCandidate(
-            candidate_id=candidate_id,
-            action=decision.value if hasattr(decision, 'value') else str(decision),
-            target_node=next_step_id,
-            reason=reason,
-            priority=60,
-            source="microloop_state",
-        )],
+        routing_candidates=[
+            RoutingCandidate(
+                candidate_id=candidate_id,
+                action=decision.value if hasattr(decision, "value") else str(decision),
+                target_node=next_step_id,
+                reason=reason,
+                priority=60,
+                source="microloop_state",
+            )
+        ],
     )
 
 
@@ -825,14 +830,16 @@ def _create_routing_signal_from_spec(
             needs_human=needs_human,
             routing_source="spec_routing",
             chosen_candidate_id=candidate_id,
-            routing_candidates=[RoutingCandidate(
-                candidate_id=candidate_id,
-                action="terminate",
-                target_node=None,
-                reason="terminal_step",
-                priority=70,
-                source="flow_spec",
-            )],
+            routing_candidates=[
+                RoutingCandidate(
+                    candidate_id=candidate_id,
+                    action="terminate",
+                    target_node=None,
+                    reason="terminal_step",
+                    priority=70,
+                    source="flow_spec",
+                )
+            ],
         )
 
     elif kind == "linear":
@@ -1227,10 +1234,7 @@ def _count_critical_discrepancies(forensic_verdict: Dict[str, Any]) -> int:
         Number of critical discrepancies.
     """
     discrepancies = forensic_verdict.get("discrepancies", [])
-    return sum(
-        1 for d in discrepancies
-        if isinstance(d, dict) and d.get("severity") == "critical"
-    )
+    return sum(1 for d in discrepancies if isinstance(d, dict) and d.get("severity") == "critical")
 
 
 def _build_forensic_evidence_pointers(forensic_verdict: Dict[str, Any]) -> List[str]:
@@ -1378,7 +1382,11 @@ def generate_routing_candidates(
         # Check if under max iterations
         under_max = current_iter < routing.max_iterations
 
-        if under_max and can_iterate and status in ("PARTIAL", "partial", "UNVERIFIED", "unverified"):
+        if (
+            under_max
+            and can_iterate
+            and status in ("PARTIAL", "partial", "UNVERIFIED", "unverified")
+        ):
             is_default = True
             candidates.append(
                 RoutingCandidate(
@@ -1497,7 +1505,9 @@ def generate_routing_candidates(
                     # Stronger demotion for REJECT verdict (40 points) vs VERIFY (30 points)
                     demotion = 40 if forensic_verdict.get("recommendation") == "REJECT" else 30
                     candidate.priority = max(0, candidate.priority - demotion)
-                    candidate.evidence_pointers = (candidate.evidence_pointers or []) + forensic_evidence
+                    candidate.evidence_pointers = (
+                        candidate.evidence_pointers or []
+                    ) + forensic_evidence
                     logger.debug(
                         "Forensic shaping: demoted %s by %d points (new priority=%d)",
                         candidate.candidate_id,
@@ -1508,7 +1518,9 @@ def generate_routing_candidates(
                 elif candidate.action == "repeat":
                     # Promote REPEAT candidates: give the step another chance to fix issues
                     candidate.priority += 20
-                    candidate.evidence_pointers = (candidate.evidence_pointers or []) + forensic_evidence
+                    candidate.evidence_pointers = (
+                        candidate.evidence_pointers or []
+                    ) + forensic_evidence
                     logger.debug(
                         "Forensic shaping: promoted %s by 20 points (new priority=%d)",
                         candidate.candidate_id,
@@ -1518,7 +1530,9 @@ def generate_routing_candidates(
                 elif candidate.action == "escalate":
                     # Promote ESCALATE candidates: human review is valuable when evidence is suspect
                     candidate.priority += 30
-                    candidate.evidence_pointers = (candidate.evidence_pointers or []) + forensic_evidence
+                    candidate.evidence_pointers = (
+                        candidate.evidence_pointers or []
+                    ) + forensic_evidence
                     logger.debug(
                         "Forensic shaping: promoted %s by 30 points (new priority=%d)",
                         candidate.candidate_id,

@@ -7,12 +7,12 @@ Serves both the API and an embedded HTML UI for interactive graph exploration.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
 from flask import Flask, Response, jsonify
+
+import yaml
 
 from .config import FlowStudioConfig, get_default_config
 
@@ -63,12 +63,14 @@ def load_flows(config: FlowStudioConfig) -> Dict[str, Any]:
             for a in raw.get("agents") or []:
                 if isinstance(a, str):
                     agents_list.append(a.strip())
-            steps.append({
-                "id": sid,
-                "title": stitle,
-                "role": role,
-                "agents": agents_list,
-            })
+            steps.append(
+                {
+                    "id": sid,
+                    "title": stitle,
+                    "role": role,
+                    "agents": agents_list,
+                }
+            )
 
         flows[key] = {
             "key": key,
@@ -134,31 +136,35 @@ def build_graph(flow_key: str, flows: Dict[str, Any], agents: Dict[str, Any]) ->
     # Step nodes
     for idx, step in enumerate(flow.get("steps", [])):
         nid = f"step:{flow_key}:{step['id']}"
-        nodes.append({
-            "data": {
-                "id": nid,
-                "label": step.get("title", step["id"]),
-                "type": "step",
-                "flow": flow_key,
-                "step_id": step["id"],
-                "order": idx,
-                "role": step.get("role", ""),
+        nodes.append(
+            {
+                "data": {
+                    "id": nid,
+                    "label": step.get("title", step["id"]),
+                    "type": "step",
+                    "flow": flow_key,
+                    "step_id": step["id"],
+                    "order": idx,
+                    "role": step.get("role", ""),
+                }
             }
-        })
+        )
 
     # Step ordering edges
     steps = flow.get("steps", [])
     for i in range(len(steps) - 1):
         a = steps[i]
         b = steps[i + 1]
-        edges.append({
-            "data": {
-                "id": f"edge:step:{a['id']}->{b['id']}",
-                "source": f"step:{flow_key}:{a['id']}",
-                "target": f"step:{flow_key}:{b['id']}",
-                "type": "step-sequence",
+        edges.append(
+            {
+                "data": {
+                    "id": f"edge:step:{a['id']}->{b['id']}",
+                    "source": f"step:{flow_key}:{a['id']}",
+                    "target": f"step:{flow_key}:{b['id']}",
+                    "type": "step-sequence",
+                }
             }
-        })
+        )
 
     # Agent nodes + step->agent edges
     seen_agents: Dict[str, bool] = {}
@@ -194,14 +200,16 @@ def build_graph(flow_key: str, flows: Dict[str, Any], agents: Dict[str, Any]) ->
                     }
                     nodes.append({"data": node_data})
 
-            edges.append({
-                "data": {
-                    "id": f"edge:step:{step['id']}->agent:{agent_key}",
-                    "source": step_node_id,
-                    "target": f"agent:{agent_key}",
-                    "type": "step-agent",
+            edges.append(
+                {
+                    "data": {
+                        "id": f"edge:step:{step['id']}->agent:{agent_key}",
+                        "source": step_node_id,
+                        "target": f"agent:{agent_key}",
+                        "type": "step-agent",
+                    }
                 }
-            })
+            )
 
     return {"nodes": nodes, "edges": edges}
 
@@ -409,20 +417,24 @@ def create_app(config: Optional[FlowStudioConfig] = None) -> Flask:
     def api_reload() -> Response:
         """Reload flows and agents from disk."""
         reload_data()
-        return jsonify({
-            "status": "ok",
-            "flows": len(_cache["flows"]),
-            "agents": len(_cache["agents"]),
-        })
+        return jsonify(
+            {
+                "status": "ok",
+                "flows": len(_cache["flows"]),
+                "agents": len(_cache["agents"]),
+            }
+        )
 
     @app.route("/health")
     def health() -> Response:
         """Health check endpoint."""
-        return jsonify({
-            "status": "ok",
-            "flows": len(_cache["flows"]),
-            "agents": len(_cache["agents"]),
-        })
+        return jsonify(
+            {
+                "status": "ok",
+                "flows": len(_cache["flows"]),
+                "agents": len(_cache["agents"]),
+            }
+        )
 
     return app
 

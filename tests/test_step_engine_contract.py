@@ -29,9 +29,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict
 
 import pytest
 
@@ -47,7 +45,6 @@ from swarm.runtime.engines import (
     StepResult,
 )
 from swarm.runtime.types import RunSpec
-
 
 # -----------------------------------------------------------------------------
 # Constants for Contract Limits
@@ -236,8 +233,7 @@ class TestStepResultContract:
         result, _ = gemini_engine.run_step(sample_step_context)
 
         assert result.step_id == sample_step_context.step_id, (
-            f"step_id mismatch: expected '{sample_step_context.step_id}', "
-            f"got '{result.step_id}'"
+            f"step_id mismatch: expected '{sample_step_context.step_id}', got '{result.step_id}'"
         )
 
     def test_step_id_matches_context_claude(
@@ -249,8 +245,7 @@ class TestStepResultContract:
         result, _ = claude_engine.run_step(sample_step_context)
 
         assert result.step_id == sample_step_context.step_id, (
-            f"step_id mismatch: expected '{sample_step_context.step_id}', "
-            f"got '{result.step_id}'"
+            f"step_id mismatch: expected '{sample_step_context.step_id}', got '{result.step_id}'"
         )
 
     def test_dataclass_construction_validates_duration(self) -> None:
@@ -308,9 +303,7 @@ class TestStepContextContract:
         """
         run_base = sample_step_context.run_base
 
-        assert isinstance(run_base, Path), (
-            f"run_base must be a Path, got {type(run_base).__name__}"
-        )
+        assert isinstance(run_base, Path), f"run_base must be a Path, got {type(run_base).__name__}"
 
     def test_run_base_path_structure(
         self,
@@ -336,8 +329,7 @@ class TestStepContextContract:
 
         # Verify grandparent is 'runs'
         assert run_base.parent.parent.name == "runs", (
-            f"run_base grandparent should be 'runs', "
-            f"got '{run_base.parent.parent.name}'"
+            f"run_base grandparent should be 'runs', got '{run_base.parent.parent.name}'"
         )
 
     def test_run_base_is_relative_to_repo_root(
@@ -355,8 +347,7 @@ class TestStepContextContract:
             )
         except ValueError:
             pytest.fail(
-                f"run_base {run_base} is not relative to repo_root "
-                f"{sample_step_context.repo_root}"
+                f"run_base {run_base} is not relative to repo_root {sample_step_context.repo_root}"
             )
 
     def test_context_preserves_step_metadata(
@@ -405,8 +396,7 @@ class TestEngineTranscriptContract:
 
         transcript_files = list(llm_dir.glob("*-claude.jsonl"))
         assert len(transcript_files) >= 1, (
-            f"Expected at least one transcript file in {llm_dir}, "
-            f"found: {list(llm_dir.iterdir())}"
+            f"Expected at least one transcript file in {llm_dir}, found: {list(llm_dir.iterdir())}"
         )
 
         # Verify each line is valid JSON
@@ -570,8 +560,7 @@ class TestEngineReceiptContract:
 
             missing_fields = REQUIRED_RECEIPT_FIELDS - set(receipt.keys())
             assert not missing_fields, (
-                f"Receipt in {receipt_file.name} missing required fields: "
-                f"{missing_fields}"
+                f"Receipt in {receipt_file.name} missing required fields: {missing_fields}"
             )
 
     def test_receipt_engine_field_matches_claude(
@@ -598,8 +587,7 @@ class TestEngineReceiptContract:
                 receipt = json.load(f)
 
             assert receipt["engine"] == claude_engine.engine_id, (
-                f"Receipt engine should be '{claude_engine.engine_id}', "
-                f"got '{receipt['engine']}'"
+                f"Receipt engine should be '{claude_engine.engine_id}', got '{receipt['engine']}'"
             )
 
     def test_receipt_step_id_matches_context_claude(
@@ -722,8 +710,7 @@ class TestEngineReceiptContract:
                 receipt = json.load(f)
 
             assert receipt["status"] in VALID_STATUSES, (
-                f"Receipt status should be one of {VALID_STATUSES}, "
-                f"got '{receipt['status']}'"
+                f"Receipt status should be one of {VALID_STATUSES}, got '{receipt['status']}'"
             )
 
 
@@ -744,8 +731,7 @@ class TestEngineIdContract:
     ) -> None:
         """GeminiStepEngine has engine_id 'gemini-step'."""
         assert gemini_engine.engine_id == "gemini-step", (
-            f"GeminiStepEngine.engine_id should be 'gemini-step', "
-            f"got '{gemini_engine.engine_id}'"
+            f"GeminiStepEngine.engine_id should be 'gemini-step', got '{gemini_engine.engine_id}'"
         )
 
     def test_claude_engine_id(
@@ -754,8 +740,7 @@ class TestEngineIdContract:
     ) -> None:
         """ClaudeStepEngine has engine_id 'claude-step'."""
         assert claude_engine.engine_id == "claude-step", (
-            f"ClaudeStepEngine.engine_id should be 'claude-step', "
-            f"got '{claude_engine.engine_id}'"
+            f"ClaudeStepEngine.engine_id should be 'claude-step', got '{claude_engine.engine_id}'"
         )
 
     def test_engine_ids_are_different(
@@ -907,18 +892,14 @@ class TestRunStepReturnContract:
         assert isinstance(returned, tuple), (
             f"run_step should return tuple, got {type(returned).__name__}"
         )
-        assert len(returned) == 2, (
-            f"run_step tuple should have 2 elements, got {len(returned)}"
-        )
+        assert len(returned) == 2, f"run_step tuple should have 2 elements, got {len(returned)}"
 
         result, events = returned
         assert isinstance(result, StepResult), (
             f"First element should be StepResult, got {type(result).__name__}"
         )
         # Events should be iterable (list in our case)
-        assert hasattr(events, "__iter__"), (
-            "Second element should be iterable"
-        )
+        assert hasattr(events, "__iter__"), "Second element should be iterable"
 
     def test_run_step_returns_tuple_claude(
         self,
@@ -934,17 +915,13 @@ class TestRunStepReturnContract:
         assert isinstance(returned, tuple), (
             f"run_step should return tuple, got {type(returned).__name__}"
         )
-        assert len(returned) == 2, (
-            f"run_step tuple should have 2 elements, got {len(returned)}"
-        )
+        assert len(returned) == 2, f"run_step tuple should have 2 elements, got {len(returned)}"
 
         result, events = returned
         assert isinstance(result, StepResult), (
             f"First element should be StepResult, got {type(result).__name__}"
         )
-        assert hasattr(events, "__iter__"), (
-            "Second element should be iterable"
-        )
+        assert hasattr(events, "__iter__"), "Second element should be iterable"
 
 
 # -----------------------------------------------------------------------------

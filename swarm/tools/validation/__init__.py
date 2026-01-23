@@ -14,7 +14,7 @@ For individual validators, import from swarm.tools.validation.validators.
 
 from .cli import main
 from .git_helpers import get_modified_files, should_check_file
-from .registry import parse_agents_registry, parse_config_files, _parse_raw_yaml
+from .registry import _parse_raw_yaml, parse_agents_registry, parse_config_files
 from .runner import ValidatorRunner, run_validation
 
 __all__ = [

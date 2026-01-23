@@ -99,9 +99,7 @@ class PackResolver:
 
         return ResolvedConfig(config=config, provenance=provenance)
 
-    def _resolve_engine(
-        self, engine_id: str
-    ) -> Tuple[Dict[str, Any], Dict[str, Provenance]]:
+    def _resolve_engine(self, engine_id: str) -> Tuple[Dict[str, Any], Dict[str, Provenance]]:
         """Resolve engine configuration."""
         result: Dict[str, Any] = {}
         prov: Dict[str, Provenance] = {}
@@ -111,14 +109,10 @@ class PackResolver:
                 cli_key=f"engines.{engine_id}.{field}",
                 env_key=f"SWARM_{engine_id.upper()}_{field.upper()}",
                 repo_getter=lambda p, f=field, e=engine_id: (
-                    getattr(p.engines.get(e, EngineConfig()), f, None)
-                    if p
-                    else None
+                    getattr(p.engines.get(e, EngineConfig()), f, None) if p else None
                 ),
                 baseline_getter=lambda p, f=field, e=engine_id: (
-                    getattr(p.engines.get(e, EngineConfig()), f, None)
-                    if p
-                    else None
+                    getattr(p.engines.get(e, EngineConfig()), f, None) if p else None
                 ),
             )
             if value is not None:
@@ -142,9 +136,7 @@ class PackResolver:
                 cli_key=f"features.{field}",
                 env_key=f"SWARM_FEATURE_{field.upper()}",
                 repo_getter=lambda p, f=field: (getattr(p.features, f, None) if p else None),
-                baseline_getter=lambda p, f=field: (
-                    getattr(p.features, f, None) if p else None
-                ),
+                baseline_getter=lambda p, f=field: (getattr(p.features, f, None) if p else None),
             )
             if value is not None:
                 result[field] = value
@@ -166,12 +158,8 @@ class PackResolver:
             value, source, path = self._resolve_value(
                 cli_key=f"runtime.{field}",
                 env_key=f"SWARM_{field.upper()}",
-                repo_getter=lambda p, f=field: (
-                    getattr(p.runtime, f, None) if p else None
-                ),
-                baseline_getter=lambda p, f=field: (
-                    getattr(p.runtime, f, None) if p else None
-                ),
+                repo_getter=lambda p, f=field: (getattr(p.runtime, f, None) if p else None),
+                baseline_getter=lambda p, f=field: (getattr(p.runtime, f, None) if p else None),
             )
             if value is not None:
                 result[field] = value

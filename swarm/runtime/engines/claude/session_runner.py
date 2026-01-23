@@ -39,7 +39,6 @@ from swarm.runtime.path_helpers import (
     ensure_llm_dir,
     ensure_receipts_dir,
 )
-from swarm.runtime.receipt_io import capture_git_info
 from swarm.runtime.path_helpers import (
     handoff_envelope_path as make_handoff_envelope_path,
 )
@@ -49,6 +48,7 @@ from swarm.runtime.path_helpers import (
 from swarm.runtime.path_helpers import (
     transcript_path as make_transcript_path,
 )
+from swarm.runtime.receipt_io import capture_git_info
 from swarm.runtime.routing_utils import parse_routing_decision
 from swarm.runtime.types import (
     RoutingSignal,

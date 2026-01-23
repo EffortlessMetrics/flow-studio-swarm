@@ -16,11 +16,10 @@ that aren't backed by code or tests.
 """
 
 import re
-from pathlib import Path
 from typing import Set
 
-from swarm.validator import ValidationResult
 from swarm.tools.validation.helpers import ROOT
+from swarm.validator import ValidationResult
 
 
 def validate_capability_registry() -> ValidationResult:
@@ -48,13 +47,14 @@ def validate_capability_registry() -> ValidationResult:
             "specs/capabilities.yaml",
             "capability registry not found (optional file)",
             "Create specs/capabilities.yaml to track capability claims with evidence",
-            file_path=str(registry_path)
+            file_path=str(registry_path),
         )
         return result
 
     # Parse capability registry (uses PyYAML, not SimpleYAMLParser which is for frontmatter)
     try:
         from swarm.utils.yaml_utils import load_yaml
+
         content = registry_path.read_text(encoding="utf-8")
         registry = load_yaml(content)
     except ImportError:
@@ -63,7 +63,7 @@ def validate_capability_registry() -> ValidationResult:
             "specs/capabilities.yaml",
             "PyYAML not installed; skipping capability registry validation",
             "Install PyYAML: pip install pyyaml",
-            file_path=str(registry_path)
+            file_path=str(registry_path),
         )
         return result
     except Exception as e:
@@ -72,7 +72,7 @@ def validate_capability_registry() -> ValidationResult:
             "specs/capabilities.yaml",
             f"failed to parse capability registry: {e}",
             "Fix YAML syntax in specs/capabilities.yaml",
-            file_path=str(registry_path)
+            file_path=str(registry_path),
         )
         return result
 
@@ -87,7 +87,7 @@ def validate_capability_registry() -> ValidationResult:
             "specs/capabilities.yaml",
             "'surfaces' must be a dict",
             "Fix structure: surfaces should map surface names to capability lists",
-            file_path=str(registry_path)
+            file_path=str(registry_path),
         )
         return result
 
@@ -113,7 +113,7 @@ def validate_capability_registry() -> ValidationResult:
                     f"specs/capabilities.yaml:{surface_key}",
                     "capability missing 'id' field",
                     "Add 'id' field to capability entry",
-                    file_path=str(registry_path)
+                    file_path=str(registry_path),
                 )
                 continue
 
@@ -133,7 +133,7 @@ def validate_capability_registry() -> ValidationResult:
                         f"specs/capabilities.yaml:{cap_id}",
                         f"capability '{cap_id}' is 'implemented' but has no test evidence",
                         "Add 'tests' evidence pointers or change status to 'supported'",
-                        file_path=str(registry_path)
+                        file_path=str(registry_path),
                     )
 
                 # Must have code evidence
@@ -144,7 +144,7 @@ def validate_capability_registry() -> ValidationResult:
                         f"specs/capabilities.yaml:{cap_id}",
                         f"capability '{cap_id}' is 'implemented' but has no code evidence",
                         "Add 'code' evidence pointers with path and symbol",
-                        file_path=str(registry_path)
+                        file_path=str(registry_path),
                     )
 
     # Check BDD @cap: tags reference capabilities that exist
@@ -159,14 +159,14 @@ def validate_capability_registry() -> ValidationResult:
                     tag_id = match.group(1)
                     if tag_id not in cap_ids:
                         # Find line number
-                        line_num = feature_content[:match.start()].count('\n') + 1
+                        line_num = feature_content[: match.start()].count("\n") + 1
                         result.add_error(
                             "CAPABILITY",
                             f"{feature_file.name}:line {line_num}",
                             f"@cap:{tag_id} references capability not in registry",
                             f"Add '{tag_id}' to specs/capabilities.yaml or fix tag",
                             line_number=line_num,
-                            file_path=str(feature_file)
+                            file_path=str(feature_file),
                         )
             except (OSError, UnicodeDecodeError):
                 pass  # Skip files that can't be read

@@ -105,9 +105,7 @@ class SelfTestDoctor:
             if result.returncode != 0:
                 results["service"]["python_syntax"] = "ERROR"
                 stderr = result.stderr.decode() if result.stderr else ""
-                results["recommendations"].append(
-                    f"Syntax error in selftest.py: {stderr[:100]}"
-                )
+                results["recommendations"].append(f"Syntax error in selftest.py: {stderr[:100]}")
             else:
                 results["service"]["python_syntax"] = "OK"
         except Exception as e:

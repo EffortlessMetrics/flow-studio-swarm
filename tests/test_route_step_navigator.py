@@ -42,11 +42,10 @@ if str(repo_root) not in sys.path:
 
 from swarm.runtime.stepwise.routing.driver import (
     RoutingOutcome,
-    route_step,
     _try_navigator,
+    route_step,
 )
 from swarm.runtime.types import RoutingDecision, RoutingMode, RoutingSignal
-
 
 # -----------------------------------------------------------------------------
 # Test Fixtures
@@ -312,9 +311,7 @@ class TestNavigatorSuccessPath:
         )
         mock_route_via_navigator.return_value = expected_outcome
 
-        orchestrator = MockNavigationOrchestrator(
-            chosen_candidate_id="candidate_advance_implement"
-        )
+        orchestrator = MockNavigationOrchestrator(chosen_candidate_id="candidate_advance_implement")
 
         result = route_step(
             step=mock_step,
@@ -522,9 +519,7 @@ class TestNavigatorErrorHandling:
         )
 
         # Patch route_via_navigator to raise
-        with patch(
-            "swarm.runtime.stepwise.routing.navigator.route_via_navigator"
-        ) as mock_route:
+        with patch("swarm.runtime.stepwise.routing.navigator.route_via_navigator") as mock_route:
             mock_route.side_effect = RuntimeError("Navigator failed")
 
             result = _try_navigator(
@@ -564,9 +559,7 @@ class TestNavigatorErrorHandling:
         When Navigator fails, the error should be logged with enough
         context to debug (exception type, step_id, run_id, flow_key).
         """
-        mock_route_via_navigator.side_effect = ValueError(
-            "Test navigation error"
-        )
+        mock_route_via_navigator.side_effect = ValueError("Test navigation error")
 
         orchestrator = MockNavigationOrchestrator()
 

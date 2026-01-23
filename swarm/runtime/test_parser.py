@@ -38,7 +38,6 @@ import re
 import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -49,8 +48,6 @@ from swarm.runtime.forensic_types import (
     TestParseResult,
     test_failure_from_dict,
     test_failure_to_dict,
-    test_parse_result_from_dict,
-    test_parse_result_to_dict,
 )
 
 
@@ -392,9 +389,7 @@ def parse_pytest_output(raw: str, raw_output_path: Optional[Path] = None) -> Tes
             actual=actual,
         )
         summary.failures.append(failure)
-        summary.error_signatures.append(
-            _compute_error_signature(current_test_name, error_msg)
-        )
+        summary.error_signatures.append(_compute_error_signature(current_test_name, error_msg))
 
     # Deduplicate error signatures
     summary.error_signatures = list(dict.fromkeys(summary.error_signatures))
@@ -474,7 +469,7 @@ def parse_junit_xml(xml_path: Path) -> TestSummary:
             # Check for failure or error
             failure = testcase.find("failure")
             error = testcase.find("error")
-            skipped = testcase.find("skipped")
+            testcase.find("skipped")
 
             if failure is not None:
                 error_msg = failure.get("message", "")
@@ -492,9 +487,7 @@ def parse_junit_xml(xml_path: Path) -> TestSummary:
                     duration_ms=int(test_time * 1000),
                 )
                 summary.failures.append(test_failure)
-                summary.error_signatures.append(
-                    _compute_error_signature(full_name, error_msg)
-                )
+                summary.error_signatures.append(_compute_error_signature(full_name, error_msg))
 
             elif error is not None:
                 error_msg = error.get("message", "")
@@ -509,9 +502,7 @@ def parse_junit_xml(xml_path: Path) -> TestSummary:
                     duration_ms=int(test_time * 1000),
                 )
                 summary.failures.append(test_failure)
-                summary.error_signatures.append(
-                    _compute_error_signature(full_name, error_msg)
-                )
+                summary.error_signatures.append(_compute_error_signature(full_name, error_msg))
 
     # Calculate passed from total - failures - errors - skipped
     summary.passed = max(0, summary.total - summary.failed - summary.errors - summary.skipped)
@@ -640,9 +631,7 @@ def _process_playwright_suites(suites: List[Dict[str, Any]], summary: TestSummar
     return summary
 
 
-def _process_playwright_test(
-    test: Dict[str, Any], spec_title: str, summary: TestSummary
-) -> None:
+def _process_playwright_test(test: Dict[str, Any], spec_title: str, summary: TestSummary) -> None:
     """Process a single Playwright test result."""
     summary.total += 1
 
@@ -676,9 +665,7 @@ def _process_playwright_test(
                 duration_ms=result.get("duration", 0),
             )
             summary.failures.append(failure)
-            summary.error_signatures.append(
-                _compute_error_signature(test_name, error_msg)
-            )
+            summary.error_signatures.append(_compute_error_signature(test_name, error_msg))
     elif status == "skipped":
         summary.skipped += 1
 
@@ -714,9 +701,7 @@ def _process_playwright_result(result: Dict[str, Any], summary: TestSummary) -> 
             duration_ms=result.get("duration", 0),
         )
         summary.failures.append(failure)
-        summary.error_signatures.append(
-            _compute_error_signature(test_name, error_msg)
-        )
+        summary.error_signatures.append(_compute_error_signature(test_name, error_msg))
     elif status == "skipped":
         summary.skipped += 1
 
@@ -748,9 +733,7 @@ def parse_test_output(
     # Handle Path input
     if isinstance(source, Path):
         if not source.exists():
-            return TestSummary(
-                total=0, passed=0, failed=0, skipped=0, source_format="unknown"
-            )
+            return TestSummary(total=0, passed=0, failed=0, skipped=0, source_format="unknown")
 
         # Auto-detect from extension
         ext = source.suffix.lower()
@@ -767,9 +750,7 @@ def parse_test_output(
                 content = source.read_text(encoding="utf-8")
                 return parse_pytest_output(content, source)
             except (IOError, UnicodeDecodeError):
-                return TestSummary(
-                    total=0, passed=0, failed=0, skipped=0, source_format="unknown"
-                )
+                return TestSummary(total=0, passed=0, failed=0, skipped=0, source_format="unknown")
 
     # Handle string input (assumed pytest)
     return parse_pytest_output(source)

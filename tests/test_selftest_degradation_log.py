@@ -26,7 +26,6 @@ from typing import List, Tuple
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -67,7 +66,15 @@ def validate_degradation_entry(entry: dict) -> Tuple[bool, str]:
     Returns:
         (is_valid, error_message)
     """
-    required_fields = {"timestamp", "step_id", "step_name", "tier", "message", "severity", "remediation"}
+    required_fields = {
+        "timestamp",
+        "step_id",
+        "step_name",
+        "tier",
+        "message",
+        "severity",
+        "remediation",
+    }
     missing = required_fields - set(entry.keys())
 
     if missing:
@@ -186,7 +193,7 @@ class TestDegradationLogJSONLFormat:
         """tier field must be 'kernel', 'governance', or 'optional'."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
-            log_path = tmppath / "selftest_degradations.log"
+            tmppath / "selftest_degradations.log"
 
             # Valid tiers
             for tier in ["kernel", "governance", "optional"]:
@@ -210,7 +217,7 @@ class TestDegradationLogJSONLFormat:
     def test_degradation_log_schema_strict_severity_values(self):
         """severity field must be 'critical', 'warning', or 'info'."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmppath = Path(tmpdir)
+            Path(tmpdir)
 
             # Valid severities
             for severity in ["critical", "warning", "info"]:
@@ -233,7 +240,7 @@ class TestDegradationLogJSONLFormat:
 
     def test_degradation_log_schema_iso8601_timestamp(self):
         """timestamp must be valid ISO 8601 format with time component."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory():
             # Valid ISO 8601 timestamps with time component
             for ts in [
                 "2025-12-01T10:15:22+00:00",
@@ -444,7 +451,9 @@ class TestShowSelftestDegradationsCLI:
         cmd = "cd {} && uv run swarm/tools/show_selftest_degradations.py --help".format(REPO_ROOT)
         exit_code, output = run_command(cmd)
         assert exit_code == 0, f"Help should exit 0, got {exit_code}"
-        assert "degradation" in output.lower() or "log" in output.lower(), "Help should mention degradation or log"
+        assert "degradation" in output.lower() or "log" in output.lower(), (
+            "Help should mention degradation or log"
+        )
 
     def test_degradation_cli_handles_missing_log(self):
         """CLI tool handles missing log file gracefully."""
@@ -453,7 +462,9 @@ class TestShowSelftestDegradationsCLI:
             cmd = f"cd {tmpdir} && uv run {REPO_ROOT}/swarm/tools/show_selftest_degradations.py"
             exit_code, output = run_command(cmd, cwd=Path(tmpdir))
             # Should exit cleanly (0 or 1, but not crash)
-            assert exit_code in (0, 1), f"Should handle missing log gracefully, got exit code {exit_code}"
+            assert exit_code in (0, 1), (
+                f"Should handle missing log gracefully, got exit code {exit_code}"
+            )
 
     def test_degradation_cli_json_output(self):
         """CLI tool outputs valid JSON with --json flag."""

@@ -5,23 +5,20 @@ These tests verify the forensic file change detection functionality
 that captures all file mutations during step execution.
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
 from swarm.runtime.diff_scanner import (
-    FileDiff,
     FileChanges,
-    file_diff_to_dict,
-    file_diff_from_dict,
-    file_changes_to_dict,
-    file_changes_from_dict,
-    scan_file_changes_sync,
-    _parse_status_line,
+    FileDiff,
     _parse_numstat_line,
+    _parse_status_line,
     _run_git_command,
     create_file_changes_event,
+    file_changes_from_dict,
+    file_changes_to_dict,
+    file_diff_from_dict,
+    file_diff_to_dict,
+    scan_file_changes_sync,
 )
 
 
@@ -296,6 +293,7 @@ class TestScanFileChanges:
     def test_with_modifications(self, tmp_path):
         """Test scanning repo with modifications."""
         with patch("swarm.runtime.diff_scanner._run_git_command") as mock_git:
+
             def git_responses(args, cwd, **kwargs):
                 if args == ["rev-parse", "--git-dir"]:
                     return True, ".git", ""

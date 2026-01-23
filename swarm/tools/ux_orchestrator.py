@@ -22,6 +22,7 @@ Usage:
 
 The output prompts can be fed to Claude Code agents.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -48,6 +49,7 @@ FLOW_STUDIO_BASE_URL = "http://localhost:5000"
 # ============================================================================
 # Layout Screen Fetching
 # ============================================================================
+
 
 def fetch_layout_screens() -> list[dict[str, Any]]:
     """Fetch layout screens from the Flow Studio API."""
@@ -85,6 +87,7 @@ def list_screen_ids() -> list[str]:
 # Prompt Generation
 # ============================================================================
 
+
 def generate_critic_prompt(screen_id: str) -> str:
     """Generate the user prompt for the UX Critic agent."""
     return f'''You are connected to the `ux_spec` and `ux_review` MCP servers.
@@ -103,7 +106,7 @@ Remember: **do not** propose changes to the existing SDK fields, `data-uiid` val
 
 def generate_implementer_prompt(critique_json: str) -> str:
     """Generate the user prompt for the UX Implementer agent."""
-    return f'''You are connected to the `ux_repo` MCP server.
+    return f"""You are connected to the `ux_repo` MCP server.
 
 Here is a UX critique object for a single screen:
 
@@ -115,12 +118,13 @@ Here is a UX critique object for a single screen:
 2. Use `ux_repo.get_write_allowlist` and only modify files that are allowed.
 3. Use `ux_repo.read_file` / `write_file` to implement the changes.
 4. Run `ux_repo.run_ux_tests` and ensure tests pass, or explain clearly if they do not.
-5. Respond with a **single JSON object** with the shape described in your system instructions: `summary`, `touched_files`, `pr_title`, `pr_body`, and optionally `remaining_issues`.'''
+5. Respond with a **single JSON object** with the shape described in your system instructions: `summary`, `touched_files`, `pr_title`, `pr_body`, and optionally `remaining_issues`."""
 
 
 # ============================================================================
 # Artifact Writing
 # ============================================================================
+
 
 def create_run_directory(screen_id: str) -> Path:
     """Create a timestamped run directory for this review."""
@@ -166,6 +170,7 @@ def write_prompts(screen_id: str) -> dict[str, Any]:
 # ============================================================================
 # CLI
 # ============================================================================
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(

@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).parent.parent
 MANIFEST_PATH = REPO_ROOT / "demo" / "DEMO_RUN_COMMANDS.jsonl"
 
@@ -41,7 +40,15 @@ class TestManifestStructure:
 
     def test_all_entries_have_required_fields(self):
         """Verify each entry has all required fields."""
-        required_fields = {"id", "section", "order", "command", "expected", "approx_seconds", "category"}
+        required_fields = {
+            "id",
+            "section",
+            "order",
+            "command",
+            "expected",
+            "approx_seconds",
+            "category",
+        }
 
         with open(MANIFEST_PATH) as f:
             for line_num, line in enumerate(f, 1):
@@ -51,7 +58,9 @@ class TestManifestStructure:
 
                 entry = json.loads(line)
                 missing = required_fields - set(entry.keys())
-                assert not missing, f"Line {line_num} (id={entry.get('id', '?')}) missing fields: {missing}"
+                assert not missing, (
+                    f"Line {line_num} (id={entry.get('id', '?')}) missing fields: {missing}"
+                )
 
     def test_ids_are_unique(self):
         """Verify all entry IDs are unique."""
@@ -78,7 +87,9 @@ class TestManifestStructure:
 
                 entry = json.loads(line)
                 order = entry["order"]
-                assert isinstance(order, (int, float)), f"Line {line_num}: order must be numeric, got {type(order)}"
+                assert isinstance(order, (int, float)), (
+                    f"Line {line_num}: order must be numeric, got {type(order)}"
+                )
 
     def test_approx_seconds_are_reasonable(self):
         """Verify timing estimates are reasonable (0-600 seconds)."""
@@ -90,8 +101,12 @@ class TestManifestStructure:
 
                 entry = json.loads(line)
                 seconds = entry["approx_seconds"]
-                assert isinstance(seconds, (int, float)), f"Line {line_num}: approx_seconds must be numeric"
-                assert 0 <= seconds <= 600, f"Line {line_num}: approx_seconds {seconds} out of range (0-600)"
+                assert isinstance(seconds, (int, float)), (
+                    f"Line {line_num}: approx_seconds must be numeric"
+                )
+                assert 0 <= seconds <= 600, (
+                    f"Line {line_num}: approx_seconds {seconds} out of range (0-600)"
+                )
 
 
 class TestManifestContent:
@@ -126,11 +141,20 @@ class TestManifestContent:
 
     def test_categories_are_valid(self, entries):
         """Verify categories are from expected set."""
-        valid_categories = {"setup", "kernel", "governance", "visualization", "templates", "extensions"}
+        valid_categories = {
+            "setup",
+            "kernel",
+            "governance",
+            "visualization",
+            "templates",
+            "extensions",
+        }
 
         for entry in entries:
             category = entry["category"]
-            assert category in valid_categories, f"Entry {entry['id']} has invalid category '{category}'"
+            assert category in valid_categories, (
+                f"Entry {entry['id']} has invalid category '{category}'"
+            )
 
     def test_expected_values_are_non_empty(self, entries):
         """Verify expected output descriptions are provided."""
@@ -203,7 +227,9 @@ class TestCommandValidity:
         for entry in entries:
             cmd = entry["command"]
             for pattern in dangerous_patterns:
-                assert pattern not in cmd, f"Entry {entry['id']} contains dangerous pattern '{pattern}'"
+                assert pattern not in cmd, (
+                    f"Entry {entry['id']} contains dangerous pattern '{pattern}'"
+                )
 
 
 class TestManifestOrdering:

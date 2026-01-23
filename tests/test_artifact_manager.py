@@ -34,7 +34,6 @@ from artifact_manager import (
     get_user,
 )
 
-
 # ============================================================================
 # Helper Function Tests
 # ============================================================================
@@ -101,9 +100,7 @@ class TestGetGitInfo:
         # Create a git repo
         monkeypatch.chdir(tmp_path)
         subprocess.run(["git", "init"], capture_output=True, check=True)
-        subprocess.run(
-            ["git", "config", "user.name", "Test"], capture_output=True, check=True
-        )
+        subprocess.run(["git", "config", "user.name", "Test"], capture_output=True, check=True)
         subprocess.run(
             ["git", "config", "user.email", "test@test.com"],
             capture_output=True,
@@ -113,9 +110,7 @@ class TestGetGitInfo:
         # Create a file and commit
         (tmp_path / "test.txt").write_text("test")
         subprocess.run(["git", "add", "."], capture_output=True, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "initial"], capture_output=True, check=True
-        )
+        subprocess.run(["git", "commit", "-m", "initial"], capture_output=True, check=True)
 
         branch, commit = get_git_info()
 
@@ -137,9 +132,7 @@ class TestGetUser:
         """get_user returns USER or USERNAME from environment."""
         with patch.dict(os.environ, {"USER": "testuser"}, clear=False):
             result = get_user()
-            assert result == "testuser" or result == os.environ.get(
-                "USERNAME", "unknown"
-            )
+            assert result == "testuser" or result == os.environ.get("USERNAME", "unknown")
 
     def test_returns_unknown_when_no_user_env(self):
         """get_user returns 'unknown' when USER/USERNAME not set."""
@@ -183,9 +176,7 @@ class TestRunIdDetection:
         # Create a git repo
         monkeypatch.chdir(tmp_path)
         subprocess.run(["git", "init"], capture_output=True, check=True)
-        subprocess.run(
-            ["git", "config", "user.name", "Test"], capture_output=True, check=True
-        )
+        subprocess.run(["git", "config", "user.name", "Test"], capture_output=True, check=True)
         subprocess.run(
             ["git", "config", "user.email", "test@test.com"],
             capture_output=True,
@@ -193,9 +184,7 @@ class TestRunIdDetection:
         )
         (tmp_path / "test.txt").write_text("test")
         subprocess.run(["git", "add", "."], capture_output=True, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "initial"], capture_output=True, check=True
-        )
+        subprocess.run(["git", "commit", "-m", "initial"], capture_output=True, check=True)
 
         # Clear env vars to test git detection
         with patch.dict(os.environ, {"GIT_BRANCH": "", "CI_COMMIT_SHA": ""}, clear=False):
@@ -231,12 +220,12 @@ class TestRunIdDetection:
             with patch("subprocess.run") as mock_run:
                 mock_run.return_value.stdout = ""
 
-                manager1 = ArtifactManager(repo_root=tmp_path)
+                ArtifactManager(repo_root=tmp_path)
                 # Simulate time passing by patching datetime
                 with patch("artifact_manager.datetime") as mock_dt:
                     mock_dt.now.return_value = datetime(2025, 1, 1, 12, 0, 1)
                     mock_dt.strftime = datetime.strftime
-                    manager2 = ArtifactManager(repo_root=tmp_path)
+                    ArtifactManager(repo_root=tmp_path)
 
                 # They should be different (unless same second)
                 # This test is probabilistic but should pass
@@ -638,7 +627,9 @@ class TestEdgeCases:
         with patch.dict(os.environ, {"GIT_BRANCH": "unicode-test"}):
             manager = ArtifactManager(repo_root=tmp_path)
 
-            content = "# Requirements\n\n- Support Japanese: \u65e5\u672c\u8a9e\n- Support emoji: test"
+            content = (
+                "# Requirements\n\n- Support Japanese: \u65e5\u672c\u8a9e\n- Support emoji: test"
+            )
             manager.write_artifact("signal", "unicode.md", content)
 
             result = manager.read_artifact("signal", "unicode.md")

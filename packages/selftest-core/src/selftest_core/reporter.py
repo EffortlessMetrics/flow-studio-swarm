@@ -32,7 +32,7 @@ import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TextIO
+from typing import Any, TextIO
 
 
 @dataclass
@@ -52,6 +52,7 @@ class ReportMetadata:
         user: Username from environment
         mode: Selftest execution mode
     """
+
     run_id: str
     timestamp: str
     hostname: str
@@ -69,6 +70,7 @@ class StepReport:
 
     Contains detailed information about a step's execution.
     """
+
     step_id: str
     description: str
     tier: str
@@ -78,8 +80,8 @@ class StepReport:
     exit_code: int
     duration_ms: int
     command: str
-    output: Optional[str] = None
-    error: Optional[str] = None
+    output: str | None = None
+    error: str | None = None
 
 
 @dataclass
@@ -89,13 +91,14 @@ class ReportSummary:
 
     Contains aggregate counts by status, severity, and category.
     """
+
     passed: int
     failed: int
     skipped: int
     total: int
     total_duration_ms: int
-    by_severity: Dict[str, Dict[str, int]]
-    by_category: Dict[str, Dict[str, int]]
+    by_severity: dict[str, dict[str, int]]
+    by_category: dict[str, dict[str, int]]
 
 
 class ReportGenerator:
@@ -108,8 +111,8 @@ class ReportGenerator:
 
     def __init__(
         self,
-        result: Dict[str, Any],
-        run_id: Optional[str] = None,
+        result: dict[str, Any],
+        run_id: str | None = None,
     ):
         """
         Initialize the report generator.
@@ -172,7 +175,7 @@ class ReportGenerator:
             by_category=self.result.get("by_category", {}),
         )
 
-    def to_dict_v1(self) -> Dict[str, Any]:
+    def to_dict_v1(self) -> dict[str, Any]:
         """
         Generate v1 format report (legacy).
 
@@ -189,7 +192,7 @@ class ReportGenerator:
             "results": self.result.get("results", []),
         }
 
-    def to_dict_v2(self) -> Dict[str, Any]:
+    def to_dict_v2(self) -> dict[str, Any]:
         """
         Generate v2 format report (extended).
 
@@ -260,9 +263,9 @@ class ConsoleReporter:
 
     def __init__(
         self,
-        result: Dict[str, Any],
+        result: dict[str, Any],
         verbose: bool = False,
-        output: Optional[TextIO] = None,
+        output: TextIO | None = None,
     ):
         """
         Initialize the console reporter.
@@ -295,13 +298,18 @@ class ConsoleReporter:
             self._print("Mode: STRICT (KERNEL and GOVERNANCE failures block)")
         self._print()
 
-    def print_step_result(self, step_result: Dict[str, Any]):
+    def print_step_result(self, step_result: dict[str, Any]):
         """Print individual step result."""
         step_id = step_result.get("step_id", "unknown")
         status = step_result.get("status", "UNKNOWN")
         duration = step_result.get("duration_ms", 0)
 
-        status_str = "PASS" if status == "PASS" else "FAIL" if status == "FAIL" else "SKIP"
+        if status == "PASS":
+            status_str = "PASS"
+        elif status == "FAIL":
+            status_str = "FAIL"
+        else:
+            status_str = "SKIP"
         self._print(f"  [{status_str}] {step_id:30s} ({duration}ms)")
 
         if self.verbose and status == "FAIL":
@@ -386,7 +394,10 @@ class ConsoleReporter:
             for step_id in governance_failed:
                 self._print(f"    Run: selftest run --step {step_id}")
             if not kernel_failed:
-                self._print("  Or try: selftest run --degraded to work around governance failures")
+                self._print(
+                    "  Or try: selftest run --degraded to work around "
+                    "governance failures"
+                )
 
     def print_full_report(self):
         """Print complete report with all sections."""

@@ -718,7 +718,9 @@ def process_evolution_at_boundary(
     """
     config = EvolutionConfig(
         policy=policy,
-        boundary=EvolutionBoundary(boundary) if boundary in ("run_end", "flow_end") else EvolutionBoundary.RUN_END,
+        boundary=EvolutionBoundary(boundary)
+        if boundary in ("run_end", "flow_end")
+        else EvolutionBoundary.RUN_END,
         patch_types=patch_types or ["flow_evolution", "station_tuning"],
         repo_root=repo_root,
         emit_events=emit_events,

@@ -2,28 +2,23 @@
 
 import json
 import os
-import pytest
-from pathlib import Path
 from unittest.mock import patch
 
 from swarm.config.pack_registry import (
+    EngineConfig,
     Pack,
     PackLock,
-    EngineConfig,
-    FeaturesConfig,
-    RuntimeConfig,
     PackResolver,
-    load_pack_from_file,
-    load_baseline_pack,
-    get_baseline_pack_path,
-    get_pack_lock_path,
-    resolve_pack_config,
     compute_pack_hash,
     generate_pack_lock,
-    read_pack_lock,
-    write_pack_lock,
+    get_pack_lock_path,
+    load_baseline_pack,
+    load_pack_from_file,
     lock_current_pack,
+    read_pack_lock,
+    resolve_pack_config,
     verify_pack_lock,
+    write_pack_lock,
 )
 
 
@@ -111,10 +106,7 @@ class TestPackResolution:
     def test_cli_overrides_env(self):
         """CLI overrides should take highest priority."""
         with patch.dict(os.environ, {"SWARM_CLAUDE_MODE": "sdk"}):
-            resolver = PackResolver(
-                repo_root=None,
-                cli_overrides={"engines.claude.mode": "cli"}
-            )
+            resolver = PackResolver(repo_root=None, cli_overrides={"engines.claude.mode": "cli"})
             result = resolver.resolve()
 
             assert result.config.get("engines.claude.mode") == "cli"
@@ -241,9 +233,7 @@ class TestConvenienceFunction:
 
     def test_resolve_pack_config_with_cli_overrides(self):
         """resolve_pack_config should accept CLI overrides."""
-        result = resolve_pack_config(
-            cli_overrides={"engines.claude.mode": "test"}
-        )
+        result = resolve_pack_config(cli_overrides={"engines.claude.mode": "test"})
         assert result.config.get("engines.claude.mode") == "test"
 
 
@@ -597,9 +587,7 @@ engines:
             "pack_hash": "test",
             "timestamp": "2025-01-01T00:00:00Z",
             "resolved_config": {
-                "engines": {
-                    "claude": {"mode": "pinned-mode", "execution": None, "provider": None}
-                },
+                "engines": {"claude": {"mode": "pinned-mode", "execution": None, "provider": None}},
                 "features": {},
                 "runtime": {},
                 "flows": {},

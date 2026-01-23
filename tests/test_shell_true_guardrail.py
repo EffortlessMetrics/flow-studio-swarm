@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-
 # Production code directories to scan
 PRODUCTION_PATHS = [
     "swarm/tools",
@@ -93,17 +92,19 @@ def test_no_shell_true_in_production_code():
             relative = file_path.relative_to(repo_root)
             message_parts.append(f"  {relative}:{line_num}: {line_content}")
 
-        message_parts.extend([
-            "",
-            "Fix by converting to argv lists:",
-            '  BAD:  subprocess.run("git status", shell=True, ...)',
-            '  GOOD: subprocess.run(["git", "status"], ...)',
-            "",
-            "For string commands, use shlex.split():",
-            '  import shlex',
-            '  argv = shlex.split("git status")',
-            '  subprocess.run(argv, ...)',
-        ])
+        message_parts.extend(
+            [
+                "",
+                "Fix by converting to argv lists:",
+                '  BAD:  subprocess.run("git status", shell=True, ...)',
+                '  GOOD: subprocess.run(["git", "status"], ...)',
+                "",
+                "For string commands, use shlex.split():",
+                "  import shlex",
+                '  argv = shlex.split("git status")',
+                "  subprocess.run(argv, ...)",
+            ]
+        )
 
         pytest.fail("\n".join(message_parts))
 
