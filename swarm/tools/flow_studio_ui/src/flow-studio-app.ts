@@ -14,6 +14,7 @@
 // Core state and utilities
 import { state } from "./state.js";
 import { Api } from "./api.js";
+import { createQuickCommands } from "./utils.js";
 import type {
   FlowKey,
   NodeData,
@@ -704,20 +705,42 @@ function showFlowDetails(detail: FlowDetail | FlowDetailExtended): void {
 
   const hint = document.createElement("div");
   hint.className = "welcome-panel author-only";
-  hint.innerHTML = `
-    <div class="welcome-section" style="margin-bottom: 12px;">
-      <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">
-        Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
-      </div>
-      <div style="font-size: 11px; color: #9ca3af;">
-        Artifacts: <code class="mono" style="font-size: 10px;">swarm/runs/&lt;run&gt;/${flow.key || "&lt;flow&gt;"}/</code>
-      </div>
+
+  const welcomeSection = document.createElement("div");
+  welcomeSection.className = "welcome-section";
+  welcomeSection.style.marginBottom = "12px";
+  welcomeSection.innerHTML = `
+    <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">
+      Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
     </div>
-    <div class="welcome-section">
-      <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">Edit flow:</div>
-      <pre class="mono" style="font-size: 10px; margin: 0;">$EDITOR swarm/config/flows/${flow.key || "&lt;key&gt;"}.yaml</pre>
+    <div style="font-size: 11px; color: #9ca3af;">
+      Artifacts: <code class="mono" style="font-size: 10px;">swarm/runs/&lt;run&gt;/${flow.key || "&lt;flow&gt;"}/</code>
     </div>
   `;
+  hint.appendChild(welcomeSection);
+
+  const editSection = document.createElement("div");
+  editSection.className = "welcome-section";
+
+  const editLabel = document.createElement("div");
+  editLabel.style.fontSize = "11px";
+  editLabel.style.color = "#6b7280";
+  editLabel.style.marginBottom = "4px";
+  editLabel.textContent = "Edit flow:";
+  editSection.appendChild(editLabel);
+
+  const commands = [
+    `$EDITOR swarm/config/flows/${flow.key || "<key>"}.yaml`,
+    "uv run swarm/tools/gen_flows.py",
+    "make validate-swarm"
+  ];
+  const quickCmds = createQuickCommands(commands);
+  // Remove the "Quick commands" label added by util since we have "Edit flow:"
+  const utilLabel = quickCmds.querySelector(".kv-label");
+  if (utilLabel) utilLabel.remove();
+
+  editSection.appendChild(quickCmds);
+  hint.appendChild(editSection);
 
   const operatorHint = document.createElement("div");
   operatorHint.className = "operator-only";

@@ -1134,7 +1134,7 @@
       padding: 8px 12px;
       font-size: 11px;
       pointer-events: auto;
-      z-index: 100;
+      z-index: 4;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       transition: all 0.2s ease;
     }

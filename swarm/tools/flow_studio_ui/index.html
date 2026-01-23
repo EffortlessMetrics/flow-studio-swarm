@@ -147,15 +147,17 @@
   </aside>
   <main id="graph" role="main" aria-label="Flow graph visualization" data-uiid="flow_studio.canvas">
     <!-- Empty state shown when no run is loaded -->
-    <div id="canvas-empty-state" class="fs-empty" style="display: none; position: absolute; inset: 0; z-index: 5;" data-uiid="flow_studio.canvas.empty">
-      <div class="fs-empty-icon" aria-hidden="true">📊</div>
-      <p class="fs-empty-title">Welcome to Flow Studio</p>
-      <p class="fs-empty-description">Select a run from the sidebar to visualize flows.</p>
-      <div style="margin-top: 16px; text-align: center;">
-        <p class="fs-text-sm fs-text-muted">Generate a demo run with:</p>
-        <div style="display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 12px; background: #f3f4f6; border-radius: 4px;">
-          <code class="mono" style="font-size: 12px;">make stepwise-sdlc-stub</code>
-          <button class="copy-btn" onclick="navigator.clipboard.writeText('make stepwise-sdlc-stub').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard" aria-label="Copy demo command to clipboard">Copy</button>
+    <div id="canvas-empty-state" class="fs-empty" style="display: none; position: absolute; inset: 0; z-index: 5; pointer-events: none;" data-uiid="flow_studio.canvas.empty">
+      <div style="pointer-events: auto; display: flex; flex-direction: column; align-items: center;">
+        <div class="fs-empty-icon" aria-hidden="true">📊</div>
+        <p class="fs-empty-title">Welcome to Flow Studio</p>
+        <p class="fs-empty-description">Select a run from the sidebar to visualize flows.</p>
+        <div style="margin-top: 16px; text-align: center;">
+          <p class="fs-text-sm fs-text-muted">Generate a demo run with:</p>
+          <div style="display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 12px; background: #f3f4f6; border-radius: 4px;">
+            <code class="mono" style="font-size: 12px;">make stepwise-sdlc-stub</code>
+            <button class="copy-btn" onclick="navigator.clipboard.writeText('make stepwise-sdlc-stub').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard" aria-label="Copy demo command to clipboard">Copy</button>
+          </div>
         </div>
       </div>
     </div>
@@ -202,9 +204,19 @@
         <li><code>swarm/runs/&lt;run&gt;/&lt;flow&gt;/</code> (artifacts)</li>
       </ul>
       <strong>To change a flow:</strong>
-      <pre class="mono">$EDITOR swarm/config/flows/&lt;key&gt;.yaml
-uv run swarm/tools/gen_flows.py
-make validate-swarm</pre>
+      <div class="quick-commands">
+        <div class="command-line">
+           <span class="command-text">$EDITOR swarm/config/flows/&lt;key&gt;.yaml</span>
+        </div>
+        <div class="command-line">
+           <span class="command-text">uv run swarm/tools/gen_flows.py</span>
+           <button class="copy-btn" onclick="navigator.clipboard.writeText('uv run swarm/tools/gen_flows.py').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard">Copy</button>
+        </div>
+        <div class="command-line">
+           <span class="command-text">make validate-swarm</span>
+           <button class="copy-btn" onclick="navigator.clipboard.writeText('make validate-swarm').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard">Copy</button>
+        </div>
+      </div>
       <p style="margin-top: 12px; font-size: 12px; color: #6b7280;">
         <strong>Keyboard shortcuts:</strong> Press <kbd>?</kbd> for help, <kbd>1-6</kbd> to jump to flows.
       </p>
@@ -1798,7 +1810,7 @@ make validate-swarm</pre>
       padding: 8px 12px;
       font-size: 11px;
       pointer-events: auto;
-      z-index: 100;
+      z-index: 4;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       transition: all 0.2s ease;
     }
