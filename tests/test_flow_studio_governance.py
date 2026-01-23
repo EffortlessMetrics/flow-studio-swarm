@@ -33,11 +33,13 @@ Catches drift when:
 - Modifying API response structure (API contract violations)
 - Moving/removing example runs (discoverability failures)
 """
+
 import json
 import sys
 from pathlib import Path
 
 import pytest
+
 import yaml
 
 # Import FastAPI app for API tests
@@ -149,9 +151,7 @@ def test_example_runs_discoverable(artifact_catalog):
 
     required_fields = {"title", "description", "tags"}
     missing_fields = required_fields - set(run_data.keys())
-    assert not missing_fields, (
-        f"health-check/run.json missing fields: {missing_fields}"
-    )
+    assert not missing_fields, f"health-check/run.json missing fields: {missing_fields}"
 
     # Tags should be non-empty list
     assert isinstance(run_data["tags"], list), "tags must be a list"
@@ -276,9 +276,7 @@ def test_api_runs_list(client):
 
     # Health-check should appear in list
     run_ids = [run["run_id"] for run in runs]
-    assert "health-check" in run_ids, (
-        f"health-check example not found in runs list: {run_ids}"
-    )
+    assert "health-check" in run_ids, f"health-check example not found in runs list: {run_ids}"
 
 
 def test_api_run_summary(client):
@@ -312,9 +310,7 @@ def test_api_agent_usage(client, flow_configs):
 
     # code-implementer should be used in build flow
     flow_keys = [u["flow"] for u in data["usage"]]
-    assert "build" in flow_keys, (
-        f"code-implementer should be used in 'build' flow: {flow_keys}"
-    )
+    assert "build" in flow_keys, f"code-implementer should be used in 'build' flow: {flow_keys}"
 
 
 def test_api_tours(client):

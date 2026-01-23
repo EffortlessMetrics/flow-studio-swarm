@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 # Mock necessary modules before importing routes
 # We need to mock swarm.runtime.autopilot and swarm.api.services.run_state
 
+
 @pytest.fixture
 def mock_state_manager():
     with patch("swarm.api.routes.issue_routes.get_state_manager") as mock:
@@ -17,10 +18,12 @@ def mock_state_manager():
         mock.return_value = manager
         yield manager
 
+
 @pytest.fixture
 def mock_autopilot():
     with patch("swarm.api.routes.issue_routes._get_autopilot_controller") as mock:
         yield mock
+
 
 @pytest.fixture
 def client():
@@ -31,6 +34,7 @@ def client():
     app = FastAPI()
     app.include_router(router)
     return TestClient(app)
+
 
 def test_ingest_issue_valid_repo(client, mock_state_manager, mock_autopilot):
     """Test ingestion with a valid repo name."""
@@ -49,16 +53,15 @@ def test_ingest_issue_valid_repo(client, mock_state_manager, mock_autopilot):
 
     # We need to mock Path.mkdir and Path.write_text to avoid FS errors
     with patch("pathlib.Path.mkdir"), patch("pathlib.Path.write_text"):
-        response = client.post("/from-issue", json={
-            "provider": "github",
-            "repo": "owner/repo",
-            "issue_number": 123
-        })
+        response = client.post(
+            "/from-issue", json={"provider": "github", "repo": "owner/repo", "issue_number": 123}
+        )
 
     assert response.status_code == 201
     data = response.json()
     assert data["status"] == "created"
     assert "issue-owner-repo-123" in data["run_id"]
+
 
 def test_ingest_issue_invalid_repo_chars(client, mock_state_manager):
     """Test ingestion with invalid characters in repo name."""
@@ -67,16 +70,15 @@ def test_ingest_issue_invalid_repo_chars(client, mock_state_manager):
     # $ is invalid in validate_path_component
 
     with patch("pathlib.Path.mkdir"), patch("pathlib.Path.write_text"):
-        response = client.post("/from-issue", json={
-            "provider": "github",
-            "repo": "owner$repo",
-            "issue_number": 123
-        })
+        response = client.post(
+            "/from-issue", json={"provider": "github", "repo": "owner$repo", "issue_number": 123}
+        )
 
     assert response.status_code == 400
     data = response.json()
     assert data["detail"]["error"] == "invalid_run_id"
     assert "Generated run ID is invalid" in data["detail"]["message"]
+
 
 def test_ingest_issue_traversal_attempt(client, mock_state_manager):
     """Test ingestion with path traversal attempt."""
@@ -91,11 +93,10 @@ def test_ingest_issue_traversal_attempt(client, mock_state_manager):
     # space is not allowed.
 
     with patch("pathlib.Path.mkdir"), patch("pathlib.Path.write_text"):
-        response = client.post("/from-issue", json={
-            "provider": "github",
-            "repo": "owner/repo name",
-            "issue_number": 123
-        })
+        response = client.post(
+            "/from-issue",
+            json={"provider": "github", "repo": "owner/repo name", "issue_number": 123},
+        )
 
     # "owner/repo name" -> "owner-repo name" -> has space -> invalid
     assert response.status_code == 400

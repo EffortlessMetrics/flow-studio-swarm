@@ -29,14 +29,16 @@ def load_tours(repo_root: Path) -> Dict[str, Any]:
                 if not isinstance(raw_step, dict):
                     continue
                 target = raw_step.get("target") or {}
-                tour_steps.append({
-                    "target_type": target.get("type", "flow"),
-                    "target_flow": target.get("flow", ""),
-                    "target_step": target.get("step", ""),
-                    "title": raw_step.get("title", ""),
-                    "text": raw_step.get("text", ""),
-                    "action": raw_step.get("action", "select_flow"),
-                })
+                tour_steps.append(
+                    {
+                        "target_type": target.get("type", "flow"),
+                        "target_flow": target.get("flow", ""),
+                        "target_step": target.get("step", ""),
+                        "title": raw_step.get("title", ""),
+                        "text": raw_step.get("text", ""),
+                        "action": raw_step.get("action", "select_flow"),
+                    }
+                )
 
             tours[tour_id] = {
                 "id": tour_id,

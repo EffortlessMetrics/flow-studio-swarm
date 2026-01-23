@@ -144,6 +144,7 @@ ALLOWLISTED_PATTERNS = [
     "uv run swarm/tools/check_selftest_ac_freshness.py --check",
 ]
 
+
 def _as_argv(cmd: str) -> list[str]:
     """Convert a command string to an argv list for subprocess.
 
@@ -313,7 +314,11 @@ def dry_run(
             cwd=working_dir,
             timeout=30,
         )
-        initial_files = set(git_status_before.stdout.strip().split("\n")) if git_status_before.stdout and git_status_before.stdout.strip() else set()
+        initial_files = (
+            set(git_status_before.stdout.strip().split("\n"))
+            if git_status_before.stdout and git_status_before.stdout.strip()
+            else set()
+        )
     except (subprocess.SubprocessError, FileNotFoundError):
         initial_files = set()
         warnings.append("Could not check git status before dry-run")
@@ -400,7 +405,11 @@ def dry_run(
             cwd=working_dir,
             timeout=30,
         )
-        final_files = set(git_status_after.stdout.strip().split("\n")) if git_status_after.stdout and git_status_after.stdout.strip() else set()
+        final_files = (
+            set(git_status_after.stdout.strip().split("\n"))
+            if git_status_after.stdout and git_status_after.stdout.strip()
+            else set()
+        )
         new_files = final_files - initial_files
         for f in new_files:
             if f.startswith("?? "):
@@ -640,12 +649,16 @@ def write_audit_log(
         dry_run={
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "command": remediation.command,
-            "diff_summary": dry_run_result.diff[:200] + "..." if dry_run_result and len(dry_run_result.diff) > 200 else (dry_run_result.diff if dry_run_result else ""),
+            "diff_summary": dry_run_result.diff[:200] + "..."
+            if dry_run_result and len(dry_run_result.diff) > 200
+            else (dry_run_result.diff if dry_run_result else ""),
             "affected_files": dry_run_result.affected_files if dry_run_result else [],
             "file_count": dry_run_result.file_count if dry_run_result else 0,
             "safe_to_execute": dry_run_result.safe_to_execute if dry_run_result else False,
             "warnings": dry_run_result.warnings if dry_run_result else [],
-        } if dry_run_result else {},
+        }
+        if dry_run_result
+        else {},
         approval={
             "status": approval.status.value,
             "approver": approval.approver,
@@ -660,11 +673,17 @@ def write_audit_log(
             "completed_at": datetime.now(timezone.utc).isoformat() if execute_result else None,
             "duration_ms": execute_result.duration_ms if execute_result else 0,
             "exit_code": execute_result.exit_code if execute_result else None,
-            "stdout_summary": execute_result.stdout[:500] if execute_result and execute_result.stdout else "",
-            "stderr": execute_result.stderr[:500] if execute_result and execute_result.stderr else "",
+            "stdout_summary": execute_result.stdout[:500]
+            if execute_result and execute_result.stdout
+            else "",
+            "stderr": execute_result.stderr[:500]
+            if execute_result and execute_result.stderr
+            else "",
             "git_sha_before": execute_result.git_commit_before if execute_result else None,
             "git_sha_after": execute_result.git_commit_after if execute_result else None,
-        } if execute_result else {},
+        }
+        if execute_result
+        else {},
         metadata={
             "hostname": socket.gethostname(),
             "user": getpass.getuser(),

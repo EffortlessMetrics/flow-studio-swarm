@@ -19,9 +19,9 @@ We intentionally skip the registry → file check because:
 
 from typing import Any, Dict, Set
 
-from swarm.validator import ValidationResult
 from swarm.tools.validation.helpers import AGENTS_DIR, ROOT
 from swarm.tools.validation.validators.flow_references import suggest_typos
+from swarm.validator import ValidationResult
 
 
 def validate_bijection(registry: Dict[str, Dict[str, Any]]) -> ValidationResult:
@@ -85,7 +85,7 @@ def validate_bijection(registry: Dict[str, Dict[str, Any]]) -> ValidationResult:
                 str(file_path.relative_to(ROOT)),
                 problem,
                 fix_action,
-                file_path=str(file_path)
+                file_path=str(file_path),
             )
 
     return result

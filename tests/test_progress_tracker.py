@@ -6,22 +6,22 @@ not the budget. If error signatures remain identical, velocity is zero
 and we're stalled. If they change, velocity is positive and we continue.
 """
 
-import pytest
 from datetime import datetime
 
+import pytest
 from swarm.runtime.progress_tracker import (
     ProgressTracker,
     StallInfo,
-    compute_error_signature,
-    normalize_error_output,
-    extract_error_category,
     build_stall_context,
-    should_suggest_sidequest,
+    compute_error_signature,
     create_tracker,
-    tracker_to_dict,
-    tracker_from_dict,
-    stall_info_to_dict,
+    extract_error_category,
+    normalize_error_output,
+    should_suggest_sidequest,
     stall_info_from_dict,
+    stall_info_to_dict,
+    tracker_from_dict,
+    tracker_to_dict,
 )
 
 
@@ -254,7 +254,7 @@ class TestProgressTracker:
         tracker.record_iteration(error)
         tracker.record_iteration(error)
         # All 3 are the same, so unique = 1, velocity = 1/3
-        assert tracker.get_velocity() == pytest.approx(1/3, rel=0.01)
+        assert tracker.get_velocity() == pytest.approx(1 / 3, rel=0.01)
 
     def test_velocity_partial(self):
         """Velocity should be partial when some errors are same."""
@@ -263,7 +263,7 @@ class TestProgressTracker:
         tracker.record_iteration("Error B")
         tracker.record_iteration("Error A")
         # 2 unique out of 3, velocity = 2/3
-        assert tracker.get_velocity() == pytest.approx(2/3, rel=0.01)
+        assert tracker.get_velocity() == pytest.approx(2 / 3, rel=0.01)
 
     def test_record_success_breaks_stall(self):
         """Recording success should break a stall pattern."""
@@ -518,7 +518,7 @@ class TestEdgeCases:
     def test_unicode_in_error(self):
         """Unicode characters in errors should be handled."""
         tracker = ProgressTracker()
-        tracker.record_iteration("Error: \u2603 snowman failed \U0001F4A5")
+        tracker.record_iteration("Error: \u2603 snowman failed \U0001f4a5")
         assert len(tracker) == 1
 
     def test_signature_history(self):
@@ -572,11 +572,11 @@ class TestStallContextIntegration:
     def test_stall_context_in_routing_explanation(self):
         """StallContext should integrate with RoutingExplanation."""
         from swarm.runtime.types import (
+            DecisionType,
             RoutingExplanation,
             StallContext,
-            DecisionType,
-            routing_explanation_to_dict,
             routing_explanation_from_dict,
+            routing_explanation_to_dict,
         )
 
         stall_ctx = StallContext(
@@ -609,10 +609,10 @@ class TestStallContextIntegration:
     def test_routing_explanation_without_stall_context(self):
         """RoutingExplanation should work without StallContext."""
         from swarm.runtime.types import (
-            RoutingExplanation,
             DecisionType,
-            routing_explanation_to_dict,
+            RoutingExplanation,
             routing_explanation_from_dict,
+            routing_explanation_to_dict,
         )
 
         explanation = RoutingExplanation(

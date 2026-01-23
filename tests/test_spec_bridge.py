@@ -9,24 +9,22 @@ These tests verify that:
 """
 
 import json
-import pytest
 from pathlib import Path
 
-from swarm.runtime.spec_bridge import (
-    flow_spec_to_definition,
-    load_flow_from_json,
-    load_flow_from_pack,
-    analyze_node_edges,
-    infer_step_order,
-    PackFlowRegistry,
-    FLOW_INDEX_MAP,
-)
+import pytest
 from swarm.config.pack_registry import (
-    FlowSpecData,
-    FlowNode,
     FlowEdge,
+    FlowNode,
+    FlowSpecData,
 )
-
+from swarm.runtime.spec_bridge import (
+    FLOW_INDEX_MAP,
+    PackFlowRegistry,
+    analyze_node_edges,
+    flow_spec_to_definition,
+    infer_step_order,
+    load_flow_from_json,
+)
 
 # =============================================================================
 # Fixtures
@@ -63,8 +61,20 @@ def simple_linear_spec():
             FlowNode(node_id="step-3", template_id="agent-3", params={}, overrides={}),
         ],
         edges=[
-            FlowEdge(edge_id="e1", from_node="step-1", to_node="step-2", edge_type="sequence", priority=50),
-            FlowEdge(edge_id="e2", from_node="step-2", to_node="step-3", edge_type="sequence", priority=50),
+            FlowEdge(
+                edge_id="e1",
+                from_node="step-1",
+                to_node="step-2",
+                edge_type="sequence",
+                priority=50,
+            ),
+            FlowEdge(
+                edge_id="e2",
+                from_node="step-2",
+                to_node="step-3",
+                edge_type="sequence",
+                priority=50,
+            ),
         ],
         policy={"max_loop_iterations": 10},
         pack_origin="test",
@@ -81,13 +91,38 @@ def microloop_spec():
         version=1,
         nodes=[
             FlowNode(node_id="author", template_id="author-agent", params={}, overrides={}),
-            FlowNode(node_id="critic", template_id="critic-agent", params={}, overrides={"exit_on": {"status": ["VERIFIED"]}}),
+            FlowNode(
+                node_id="critic",
+                template_id="critic-agent",
+                params={},
+                overrides={"exit_on": {"status": ["VERIFIED"]}},
+            ),
             FlowNode(node_id="final", template_id="final-agent", params={}, overrides={}),
         ],
         edges=[
-            FlowEdge(edge_id="e1", from_node="author", to_node="critic", edge_type="sequence", priority=50),
-            FlowEdge(edge_id="e2-loop", from_node="critic", to_node="author", edge_type="loop", priority=40, condition={"expression": "status != 'VERIFIED'"}),
-            FlowEdge(edge_id="e2-exit", from_node="critic", to_node="final", edge_type="sequence", priority=50, condition={"expression": "status == 'VERIFIED'"}),
+            FlowEdge(
+                edge_id="e1",
+                from_node="author",
+                to_node="critic",
+                edge_type="sequence",
+                priority=50,
+            ),
+            FlowEdge(
+                edge_id="e2-loop",
+                from_node="critic",
+                to_node="author",
+                edge_type="loop",
+                priority=40,
+                condition={"expression": "status != 'VERIFIED'"},
+            ),
+            FlowEdge(
+                edge_id="e2-exit",
+                from_node="critic",
+                to_node="final",
+                edge_type="sequence",
+                priority=50,
+                condition={"expression": "status == 'VERIFIED'"},
+            ),
         ],
         policy={"max_loop_iterations": 50, "suggested_sidequests": ["clarifier"]},
         pack_origin="test",
@@ -179,8 +214,12 @@ class TestEdgeAnalysis:
     def test_loop_detection(self):
         """Test detection of loop edges."""
         edges = [
-            FlowEdge(edge_id="e1", from_node="critic", to_node="author", edge_type="loop", priority=40),
-            FlowEdge(edge_id="e2", from_node="critic", to_node="final", edge_type="sequence", priority=50),
+            FlowEdge(
+                edge_id="e1", from_node="critic", to_node="author", edge_type="loop", priority=40
+            ),
+            FlowEdge(
+                edge_id="e2", from_node="critic", to_node="final", edge_type="sequence", priority=50
+            ),
         ]
 
         analysis = analyze_node_edges("critic", edges)
@@ -221,8 +260,16 @@ class TestStepOrdering:
             FlowNode(node_id="critic", template_id="", params={}, overrides={}),
         ]
         edges = [
-            FlowEdge(edge_id="e1", from_node="author", to_node="critic", edge_type="sequence", priority=50),
-            FlowEdge(edge_id="e2", from_node="critic", to_node="author", edge_type="loop", priority=40),
+            FlowEdge(
+                edge_id="e1",
+                from_node="author",
+                to_node="critic",
+                edge_type="sequence",
+                priority=50,
+            ),
+            FlowEdge(
+                edge_id="e2", from_node="critic", to_node="author", edge_type="loop", priority=40
+            ),
         ]
 
         order = infer_step_order(nodes, edges)
@@ -292,9 +339,7 @@ class TestRealFlowConversion:
 
     def test_build_flow_has_microloops(self, repo_root, build_flow_json):
         """Verify build flow preserves microloop patterns."""
-        flow_def = load_flow_from_json(
-            repo_root / "swarm" / "packs" / "flows" / "build.json"
-        )
+        flow_def = load_flow_from_json(repo_root / "swarm" / "packs" / "flows" / "build.json")
 
         # Find test-critic step
         test_critic = next((s for s in flow_def.steps if s.id == "test-critic"), None)

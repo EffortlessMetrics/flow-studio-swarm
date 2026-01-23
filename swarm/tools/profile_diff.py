@@ -94,11 +94,13 @@ def build_profile_from_current() -> Profile:
         for yaml_file in sorted(flows_dir.glob("*.yaml")):
             content = yaml_file.read_text(encoding="utf-8")
             rel_path = str(yaml_file.relative_to(_SWARM_ROOT))
-            flow_configs.append(ConfigEntry(
-                key=yaml_file.stem,
-                path=rel_path,
-                yaml=content,
-            ))
+            flow_configs.append(
+                ConfigEntry(
+                    key=yaml_file.stem,
+                    path=rel_path,
+                    yaml=content,
+                )
+            )
 
     # Read per-agent configs
     agent_configs: list[ConfigEntry] = []
@@ -107,11 +109,13 @@ def build_profile_from_current() -> Profile:
         for yaml_file in sorted(agents_dir.glob("*.yaml")):
             content = yaml_file.read_text(encoding="utf-8")
             rel_path = str(yaml_file.relative_to(_SWARM_ROOT))
-            agent_configs.append(ConfigEntry(
-                key=yaml_file.stem,
-                path=rel_path,
-                yaml=content,
-            ))
+            agent_configs.append(
+                ConfigEntry(
+                    key=yaml_file.stem,
+                    path=rel_path,
+                    yaml=content,
+                )
+            )
 
     # Create profile metadata
     meta = ProfileMeta(
@@ -141,12 +145,14 @@ def format_unified_diff(
     lines_a = content_a.splitlines(keepends=True)
     lines_b = content_b.splitlines(keepends=True)
 
-    diff_lines = list(difflib.unified_diff(
-        lines_a,
-        lines_b,
-        fromfile=filename_a,
-        tofile=filename_b,
-    ))
+    diff_lines = list(
+        difflib.unified_diff(
+            lines_a,
+            lines_b,
+            fromfile=filename_a,
+            tofile=filename_b,
+        )
+    )
 
     if not use_color:
         return diff_lines

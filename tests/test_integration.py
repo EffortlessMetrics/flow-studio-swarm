@@ -15,7 +15,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from conftest import (
     add_agent_to_registry,
     assert_validator_failed,
@@ -46,7 +45,7 @@ def test_validate_current_repository(run_validator):
         ["uv", "run", "swarm/tools/validate_swarm.py"],
         cwd=repo_root,
         capture_output=True,
-        text=True
+        text=True,
     )
 
     # If repo is properly aligned, should pass
@@ -94,13 +93,13 @@ def test_all_42_agents_present(run_validator):
     if agents_md.exists():
         content = agents_md.read_text(encoding="utf-8")
         # Count "- key:" entries
-        agent_count = content.count("- key:")
+        content.count("- key:")
 
         # Count agent files
         agents_dir = repo_root / ".claude" / "agents"
         if agents_dir.exists():
             agent_files = list(agents_dir.glob("*.md"))
-            file_count = len(agent_files)
+            len(agent_files)
 
             # Counts should match
             # Note: Actual count may differ from 42 depending on repo state
@@ -376,7 +375,7 @@ model: inherit
 Agent prompt.
 """)
 
-    result = run_validator(temp_repo)
+    run_validator(temp_repo)
     # Should either pass or fail with parse error (but not execute code)
     # This is more of a code review item
 
@@ -390,7 +389,7 @@ def test_path_traversal_resistance(temp_repo, run_validator):
     # Try to create agent with path traversal in name
     add_agent_to_registry(temp_repo, "../../../etc/passwd")
 
-    result = run_validator(temp_repo)
+    run_validator(temp_repo)
     # Should fail gracefully without accessing outside repo
 
 
@@ -421,11 +420,11 @@ def test_validation_passes_on_clean_repo(run_validator):
     """
     repo_root = Path(__file__).parent.parent.resolve()
 
-    result = subprocess.run(
+    subprocess.run(
         ["uv", "run", "swarm/tools/validate_swarm.py"],
         cwd=repo_root,
         capture_output=True,
-        text=True
+        text=True,
     )
 
     # If repo is clean, should pass
@@ -679,11 +678,7 @@ def test_large_realistic_repository(temp_repo, run_validator):
 
     # Create 6 flows
     for flow_num in range(1, 7):
-        create_flow_file(
-            temp_repo,
-            f"flow-{flow_num}",
-            [f"agent-{i:02d}" for i in range(0, 5)]
-        )
+        create_flow_file(temp_repo, f"flow-{flow_num}", [f"agent-{i:02d}" for i in range(0, 5)])
 
     result = run_validator(temp_repo)
     assert_validator_passed(result)
@@ -726,7 +721,7 @@ def test_unicode_in_agent_names(temp_repo, run_validator):
         add_agent_to_registry(temp_repo, "test-agent-café")
         create_agent_file(temp_repo, "test-agent-café")
 
-        result = run_validator(temp_repo)
+        run_validator(temp_repo)
         # Should either pass or fail gracefully
     except Exception:
         # Unicode may not be supported
@@ -762,13 +757,10 @@ def test_symlink_agents_skipped(temp_repo, run_validator):
     # Only test symlink support on Unix-like systems
     try:
         # Create symlink pointing to real-agent.md
-        os.symlink(
-            agents_dir / "real-agent.md",
-            symlink_path
-        )
+        os.symlink(agents_dir / "real-agent.md", symlink_path)
 
         # Run validator
-        result = run_validator(temp_repo)
+        run_validator(temp_repo)
 
         # Validator should pass (symlink skipped, real agent validated)
         # If symlink was followed, it would cause duplicate agent issues

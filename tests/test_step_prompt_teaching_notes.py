@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import pytest
 
@@ -43,17 +43,14 @@ if str(repo_root) not in sys.path:
 
 from swarm.config.flow_registry import (
     FlowRegistry,
-    StepDefinition,
     TeachingNotes,
 )
 from swarm.runtime.engines import (
     ClaudeStepEngine,
     GeminiStepEngine,
-    HistoryTruncationInfo,
     StepContext,
 )
 from swarm.runtime.types import RunSpec
-
 
 # -----------------------------------------------------------------------------
 # Helper: Extract prompt text from _build_prompt tuple return
@@ -221,9 +218,7 @@ class TestTeachingNotesInPrompt:
 
         # Verify inputs appear in prompt
         for input_path in teaching_notes.inputs:
-            assert input_path in prompt, (
-                f"Input path '{input_path}' should appear in prompt"
-            )
+            assert input_path in prompt, f"Input path '{input_path}' should appear in prompt"
 
     def test_outputs_appear_in_prompt_gemini(
         self,
@@ -256,9 +251,7 @@ class TestTeachingNotesInPrompt:
         prompt = build_prompt_text(gemini_engine, ctx)
 
         for output_path in teaching_notes.outputs:
-            assert output_path in prompt, (
-                f"Output path '{output_path}' should appear in prompt"
-            )
+            assert output_path in prompt, f"Output path '{output_path}' should appear in prompt"
 
     def test_emphasizes_appear_in_prompt_claude(
         self,
@@ -290,9 +283,7 @@ class TestTeachingNotesInPrompt:
         prompt = build_prompt_text(claude_engine, ctx)
 
         for emphasis in teaching_notes.emphasizes:
-            assert emphasis in prompt, (
-                f"Emphasis '{emphasis}' should appear in prompt"
-            )
+            assert emphasis in prompt, f"Emphasis '{emphasis}' should appear in prompt"
 
     def test_constraints_appear_in_prompt_claude(
         self,
@@ -324,9 +315,7 @@ class TestTeachingNotesInPrompt:
         prompt = build_prompt_text(claude_engine, ctx)
 
         for constraint in teaching_notes.constraints:
-            assert constraint in prompt, (
-                f"Constraint '{constraint}' should appear in prompt"
-            )
+            assert constraint in prompt, f"Constraint '{constraint}' should appear in prompt"
 
 
 # -----------------------------------------------------------------------------
@@ -390,9 +379,7 @@ class TestCurrentPromptStructure:
 
         prompt = build_prompt_text(gemini_engine, ctx)
 
-        assert "Execute the important task with care" in prompt, (
-            "Step role should appear in prompt"
-        )
+        assert "Execute the important task with care" in prompt, "Step role should appear in prompt"
 
     def test_prompt_includes_agent_assignment(
         self,
@@ -516,9 +503,7 @@ class TestTeachingNotesExistence:
             if step.teaching_notes is not None:
                 steps_with_notes += 1
 
-        assert steps_with_notes > 0, (
-            "Build flow should have at least one step with teaching_notes"
-        )
+        assert steps_with_notes > 0, "Build flow should have at least one step with teaching_notes"
 
     def test_teaching_notes_have_inputs(self) -> None:
         """Teaching notes in build.yaml have inputs defined."""
@@ -575,12 +560,8 @@ class TestTeachingNotesExistence:
                 assert isinstance(step.teaching_notes, TeachingNotes), (
                     f"Step {step.id} teaching_notes should be TeachingNotes instance"
                 )
-                assert isinstance(step.teaching_notes.inputs, tuple), (
-                    "inputs should be a tuple"
-                )
-                assert isinstance(step.teaching_notes.outputs, tuple), (
-                    "outputs should be a tuple"
-                )
+                assert isinstance(step.teaching_notes.inputs, tuple), "inputs should be a tuple"
+                assert isinstance(step.teaching_notes.outputs, tuple), "outputs should be a tuple"
                 assert isinstance(step.teaching_notes.emphasizes, tuple), (
                     "emphasizes should be a tuple"
                 )

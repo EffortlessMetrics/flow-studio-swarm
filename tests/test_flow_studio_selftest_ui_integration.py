@@ -37,9 +37,9 @@ repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
+from typing import Any, Dict, Optional
+
 import pytest
-import json
-from typing import Dict, Any, Optional
 from fastapi.testclient import TestClient
 
 
@@ -47,6 +47,7 @@ from fastapi.testclient import TestClient
 def api_client():
     """HTTP client for API requests using FastAPI TestClient."""
     from swarm.tools.flow_studio_fastapi import app
+
     client = TestClient(app)
     return client
 
@@ -106,11 +107,12 @@ class TestFlowStudioSelftestUI:
 
         # Verify UI-renderable fields are present
         for step in plan["steps"]:
-            assert "id" in step, f"Step missing id"
-            assert "description" in step, f"Step missing description"
-            assert "tier" in step, f"Step missing tier"
-            assert step["tier"] in ["kernel", "governance", "optional"], \
+            assert "id" in step, "Step missing id"
+            assert "description" in step, "Step missing description"
+            assert "tier" in step, "Step missing tier"
+            assert step["tier"] in ["kernel", "governance", "optional"], (
                 f"Invalid tier: {step['tier']}"
+            )
 
     def test_ac_badge_rendering(self, api_client):
         """
@@ -147,9 +149,9 @@ class TestFlowStudioSelftestUI:
 
         # Expected tier color mapping (from UI CSS)
         TIER_COLORS = {
-            "kernel": "critical",      # red badge
-            "governance": "warning",   # orange badge
-            "optional": "pass"         # gray badge (default)
+            "kernel": "critical",  # red badge
+            "governance": "warning",  # orange badge
+            "optional": "pass",  # gray badge (default)
         }
 
         steps_with_ac = [s for s in plan["steps"] if s.get("ac_ids")]
@@ -161,16 +163,14 @@ class TestFlowStudioSelftestUI:
             ac_ids = step["ac_ids"]
 
             # Verify tier is valid
-            assert tier in TIER_COLORS, \
-                f"Step {step_id} has invalid tier: {tier}"
+            assert tier in TIER_COLORS, f"Step {step_id} has invalid tier: {tier}"
 
             # Verify AC badges have required data
             assert len(ac_ids) > 0, f"Step {step_id} has empty ac_ids array"
 
             for ac_id in ac_ids:
                 # Verify AC ID format (should be like AC-SELFTEST-*)
-                assert ac_id.startswith("AC-"), \
-                    f"Invalid AC ID format: {ac_id}"
+                assert ac_id.startswith("AC-"), f"Invalid AC ID format: {ac_id}"
 
                 # Get expected CSS class for tier
                 tier_color_class = TIER_COLORS[tier]
@@ -178,8 +178,9 @@ class TestFlowStudioSelftestUI:
                 # In the UI, badge would be rendered as:
                 # <div class="selftest-ac-badge {tier_color_class}">
                 # Here we verify the data structure supports this
-                assert tier_color_class in ["critical", "warning", "pass"], \
+                assert tier_color_class in ["critical", "warning", "pass"], (
                     f"Invalid tier color class: {tier_color_class}"
+                )
 
     def test_step_card_displays_tier_and_status(self, api_client):
         """
@@ -229,11 +230,13 @@ class TestFlowStudioSelftestUI:
             tier = step["tier"]
 
             # Verify tier can be displayed
-            assert tier in ["kernel", "governance", "optional"], \
+            assert tier in ["kernel", "governance", "optional"], (
                 f"Step {step_id} has invalid tier: {tier}"
+            )
             tier_display = tier.upper()
-            assert tier_display in ["KERNEL", "GOVERNANCE", "OPTIONAL"], \
+            assert tier_display in ["KERNEL", "GOVERNANCE", "OPTIONAL"], (
                 f"Tier display invalid: {tier_display}"
+            )
 
             # Determine status from API data
             if step_id in failed_steps:
@@ -247,10 +250,10 @@ class TestFlowStudioSelftestUI:
                 expected_icon = "✓"
 
             # Verify status data is available for UI rendering
-            assert expected_status in ["PASS", "DEGRADED", "FAIL"], \
+            assert expected_status in ["PASS", "DEGRADED", "FAIL"], (
                 f"Invalid status for step {step_id}"
-            assert expected_icon in ["✓", "⚠️", "❌"], \
-                f"Invalid status icon for step {step_id}"
+            )
+            assert expected_icon in ["✓", "⚠️", "❌"], f"Invalid status icon for step {step_id}"
 
     def test_step_card_shows_dependencies(self, api_client):
         """
@@ -281,28 +284,28 @@ class TestFlowStudioSelftestUI:
         # Build set of valid step IDs
         all_step_ids = {s["id"] for s in plan["steps"]}
 
-        steps_with_deps = [s for s in plan["steps"] if s.get("depends_on")]
+        [s for s in plan["steps"] if s.get("depends_on")]
 
         for step in plan["steps"]:
             step_id = step["id"]
             depends_on = step.get("depends_on", [])
 
             # Verify depends_on is a list
-            assert isinstance(depends_on, list), \
+            assert isinstance(depends_on, list), (
                 f"Step {step_id} depends_on should be list, got {type(depends_on)}"
+            )
 
             if len(depends_on) > 0:
                 # Verify each dependency is a valid step ID
                 for dep in depends_on:
-                    assert dep in all_step_ids, \
-                        f"Step {step_id} depends on unknown step: {dep}"
+                    assert dep in all_step_ids, f"Step {step_id} depends on unknown step: {dep}"
 
                 # Verify UI can render dependency list
                 dep_text = ", ".join(depends_on)
-                assert len(dep_text) > 0, \
-                    f"Step {step_id} dependency text is empty"
-                assert all(c.isalnum() or c in ["-", "_", ",", " "] for c in dep_text), \
+                assert len(dep_text) > 0, f"Step {step_id} dependency text is empty"
+                assert all(c.isalnum() or c in ["-", "_", ",", " "] for c in dep_text), (
                     f"Step {step_id} dependency text has invalid characters"
+                )
 
     def test_degradations_section_renders(self, api_client):
         """
@@ -348,8 +351,7 @@ class TestFlowStudioSelftestUI:
         degradations = selftest_status.get("degradations", [])
 
         # Verify degradations is a list
-        assert isinstance(degradations, list), \
-            "degradations should be a list"
+        assert isinstance(degradations, list), "degradations should be a list"
 
         if len(degradations) == 0:
             # Should render "No degradations" message
@@ -358,22 +360,18 @@ class TestFlowStudioSelftestUI:
         else:
             # Verify each degradation has required fields
             for i, deg in enumerate(degradations):
-                assert "step_id" in deg, \
-                    f"Degradation {i} missing step_id"
-                assert "timestamp" in deg, \
-                    f"Degradation {i} missing timestamp"
-                assert "message" in deg, \
-                    f"Degradation {i} missing message"
-                assert "severity" in deg, \
-                    f"Degradation {i} missing severity"
+                assert "step_id" in deg, f"Degradation {i} missing step_id"
+                assert "timestamp" in deg, f"Degradation {i} missing timestamp"
+                assert "message" in deg, f"Degradation {i} missing message"
+                assert "severity" in deg, f"Degradation {i} missing severity"
 
                 # Verify severity is valid
-                assert deg["severity"] in ["CRITICAL", "WARNING", "INFO"], \
+                assert deg["severity"] in ["CRITICAL", "WARNING", "INFO"], (
                     f"Degradation {i} has invalid severity: {deg['severity']}"
+                )
 
                 # Verify message is non-empty
-                assert len(deg["message"]) > 0, \
-                    f"Degradation {i} has empty message"
+                assert len(deg["message"]) > 0, f"Degradation {i} has empty message"
 
     def test_degradation_severity_colors(self, api_client):
         """
@@ -409,9 +407,9 @@ class TestFlowStudioSelftestUI:
 
         # Expected severity color mapping (from UI)
         SEVERITY_COLORS = {
-            "CRITICAL": "#dc2626",   # red
-            "WARNING": "#f97316",    # orange
-            "INFO": "#3b82f6"        # blue
+            "CRITICAL": "#dc2626",  # red
+            "WARNING": "#f97316",  # orange
+            "INFO": "#3b82f6",  # blue
         }
 
         governance = status.get("governance", {})
@@ -422,18 +420,16 @@ class TestFlowStudioSelftestUI:
             severity = deg.get("severity")
 
             # Verify severity has color mapping
-            assert severity in SEVERITY_COLORS, \
-                f"Degradation {i} has unmapped severity: {severity}"
+            assert severity in SEVERITY_COLORS, f"Degradation {i} has unmapped severity: {severity}"
 
             color = SEVERITY_COLORS[severity]
 
             # Verify color is valid CSS hex
-            assert color.startswith("#"), \
-                f"Severity {severity} color should be hex, got: {color}"
-            assert len(color) == 7, \
-                f"Severity {severity} color should be 7 chars, got: {color}"
-            assert all(c in "0123456789abcdef" for c in color[1:].lower()), \
+            assert color.startswith("#"), f"Severity {severity} color should be hex, got: {color}"
+            assert len(color) == 7, f"Severity {severity} color should be 7 chars, got: {color}"
+            assert all(c in "0123456789abcdef" for c in color[1:].lower()), (
                 f"Severity {severity} color has invalid hex: {color}"
+            )
 
     def test_status_banner_reflects_api(self, api_client):
         """
@@ -472,9 +468,9 @@ class TestFlowStudioSelftestUI:
 
         # Expected state color mapping (based on selftest status)
         STATUS_COLORS = {
-            "GREEN": "#059669",   # green (healthy)
+            "GREEN": "#059669",  # green (healthy)
             "YELLOW": "#f97316",  # orange (degraded)
-            "RED": "#dc2626"      # red (broken)
+            "RED": "#dc2626",  # red (broken)
         }
 
         # Extract selftest status
@@ -487,8 +483,11 @@ class TestFlowStudioSelftestUI:
             pytest.skip("Selftest report not available or has format issues - status is UNKNOWN")
 
         # Verify status is valid
-        assert selftest_status in STATUS_COLORS or selftest_status in ["PASS", "DEGRADED", "FAIL"], \
-            f"Invalid status: {selftest_status}"
+        assert selftest_status in STATUS_COLORS or selftest_status in [
+            "PASS",
+            "DEGRADED",
+            "FAIL",
+        ], f"Invalid status: {selftest_status}"
 
         # Map to color (handle both status formats)
         if selftest_status in STATUS_COLORS:
@@ -501,15 +500,12 @@ class TestFlowStudioSelftestUI:
             color = STATUS_COLORS["RED"]
 
         # Verify color is valid
-        assert color.startswith("#"), \
-            f"Status {selftest_status} color should be hex, got: {color}"
+        assert color.startswith("#"), f"Status {selftest_status} color should be hex, got: {color}"
 
         # Verify banner text can be rendered
         banner_text = f"Selftest Status: {selftest_status}"
-        assert len(banner_text) > 0, \
-            "Banner text is empty"
-        assert selftest_status in banner_text, \
-            f"Banner text should contain status: {banner_text}"
+        assert len(banner_text) > 0, "Banner text is empty"
+        assert selftest_status in banner_text, f"Banner text should contain status: {banner_text}"
 
     def test_step_modal_status_indicator(self, api_client):
         """
@@ -556,11 +552,7 @@ class TestFlowStudioSelftestUI:
         degraded_steps = set(selftest_status.get("degraded_steps", []))
 
         # Status icon mapping
-        STATUS_ICONS = {
-            "PASS": "✓",
-            "DEGRADED": "⚠️",
-            "FAIL": "❌"
-        }
+        STATUS_ICONS = {"PASS": "✓", "DEGRADED": "⚠️", "FAIL": "❌"}
 
         for step in plan["steps"]:
             step_id = step["id"]
@@ -574,19 +566,17 @@ class TestFlowStudioSelftestUI:
                 status_state = "PASS"
 
             # Verify status can be rendered
-            assert status_state in STATUS_ICONS, \
+            assert status_state in STATUS_ICONS, (
                 f"Step {step_id} has invalid status: {status_state}"
+            )
 
             icon = STATUS_ICONS[status_state]
-            assert len(icon) > 0, \
-                f"Step {step_id} status icon is empty"
+            assert len(icon) > 0, f"Step {step_id} status icon is empty"
 
             # Verify status text can be generated
             status_text = f"Status: {status_state}"
-            assert len(status_text) > 0, \
-                f"Step {step_id} status text is empty"
-            assert status_state in status_text, \
-                f"Status text should contain state: {status_text}"
+            assert len(status_text) > 0, f"Step {step_id} status text is empty"
+            assert status_state in status_text, f"Status text should contain state: {status_text}"
 
     def test_empty_plan_graceful_handling(self, api_client):
         """
@@ -619,10 +609,8 @@ class TestFlowStudioSelftestUI:
 
         if "error" in plan:
             # Graceful error handling
-            assert isinstance(plan["error"], str), \
-                "Error should be string message"
-            assert len(plan["error"]) > 0, \
-                "Error message should not be empty"
+            assert isinstance(plan["error"], str), "Error should be string message"
+            assert len(plan["error"]) > 0, "Error message should not be empty"
         else:
             # Plan should have required structure
             assert "steps" in plan, "Plan missing steps"
@@ -630,8 +618,7 @@ class TestFlowStudioSelftestUI:
 
             # If steps empty, that's valid (graceful handling)
             if len(plan["steps"]) == 0:
-                assert plan["steps"] == [], \
-                    "Empty steps should be empty array"
+                assert plan["steps"] == [], "Empty steps should be empty array"
 
 
 @pytest.mark.integration
@@ -682,23 +669,19 @@ def test_flow_studio_selftest_ui_coherence(api_client):
 
     # Coherence check 1: All failed/degraded steps exist in plan
     for step_id in failed_steps:
-        assert step_id in plan_step_ids, \
-            f"Status references unknown failed step: {step_id}"
+        assert step_id in plan_step_ids, f"Status references unknown failed step: {step_id}"
 
     for step_id in degraded_steps:
-        assert step_id in plan_step_ids, \
-            f"Status references unknown degraded step: {step_id}"
+        assert step_id in plan_step_ids, f"Status references unknown degraded step: {step_id}"
 
     # Coherence check 2: All degradations reference valid steps
     for deg in degradations:
         step_id = deg.get("step_id")
-        assert step_id in plan_step_ids, \
-            f"Degradation references unknown step: {step_id}"
+        assert step_id in plan_step_ids, f"Degradation references unknown step: {step_id}"
 
     # Coherence check 3: AC IDs follow expected format
     for ac_id in plan_ac_ids:
-        assert ac_id.startswith("AC-"), \
-            f"Invalid AC ID format: {ac_id}"
+        assert ac_id.startswith("AC-"), f"Invalid AC ID format: {ac_id}"
 
     # Success: UI/API coherence verified
     assert True, "UI/API coherence verified"

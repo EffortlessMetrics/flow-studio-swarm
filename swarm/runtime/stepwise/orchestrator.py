@@ -45,18 +45,13 @@ from swarm.config.flow_registry import (
 from swarm.runtime import storage as storage_module
 from swarm.runtime.engines import StepContext, StepEngine
 
-
 # Macro navigation imports (between-flow routing)
 from swarm.runtime.macro_navigator import (
     MacroNavigator,
     extract_flow_result,
 )
-from swarm.runtime.router import FlowGraph  # For Navigator integration
-
-
 from swarm.runtime.types import (
     FlowResult,
-    InjectedNodeSpec,
     MacroAction,
     MacroRoutingDecision,
     RoutingMode,
@@ -70,8 +65,16 @@ from swarm.runtime.types import (
     generate_run_id,
 )
 
+# Utility flow injection imports
+from swarm.runtime.utility_flow_injection import (
+    InjectionTriggerDetector,
+    UtilityFlowInjector,
+    UtilityFlowRegistry,
+)
+
 # Modular stepwise components
-from .engine_runner import emit_step_execution_events, run_step as run_step_via_engine
+from .engine_runner import emit_step_execution_events
+from .engine_runner import run_step as run_step_via_engine
 from .envelope import ensure_step_envelope
 from .graph_bridge import build_flow_graph_from_definition
 from .models import FlowExecutionResult, FlowStepwiseSummary, ResolvedNode
@@ -79,18 +82,9 @@ from .node_resolver import resolve_node
 from .receipt_compat import update_receipt_routing
 from .routing import (
     build_routing_context,
-    RoutingOutcome,
     route_step,
 )
 from .spec_facade import SpecFacade
-
-# Utility flow injection imports
-from swarm.runtime.utility_flow_injection import (
-    InjectionTriggerDetector,
-    TriggerDetectionResult,
-    UtilityFlowInjector,
-    UtilityFlowRegistry,
-)
 
 # Sentinel for unset cached value (distinguishes None from "not computed")
 _GIT_STATUS_UNSET = object()
@@ -197,7 +191,9 @@ class StepwiseOrchestrator:
             logger.info("Orchestrator initialized in %s mode with Navigator", routing_mode.value)
         else:
             self._navigation_orchestrator = navigation_orchestrator
-            logger.info("Orchestrator initialized in %s mode with custom Navigator", routing_mode.value)
+            logger.info(
+                "Orchestrator initialized in %s mode with custom Navigator", routing_mode.value
+            )
 
         # Stop request tracking for graceful interruption
         self._stop_requests: Dict[RunId, threading.Event] = {}
@@ -1094,7 +1090,6 @@ class StepwiseOrchestrator:
                 # Utility flow was injected - redirect to it
                 next_step_id = injection_result
                 reason = "utility_flow_injected"
-                routing_source = "utility_flow_injection"
 
                 # Emit injection event
                 storage_module.append_event(
@@ -1125,7 +1120,6 @@ class StepwiseOrchestrator:
                 # Utility flow completed - resume at the interrupted node
                 next_step_id = resume_node
                 reason = "utility_flow_completed:return"
-                routing_source = "utility_flow_return"
 
                 # Emit resumption event
                 storage_module.append_event(
@@ -1503,7 +1497,11 @@ class StepwiseOrchestrator:
 
             logger.debug(
                 "Git status: branch=%s upstream=%s behind=%d ahead=%d diverged=%s",
-                branch, upstream, behind_count, ahead_count, diverged,
+                branch,
+                upstream,
+                behind_count,
+                ahead_count,
+                diverged,
             )
 
             return self._cached_git_status

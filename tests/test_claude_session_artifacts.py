@@ -6,11 +6,10 @@ These tests pin the invariants introduced in the session_runner refactor:
 3. repo_root fallback (engine.repo_root or ctx.repo_root) works correctly
 """
 
-import pytest
 from pathlib import Path
 
-from swarm.runtime.types import RoutingDecision
 from swarm.runtime.routing_utils import parse_routing_decision
+from swarm.runtime.types import RoutingDecision
 
 
 class TestParseRoutingDecision:
@@ -122,10 +121,11 @@ class TestRepoRootFallback:
 
     def test_hydrate_context_uses_ctx_repo_root_as_fallback(self):
         """_hydrate_context falls back to ctx.repo_root when engine.repo_root is None."""
+        import tempfile
+
         from swarm.runtime.engines.claude.engine import ClaudeStepEngine
         from swarm.runtime.engines.models import StepContext
         from swarm.runtime.types import RunSpec
-        import tempfile
 
         engine = ClaudeStepEngine(repo_root=None, mode="stub")
 
@@ -159,8 +159,9 @@ class TestSessionEnvelopePaths:
 
     def test_committed_envelope_path_format(self):
         """Committed envelope path follows canonical format."""
-        from swarm.runtime.path_helpers import handoff_envelope_path
         import tempfile
+
+        from swarm.runtime.path_helpers import handoff_envelope_path
 
         with tempfile.TemporaryDirectory() as tmpdir:
             run_base = Path(tmpdir)
@@ -174,8 +175,9 @@ class TestSessionEnvelopePaths:
 
     def test_draft_vs_committed_envelope_distinction(self):
         """Draft and committed envelopes have distinct paths."""
-        from swarm.runtime.path_helpers import handoff_envelope_path
         import tempfile
+
+        from swarm.runtime.path_helpers import handoff_envelope_path
 
         with tempfile.TemporaryDirectory() as tmpdir:
             run_base = Path(tmpdir)
@@ -201,12 +203,12 @@ class TestA3EnvelopeFirstRouting:
 
     def test_read_routing_from_envelope_returns_signal_when_present(self):
         """read_routing_from_envelope returns routing_signal from committed envelope."""
-        from swarm.runtime.handoff_io import (
-            write_handoff_envelope,
-            read_routing_from_envelope,
-        )
         import tempfile
-        import json
+
+        from swarm.runtime.handoff_io import (
+            read_routing_from_envelope,
+            write_handoff_envelope,
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             run_base = Path(tmpdir)
@@ -235,11 +237,12 @@ class TestA3EnvelopeFirstRouting:
 
     def test_read_routing_from_envelope_returns_none_when_no_signal(self):
         """read_routing_from_envelope returns None when routing_signal is missing."""
-        from swarm.runtime.handoff_io import (
-            write_handoff_envelope,
-            read_routing_from_envelope,
-        )
         import tempfile
+
+        from swarm.runtime.handoff_io import (
+            read_routing_from_envelope,
+            write_handoff_envelope,
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             run_base = Path(tmpdir)
@@ -259,8 +262,9 @@ class TestA3EnvelopeFirstRouting:
 
     def test_read_routing_from_envelope_returns_none_for_missing_envelope(self):
         """read_routing_from_envelope returns None when envelope doesn't exist."""
-        from swarm.runtime.handoff_io import read_routing_from_envelope
         import tempfile
+
+        from swarm.runtime.handoff_io import read_routing_from_envelope
 
         with tempfile.TemporaryDirectory() as tmpdir:
             run_base = Path(tmpdir)
@@ -273,12 +277,13 @@ class TestA3EnvelopeFirstRouting:
 
     def test_update_envelope_routing_persists_fallback_routing(self):
         """update_envelope_routing persists fallback routing to envelope."""
-        from swarm.runtime.handoff_io import (
-            write_handoff_envelope,
-            update_envelope_routing,
-            read_routing_from_envelope,
-        )
         import tempfile
+
+        from swarm.runtime.handoff_io import (
+            read_routing_from_envelope,
+            update_envelope_routing,
+            write_handoff_envelope,
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             run_base = Path(tmpdir)
@@ -322,13 +327,14 @@ class TestA3EnvelopeFirstRouting:
 
     def test_envelope_routing_with_loop_decision(self):
         """Envelope routing correctly handles LOOP decisions."""
+        import tempfile
+
         from swarm.runtime.handoff_io import (
-            write_handoff_envelope,
             read_routing_from_envelope,
+            write_handoff_envelope,
         )
         from swarm.runtime.routing_utils import parse_routing_decision
         from swarm.runtime.types import RoutingDecision
-        import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
             run_base = Path(tmpdir)
@@ -356,13 +362,14 @@ class TestA3EnvelopeFirstRouting:
 
     def test_envelope_routing_with_terminate_decision(self):
         """Envelope routing correctly handles TERMINATE decisions."""
+        import tempfile
+
         from swarm.runtime.handoff_io import (
-            write_handoff_envelope,
             read_routing_from_envelope,
+            write_handoff_envelope,
         )
         from swarm.runtime.routing_utils import parse_routing_decision
         from swarm.runtime.types import RoutingDecision
-        import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
             run_base = Path(tmpdir)

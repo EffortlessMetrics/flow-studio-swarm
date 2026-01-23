@@ -35,7 +35,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 import yaml
-
 from swarm.utils.yaml_utils import load_yaml
 
 if TYPE_CHECKING:

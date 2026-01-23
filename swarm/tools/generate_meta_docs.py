@@ -79,7 +79,7 @@ def generate_agent_counts(meta: Dict[str, Any]) -> str:
 
 def generate_selftest_counts(meta: Dict[str, Any]) -> str:
     """Generate selftest counts snippet."""
-    tiers = meta['selftest']['tiers']
+    tiers = meta["selftest"]["tiers"]
     return (
         f"**{meta['selftest']['total']} selftest steps** "
         f"({tiers['KERNEL']} KERNEL + {tiers['GOVERNANCE']} GOVERNANCE + {tiers['OPTIONAL']} OPTIONAL)"
@@ -88,20 +88,20 @@ def generate_selftest_counts(meta: Dict[str, Any]) -> str:
 
 def generate_skills_counts(meta: Dict[str, Any]) -> str:
     """Generate skills counts snippet."""
-    skills_list = ", ".join(meta['skills']['list'])
+    skills_list = ", ".join(meta["skills"]["list"])
     return f"**{meta['skills']['count']} skills** ({skills_list})"
 
 
 def generate_full_summary(meta: Dict[str, Any]) -> str:
     """Generate full metadata summary."""
-    tiers = meta['selftest']['tiers']
-    skills_list = ", ".join(meta['skills']['list'])
+    tiers = meta["selftest"]["tiers"]
+    skills_list = ", ".join(meta["skills"]["list"])
     return f"""**Swarm Metadata** (auto-generated from configuration)
 
-- **Agents**: {meta['agents']['total']} total ({meta['agents']['built_in']} built-in + {meta['agents']['domain']} domain)
-- **Selftest**: {meta['selftest']['total']} steps ({tiers['KERNEL']} KERNEL + {tiers['GOVERNANCE']} GOVERNANCE + {tiers['OPTIONAL']} OPTIONAL)
-- **Skills**: {meta['skills']['count']} ({skills_list})
-- **Flows**: {meta['flows']['sdlc_count']} SDLC flows"""
+- **Agents**: {meta["agents"]["total"]} total ({meta["agents"]["built_in"]} built-in + {meta["agents"]["domain"]} domain)
+- **Selftest**: {meta["selftest"]["total"]} steps ({tiers["KERNEL"]} KERNEL + {tiers["GOVERNANCE"]} GOVERNANCE + {tiers["OPTIONAL"]} OPTIONAL)
+- **Skills**: {meta["skills"]["count"]} ({skills_list})
+- **Flows**: {meta["flows"]["sdlc_count"]} SDLC flows"""
 
 
 # Marker name -> generator function
@@ -120,16 +120,15 @@ def find_markers(content: str) -> List[Tuple[str, int, int]]:
     Returns list of (marker_name, start_pos, end_pos) tuples.
     """
     markers = []
-    pattern = re.compile(
-        r'<!-- META:(\w+) -->\n(.*?)<!-- /META:\1 -->',
-        re.DOTALL
-    )
+    pattern = re.compile(r"<!-- META:(\w+) -->\n(.*?)<!-- /META:\1 -->", re.DOTALL)
     for match in pattern.finditer(content):
-        markers.append((
-            match.group(1),  # marker name
-            match.start(),   # start position
-            match.end(),     # end position
-        ))
+        markers.append(
+            (
+                match.group(1),  # marker name
+                match.start(),  # start position
+                match.end(),  # end position
+            )
+        )
     return markers
 
 
@@ -156,11 +155,13 @@ def update_markers(content: str, meta: Dict[str, Any]) -> Tuple[str, List[Dict[s
         # Check if content changed
         old_section = content[start:end]
         if old_section != replacement:
-            changes.append({
-                "marker": marker_name,
-                "old_length": len(old_section),
-                "new_length": len(replacement),
-            })
+            changes.append(
+                {
+                    "marker": marker_name,
+                    "old_length": len(old_section),
+                    "new_length": len(replacement),
+                }
+            )
 
         content = content[:start] + replacement + content[end:]
 
@@ -168,9 +169,7 @@ def update_markers(content: str, meta: Dict[str, Any]) -> Tuple[str, List[Dict[s
 
 
 def process_file(
-    file_path: Path,
-    meta: Dict[str, Any],
-    dry_run: bool = False
+    file_path: Path, meta: Dict[str, Any], dry_run: bool = False
 ) -> Optional[Dict[str, Any]]:
     """
     Process a single documentation file.
@@ -181,7 +180,7 @@ def process_file(
         return None
 
     try:
-        content = file_path.read_text(encoding='utf-8')
+        content = file_path.read_text(encoding="utf-8")
     except Exception as e:
         return {"file": str(file_path), "error": str(e)}
 
@@ -202,7 +201,7 @@ def process_file(
 
     # Write if not dry-run and content changed
     if not dry_run and updated_content != content:
-        file_path.write_text(updated_content, encoding='utf-8')
+        file_path.write_text(updated_content, encoding="utf-8")
         result["written"] = True
     else:
         result["written"] = False
@@ -211,29 +210,15 @@ def process_file(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Generate documentation from swarm metadata"
+    parser = argparse.ArgumentParser(description="Generate documentation from swarm metadata")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Preview changes without writing files"
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Preview changes without writing files"
+        "--check", action="store_true", help="Check if docs are up-to-date (exit 1 if not)"
     )
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Check if docs are up-to-date (exit 1 if not)"
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output results as JSON"
-    )
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Verbose output"
-    )
+    parser.add_argument("--json", action="store_true", help="Output results as JSON")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     args = parser.parse_args()
 
     repo_root = get_repo_root()
@@ -265,7 +250,9 @@ def main() -> int:
         print("=" * 50)
         print()
         print("Computed metadata:")
-        print(f"  Agents: {meta['agents']['total']} ({meta['agents']['built_in']} built-in + {meta['agents']['domain']} domain)")
+        print(
+            f"  Agents: {meta['agents']['total']} ({meta['agents']['built_in']} built-in + {meta['agents']['domain']} domain)"
+        )
         print(f"  Selftest: {meta['selftest']['total']} steps")
         print(f"  Skills: {meta['skills']['count']}")
         print()

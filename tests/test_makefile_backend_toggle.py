@@ -20,8 +20,6 @@ Original purpose: Test environment variable-based backend selection for Flow Stu
 
 import sys
 from pathlib import Path
-import subprocess
-import os
 
 # Add repo root to path
 repo_root = Path(__file__).resolve().parents[1]

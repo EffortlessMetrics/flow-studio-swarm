@@ -53,6 +53,7 @@ AUTOGEN_END = "<!-- FLOW AUTOGEN END -->"
 # Simple IR
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Agent:
     key: str
@@ -81,6 +82,7 @@ class FlowConfig:
 # ---------------------------------------------------------------------------
 # Loading YAML config
 # ---------------------------------------------------------------------------
+
 
 def _safe_load_yaml(path: Path) -> Dict[str, Any]:
     text = path.read_text(encoding="utf-8")
@@ -163,6 +165,7 @@ def load_flows() -> Dict[str, FlowConfig]:
 # Rendering helpers
 # ---------------------------------------------------------------------------
 
+
 def render_mermaid(flow: FlowConfig) -> str:
     """
     Render a simple Mermaid graph showing step order and attached agents.
@@ -212,9 +215,7 @@ def render_steps_table(flow: FlowConfig, agents: Dict[str, Agent]) -> str:
                 agent_cells.append(f"`{akey}`")
         agents_text = "<br>".join(agent_cells)
         role = step.role.replace("\n", " ").strip()
-        lines.append(
-            f"| {idx} | `{step.id}` | {agents_text} | {role} |"
-        )
+        lines.append(f"| {idx} | `{step.id}` | {agents_text} | {role} |")
 
     return "\n".join(lines)
 
@@ -244,6 +245,7 @@ def render_autogen_block(flow: FlowConfig, agents: Dict[str, Agent]) -> str:
 # Markdown rewriting
 # ---------------------------------------------------------------------------
 
+
 def update_autogen_section(existing: str, new_block: str) -> Tuple[str, bool]:
     """
     Replace or append the autogen block in the existing markdown.
@@ -259,7 +261,7 @@ def update_autogen_section(existing: str, new_block: str) -> Tuple[str, bool]:
         before = existing[:start_idx].rstrip()
         after = existing[end_idx:].lstrip("\n")
         updated = before + "\n\n" + new_block + "\n\n" + after
-        changed = (updated != existing)
+        changed = updated != existing
         return updated, changed
 
     # No existing block: append at the end
@@ -274,6 +276,7 @@ def update_autogen_section(existing: str, new_block: str) -> Tuple[str, bool]:
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def process_flow(
     flow: FlowConfig,

@@ -50,7 +50,6 @@ This test suite covers:
 
 import json
 import sys
-import time
 from dataclasses import asdict
 from pathlib import Path
 
@@ -60,23 +59,21 @@ if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 import pytest
-
 from swarm.tools.status_provider import (
     AgentsStatus,
     FlowsStatus,
-    Hints,
     KernelStatus,
-    SelfTestStatus,
     SelftestSnapshot,
+    SelfTestStatus,
     StatusProvider,
     StatusReport,
     ValidationStatus,
 )
 
-
 # ============================================================================
 # Data Classes Tests
 # ============================================================================
+
 
 class TestDataClasses:
     """Tests for the dataclass definitions."""
@@ -170,6 +167,7 @@ class TestDataClasses:
 # ============================================================================
 # Status Aggregation Tests
 # ============================================================================
+
 
 class TestGovernanceStateAggregation:
     """Tests for _determine_governance_state() logic."""
@@ -294,6 +292,7 @@ class TestGovernanceStateAggregation:
 # Snapshot Loading Tests
 # ============================================================================
 
+
 class TestSnapshotLoading:
     """Tests for loading selftest snapshots and degradation logs."""
 
@@ -382,7 +381,7 @@ class TestSnapshotLoading:
         log_path = tmp_path / "selftest_degradations.log"
         log_path.write_text(
             '{"timestamp": "2025-01-01T00:00:00Z", "step": "valid"}\n'
-            'not valid json\n'
+            "not valid json\n"
             '{"timestamp": "2025-01-02T00:00:00Z", "step": "also-valid"}\n'
         )
 
@@ -397,6 +396,7 @@ class TestSnapshotLoading:
 # ============================================================================
 # Hint Generation Tests
 # ============================================================================
+
 
 class TestHintGeneration:
     """Tests for _build_hints() method."""
@@ -505,6 +505,7 @@ class TestHintGeneration:
 # Status Report Tests
 # ============================================================================
 
+
 class TestStatusReport:
     """Tests for StatusReport serialization."""
 
@@ -584,6 +585,7 @@ class TestStatusReport:
 # Caching Tests
 # ============================================================================
 
+
 class TestStatusProviderCaching:
     """Tests for StatusProvider caching behavior."""
 
@@ -592,8 +594,6 @@ class TestStatusProviderCaching:
         # Create minimal repo structure to avoid subprocess errors
         # We'll mock the subprocess calls instead
         call_count = [0]
-
-        original_compute = StatusProvider._compute_status
 
         def mock_compute(self):
             call_count[0] += 1
@@ -657,6 +657,7 @@ class TestStatusProviderCaching:
 # Edge Cases and Stress Tests
 # ============================================================================
 
+
 class TestEdgeCases:
     """Edge case and boundary condition tests."""
 
@@ -667,15 +668,19 @@ class TestEdgeCases:
         # Create an empty report
         report_dir = tmp_path / "swarm" / "runs" / "main" / "build"
         report_dir.mkdir(parents=True)
-        (report_dir / "selftest_report.json").write_text(json.dumps({
-            "summary": {
-                "mode": "strict",
-                "kernel_ok": True,
-                "governance_ok": True,
-                "optional_ok": True,
-                "failed_steps": [],
-            }
-        }))
+        (report_dir / "selftest_report.json").write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "mode": "strict",
+                        "kernel_ok": True,
+                        "governance_ok": True,
+                        "optional_ok": True,
+                        "failed_steps": [],
+                    }
+                }
+            )
+        )
 
         snapshot = provider._load_selftest_snapshot()
 
@@ -765,6 +770,7 @@ class TestEdgeCases:
 # Tier Count Aggregation Tests
 # ============================================================================
 
+
 class TestTierAggregation:
     """Tests for per-tier count aggregation in SelfTestStatus."""
 
@@ -846,6 +852,7 @@ class TestTierAggregation:
 # JSON Output Format Tests
 # ============================================================================
 
+
 class TestJSONOutputFormat:
     """Tests for JSON output format compliance."""
 
@@ -924,6 +931,7 @@ class TestJSONOutputFormat:
 # ============================================================================
 # File-based Status Checks Tests
 # ============================================================================
+
 
 class TestFileBasedChecks:
     """Tests for _check_flows() and _check_agents() which read YAML configs."""
@@ -1039,17 +1047,25 @@ class TestFileBasedChecks:
         agents_dir.mkdir(parents=True)
 
         # Valid agent
-        (agents_dir / "valid-agent.yaml").write_text(yaml.dump({
-            "key": "valid-agent",
-            "category": "implementation",
-            "color": "green",
-        }))
+        (agents_dir / "valid-agent.yaml").write_text(
+            yaml.dump(
+                {
+                    "key": "valid-agent",
+                    "category": "implementation",
+                    "color": "green",
+                }
+            )
+        )
 
         # Missing 'color'
-        (agents_dir / "bad-agent.yaml").write_text(yaml.dump({
-            "key": "bad-agent",
-            "category": "implementation",
-        }))
+        (agents_dir / "bad-agent.yaml").write_text(
+            yaml.dump(
+                {
+                    "key": "bad-agent",
+                    "category": "implementation",
+                }
+            )
+        )
 
         provider = StatusProvider(repo_root=tmp_path, cache_ttl_seconds=0)
         status = provider._check_agents()
@@ -1078,6 +1094,7 @@ class TestFileBasedChecks:
 # Snapshot Status Derivation Tests
 # ============================================================================
 
+
 class TestSnapshotStatusDerivation:
     """Tests for status derivation from snapshot data."""
 
@@ -1086,13 +1103,17 @@ class TestSnapshotStatusDerivation:
         report_dir = tmp_path / "swarm" / "runs" / "main" / "build"
         report_dir.mkdir(parents=True)
 
-        (report_dir / "selftest_report.json").write_text(json.dumps({
-            "summary": {
-                "kernel_ok": False,
-                "governance_ok": True,
-                "optional_ok": True,
-            }
-        }))
+        (report_dir / "selftest_report.json").write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "kernel_ok": False,
+                        "governance_ok": True,
+                        "optional_ok": True,
+                    }
+                }
+            )
+        )
 
         provider = StatusProvider(repo_root=tmp_path, cache_ttl_seconds=0)
         snapshot = provider._load_selftest_snapshot()
@@ -1105,13 +1126,17 @@ class TestSnapshotStatusDerivation:
         report_dir = tmp_path / "swarm" / "runs" / "main" / "build"
         report_dir.mkdir(parents=True)
 
-        (report_dir / "selftest_report.json").write_text(json.dumps({
-            "summary": {
-                "kernel_ok": True,
-                "governance_ok": False,
-                "optional_ok": True,
-            }
-        }))
+        (report_dir / "selftest_report.json").write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "kernel_ok": True,
+                        "governance_ok": False,
+                        "optional_ok": True,
+                    }
+                }
+            )
+        )
 
         provider = StatusProvider(repo_root=tmp_path, cache_ttl_seconds=0)
         snapshot = provider._load_selftest_snapshot()
@@ -1125,13 +1150,17 @@ class TestSnapshotStatusDerivation:
         report_dir = tmp_path / "swarm" / "runs" / "main" / "build"
         report_dir.mkdir(parents=True)
 
-        (report_dir / "selftest_report.json").write_text(json.dumps({
-            "summary": {
-                "kernel_ok": True,
-                "governance_ok": True,
-                "optional_ok": False,  # Optional failures don't affect GREEN
-            }
-        }))
+        (report_dir / "selftest_report.json").write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "kernel_ok": True,
+                        "governance_ok": True,
+                        "optional_ok": False,  # Optional failures don't affect GREEN
+                    }
+                }
+            )
+        )
 
         provider = StatusProvider(repo_root=tmp_path, cache_ttl_seconds=0)
         snapshot = provider._load_selftest_snapshot()
@@ -1143,17 +1172,21 @@ class TestSnapshotStatusDerivation:
         report_dir = tmp_path / "swarm" / "runs" / "main" / "build"
         report_dir.mkdir(parents=True)
 
-        (report_dir / "selftest_report.json").write_text(json.dumps({
-            "summary": {
-                "kernel_ok": False,
-                "governance_ok": False,
-                "optional_ok": False,
-                "failed_steps": ["core-checks", "agents-governance", "ac-coverage"],
-                "kernel_failed": ["core-checks"],
-                "governance_failed": ["agents-governance"],
-                "optional_failed": ["ac-coverage"],
-            }
-        }))
+        (report_dir / "selftest_report.json").write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "kernel_ok": False,
+                        "governance_ok": False,
+                        "optional_ok": False,
+                        "failed_steps": ["core-checks", "agents-governance", "ac-coverage"],
+                        "kernel_failed": ["core-checks"],
+                        "governance_failed": ["agents-governance"],
+                        "optional_failed": ["ac-coverage"],
+                    }
+                }
+            )
+        )
 
         provider = StatusProvider(repo_root=tmp_path, cache_ttl_seconds=0)
         snapshot = provider._load_selftest_snapshot()
@@ -1170,15 +1203,19 @@ class TestSnapshotStatusDerivation:
         report_dir = tmp_path / "swarm" / "runs" / "main" / "build"
         report_dir.mkdir(parents=True)
 
-        (report_dir / "selftest_report.json").write_text(json.dumps({
-            "summary": {
-                "kernel_ok": True,
-                "governance_ok": True,
-                "optional_ok": True,
-                "failed_steps": None,
-                "kernel_failed": None,
-            }
-        }))
+        (report_dir / "selftest_report.json").write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "kernel_ok": True,
+                        "governance_ok": True,
+                        "optional_ok": True,
+                        "failed_steps": None,
+                        "kernel_failed": None,
+                    }
+                }
+            )
+        )
 
         provider = StatusProvider(repo_root=tmp_path, cache_ttl_seconds=0)
         snapshot = provider._load_selftest_snapshot()
@@ -1190,6 +1227,7 @@ class TestSnapshotStatusDerivation:
 # ============================================================================
 # Timeout Handling Regression Tests
 # ============================================================================
+
 
 class TestTimeoutHandling:
     """

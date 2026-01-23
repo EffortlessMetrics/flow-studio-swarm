@@ -10,8 +10,9 @@ Purpose: Prevent drift between test scenarios, documentation, and implementation
 """
 
 import re
-import pytest
 from pathlib import Path
+
+import pytest
 
 # File paths
 GHERKIN_FILE = Path("features/selftest.feature")

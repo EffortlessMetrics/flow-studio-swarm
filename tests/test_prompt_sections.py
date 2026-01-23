@@ -16,8 +16,6 @@ BDD Scenarios covered:
 - Check is disabled by default (requires --check-prompts flag)
 """
 
-import pytest
-
 from conftest import (
     add_agent_to_registry,
     assert_error_contains,
@@ -25,7 +23,6 @@ from conftest import (
     assert_validator_failed,
     assert_validator_passed,
 )
-
 
 # ============================================================================
 # Happy Path Tests

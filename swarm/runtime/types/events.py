@@ -10,8 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from uuid import uuid4
+from typing import Any, Dict, Optional
 
 from .runs import RunEvent
 
@@ -19,7 +18,7 @@ from .runs import RunEvent
 @dataclass
 class EventBase:
     """Base class for all specific event types."""
-    
+
     def to_run_event(self, run_id: str, flow_key: str) -> RunEvent:
         """Convert to generic RunEvent for persistence."""
         raise NotImplementedError
@@ -28,11 +27,11 @@ class EventBase:
 @dataclass
 class StepStartEvent(EventBase):
     """Event emitted when a step execution begins."""
-    
+
     step_id: str
     step_index: int
     inputs: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_run_event(self, run_id: str, flow_key: str) -> RunEvent:
         return RunEvent(
             run_id=run_id,
@@ -50,13 +49,13 @@ class StepStartEvent(EventBase):
 @dataclass
 class StepEndEvent(EventBase):
     """Event emitted when a step execution completes."""
-    
+
     step_id: str
     step_index: int
     status: str
     output: Any
     duration_ms: int
-    
+
     def to_run_event(self, run_id: str, flow_key: str) -> RunEvent:
         return RunEvent(
             run_id=run_id,
@@ -76,11 +75,11 @@ class StepEndEvent(EventBase):
 @dataclass
 class FlowCompletedEvent(EventBase):
     """Event emitted when a flow completes."""
-    
+
     status: str
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
-    
+
     def to_run_event(self, run_id: str, flow_key: str) -> RunEvent:
         return RunEvent(
             run_id=run_id,
@@ -99,11 +98,11 @@ class FlowCompletedEvent(EventBase):
 @dataclass
 class FactsUpdatedEvent(EventBase):
     """Event emitted when shared context/facts are updated."""
-    
+
     step_id: str
     facts: Dict[str, Any]
     delta: Optional[Dict[str, Any]] = None
-    
+
     def to_run_event(self, run_id: str, flow_key: str) -> RunEvent:
         return RunEvent(
             run_id=run_id,
@@ -121,9 +120,9 @@ class FactsUpdatedEvent(EventBase):
 @dataclass
 class RunPausingEvent(EventBase):
     """Event emitted when a run pause is requested."""
-    
+
     reason: str
-    
+
     def to_run_event(self, run_id: str, flow_key: str) -> RunEvent:
         return RunEvent(
             run_id=run_id,
@@ -140,10 +139,10 @@ class RunPausingEvent(EventBase):
 @dataclass
 class RunPausedEvent(EventBase):
     """Event emitted when a run is effectively paused."""
-    
+
     step_id: str
     reason: str
-    
+
     def to_run_event(self, run_id: str, flow_key: str) -> RunEvent:
         return RunEvent(
             run_id=run_id,
@@ -160,9 +159,9 @@ class RunPausedEvent(EventBase):
 @dataclass
 class RunResumedEvent(EventBase):
     """Event emitted when a run is resumed."""
-    
+
     step_id: str
-    
+
     def to_run_event(self, run_id: str, flow_key: str) -> RunEvent:
         return RunEvent(
             run_id=run_id,
@@ -173,12 +172,13 @@ class RunResumedEvent(EventBase):
             payload={},
         )
 
+
 @dataclass
 class RunStoppingEvent(EventBase):
     """Event emitted when a run stop is requested."""
-    
+
     reason: str
-    
+
     def to_run_event(self, run_id: str, flow_key: str) -> RunEvent:
         return RunEvent(
             run_id=run_id,
@@ -191,13 +191,14 @@ class RunStoppingEvent(EventBase):
             },
         )
 
+
 @dataclass
 class RunStoppedEvent(EventBase):
     """Event emitted when a run is effectively stopped."""
-    
+
     step_id: str
     reason: str
-    
+
     def to_run_event(self, run_id: str, flow_key: str) -> RunEvent:
         return RunEvent(
             run_id=run_id,

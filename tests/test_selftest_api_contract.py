@@ -45,6 +45,7 @@ from fastapi.testclient import TestClient
 def fastapi_client():
     """Create FastAPI test client."""
     from swarm.tools.flow_studio_fastapi import app
+
     return TestClient(app)
 
 
@@ -157,9 +158,7 @@ class TestSelfTestPlanAPIContract:
                 )
 
             # Assert: Description is non-empty
-            assert len(step["description"]) > 0, (
-                f"Step {i} ('{step['id']}'): description is empty"
-            )
+            assert len(step["description"]) > 0, f"Step {i} ('{step['id']}'): description is empty"
 
             # Assert: depends_on is a list (may be empty)
             assert isinstance(step["depends_on"], list), (
@@ -192,8 +191,7 @@ class TestSelfTestPlanAPIContract:
         for step in steps:
             tier = step["tier"]
             assert tier in valid_tiers, (
-                f"Step '{step['id']}' has invalid tier '{tier}', "
-                f"expected one of {valid_tiers}"
+                f"Step '{step['id']}' has invalid tier '{tier}', expected one of {valid_tiers}"
             )
 
     def test_selftest_plan_api_contract_summary_counts(self, fastapi_client):
@@ -230,22 +228,19 @@ class TestSelfTestPlanAPIContract:
 
         # Assert: summary.total matches step count
         assert summary["total"] == len(steps), (
-            f"summary.total mismatch: reported {summary['total']}, "
-            f"actual {len(steps)}"
+            f"summary.total mismatch: reported {summary['total']}, actual {len(steps)}"
         )
 
         # Assert: by_tier counts match actual
         assert by_tier["kernel"] == actual_kernel, (
-            f"kernel count mismatch: reported {by_tier['kernel']}, "
-            f"actual {actual_kernel}"
+            f"kernel count mismatch: reported {by_tier['kernel']}, actual {actual_kernel}"
         )
         assert by_tier["governance"] == actual_governance, (
             f"governance count mismatch: reported {by_tier['governance']}, "
             f"actual {actual_governance}"
         )
         assert by_tier["optional"] == actual_optional, (
-            f"optional count mismatch: reported {by_tier['optional']}, "
-            f"actual {actual_optional}"
+            f"optional count mismatch: reported {by_tier['optional']}, actual {actual_optional}"
         )
 
         # Assert: by_tier sum matches total
@@ -282,8 +277,7 @@ class TestSelfTestPlanAPIContract:
 
         # Assert: No duplicates
         assert len(step_ids) == len(unique_ids), (
-            f"Duplicate step IDs found: "
-            f"{[id for id in step_ids if step_ids.count(id) > 1]}"
+            f"Duplicate step IDs found: {[id for id in step_ids if step_ids.count(id) > 1]}"
         )
 
     def test_selftest_plan_api_contract_dependencies_valid(self, fastapi_client):
@@ -325,9 +319,7 @@ class TestSelfTestPlanAPIContract:
                 )
 
                 # Assert: No self-dependencies
-                assert dep_id != step_id, (
-                    f"Step '{step_id}' has self-dependency: {dep_id}"
-                )
+                assert dep_id != step_id, f"Step '{step_id}' has self-dependency: {dep_id}"
 
     def test_selftest_plan_has_ac_ids(self, fastapi_client):
         """
@@ -359,12 +351,9 @@ class TestSelfTestPlanAPIContract:
 
         for step in steps:
             # Assert: ac_ids field exists and is a list
-            assert "ac_ids" in step, (
-                f"Step '{step['id']}' missing ac_ids field"
-            )
+            assert "ac_ids" in step, f"Step '{step['id']}' missing ac_ids field"
             assert isinstance(step["ac_ids"], list), (
-                f"Step '{step['id']}': ac_ids should be a list, "
-                f"got {type(step['ac_ids']).__name__}"
+                f"Step '{step['id']}': ac_ids should be a list, got {type(step['ac_ids']).__name__}"
             )
 
             # Track AC IDs per step
@@ -372,9 +361,7 @@ class TestSelfTestPlanAPIContract:
                 assert isinstance(ac_id, str), (
                     f"Step '{step['id']}': AC ID should be string, got {type(ac_id).__name__}"
                 )
-                assert len(ac_id) > 0, (
-                    f"Step '{step['id']}': AC ID cannot be empty"
-                )
+                assert len(ac_id) > 0, f"Step '{step['id']}': AC ID cannot be empty"
 
                 all_ac_ids.add(ac_id)
 
@@ -386,7 +373,7 @@ class TestSelfTestPlanAPIContract:
         # (Some sharing is OK for shared concerns, like INTROSPECTABLE across governance steps)
         # Allow specific cross-cutting ACs that legitimately apply to all steps
         cross_cutting_acs = {
-            "AC-SELFTEST-FAILURE-HINTS",       # All steps provide hints
+            "AC-SELFTEST-FAILURE-HINTS",  # All steps provide hints
             "AC-SELFTEST-DEGRADATION-TRACKED",  # All governance steps track degradations
         }
         for ac_id, step_ids in ac_id_to_steps.items():
@@ -422,21 +409,15 @@ class TestSelfTestPlanAPIContract:
         # Assert: version field exists and is a string
         assert "version" in data, "Response missing 'version' field"
         version = data["version"]
-        assert isinstance(version, str), (
-            f"version should be string, got {type(version).__name__}"
-        )
+        assert isinstance(version, str), f"version should be string, got {type(version).__name__}"
         assert len(version) > 0, "version cannot be empty"
 
         # Assert: version looks like a version string
         # Expect format like "1.0", "1.0.0", etc.
         parts = version.split(".")
-        assert len(parts) >= 2, (
-            f"version '{version}' should have at least major.minor format"
-        )
+        assert len(parts) >= 2, f"version '{version}' should have at least major.minor format"
         for part in parts:
-            assert part.isdigit(), (
-                f"version '{version}' has non-numeric component: '{part}'"
-            )
+            assert part.isdigit(), f"version '{version}' has non-numeric component: '{part}'"
 
     def test_selftest_plan_step_order_consistency(self, fastapi_client):
         """
@@ -463,21 +444,16 @@ class TestSelfTestPlanAPIContract:
         data2 = resp2.json()
 
         # Assert: Same number of steps
-        assert len(data1["steps"]) == len(data2["steps"]), (
-            "Step count differs between calls"
-        )
+        assert len(data1["steps"]) == len(data2["steps"]), "Step count differs between calls"
 
         # Assert: Steps are in same order
         for i, (step1, step2) in enumerate(zip(data1["steps"], data2["steps"])):
             assert step1["id"] == step2["id"], (
-                f"Step order differs at position {i}: "
-                f"'{step1['id']}' vs '{step2['id']}'"
+                f"Step order differs at position {i}: '{step1['id']}' vs '{step2['id']}'"
             )
 
         # Assert: Summary is identical
-        assert data1["summary"] == data2["summary"], (
-            "Summary differs between calls"
-        )
+        assert data1["summary"] == data2["summary"], "Summary differs between calls"
 
     def test_selftest_plan_response_time(self, fastapi_client):
         """
@@ -505,8 +481,7 @@ class TestSelfTestPlanAPIContract:
 
         # Assert: Response time is acceptable
         assert duration_ms < 1000, (
-            f"Plan endpoint took {duration_ms:.0f}ms, "
-            f"expected < 1000ms for UI responsiveness"
+            f"Plan endpoint took {duration_ms:.0f}ms, expected < 1000ms for UI responsiveness"
         )
 
     def test_selftest_plan_category_values(self, fastapi_client):

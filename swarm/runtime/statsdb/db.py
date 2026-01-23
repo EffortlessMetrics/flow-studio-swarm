@@ -12,7 +12,12 @@ from .ingestion import StatsDBIngestionMixin, _is_in_ingestion_context
 from .queries import StatsDBQueryMixin
 from .rebuild import StatsDBRebuildMixin
 from .schema_sql import CREATE_TABLES_SQL
-from .versions import SCHEMA_VERSION, PROJECTION_VERSION, _check_projection_version, _set_projection_version
+from .versions import (
+    PROJECTION_VERSION,
+    SCHEMA_VERSION,
+    _check_projection_version,
+    _set_projection_version,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +33,7 @@ class StatsDB(StatsDBIngestionMixin, StatsDBQueryMixin, StatsDBRebuildMixin):
         db_path: Path to the DuckDB database file.
         connection: Active DuckDB connection (lazy initialized).
     """
+
     def __init__(
         self,
         db_path: Optional[Path] = None,

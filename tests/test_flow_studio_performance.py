@@ -156,7 +156,7 @@ class TestFlowStudioPerformanceBaseline:
         # Note: benchmark.stats is only available after benchmark completes
         # pytest-benchmark handles this internally
         stats = benchmark.stats
-        if stats and hasattr(stats, 'median'):
+        if stats and hasattr(stats, "median"):
             median_ms = stats.median * 1000  # Convert to ms
             assert median_ms < HEALTH_TARGET_MS, (
                 f"Health endpoint too slow: {median_ms:.2f}ms > {HEALTH_TARGET_MS}ms target"
@@ -169,7 +169,7 @@ class TestFlowStudioPerformanceBaseline:
 
         if result.status_code == 200:
             stats = benchmark.stats
-            if stats and hasattr(stats, 'median'):
+            if stats and hasattr(stats, "median"):
                 median_ms = stats.median * 1000
                 assert median_ms < GRAPH_TARGET_MS, (
                     f"Graph endpoint too slow: {median_ms:.2f}ms > {GRAPH_TARGET_MS}ms target"

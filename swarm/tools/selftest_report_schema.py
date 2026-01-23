@@ -62,6 +62,7 @@ from typing import List, Optional
 @dataclass
 class SelfTestReportMetadata:
     """Metadata about selftest execution."""
+
     run_id: str
     timestamp: str  # ISO format: 2025-11-30T15:30:00Z
     hostname: str
@@ -75,6 +76,7 @@ class SelfTestReportMetadata:
 @dataclass
 class SelfTestStepResult:
     """Result of a single selftest step."""
+
     step_id: str
     description: str
     tier: str
@@ -93,6 +95,7 @@ class SelfTestStepResult:
 @dataclass
 class SelfTestSummary:
     """Summary statistics for selftest run."""
+
     # By status
     passed: int
     failed: int
@@ -123,6 +126,7 @@ class SelfTestSummary:
 @dataclass
 class SelfTestReport:
     """Complete selftest report."""
+
     metadata: SelfTestReportMetadata
     results: List[SelfTestStepResult]
     summary: SelfTestSummary

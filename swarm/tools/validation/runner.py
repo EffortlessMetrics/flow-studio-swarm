@@ -10,32 +10,32 @@ import sys
 import time
 from typing import Any, Dict, Optional, Set
 
-from swarm.validator import ValidationResult
-from swarm.tools.validation.helpers import FLOWS_CONFIG_DIR
 from swarm.tools.validation.constants import EXIT_FATAL_ERROR
 from swarm.tools.validation.git_helpers import get_modified_files
+from swarm.tools.validation.helpers import FLOWS_CONFIG_DIR
 from swarm.tools.validation.registry import parse_agents_registry
 from swarm.tools.validation.validators import (
     validate_bijection,
-    validate_frontmatter,
+    validate_capability_registry,
     validate_colors,
     validate_config_coverage,
     validate_flow_references,
-    validate_skills,
-    validate_runbase_paths,
-    validate_prompt_sections,
+    validate_frontmatter,
     validate_microloop_phrases,
-    validate_capability_registry,
+    validate_prompt_sections,
+    validate_runbase_paths,
+    validate_skills,
 )
 from swarm.tools.validation.validators.flows import (
     parse_flow_config,
-    validate_no_empty_flows,
-    validate_no_agentless_steps,
     validate_flow_agent_validity,
     validate_flow_documentation_completeness,
     validate_flow_studio_sync,
+    validate_no_agentless_steps,
+    validate_no_empty_flows,
     validate_utility_flow_graphs,
 )
+from swarm.validator import ValidationResult
 
 
 class ValidatorRunner:
@@ -94,8 +94,7 @@ class ValidatorRunner:
         if self.modified_files is None:
             return True
         return any(
-            any(f.startswith(prefix) for prefix in path_prefixes)
-            for f in self.modified_files
+            any(f.startswith(prefix) for prefix in path_prefixes) for f in self.modified_files
         )
 
     def _debug_print(self, message: str) -> None:
@@ -262,7 +261,9 @@ class ValidatorRunner:
         # Invariant 6: Utility flow validation (flow graph JSON files)
         utility_flow_result = validate_utility_flow_graphs()
         result.extend(utility_flow_result)
-        self._debug_print(f"Utility-flow check: {len(utility_flow_result.errors)} errors, {len(utility_flow_result.warnings)} warnings")
+        self._debug_print(
+            f"Utility-flow check: {len(utility_flow_result.errors)} errors, {len(utility_flow_result.warnings)} warnings"
+        )
 
         return result
 
@@ -299,12 +300,7 @@ class ValidatorRunner:
         result = ValidationResult()
 
         # FR-006a: Microloop phrase validation
-        if self._should_check(
-            ".claude/commands/",
-            "swarm/flows/",
-            ".claude/agents/",
-            "CLAUDE.md"
-        ):
+        if self._should_check(".claude/commands/", "swarm/flows/", ".claude/agents/", "CLAUDE.md"):
             microloop_result = validate_microloop_phrases()
             result.extend(microloop_result)
             self._debug_print(f"Microloop phrase check: {len(microloop_result.errors)} errors")
@@ -369,7 +365,7 @@ def run_validation(
     debug: bool = False,
     strict_mode: bool = False,
     flows_only: bool = False,
-    check_prompts: bool = False
+    check_prompts: bool = False,
 ) -> ValidationResult:
     """
     Run all validation checks.

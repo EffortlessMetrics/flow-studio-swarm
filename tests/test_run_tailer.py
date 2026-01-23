@@ -12,11 +12,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
-
 from swarm.runtime.db import StatsDB
 from swarm.runtime.run_tailer import RunTailer, TailerError
 
@@ -165,9 +163,7 @@ class TestRunTailer:
         tailer = RunTailer(setup_run["db"], setup_run["runs_dir"])
 
         # Mock ingest_events to raise
-        with patch.object(
-            setup_run["db"], "ingest_events", side_effect=RuntimeError("DB error")
-        ):
+        with patch.object(setup_run["db"], "ingest_events", side_effect=RuntimeError("DB error")):
             with pytest.raises(TailerError):
                 tailer.tail_run(setup_run["run_id"])
 

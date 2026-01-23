@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VENDOR_DIR = REPO_ROOT / "docs" / "vendor" / "anthropic" / "agent-sdk" / "python"
 TOOLS_MANIFEST = VENDOR_DIR / "TOOLS_MANIFEST.json"
@@ -49,6 +48,7 @@ class TestAdapterAvailability:
 
         try:
             import claude_agent_sdk
+
             assert claude_sdk._sdk_module is claude_agent_sdk
         except ImportError:
             # Official package not installed; fallback is acceptable.
@@ -71,7 +71,7 @@ class TestFacadeExports:
 
     def test_claude_code_options_proxy(self):
         """ClaudeCodeOptions exists and maps to SDK options when available."""
-        from swarm.runtime.claude_sdk import ClaudeCodeOptions, SDK_AVAILABLE, get_sdk_module
+        from swarm.runtime.claude_sdk import SDK_AVAILABLE, ClaudeCodeOptions, get_sdk_module
 
         assert ClaudeCodeOptions is not None
         if not SDK_AVAILABLE:
@@ -140,8 +140,8 @@ class TestToolPermissionSemantics:
     def test_disallowed_tools_computation(self):
         """Verify compute_disallowed_tools produces correct complement."""
         from swarm.runtime.claude_sdk import (
-            compute_disallowed_tools,
             ALL_STANDARD_TOOLS,
+            compute_disallowed_tools,
         )
 
         # Allow only Read and Write
@@ -168,8 +168,8 @@ class TestToolPermissionSemantics:
     def test_empty_allowed_disallows_all(self):
         """Verify empty allowed list disallows all standard tools."""
         from swarm.runtime.claude_sdk import (
-            compute_disallowed_tools,
             ALL_STANDARD_TOOLS,
+            compute_disallowed_tools,
         )
 
         disallowed = compute_disallowed_tools([])
@@ -189,12 +189,12 @@ class TestStructuredOutputContract:
         """Fence parsing extracts JSON correctly."""
         from swarm.runtime.structured_output import extract_json_from_text
 
-        response = '''
+        response = """
 Here is the output:
 ```json
 {"status": "VERIFIED", "summary": "Test completed"}
 ```
-'''
+"""
         result, error = extract_json_from_text(response)
 
         assert result is not None
@@ -217,11 +217,11 @@ Here is the output:
         """JSON embedded in surrounding text is extracted."""
         from swarm.runtime.structured_output import extract_json_from_text
 
-        response = '''
+        response = """
 Let me provide the output:
 {"status": "UNVERIFIED", "concerns": ["issue1"]}
 That concludes my analysis.
-'''
+"""
         result, error = extract_json_from_text(response)
 
         assert result is not None
@@ -237,7 +237,7 @@ That concludes my analysis.
             "properties": {
                 "status": {"type": "string"},
                 "summary": {"type": "string"},
-            }
+            },
         }
 
         # Missing 'summary' field
@@ -255,11 +255,8 @@ That concludes my analysis.
             "type": "object",
             "required": ["status"],
             "properties": {
-                "status": {
-                    "type": "string",
-                    "enum": ["VERIFIED", "UNVERIFIED", "BLOCKED"]
-                },
-            }
+                "status": {"type": "string", "enum": ["VERIFIED", "UNVERIFIED", "BLOCKED"]},
+            },
         }
 
         # Invalid enum value
@@ -277,12 +274,9 @@ That concludes my analysis.
             "type": "object",
             "required": ["status", "summary"],
             "properties": {
-                "status": {
-                    "type": "string",
-                    "enum": ["VERIFIED", "UNVERIFIED", "BLOCKED"]
-                },
+                "status": {"type": "string", "enum": ["VERIFIED", "UNVERIFIED", "BLOCKED"]},
                 "summary": {"type": "string"},
-            }
+            },
         }
 
         data = {"status": "VERIFIED", "summary": "All tests passed"}
@@ -307,12 +301,12 @@ class TestSessionSemantics:
 
         # Should have explicit flags for key features
         # Session semantics are split: within-step and across-steps
-        assert hasattr(caps, 'supports_hot_context_within_step')
-        assert hasattr(caps, 'supports_context_across_steps')
-        assert hasattr(caps, 'supports_output_format')
-        assert hasattr(caps, 'supports_hooks')
-        assert hasattr(caps, 'supports_interrupts')
-        assert hasattr(caps, 'supports_sandbox')
+        assert hasattr(caps, "supports_hot_context_within_step")
+        assert hasattr(caps, "supports_context_across_steps")
+        assert hasattr(caps, "supports_output_format")
+        assert hasattr(caps, "supports_hooks")
+        assert hasattr(caps, "supports_interrupts")
+        assert hasattr(caps, "supports_sandbox")
 
     def test_claude_sdk_capabilities_correct(self):
         """Verify Claude SDK capabilities are set correctly."""
@@ -393,8 +387,8 @@ class TestSandboxCapability:
     def test_sandbox_not_supported(self):
         """All transports should report sandbox enforcement as unsupported."""
         from swarm.runtime.transports.port import (
-            CLAUDE_SDK_CAPABILITIES,
             CLAUDE_CLI_CAPABILITIES,
+            CLAUDE_SDK_CAPABILITIES,
             GEMINI_CLI_CAPABILITIES,
             STUB_CAPABILITIES,
         )
@@ -609,7 +603,7 @@ class TestDisallowedToolsEnforcement:
         See: docs/reference/SDK_CAPABILITIES.md for enforcement details
         See: platform.claude.com/cookbook/claude-agent-sdk-02
         """
-        from swarm.runtime.claude_sdk import compute_disallowed_tools, ALL_STANDARD_TOOLS
+        from swarm.runtime.claude_sdk import compute_disallowed_tools
 
         # Verify the function exists and works
         disallowed = compute_disallowed_tools(["Read"])
@@ -625,7 +619,7 @@ class TestDisallowedToolsEnforcement:
 
     def test_disallowed_tools_complement_is_correct(self):
         """Verify disallowed_tools is the exact complement of allowed_tools."""
-        from swarm.runtime.claude_sdk import compute_disallowed_tools, ALL_STANDARD_TOOLS
+        from swarm.runtime.claude_sdk import ALL_STANDARD_TOOLS, compute_disallowed_tools
 
         allowed = ["Read", "Write", "Glob"]
         disallowed = compute_disallowed_tools(allowed)
@@ -667,11 +661,11 @@ class TestToolCallNormalization:
 
         assert tool_call.tool_name == "Read"
         assert tool_call.tool_input == {"file_path": "/path/to/file"}
-        assert hasattr(tool_call, 'tool_output')
-        assert hasattr(tool_call, 'success')
-        assert hasattr(tool_call, 'duration_ms')
-        assert hasattr(tool_call, 'blocked')
-        assert hasattr(tool_call, 'source')
+        assert hasattr(tool_call, "tool_output")
+        assert hasattr(tool_call, "success")
+        assert hasattr(tool_call, "duration_ms")
+        assert hasattr(tool_call, "blocked")
+        assert hasattr(tool_call, "source")
 
     def test_dict_to_normalized_conversion(self):
         """Verify legacy dict format converts to NormalizedToolCall."""

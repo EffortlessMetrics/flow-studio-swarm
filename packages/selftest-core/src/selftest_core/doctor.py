@@ -27,8 +27,9 @@ Example usage:
 import os
 import subprocess
 import sys
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -42,6 +43,7 @@ class DiagnosticCheck:
         check_fn: Function that returns (status, recommendation)
         required: If True, failure makes this category fail
     """
+
     name: str
     category: str  # 'harness' or 'service'
     check_fn: Callable[[], tuple]  # Returns (status, recommendation)
@@ -65,13 +67,15 @@ class SelfTestDoctor:
         doctor.add_check(DiagnosticCheck(
             name="database",
             category="service",
-            check_fn=lambda: ("OK", None) if db_is_up() else ("ERROR", "Start database"),
+            check_fn=lambda: (
+                ("OK", None) if db_is_up() else ("ERROR", "Start database")
+            ),
         ))
 
         diagnosis = doctor.diagnose()
     """
 
-    def __init__(self, checks: Optional[List[DiagnosticCheck]] = None):
+    def __init__(self, checks: list[DiagnosticCheck] | None = None):
         """
         Initialize the doctor.
 
@@ -80,7 +84,7 @@ class SelfTestDoctor:
         """
         self.checks = checks or self._default_checks()
 
-    def _default_checks(self) -> List[DiagnosticCheck]:
+    def _default_checks(self) -> list[DiagnosticCheck]:
         """Return the default diagnostic checks."""
         return [
             DiagnosticCheck(
@@ -112,8 +116,6 @@ class SelfTestDoctor:
     def _check_python_env(self) -> tuple:
         """Check Python environment."""
         try:
-            if sys.version_info < (3, 10):
-                return ("ERROR", "Upgrade to Python 3.10+")
             return ("OK", None)
         except Exception as e:
             return ("ERROR", f"Python error: {e}")
@@ -123,8 +125,7 @@ class SelfTestDoctor:
         try:
             # Check if in git repo
             result = subprocess.run(
-                "git status",
-                shell=True,
+                ["git", "status"],
                 capture_output=True,
                 timeout=5,
             )
@@ -133,8 +134,7 @@ class SelfTestDoctor:
 
             # Check for dirty tree
             result = subprocess.run(
-                "git diff --quiet",
-                shell=True,
+                ["git", "diff", "--quiet"],
                 capture_output=True,
                 timeout=5,
             )
@@ -153,8 +153,7 @@ class SelfTestDoctor:
         try:
             # Try to compile a basic Python check
             result = subprocess.run(
-                f"{sys.executable} -c 'import sys; print(sys.version)'",
-                shell=True,
+                [sys.executable, "-c", "import sys; print(sys.version)"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -165,7 +164,7 @@ class SelfTestDoctor:
         except Exception as e:
             return ("ERROR", f"Python syntax check failed: {e}")
 
-    def diagnose(self) -> Dict[str, Any]:
+    def diagnose(self) -> dict[str, Any]:
         """
         Run all diagnostic checks.
 
@@ -176,7 +175,7 @@ class SelfTestDoctor:
             - summary: Overall status (HEALTHY, HARNESS_ISSUE, SERVICE_ISSUE)
             - recommendations: List of recommended actions
         """
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "harness": {},
             "service": {},
             "recommendations": [],
@@ -205,7 +204,7 @@ class SelfTestDoctor:
 
         return results
 
-    def print_diagnosis(self, diagnosis: Optional[Dict[str, Any]] = None):
+    def print_diagnosis(self, diagnosis: dict[str, Any] | None = None):
         """
         Print diagnosis results to console.
 
@@ -247,17 +246,18 @@ class SelfTestDoctor:
 
 def make_command_check(
     name: str,
-    command: str,
+    command: str | list[str],
     category: str = "harness",
     timeout: int = 5,
-    error_message: Optional[str] = None,
+    error_message: str | None = None,
 ) -> DiagnosticCheck:
     """
-    Create a diagnostic check that runs a shell command.
+    Create a diagnostic check that runs a command.
 
     Args:
         name: Check name
-        command: Shell command to run
+        command: Command to run - either a string or argv list.
+            String commands are parsed with shlex.split and executed with shell=False.
         category: 'harness' or 'service'
         timeout: Command timeout in seconds
         error_message: Custom error message on failure
@@ -265,21 +265,30 @@ def make_command_check(
     Returns:
         DiagnosticCheck instance
     """
+    import shlex
+
+    # Parse command to argv if it's a string
+    if isinstance(command, str):
+        argv = shlex.split(command, posix=(os.name != "nt"))
+        cmd_display = command
+    else:
+        argv = command
+        cmd_display = " ".join(command)
+
     def check_fn() -> tuple:
         try:
             result = subprocess.run(
-                command,
-                shell=True,
+                argv,
                 capture_output=True,
                 timeout=timeout,
             )
             if result.returncode == 0:
                 return ("OK", None)
             else:
-                msg = error_message or f"Command '{command}' failed"
+                msg = error_message or f"Command '{cmd_display}' failed"
                 return ("ERROR", msg)
         except subprocess.TimeoutExpired:
-            return ("ERROR", f"Command '{command}' timed out")
+            return ("ERROR", f"Command '{cmd_display}' timed out")
         except Exception as e:
             return ("ERROR", f"Command failed: {e}")
 
@@ -292,7 +301,7 @@ def make_command_check(
 
 def make_python_package_check(
     package: str,
-    import_name: Optional[str] = None,
+    import_name: str | None = None,
 ) -> DiagnosticCheck:
     """
     Create a diagnostic check for a Python package.
@@ -309,8 +318,7 @@ def make_python_package_check(
     def check_fn() -> tuple:
         try:
             result = subprocess.run(
-                f"{sys.executable} -c 'import {import_name}'",
-                shell=True,
+                [sys.executable, "-c", f"import {import_name}"],
                 capture_output=True,
                 timeout=5,
             )
@@ -342,6 +350,7 @@ def make_env_var_check(
     Returns:
         DiagnosticCheck instance
     """
+
     def check_fn() -> tuple:
         if os.environ.get(var_name):
             return ("OK", None)

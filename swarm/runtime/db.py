@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 db.py - StatsDB compatibility shim.
 
@@ -6,10 +7,11 @@ Re-exports the StatsDB implementation from swarm.runtime.statsdb to preserve
 import paths for callers (swarm.runtime.db).
 """
 
-from typing import Optional
+from typing import Optional  # noqa: E402
 
-from swarm.runtime.statsdb import *  # noqa: F403
-from swarm.runtime.statsdb import __all__ as _statsdb_all, StatsDB
+from swarm.runtime.statsdb import *  # noqa: F403, E402
+from swarm.runtime.statsdb import StatsDB  # noqa: E402
+from swarm.runtime.statsdb import __all__ as _statsdb_all  # noqa: E402
 
 __all__ = _statsdb_all
 

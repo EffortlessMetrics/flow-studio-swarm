@@ -38,7 +38,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -48,18 +48,15 @@ repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from swarm.runtime import storage
 from swarm.runtime import service as runtime_service
+from swarm.runtime import storage
 from swarm.runtime.service import RunService
 from swarm.runtime.types import (
-    BackendCapabilities,
-    RunEvent,
     RunSpec,
     RunStatus,
     RunSummary,
     SDLCStatus,
 )
-
 
 # -----------------------------------------------------------------------------
 # Fixtures
@@ -180,18 +177,10 @@ class TestGeminiStepwiseBackendCapabilities:
         assert caps.label == "Gemini CLI (stepwise)", (
             f"Expected label 'Gemini CLI (stepwise)', got '{caps.label}'"
         )
-        assert caps.supports_streaming is True, (
-            "Backend should support streaming"
-        )
-        assert caps.supports_events is True, (
-            "Backend should support events"
-        )
-        assert caps.supports_cancel is True, (
-            "Backend should support cancellation"
-        )
-        assert caps.supports_replay is False, (
-            "Stepwise backend should not support replay"
-        )
+        assert caps.supports_streaming is True, "Backend should support streaming"
+        assert caps.supports_events is True, "Backend should support events"
+        assert caps.supports_cancel is True, "Backend should support cancellation"
+        assert caps.supports_replay is False, "Stepwise backend should not support replay"
 
 
 # -----------------------------------------------------------------------------
@@ -242,9 +231,7 @@ class TestGeminiStepwiseBackendRunCreation:
 
         # Verify run_id format
         assert run_id is not None, "start() should return a run_id"
-        assert run_id.startswith("run-"), (
-            f"run_id should start with 'run-', got '{run_id}'"
-        )
+        assert run_id.startswith("run-"), f"run_id should start with 'run-', got '{run_id}'"
 
         # Verify summary can be read back via the backend
         summary = backend.get_summary(run_id)
@@ -363,9 +350,7 @@ class TestGeminiStepwiseBackendOrchestrator:
         backend = GeminiStepwiseBackend(repo_root=env["repo_root"])
 
         # Verify the backend has an orchestrator accessor
-        assert hasattr(backend, "_get_orchestrator"), (
-            "Backend should have _get_orchestrator method"
-        )
+        assert hasattr(backend, "_get_orchestrator"), "Backend should have _get_orchestrator method"
 
         # Mock the orchestrator to prevent actual execution
         mock_orchestrator = MagicMock()
@@ -445,9 +430,7 @@ class TestGeminiStepwiseBackendSummary:
         assert summary is not None, "get_summary should return a RunSummary"
 
         # Verify run_id matches
-        assert summary.id == run_id, (
-            f"Summary run_id mismatch: expected {run_id}, got {summary.id}"
-        )
+        assert summary.id == run_id, f"Summary run_id mismatch: expected {run_id}, got {summary.id}"
 
         # Verify status is valid
         assert summary.status in [
@@ -660,9 +643,7 @@ class TestBackendRegistration:
         # Verify backend can be retrieved
         backend = get_backend("gemini-step-orchestrator")
         assert backend is not None, "Backend should be registered"
-        assert backend.id == "gemini-step-orchestrator", (
-            f"Backend id mismatch: {backend.id}"
-        )
+        assert backend.id == "gemini-step-orchestrator", f"Backend id mismatch: {backend.id}"
 
         # Verify it appears in list_backends
         all_backends = list_backends()
@@ -677,9 +658,7 @@ class TestBackendRegistration:
 
         backend = get_backend("claude-step-orchestrator")
         assert backend is not None, "Backend should be registered"
-        assert backend.id == "claude-step-orchestrator", (
-            f"Backend id mismatch: {backend.id}"
-        )
+        assert backend.id == "claude-step-orchestrator", f"Backend id mismatch: {backend.id}"
 
         all_backends = list_backends()
         backend_ids = [b.id for b in all_backends]
@@ -746,9 +725,7 @@ class TestStepEventEmission:
         # whether the orchestrator found valid flow definitions)
         # In test isolation, flow registry may not have steps, so we check
         # for run-level events that are always emitted
-        assert "run_created" in event_kinds, (
-            f"run_created should be in events: {event_kinds}"
-        )
+        assert "run_created" in event_kinds, f"run_created should be in events: {event_kinds}"
 
         # If steps were executed, verify step events
         if "step_start" in event_kinds:
@@ -765,9 +742,7 @@ class TestStepEventEmission:
 
         if "step_end" in event_kinds or "step_error" in event_kinds:
             # Verify step_end has expected payload structure
-            step_end_events = [
-                e for e in events if e.kind in ("step_end", "step_error")
-            ]
+            step_end_events = [e for e in events if e.kind in ("step_end", "step_error")]
             for event in step_end_events:
                 assert event.flow_key is not None, "step_end should have flow_key"
                 assert event.step_id is not None, "step_end should have step_id"
@@ -842,9 +817,9 @@ class TestRunCompletionStatus:
         events = backend.get_events(run_id)
         event_kinds = [e.kind for e in events]
         # Either run_completed or run_started should be present
-        assert (
-            "run_created" in event_kinds or "run_started" in event_kinds
-        ), f"Expected run lifecycle events: {event_kinds}"
+        assert "run_created" in event_kinds or "run_started" in event_kinds, (
+            f"Expected run lifecycle events: {event_kinds}"
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -927,18 +902,12 @@ class TestTranscriptAndReceiptFiles:
                     # Verify JSON files
                     json_files = list(receipts_dir.glob("*.json"))
                     for json_file in json_files:
-                        assert json_file.suffix == ".json", (
-                            f"Receipt should be JSON: {json_file}"
-                        )
+                        assert json_file.suffix == ".json", f"Receipt should be JSON: {json_file}"
                         # Verify content is valid JSON
                         with json_file.open() as f:
                             receipt = json.load(f)
-                        assert "step_id" in receipt, (
-                            f"Receipt should have step_id: {receipt}"
-                        )
-                        assert "status" in receipt, (
-                            f"Receipt should have status: {receipt}"
-                        )
+                        assert "step_id" in receipt, f"Receipt should have step_id: {receipt}"
+                        assert "status" in receipt, f"Receipt should have status: {receipt}"
 
 
 # -----------------------------------------------------------------------------
@@ -995,8 +964,6 @@ class TestBackendRegistryIntegration:
         3. The run is persisted and retrievable
         """
         from swarm.runtime.backends import get_backend
-
-        env = isolated_runs_env
 
         # Force stub mode
         monkeypatch.setenv("SWARM_GEMINI_STUB", "1")

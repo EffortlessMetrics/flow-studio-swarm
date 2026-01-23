@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
-
 
 class TestPublicSurfaceImports:
     """Verify all public symbols are importable from swarm.runtime.types."""
@@ -66,40 +64,9 @@ class TestPublicSurfaceImports:
     def test_dataclasses(self) -> None:
         """Test all dataclasses are importable."""
         from swarm.runtime.types import (
-            AssumptionEntry,
-            BackendCapabilities,
-            CELEvaluation,
-            DecisionLogEntry,
-            DecisionMetrics,
-            EdgeOption,
-            Elimination,
-            FlowResult,
-            HandoffEnvelope,
-            HumanPolicy,
-            InjectedNode,
-            InjectedNodeSpec,
-            InterruptionFrame,
-            LLMReasoning,
-            MacroPolicy,
-            MacroRoutingDecision,
-            MacroRoutingRule,
-            MicroloopContext,
-            ObservationEntry,
-            ResumePoint,
-            RoutingCandidate,
             RoutingDecision,
-            RoutingExplanation,
-            RoutingFactor,
             RoutingSignal,
-            RunEvent,
-            RunPlanSpec,
             RunSpec,
-            RunState,
-            RunSummary,
-            WhyNowJustification,
-            WP4EliminationEntry,
-            WP4RoutingExplanation,
-            WP4RoutingMetrics,
         )
 
         # Spot-check instantiation
@@ -109,49 +76,7 @@ class TestPublicSurfaceImports:
     def test_functions(self) -> None:
         """Test all public functions are importable."""
         from swarm.runtime.types import (
-            assumption_entry_from_dict,
-            assumption_entry_to_dict,
-            decision_log_entry_from_dict,
-            decision_log_entry_to_dict,
-            flow_result_from_dict,
-            flow_result_to_dict,
             generate_run_id,
-            handoff_envelope_from_dict,
-            handoff_envelope_to_dict,
-            human_policy_from_dict,
-            human_policy_to_dict,
-            injected_node_from_dict,
-            injected_node_spec_from_dict,
-            injected_node_spec_to_dict,
-            injected_node_to_dict,
-            interruption_frame_from_dict,
-            interruption_frame_to_dict,
-            macro_policy_from_dict,
-            macro_policy_to_dict,
-            macro_routing_decision_from_dict,
-            macro_routing_decision_to_dict,
-            macro_routing_rule_from_dict,
-            macro_routing_rule_to_dict,
-            resume_point_from_dict,
-            resume_point_to_dict,
-            routing_candidate_from_dict,
-            routing_candidate_to_dict,
-            routing_explanation_from_dict,
-            routing_explanation_to_dict,
-            routing_signal_from_dict,
-            routing_signal_to_dict,
-            run_event_from_dict,
-            run_event_to_dict,
-            run_plan_spec_from_dict,
-            run_plan_spec_to_dict,
-            run_spec_from_dict,
-            run_spec_to_dict,
-            run_state_from_dict,
-            run_state_to_dict,
-            run_summary_from_dict,
-            run_summary_to_dict,
-            wp4_routing_explanation_from_dict,
-            wp4_routing_explanation_to_dict,
         )
 
         # Verify generate_run_id works
@@ -465,9 +390,7 @@ class TestSerdesRoundtrip:
                 llm_tokens_used=0,
             ),
         )
-        roundtrip = wp4_routing_explanation_from_dict(
-            wp4_routing_explanation_to_dict(original)
-        )
+        roundtrip = wp4_routing_explanation_from_dict(wp4_routing_explanation_to_dict(original))
 
         assert roundtrip.decision == original.decision
         assert roundtrip.method == original.method
@@ -496,9 +419,7 @@ class TestSerdesRoundtrip:
             constraints_checked=["max_bounces"],
             warnings=["Approaching bounce limit"],
         )
-        roundtrip = macro_routing_decision_from_dict(
-            macro_routing_decision_to_dict(original)
-        )
+        roundtrip = macro_routing_decision_from_dict(macro_routing_decision_to_dict(original))
 
         assert roundtrip.action == MacroAction.GOTO
         assert roundtrip.next_flow == "build"

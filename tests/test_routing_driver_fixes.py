@@ -27,7 +27,6 @@ from swarm.runtime.stepwise.routing.driver import (
 )
 from swarm.runtime.types import RoutingDecision
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================

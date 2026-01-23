@@ -28,7 +28,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from swarm.runtime.forensic_comparator import (
     compare_claim_vs_evidence,
@@ -36,17 +36,18 @@ from swarm.runtime.forensic_comparator import (
 )
 from swarm.runtime.forensic_types import diff_scan_result_from_dict
 from swarm.runtime.handoff_io import update_envelope_routing
+from swarm.runtime.stepwise._routing_legacy import generate_routing_candidates
 from swarm.runtime.types import (
     RoutingDecision,
     RoutingMode,
     handoff_envelope_to_dict,
 )
-from swarm.runtime.stepwise._routing_legacy import generate_routing_candidates
+
+from .driver import RoutingOutcome
 
 # Import from utility_candidates.py to avoid circular imports with driver.py
 # The utility_candidates module is the single source of truth for candidate generation
 from .utility_candidates import get_utility_flow_candidates as _get_utility_flow_candidates
-from .driver import RoutingOutcome
 
 if TYPE_CHECKING:
     from swarm.config.flow_registry import FlowDefinition, StepDefinition
@@ -103,9 +104,15 @@ def route_via_navigator(
     """
     # Build step result dict for Navigator
     step_result_dict = {
-        "status": step_result.status if hasattr(step_result, "status") else step_result.get("status", ""),
-        "output": step_result.output if hasattr(step_result, "output") else step_result.get("output", ""),
-        "duration_ms": step_result.duration_ms if hasattr(step_result, "duration_ms") else step_result.get("duration_ms", 0),
+        "status": step_result.status
+        if hasattr(step_result, "status")
+        else step_result.get("status", ""),
+        "output": step_result.output
+        if hasattr(step_result, "output")
+        else step_result.get("output", ""),
+        "duration_ms": step_result.duration_ms
+        if hasattr(step_result, "duration_ms")
+        else step_result.get("duration_ms", 0),
     }
 
     # Get file changes from step result if available
@@ -303,9 +310,7 @@ def route_via_navigator(
                 candidate_file,
             )
         except Exception as e:
-            logger.warning(
-                "Failed to write routing candidates to artifact file: %s", e
-            )
+            logger.warning("Failed to write routing candidates to artifact file: %s", e)
             candidate_set_path = None
 
     routing_dict = {

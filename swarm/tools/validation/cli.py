@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
+
 # Early argument parsing for --repo (must happen before other imports)
 # This allows us to set the repo root before validation modules resolve their paths
 def _get_repo_override() -> Path | None:
@@ -24,24 +25,25 @@ def _get_repo_override() -> Path | None:
 _repo_override = _get_repo_override()
 if _repo_override is not None:
     from swarm.tools.validation.helpers import set_repo_root
+
     set_repo_root(_repo_override)
 
 # Now import validation modules (they will use the configured repo root)
-from swarm.tools.validation.constants import (
+from swarm.tools.validation.constants import (  # noqa: E402
+    EXIT_FATAL_ERROR,
     EXIT_SUCCESS,
     EXIT_VALIDATION_FAILED,
-    EXIT_FATAL_ERROR,
 )
-from swarm.tools.validation.registry import parse_agents_registry
-from swarm.tools.validation.reporting import (
+from swarm.tools.validation.registry import parse_agents_registry  # noqa: E402
+from swarm.tools.validation.reporting import (  # noqa: E402
     build_report_json,
     build_report_markdown,
+    print_errors,
     print_json_output,
     print_success,
-    print_errors,
 )
-from swarm.tools.validation.validators.flows import parse_flow_config
-from swarm.tools.validation.runner import run_validation
+from swarm.tools.validation.runner import run_validation  # noqa: E402
+from swarm.tools.validation.validators.flows import parse_flow_config  # noqa: E402
 
 
 def main() -> None:
@@ -61,62 +63,56 @@ Examples:
   uv run swarm/tools/validate_swarm.py --flows-only
   uv run swarm/tools/validate_swarm.py --debug
   uv run swarm/tools/validate_swarm.py --repo /path/to/repo
-        """
+        """,
     )
 
     parser.add_argument(
         "--repo",
         metavar="PATH",
-        help="Path to repository root to validate (default: auto-detect from cwd)"
+        help="Path to repository root to validate (default: auto-detect from cwd)",
     )
 
     parser.add_argument(
         "--check-modified",
         action="store_true",
-        help="Only check files modified vs main branch (git-aware mode)"
+        help="Only check files modified vs main branch (git-aware mode)",
     )
 
     parser.add_argument(
         "--flows-only",
         action="store_true",
-        help="Only run flow validation checks (skip agent/adapter validation)"
+        help="Only run flow validation checks (skip agent/adapter validation)",
     )
 
     parser.add_argument(
         "--check-prompts",
         action="store_true",
-        help="Validate agent prompt sections (## Inputs, ## Outputs, ## Behavior)"
+        help="Validate agent prompt sections (## Inputs, ## Outputs, ## Behavior)",
     )
 
     parser.add_argument(
         "--strict",
         action="store_true",
-        help="Enforce swarm design constraints (tools/permissionMode become errors, not warnings)"
+        help="Enforce swarm design constraints (tools/permissionMode become errors, not warnings)",
     )
 
     parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug output with timing and validation steps"
+        "--debug", action="store_true", help="Enable debug output with timing and validation steps"
     )
 
     parser.add_argument(
         "--json",
         action="store_true",
-        help="Output machine-readable JSON with detailed per-agent/flow/step results"
+        help="Output machine-readable JSON with detailed per-agent/flow/step results",
     )
 
     parser.add_argument(
         "--report",
         choices=["json", "markdown"],
-        help="Output format for validation report (json or markdown)"
+        help="Output format for validation report (json or markdown)",
     )
 
-    parser.add_argument(
-        "--version",
-        action="version",
-        version="validate_swarm.py 2.1.0"
-    )
+    parser.add_argument("--version", action="version", version="validate_swarm.py 2.1.0")
 
     args = parser.parse_args()
 
@@ -145,7 +141,7 @@ Examples:
             debug=args.debug,
             strict_mode=args.strict,
             flows_only=args.flows_only,
-            check_prompts=args.check_prompts
+            check_prompts=args.check_prompts,
         )
     except SystemExit:
         raise
@@ -166,6 +162,7 @@ Examples:
         print(f"ERROR: Unexpected error during validation: {e}", file=sys.stderr)
         if args.debug:
             import traceback
+
             traceback.print_exc(file=sys.stderr)
         sys.exit(EXIT_FATAL_ERROR)
 

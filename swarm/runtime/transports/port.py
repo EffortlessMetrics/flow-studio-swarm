@@ -20,19 +20,17 @@ Each transport declares its capabilities so the orchestrator can adapt.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncContextManager,
-    Callable,
     Dict,
     List,
     Literal,
     Optional,
     Protocol,
-    Tuple,
     runtime_checkable,
 )
 
@@ -364,8 +362,8 @@ CLAUDE_SDK_CAPABILITIES = TransportCapabilities(
     supports_output_format=True,
     supports_interrupts=True,
     supports_hooks=True,
-    supports_hot_context_within_step=True,   # Work/Finalize/Route share session
-    supports_context_across_steps=False,      # Each step starts fresh (intentional)
+    supports_hot_context_within_step=True,  # Work/Finalize/Route share session
+    supports_context_across_steps=False,  # Each step starts fresh (intentional)
     supports_streaming=True,
     supports_rewind=False,
     max_context_tokens=200000,
@@ -385,7 +383,7 @@ CLAUDE_CLI_CAPABILITIES = TransportCapabilities(
     supports_interrupts=False,  # Subprocess can be killed but no graceful interrupt
     supports_hooks=False,  # No hook integration
     supports_hot_context_within_step=False,  # Each CLI call is stateless
-    supports_context_across_steps=False,      # Each step starts fresh
+    supports_context_across_steps=False,  # Each step starts fresh
     supports_streaming=True,  # stream-json output
     supports_rewind=False,
     max_context_tokens=200000,
@@ -405,7 +403,7 @@ GEMINI_CLI_CAPABILITIES = TransportCapabilities(
     supports_interrupts=False,
     supports_hooks=False,
     supports_hot_context_within_step=False,  # Each CLI call is stateless
-    supports_context_across_steps=False,      # Each step starts fresh
+    supports_context_across_steps=False,  # Each step starts fresh
     supports_streaming=True,  # JSON streaming
     supports_rewind=False,
     max_context_tokens=1000000,  # Gemini has larger context
@@ -424,8 +422,8 @@ STUB_CAPABILITIES = TransportCapabilities(
     supports_output_format=True,  # Stubs can simulate anything
     supports_interrupts=True,
     supports_hooks=True,
-    supports_hot_context_within_step=True,   # Simulates full capability
-    supports_context_across_steps=False,      # Each step starts fresh (intentional)
+    supports_hot_context_within_step=True,  # Simulates full capability
+    supports_context_across_steps=False,  # Each step starts fresh (intentional)
     supports_streaming=True,
     supports_rewind=False,
     max_context_tokens=0,  # Unlimited for stubs

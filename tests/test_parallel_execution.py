@@ -12,25 +12,20 @@ These tests verify the ParallelExecutor correctly handles:
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-
 from swarm.runtime.stepwise.parallel import (
     AggregateStatus,
-    BranchResult,
     ExecutionPolicy,
     FailurePolicy,
     ForkConfig,
-    ForkResult,
     IsolationMode,
     JoinConfig,
     JoinStrategy,
-    ParallelContext,
     ParallelExecutor,
     create_fork_contexts,
 )
@@ -384,16 +379,11 @@ class TestGateFlowParallel:
 
     def test_gate_flow_config_has_parallel_section(self):
         """Test that gate.yaml has parallel configuration."""
-        import yaml
         from pathlib import Path
 
-        gate_path = (
-            Path(__file__).parent.parent
-            / "swarm"
-            / "config"
-            / "flows"
-            / "gate.yaml"
-        )
+        import yaml
+
+        gate_path = Path(__file__).parent.parent / "swarm" / "config" / "flows" / "gate.yaml"
 
         with open(gate_path) as f:
             config = yaml.safe_load(f)
@@ -417,16 +407,11 @@ class TestGateFlowParallel:
 
     def test_gate_flow_steps_have_parallel_markers(self):
         """Test that gate flow steps have parallel_branch markers."""
-        import yaml
         from pathlib import Path
 
-        gate_path = (
-            Path(__file__).parent.parent
-            / "swarm"
-            / "config"
-            / "flows"
-            / "gate.yaml"
-        )
+        import yaml
+
+        gate_path = Path(__file__).parent.parent / "swarm" / "config" / "flows" / "gate.yaml"
 
         with open(gate_path) as f:
             config = yaml.safe_load(f)
@@ -456,9 +441,10 @@ class TestCreateForkContexts:
 
     def test_creates_contexts_for_each_target(self):
         """Test that contexts are created for each fork target."""
-        from swarm.runtime.engines.models import RoutingContext, StepContext
-        from swarm.runtime.types import RunSpec
         from pathlib import Path
+
+        from swarm.runtime.engines.models import StepContext
+        from swarm.runtime.types import RunSpec
 
         base_ctx = StepContext(
             repo_root=Path("/test"),

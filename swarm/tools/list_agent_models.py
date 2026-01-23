@@ -119,9 +119,7 @@ def print_table(configs: list[Dict[str, Any]]) -> None:
     model_width = max(len("model"), max(len(c["model"]) for c in configs))
 
     # Header
-    print(
-        f"{'key':<{key_width}}  {'flows':<{flows_width}}  {'model':<{model_width}}  category"
-    )
+    print(f"{'key':<{key_width}}  {'flows':<{flows_width}}  {'model':<{model_width}}  category")
     print("-" * (key_width + flows_width + model_width + 30))
 
     # Rows
@@ -154,15 +152,11 @@ def print_csv(configs: list[Dict[str, Any]]) -> None:
 
     # Rows
     for cfg in configs:
-        print(
-            f'{cfg["key"]},{cfg["flows"]},{cfg["model"]},{cfg["category"]},{cfg["color"]}'
-        )
+        print(f"{cfg['key']},{cfg['flows']},{cfg['model']},{cfg['category']},{cfg['color']}")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="List agent model configurations for inspection."
-    )
+    parser = argparse.ArgumentParser(description="List agent model configurations for inspection.")
     parser.add_argument(
         "--format",
         choices=["table", "csv"],

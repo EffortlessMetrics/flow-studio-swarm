@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
@@ -42,7 +43,9 @@ async def platform_status(state: FlowStudioState = Depends(get_state)):
         )
 
 
-@router.post("/platform/status/refresh", response_model=schema.ValidationSnapshot if schema else None)
+@router.post(
+    "/platform/status/refresh", response_model=schema.ValidationSnapshot if schema else None
+)
 async def platform_status_refresh(state: FlowStudioState = Depends(get_state)):
     if not state.core:
         return JSONResponse(

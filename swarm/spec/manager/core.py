@@ -25,8 +25,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from .compile import compile_to_prompt_plan as _compile_to_prompt_plan
-from .etag import canonical_json, compute_etag_bytes, compute_file_etag
 from .errors import ConcurrencyError, SpecNotFoundError, SpecValidationError
+from .etag import canonical_json, compute_etag_bytes, compute_file_etag
 from .git import git_commit
 from .io import atomic_write
 from .models import FlowGraph, StepTemplate, ValidationError, ValidationResult
@@ -47,7 +47,6 @@ from .paths import (
 )
 from .schemas import load_schema
 from .validate import check_jsonschema, validate_spec
-
 
 logger = logging.getLogger(__name__)
 
@@ -214,9 +213,7 @@ class SpecManager:
     # Validation
     # =========================================================================
 
-    def validate_spec(
-        self, spec_type: str, data: Dict[str, Any]
-    ) -> List[ValidationError]:
+    def validate_spec(self, spec_type: str, data: Dict[str, Any]) -> List[ValidationError]:
         """Validate spec data against its JSON schema.
 
         Args:
@@ -373,11 +370,7 @@ class SpecManager:
         if not templates_dir.exists():
             return []
 
-        return sorted(
-            p.stem
-            for p in templates_dir.glob("*.json")
-            if not p.name.startswith("_")
-        )
+        return sorted(p.stem for p in templates_dir.glob("*.json") if not p.name.startswith("_"))
 
     def get_template(self, template_id: str) -> Tuple[Dict[str, Any], str]:
         """Get a template as raw dict with ETag.

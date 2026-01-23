@@ -15,8 +15,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 # Add repo root to path for imports
 repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
@@ -89,8 +87,12 @@ class TestShimIdentity:
         class_defs = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
         func_defs = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
 
-        assert len(class_defs) == 0, f"Shim should not define classes, found: {[c.name for c in class_defs]}"
-        assert len(func_defs) == 0, f"Shim should not define functions, found: {[f.name for f in func_defs]}"
+        assert len(class_defs) == 0, (
+            f"Shim should not define classes, found: {[c.name for c in class_defs]}"
+        )
+        assert len(func_defs) == 0, (
+            f"Shim should not define functions, found: {[f.name for f in func_defs]}"
+        )
 
 
 class TestStepwisePackageExports:
@@ -166,6 +168,7 @@ class TestReceiptCompat:
     def test_read_receipt_field_reads_value(self, tmp_path: Path):
         """Verify read_receipt_field reads values correctly."""
         import json
+
         from swarm.runtime.stepwise import read_receipt_field
 
         # Create receipt directory and file
@@ -229,8 +232,8 @@ class TestRoutingModule:
 
     def test_build_routing_context(self):
         """Verify build_routing_context creates proper context."""
-        from swarm.runtime.stepwise.routing import build_routing_context
         from swarm.config.flow_registry import StepDefinition, StepRouting
+        from swarm.runtime.stepwise.routing import build_routing_context
 
         # Create a step with microloop routing
         step = StepDefinition(
@@ -255,8 +258,8 @@ class TestRoutingModule:
 
     def test_build_routing_context_linear_step(self):
         """Verify build_routing_context handles linear steps."""
-        from swarm.runtime.stepwise.routing import build_routing_context
         from swarm.config.flow_registry import StepDefinition, StepRouting
+        from swarm.runtime.stepwise.routing import build_routing_context
 
         step = StepDefinition(
             id="context-loader",

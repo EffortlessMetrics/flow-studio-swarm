@@ -171,7 +171,9 @@ def check_freshness(verbose: bool = False) -> Dict[str, any]:
                 if ac in gherkin_acs:
                     status = "OK"
                 else:
-                    status = "OK_NO_GHERKIN"  # Documented but not in feature file (may be intentional)
+                    status = (
+                        "OK_NO_GHERKIN"  # Documented but not in feature file (may be intentional)
+                    )
             elif ac in gherkin_acs and ac not in matrix_acs:
                 status = "MISSING_IN_MATRIX"
             elif ac in matrix_acs and ac not in config_acs:
@@ -181,11 +183,13 @@ def check_freshness(verbose: bool = False) -> Dict[str, any]:
             else:
                 status = "UNKNOWN"
 
-            ac_details.append({
-                "id": ac,
-                "status": status,
-                "sources": status_parts,
-            })
+            ac_details.append(
+                {
+                    "id": ac,
+                    "status": status,
+                    "sources": status_parts,
+                }
+            )
 
         result["acs"] = ac_details
 
@@ -197,7 +201,9 @@ def print_plain_text_summary(result: Dict[str, any], verbose: bool = False):
     if result["status"] == "PASS":
         print("[PASS] AC Matrix Freshness Check")
         print(f"  {result['total_acs']} ACs OK (all layers aligned)")
-        print(f"  Gherkin: {result['counts']['gherkin']}, Matrix: {result['counts']['matrix']}, Config: {result['counts']['config']}")
+        print(
+            f"  Gherkin: {result['counts']['gherkin']}, Matrix: {result['counts']['matrix']}, Config: {result['counts']['config']}"
+        )
     else:
         print("[FAIL] AC Matrix Freshness Check FAILED")
         print()
@@ -226,7 +232,9 @@ def print_plain_text_summary(result: Dict[str, any], verbose: bool = False):
             print(f"  [FAIL] Config -> Matrix: {len(config_check['orphaned'])} orphaned")
             for ac in config_check["orphaned"]:
                 print(f"    - {ac}")
-            print(f"  Fix: Add documentation for these ACs in {MATRIX_FILE} or remove from {CONFIG_FILE}")
+            print(
+                f"  Fix: Add documentation for these ACs in {MATRIX_FILE} or remove from {CONFIG_FILE}"
+            )
             print()
 
     if verbose and "acs" in result:

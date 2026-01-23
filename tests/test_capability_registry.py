@@ -14,9 +14,7 @@ BDD Scenarios covered:
 - Scenario 7: Supported capability without tests passes (only code required)
 """
 
-import pytest
 from pathlib import Path
-
 
 # ============================================================================
 # Helper Functions
@@ -55,7 +53,9 @@ def test_valid_capability_registry(temp_repo, run_validator):
     When: I run the validator
     Then: Validator passes with no capability errors
     """
-    create_capability_registry(temp_repo, """
+    create_capability_registry(
+        temp_repo,
+        """
 version: 1
 surfaces:
   receipts:
@@ -71,7 +71,8 @@ surfaces:
           tests:
             - kind: unit
               ref: tests/test_receipt_io.py
-""")
+""",
+    )
 
     result = run_validator(temp_repo)
     # Should pass (no CAPABILITY errors)
@@ -108,7 +109,9 @@ def test_implemented_without_test_evidence_fails(temp_repo, run_validator):
     Then: Validator fails with CAPABILITY error
     And: Error mentions missing test evidence
     """
-    create_capability_registry(temp_repo, """
+    create_capability_registry(
+        temp_repo,
+        """
 version: 1
 surfaces:
   test:
@@ -120,7 +123,8 @@ surfaces:
         evidence:
           code:
             - path: src/test.py
-""")
+""",
+    )
 
     result = run_validator(temp_repo)
     assert "CAPABILITY" in result.stderr
@@ -137,7 +141,9 @@ def test_implemented_without_code_evidence_fails(temp_repo, run_validator):
     Then: Validator fails with CAPABILITY error
     And: Error mentions missing code evidence
     """
-    create_capability_registry(temp_repo, """
+    create_capability_registry(
+        temp_repo,
+        """
 version: 1
 surfaces:
   test:
@@ -150,7 +156,8 @@ surfaces:
           tests:
             - kind: unit
               ref: tests/test_something.py
-""")
+""",
+    )
 
     result = run_validator(temp_repo)
     assert "CAPABILITY" in result.stderr
@@ -168,7 +175,9 @@ def test_bdd_cap_tag_references_nonexistent_capability(temp_repo, run_validator)
     And: Error mentions the invalid tag
     """
     # Create registry without the referenced capability
-    create_capability_registry(temp_repo, """
+    create_capability_registry(
+        temp_repo,
+        """
 version: 1
 surfaces:
   test:
@@ -183,17 +192,22 @@ surfaces:
           tests:
             - kind: unit
               ref: tests/test.py
-""")
+""",
+    )
 
     # Create feature file with invalid @cap: tag
-    create_feature_file(temp_repo, "test", """
+    create_feature_file(
+        temp_repo,
+        "test",
+        """
 Feature: Test feature
 
   @cap:test.nonexistent
   Scenario: Test scenario
     Given something
     Then something else
-""")
+""",
+    )
 
     result = run_validator(temp_repo)
     assert "CAPABILITY" in result.stderr
@@ -215,7 +229,9 @@ def test_aspirational_without_evidence_passes(temp_repo, run_validator):
     When: I run the validator
     Then: Validator passes (aspirational doesn't need evidence)
     """
-    create_capability_registry(temp_repo, """
+    create_capability_registry(
+        temp_repo,
+        """
 version: 1
 surfaces:
   test:
@@ -227,7 +243,8 @@ surfaces:
         evidence:
           design:
             - path: docs/DESIGN.md
-""")
+""",
+    )
 
     result = run_validator(temp_repo)
     # Should pass - aspirational doesn't need code/test evidence
@@ -243,7 +260,9 @@ def test_supported_without_tests_passes(temp_repo, run_validator):
     When: I run the validator
     Then: Validator passes (supported only requires code)
     """
-    create_capability_registry(temp_repo, """
+    create_capability_registry(
+        temp_repo,
+        """
 version: 1
 surfaces:
   test:
@@ -256,7 +275,8 @@ surfaces:
         evidence:
           code:
             - path: src/test.py
-""")
+""",
+    )
 
     result = run_validator(temp_repo)
     # Should pass - supported only requires code evidence
@@ -270,7 +290,9 @@ surfaces:
 
 def test_valid_cap_tag_passes(temp_repo, run_validator):
     """Valid @cap: tag that references existing capability passes."""
-    create_capability_registry(temp_repo, """
+    create_capability_registry(
+        temp_repo,
+        """
 version: 1
 surfaces:
   test:
@@ -285,16 +307,21 @@ surfaces:
           tests:
             - kind: bdd
               ref: "@cap:test.feature"
-""")
+""",
+    )
 
-    create_feature_file(temp_repo, "test", """
+    create_feature_file(
+        temp_repo,
+        "test",
+        """
 Feature: Test feature
 
   @cap:test.feature
   Scenario: Test scenario
     Given something
     Then something else
-""")
+""",
+    )
 
     result = run_validator(temp_repo)
     # Should pass - tag references valid capability
@@ -303,7 +330,9 @@ Feature: Test feature
 
 def test_multiple_surfaces_validated(temp_repo, run_validator):
     """All surfaces in registry are validated."""
-    create_capability_registry(temp_repo, """
+    create_capability_registry(
+        temp_repo,
+        """
 version: 1
 surfaces:
   surface1:
@@ -328,7 +357,8 @@ surfaces:
           code:
             - path: src/s2.py
           # Missing tests - should fail
-""")
+""",
+    )
 
     result = run_validator(temp_repo)
     assert "CAPABILITY" in result.stderr

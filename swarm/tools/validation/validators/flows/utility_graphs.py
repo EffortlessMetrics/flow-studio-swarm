@@ -11,8 +11,8 @@ Validates utility flow graph specifications to ensure consistency:
 import json
 import re
 
-from swarm.validator import ValidationResult
 from swarm.tools.validation.helpers import ROOT
+from swarm.validator import ValidationResult
 
 
 def validate_utility_flow_graphs() -> ValidationResult:
@@ -52,7 +52,7 @@ def validate_utility_flow_graphs() -> ValidationResult:
                 str(rel_path),
                 f"Invalid JSON in flow graph: {e}",
                 "Fix JSON syntax errors in the flow graph file",
-                file_path=str(graph_file)
+                file_path=str(graph_file),
             )
             continue
         except Exception as e:
@@ -61,7 +61,7 @@ def validate_utility_flow_graphs() -> ValidationResult:
                 str(rel_path),
                 f"Failed to read flow graph: {e}",
                 "Check file permissions and encoding",
-                file_path=str(graph_file)
+                file_path=str(graph_file),
             )
             continue
 
@@ -81,7 +81,7 @@ def validate_utility_flow_graphs() -> ValidationResult:
                 str(rel_path),
                 f"Utility flow '{flow_id}' is missing injection_trigger in metadata",
                 "Add 'injection_trigger' to metadata section (e.g., 'upstream_diverged', 'lint_failure')",
-                file_path=str(graph_file)
+                file_path=str(graph_file),
             )
 
         # Validation Rule 2: Utility flows should use 'return' or 'pause' for next_flow
@@ -94,7 +94,7 @@ def validate_utility_flow_graphs() -> ValidationResult:
                         str(rel_path),
                         f"Utility flow '{flow_id}' has on_complete.next_flow='{next_flow}' which is a flow spec ID; utility flows should use 'return' or 'pause'",
                         "Change on_complete.next_flow to 'return' (to resume interrupted flow) or 'pause' (for human intervention)",
-                        file_path=str(graph_file)
+                        file_path=str(graph_file),
                     )
                 else:
                     # Warn about unknown next_flow value
@@ -103,7 +103,7 @@ def validate_utility_flow_graphs() -> ValidationResult:
                         str(rel_path),
                         f"Utility flow '{flow_id}' has unusual on_complete.next_flow='{next_flow}'; expected 'return' or 'pause'",
                         "Consider using 'return' or 'pause' for utility flows",
-                        file_path=str(graph_file)
+                        file_path=str(graph_file),
                     )
 
         # Validation Rule 3: Utility flows should have flow_number >= 8
@@ -113,7 +113,7 @@ def validate_utility_flow_graphs() -> ValidationResult:
                 str(rel_path),
                 f"Utility flow '{flow_id}' has flow_number={flow_number}; utility flows should use 8+ (main SDLC flows use 1-7)",
                 "Change flow_number to 8 or higher to indicate this is a utility flow",
-                file_path=str(graph_file)
+                file_path=str(graph_file),
             )
 
         # Validation Rule 4: Main SDLC flows (1-7) should not have is_utility_flow=true
@@ -123,7 +123,7 @@ def validate_utility_flow_graphs() -> ValidationResult:
                 str(rel_path),
                 f"Flow '{flow_id}' (flow_number={flow_number}) is marked as utility flow but uses SDLC flow number (1-7)",
                 "Either remove is_utility_flow from metadata, or change flow_number to 8+",
-                file_path=str(graph_file)
+                file_path=str(graph_file),
             )
 
         # Validation Rule 5: If injection_trigger is defined but is_utility_flow is not true, warn
@@ -133,7 +133,7 @@ def validate_utility_flow_graphs() -> ValidationResult:
                 str(rel_path),
                 f"Flow '{flow_id}' has injection_trigger='{injection_trigger}' but is_utility_flow is not true",
                 "Add 'is_utility_flow: true' to metadata if this is a utility flow",
-                file_path=str(graph_file)
+                file_path=str(graph_file),
             )
 
     return result

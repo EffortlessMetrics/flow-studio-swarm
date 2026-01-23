@@ -85,11 +85,13 @@ def build_profile_from_current(
         for yaml_file in sorted(flows_dir.glob("*.yaml")):
             content = yaml_file.read_text(encoding="utf-8")
             rel_path = str(yaml_file.relative_to(_SWARM_ROOT))
-            flow_configs.append(ConfigEntry(
-                key=yaml_file.stem,
-                path=rel_path,
-                yaml=content,
-            ))
+            flow_configs.append(
+                ConfigEntry(
+                    key=yaml_file.stem,
+                    path=rel_path,
+                    yaml=content,
+                )
+            )
         print(f"  Found {len(flow_configs)} flow configs")
     else:
         print_warning(f"Warning: {flows_dir} not found")
@@ -101,11 +103,13 @@ def build_profile_from_current(
         for yaml_file in sorted(agents_dir.glob("*.yaml")):
             content = yaml_file.read_text(encoding="utf-8")
             rel_path = str(yaml_file.relative_to(_SWARM_ROOT))
-            agent_configs.append(ConfigEntry(
-                key=yaml_file.stem,
-                path=rel_path,
-                yaml=content,
-            ))
+            agent_configs.append(
+                ConfigEntry(
+                    key=yaml_file.stem,
+                    path=rel_path,
+                    yaml=content,
+                )
+            )
         print(f"  Found {len(agent_configs)} agent configs")
     else:
         print_warning(f"Warning: {agents_dir} not found")

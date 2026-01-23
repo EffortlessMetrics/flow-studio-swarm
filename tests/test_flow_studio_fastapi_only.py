@@ -11,7 +11,6 @@ Test Categories:
 - Import verification (no accidental Flask imports)
 """
 
-import subprocess
 import sys
 from pathlib import Path
 
@@ -53,13 +52,10 @@ def test_flask_not_in_production_dependencies():
 def test_flow_studio_py_archived():
     """Verify old Flask flow_studio.py is gone and legacy is under _archive/."""
     active_path = repo_root / "swarm" / "tools" / "flow_studio.py"
-    archived_path = (
-        repo_root / "swarm" / "tools" / "_archive" / "flow_studio_flask_legacy.py"
-    )
+    archived_path = repo_root / "swarm" / "tools" / "_archive" / "flow_studio_flask_legacy.py"
 
     assert not active_path.exists(), (
-        "flow_studio.py should not exist in active tools any more "
-        "(FastAPI is the only backend)."
+        "flow_studio.py should not exist in active tools any more (FastAPI is the only backend)."
     )
     assert archived_path.exists(), (
         "Legacy Flask backend should be archived at "
@@ -97,9 +93,7 @@ def test_makefile_flow_studio_uses_fastapi():
     assert "uvicorn swarm.tools.flow_studio_fastapi:app" in target_text, (
         "flow-studio should use FastAPI backend via uvicorn"
     )
-    assert "flask" not in target_text.lower(), (
-        "flow-studio should not reference Flask"
-    )
+    assert "flask" not in target_text.lower(), "flow-studio should not reference Flask"
 
 
 def test_no_flask_imports_in_fastapi_module():
@@ -110,12 +104,8 @@ def test_no_flask_imports_in_fastapi_module():
     content = fastapi_module.read_text(encoding="utf-8")
 
     # Should not import Flask
-    assert "import flask" not in content.lower(), (
-        "FastAPI module should not import Flask"
-    )
-    assert "from flask" not in content.lower(), (
-        "FastAPI module should not import from Flask"
-    )
+    assert "import flask" not in content.lower(), "FastAPI module should not import Flask"
+    assert "from flask" not in content.lower(), "FastAPI module should not import from Flask"
 
 
 def test_no_flask_in_active_test_imports():
@@ -146,9 +136,7 @@ def test_no_flask_in_active_test_imports():
 
             # If not in skipped test and found Flask import
             if not in_skipped_test and "from swarm.tools.flow_studio import" in line:
-                pytest.fail(
-                    f"{test_file}:{i+1}: Active test imports Flask: {line.strip()}"
-                )
+                pytest.fail(f"{test_file}:{i + 1}: Active test imports Flask: {line.strip()}")
 
 
 # ============================================================================
@@ -160,6 +148,7 @@ def test_fastapi_module_exists():
     """Verify FastAPI module exists and is importable."""
     try:
         from swarm.tools.flow_studio_fastapi import app
+
         assert app is not None, "FastAPI app should be defined"
     except ImportError as e:
         pytest.fail(f"Failed to import FastAPI module: {e}")
@@ -281,12 +270,8 @@ def test_no_flask_test_client_in_conftest():
     content = conftest.read_text(encoding="utf-8")
 
     # Should not import Flask for test fixtures
-    assert "from flask import" not in content, (
-        "conftest.py should not import Flask"
-    )
-    assert "import flask" not in content, (
-        "conftest.py should not import Flask"
-    )
+    assert "from flask import" not in content, "conftest.py should not import Flask"
+    assert "import flask" not in content, "conftest.py should not import Flask"
 
 
 def test_demo_commands_reference_fastapi():
@@ -302,6 +287,4 @@ def test_demo_commands_reference_fastapi():
         lines = content.split("\n")
         for i, line in enumerate(lines):
             if "flow-studio" in line and "flask" in line.lower():
-                pytest.fail(
-                    f"DEMO_RUN_COMMANDS.jsonl:{i+1} references Flask with flow-studio"
-                )
+                pytest.fail(f"DEMO_RUN_COMMANDS.jsonl:{i + 1} references Flask with flow-studio")

@@ -17,7 +17,6 @@ BDD Scenarios covered:
 import json
 
 import pytest
-
 from conftest import (
     add_agent_to_registry,
     assert_validator_failed,
@@ -443,12 +442,12 @@ def test_report_generation_no_performance_regression(valid_repo, run_validator):
 
     # Baseline run
     start1 = time.time()
-    result1 = run_validator(valid_repo)
+    run_validator(valid_repo)
     baseline_time = time.time() - start1
 
     # Run with JSON report
     start2 = time.time()
-    result2 = run_validator(valid_repo, flags=["--report", "json"])
+    run_validator(valid_repo, flags=["--report", "json"])
     report_time = time.time() - start2
 
     # Report generation should not add significant overhead
@@ -481,7 +480,7 @@ def test_debug_output_shows_files_scanned(valid_repo, run_validator):
     Then: Debug output includes files being scanned
     """
     result = run_validator(valid_repo, flags=["--debug"])
-    output = result.stderr + result.stdout
+    result.stderr + result.stdout
 
     # Should mention files being checked
     # (exact format depends on implementation)
@@ -639,8 +638,9 @@ def test_precommit_hook_uses_system_language():
         if repo.get("repo") == "local" and "hooks" in repo:
             for hook in repo["hooks"]:
                 if hook.get("id") == "swarm-validate":
-                    assert hook.get("language") == "system", \
+                    assert hook.get("language") == "system", (
                         "swarm-validate hook should use 'language: system'"
+                    )
 
 
 def test_precommit_hook_invokes_validator():
@@ -664,10 +664,8 @@ def test_precommit_hook_invokes_validator():
             for hook in repo["hooks"]:
                 if hook.get("id") == "swarm-validate":
                     entry = hook.get("entry", "")
-                    assert "validate_swarm.py" in entry, \
-                        "entry should reference validate_swarm.py"
-                    assert "--strict" in entry, \
-                        "entry should include --strict flag"
+                    assert "validate_swarm.py" in entry, "entry should reference validate_swarm.py"
+                    assert "--strict" in entry, "entry should include --strict flag"
 
 
 def test_precommit_hook_pass_filenames_false():
@@ -690,8 +688,9 @@ def test_precommit_hook_pass_filenames_false():
         if repo.get("repo") == "local" and "hooks" in repo:
             for hook in repo["hooks"]:
                 if hook.get("id") == "swarm-validate":
-                    assert hook.get("pass_filenames") is False, \
+                    assert hook.get("pass_filenames") is False, (
                         "swarm-validate hook should have pass_filenames: false"
+                    )
 
 
 def test_precommit_config_exists():
@@ -711,6 +710,7 @@ def test_precommit_config_exists():
     # File may or may not exist; just check it's valid if it does
     if config_file.exists():
         import yaml
+
         content = config_file.read_text(encoding="utf-8")
         try:
             yaml.safe_load(content)

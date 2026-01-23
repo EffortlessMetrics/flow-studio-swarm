@@ -49,7 +49,6 @@ from typing import Any, Dict, List, Optional, Union
 # Import FileDiff for compatibility with diff_scanner.py
 from swarm.runtime.diff_scanner import FileDiff, file_diff_from_dict, file_diff_to_dict
 
-
 # =============================================================================
 # Enums for type-safe field values
 # =============================================================================
@@ -313,7 +312,9 @@ def forensic_marker_to_dict(marker: ForensicMarker) -> Dict[str, Any]:
     """Convert ForensicMarker to dictionary for serialization."""
     result: Dict[str, Any] = {
         "marker_id": marker.marker_id,
-        "marker_type": marker.marker_type.value if isinstance(marker.marker_type, MarkerType) else marker.marker_type,
+        "marker_type": marker.marker_type.value
+        if isinstance(marker.marker_type, MarkerType)
+        else marker.marker_type,
         "evidence_hash": marker.evidence_hash,
         "claim": marker.claim,
         "reality": marker.reality,
@@ -597,7 +598,9 @@ def forensic_verification_to_dict(verification: ForensicVerification) -> Dict[st
     result: Dict[str, Any] = {
         "scan_id": verification.scan_id,
         "timestamp": verification.timestamp,
-        "scan_type": verification.scan_type.value if isinstance(verification.scan_type, ScanType) else verification.scan_type,
+        "scan_type": verification.scan_type.value
+        if isinstance(verification.scan_type, ScanType)
+        else verification.scan_type,
         "source": scan_source_to_dict(verification.source),
         "markers": [forensic_marker_to_dict(m) for m in verification.markers],
     }
@@ -903,9 +906,7 @@ def progress_delta_to_dict(delta: ProgressDelta) -> Dict[str, Any]:
 
 def progress_delta_from_dict(data: Dict[str, Any]) -> ProgressDelta:
     """Parse ProgressDelta from dictionary."""
-    artifacts_changed = [
-        artifact_change_from_dict(a) for a in data.get("artifacts_changed", [])
-    ]
+    artifacts_changed = [artifact_change_from_dict(a) for a in data.get("artifacts_changed", [])]
     return ProgressDelta(
         has_meaningful_change=data.get("has_meaningful_change", False),
         stall_indicator=data.get("stall_indicator", False),
@@ -1289,20 +1290,26 @@ def compute_delta(before: StateSnapshot, after: StateSnapshot) -> ProgressDelta:
     for path in after_files - before_files:
         files_added += 1
         size_delta = after.artifact_sizes.get(path, 0)
-        artifacts_changed.append(ArtifactChange(path=path, change_type="added", size_delta=size_delta))
+        artifacts_changed.append(
+            ArtifactChange(path=path, change_type="added", size_delta=size_delta)
+        )
 
     # Files deleted
     for path in before_files - after_files:
         files_deleted += 1
         size_delta = -before.artifact_sizes.get(path, 0)
-        artifacts_changed.append(ArtifactChange(path=path, change_type="deleted", size_delta=size_delta))
+        artifacts_changed.append(
+            ArtifactChange(path=path, change_type="deleted", size_delta=size_delta)
+        )
 
     # Files modified (hash changed)
     for path in before_files & after_files:
         if before.artifact_hashes[path] != after.artifact_hashes[path]:
             files_modified += 1
             size_delta = after.artifact_sizes.get(path, 0) - before.artifact_sizes.get(path, 0)
-            artifacts_changed.append(ArtifactChange(path=path, change_type="modified", size_delta=size_delta))
+            artifacts_changed.append(
+                ArtifactChange(path=path, change_type="modified", size_delta=size_delta)
+            )
 
     # Compute other deltas
     lines_added = max(0, after.line_count - before.line_count)

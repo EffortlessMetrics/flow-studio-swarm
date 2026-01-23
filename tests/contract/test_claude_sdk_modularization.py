@@ -89,9 +89,7 @@ def test_sdk_imports_only_in_allowed_location():
         if patterns_found:
             # Check if this file is in the allowed list
             if rel_path not in ALLOWED_FILES:
-                violations.append(
-                    f"{rel_path}: Found SDK imports: {', '.join(patterns_found)}"
-                )
+                violations.append(f"{rel_path}: Found SDK imports: {', '.join(patterns_found)}")
 
     # If violations found, fail with a clear error message
     if violations:
@@ -119,7 +117,7 @@ def test_sdk_imports_only_in_allowed_location():
     # If we get here, all imports are in the right place
     # Optionally, verify that the allowed files DO contain the imports
     sdk_import_file = INTERNAL_SDK_DIR / "sdk_import.py"
-    claude_sdk_file = RUNTIME_DIR / "claude_sdk.py"
+    RUNTIME_DIR / "claude_sdk.py"
 
     # Check that sdk_import.py actually imports the SDK (or tries to)
     sdk_import_patterns = _file_contains_sdk_import(sdk_import_file)
@@ -276,9 +274,7 @@ def test_public_api_exports_stable():
             non_callable.append(name)
 
     if non_callable:
-        error_message = (
-            "The following expected exports are not callable:\n"
-        )
+        error_message = "The following expected exports are not callable:\n"
         for name in non_callable:
             error_message += f"  - {name}\n"
         pytest.fail(error_message)

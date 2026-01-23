@@ -61,6 +61,7 @@ from fastapi.testclient import TestClient
 def client():
     """Create FastAPI test client."""
     from swarm.tools.flow_studio_fastapi import app
+
     return TestClient(app)
 
 
@@ -75,9 +76,7 @@ class TestFlowEndpoints:
     def test_get_flows_returns_list(self, client):
         """Test /api/flows endpoint returns list of flows."""
         resp = client.get("/api/flows")
-        assert resp.status_code == 200, (
-            f"Expected 200, got {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
         data = resp.json()
         assert "flows" in data, "Response missing 'flows' field"
         assert isinstance(data["flows"], list), "'flows' should be a list"
@@ -97,9 +96,7 @@ class TestFlowEndpoints:
             actual_fields = set(flow.keys())
 
             missing = expected_fields - actual_fields
-            assert not missing, (
-                f"Flow missing fields: {missing}. Got: {actual_fields}"
-            )
+            assert not missing, f"Flow missing fields: {missing}. Got: {actual_fields}"
 
     def test_get_flow_detail_returns_steps(self, client):
         """Test /api/graph/{flow_key} endpoint returns steps for known flow."""
@@ -116,9 +113,7 @@ class TestFlowEndpoints:
         flow_key = flows[0]["key"]
         resp = client.get(f"/api/graph/{flow_key}")
 
-        assert resp.status_code in (200, 503), (
-            f"Expected 200 or 503, got {resp.status_code}"
-        )
+        assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}"
 
         if resp.status_code == 200:
             data = resp.json()
@@ -130,9 +125,7 @@ class TestFlowEndpoints:
         resp = client.get("/api/graph/nonexistent-flow-xyz")
 
         # Either 404 or 503 (if core not available)
-        assert resp.status_code in (404, 503), (
-            f"Expected 404 or 503, got {resp.status_code}"
-        )
+        assert resp.status_code in (404, 503), f"Expected 404 or 503, got {resp.status_code}"
 
         if resp.status_code == 404:
             data = resp.json()
@@ -178,10 +171,7 @@ class TestAgentEndpoints:
         nodes = data.get("nodes", [])
 
         # Find agent nodes
-        agent_nodes = [
-            n for n in nodes
-            if n.get("data", {}).get("type") == "agent"
-        ]
+        agent_nodes = [n for n in nodes if n.get("data", {}).get("type") == "agent"]
 
         # Graph should include agent nodes (most flows have agents)
         assert isinstance(agent_nodes, list), "Agent nodes should be a list"
@@ -207,10 +197,7 @@ class TestAgentEndpoints:
             data = resp.json()
             nodes = data.get("nodes", [])
 
-            agent_nodes = [
-                n for n in nodes
-                if n.get("data", {}).get("type") == "agent"
-            ]
+            agent_nodes = [n for n in nodes if n.get("data", {}).get("type") == "agent"]
 
             if agent_nodes:
                 # Verify agent node structure
@@ -247,9 +234,7 @@ class TestGraphEndpoints:
         flow_key = flows[0]["key"]
         resp = client.get(f"/api/graph/{flow_key}")
 
-        assert resp.status_code in (200, 503), (
-            f"Expected 200 or 503, got {resp.status_code}"
-        )
+        assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}"
 
         if resp.status_code == 200:
             data = resp.json()
@@ -330,10 +315,7 @@ class TestGraphEndpoints:
         nodes = data.get("nodes", [])
 
         # Find step nodes (these are where artifacts are produced)
-        step_nodes = [
-            n for n in nodes
-            if n.get("data", {}).get("type") == "step"
-        ]
+        step_nodes = [n for n in nodes if n.get("data", {}).get("type") == "step"]
 
         # Flows should have step nodes
         assert len(step_nodes) >= 0, "Step nodes should be present in graph"
@@ -352,9 +334,7 @@ class TestRunEndpoints:
         resp = client.get("/api/runs")
 
         # Either 200 with runs list or 503 if RunInspector disabled
-        assert resp.status_code in (200, 503), (
-            f"Expected 200 or 503, got {resp.status_code}"
-        )
+        assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}"
 
         data = resp.json()
         if resp.status_code == 200:
@@ -404,9 +384,7 @@ class TestRunEndpoints:
         if resp.status_code == 200:
             data = resp.json()
             # Summary should have flow status information
-            assert "run_id" in data or "flows" in data, (
-                "Summary should have 'run_id' or 'flows'"
-            )
+            assert "run_id" in data or "flows" in data, "Summary should have 'run_id' or 'flows'"
 
     def test_get_run_sdlc_returns_bar_data(self, client):
         """Test run summary includes SDLC flow completion data."""
@@ -435,9 +413,7 @@ class TestRunEndpoints:
         if flows:
             for flow_key, flow_data in flows.items():
                 # Each flow should have status information
-                assert isinstance(flow_data, dict), (
-                    f"Flow {flow_key} data should be dict"
-                )
+                assert isinstance(flow_data, dict), f"Flow {flow_key} data should be dict"
 
     def test_get_run_timeline_returns_events(self, client):
         """Test run summary includes timeline/step event data."""
@@ -469,9 +445,7 @@ class TestRunEndpoints:
                 steps = flow_data.get("steps", {})
                 if steps:
                     for step_id, step_data in steps.items():
-                        assert isinstance(step_data, dict), (
-                            f"Step {step_id} data should be dict"
-                        )
+                        assert isinstance(step_data, dict), f"Step {step_id} data should be dict"
                     return  # Found and validated step data
 
     def test_compare_runs_returns_diff(self, client):
@@ -538,9 +512,7 @@ class TestWisdomApiEndpoints:
         """Test wisdom endpoint returns 404 for non-existent run."""
         resp = client.get("/api/runs/definitely-not-a-real-run-12345/wisdom/summary")
 
-        assert resp.status_code == 404, (
-            f"Expected 404 for non-existent run, got {resp.status_code}"
-        )
+        assert resp.status_code == 404, f"Expected 404 for non-existent run, got {resp.status_code}"
 
         data = resp.json()
         # API returns 'error' field for error responses
@@ -656,12 +628,8 @@ class TestWisdomApiEndpoints:
                     assert isinstance(flow_status, dict), (
                         f"Flow '{flow_key}' status should be a dict"
                     )
-                    assert "status" in flow_status, (
-                        f"Flow '{flow_key}' should have 'status' field"
-                    )
-                    assert flow_status["status"] in (
-                        "succeeded", "failed", "skipped"
-                    ), (
+                    assert "status" in flow_status, f"Flow '{flow_key}' should have 'status' field"
+                    assert flow_status["status"] in ("succeeded", "failed", "skipped"), (
                         f"Flow '{flow_key}' has invalid status: {flow_status['status']}"
                     )
 
@@ -685,16 +653,12 @@ class TestSearchAndTourEndpoints:
         resp = client.get("/api/search?q=signal")
 
         # Accept 404 (not implemented), 200 (success), or 503 (unavailable)
-        assert resp.status_code in (200, 404, 503), (
-            f"Unexpected status code: {resp.status_code}"
-        )
+        assert resp.status_code in (200, 404, 503), f"Unexpected status code: {resp.status_code}"
 
         if resp.status_code == 200:
             data = resp.json()
             # Search should return results list
-            assert "results" in data or isinstance(data, list), (
-                "Search should return results"
-            )
+            assert "results" in data or isinstance(data, list), "Search should return results"
 
     def test_get_tours_returns_list(self, client):
         """Test tours endpoint returns list of available tours."""
@@ -703,16 +667,12 @@ class TestSearchAndTourEndpoints:
         resp = client.get("/api/tours")
 
         # Accept 404 (not implemented), 200 (success), or 503 (unavailable)
-        assert resp.status_code in (200, 404, 503), (
-            f"Unexpected status code: {resp.status_code}"
-        )
+        assert resp.status_code in (200, 404, 503), f"Unexpected status code: {resp.status_code}"
 
         if resp.status_code == 200:
             data = resp.json()
             # Tours should return list
-            assert "tours" in data or isinstance(data, list), (
-                "Tours should return tours list"
-            )
+            assert "tours" in data or isinstance(data, list), "Tours should return tours list"
 
 
 # =============================================================================
@@ -729,15 +689,11 @@ class TestAdminEndpoints:
         # The health endpoint reflects reload status
         resp = client.get("/api/health")
 
-        assert resp.status_code == 200, (
-            f"Health endpoint should return 200, got {resp.status_code}"
-        )
+        assert resp.status_code == 200, f"Health endpoint should return 200, got {resp.status_code}"
 
         data = resp.json()
         assert "status" in data, "Health response should have 'status'"
-        assert data["status"] in ("ok", "degraded", "error"), (
-            f"Unexpected status: {data['status']}"
-        )
+        assert data["status"] in ("ok", "degraded", "error"), f"Unexpected status: {data['status']}"
 
     def test_validation_returns_fr_status(self, client):
         """Test /platform/status returns functional requirement statuses."""
@@ -766,9 +722,7 @@ class TestAdminEndpoints:
         # Governance section should exist
         if "governance" in data:
             governance = data["governance"]
-            assert isinstance(governance, dict), (
-                "Governance should be a dict"
-            )
+            assert isinstance(governance, dict), "Governance should be a dict"
 
 
 # =============================================================================
@@ -803,9 +757,7 @@ class TestHealthEndpoint:
 
         data = resp.json()
         valid_statuses = {"ok", "degraded", "error"}
-        assert data["status"] in valid_statuses, (
-            f"Invalid status: {data['status']}"
-        )
+        assert data["status"] in valid_statuses, f"Invalid status: {data['status']}"
 
     def test_health_includes_counts(self, client):
         """Test health response includes flow and agent counts."""
@@ -865,9 +817,7 @@ class TestSelftestPlanEndpoint:
         resp = client.get("/api/selftest/plan")
 
         # Either 200 with plan or 503 if selftest module disabled
-        assert resp.status_code in (200, 503), (
-            f"Expected 200 or 503, got {resp.status_code}"
-        )
+        assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}"
 
     def test_selftest_plan_structure(self, client):
         """Test selftest plan has correct structure."""
@@ -933,9 +883,7 @@ class TestErrorHandling:
         for endpoint in endpoints:
             resp = client.get(endpoint)
             # Should not return 500 (server error)
-            assert resp.status_code != 500, (
-                f"Endpoint {endpoint} returned 500 (server error)"
-            )
+            assert resp.status_code != 500, f"Endpoint {endpoint} returned 500 (server error)"
             # Should return valid response (200, 404, or 503)
             assert resp.status_code in (200, 404, 503), (
                 f"Endpoint {endpoint} returned unexpected {resp.status_code}"
@@ -956,16 +904,11 @@ class TestCORSHeaders:
         resp = client.options("/api/health")
 
         # OPTIONS should not fail
-        assert resp.status_code in (200, 204, 405), (
-            f"OPTIONS request failed: {resp.status_code}"
-        )
+        assert resp.status_code in (200, 204, 405), f"OPTIONS request failed: {resp.status_code}"
 
     def test_cors_header_present(self, client):
         """Test Access-Control headers are present."""
-        resp = client.get(
-            "/api/health",
-            headers={"Origin": "http://localhost:3000"}
-        )
+        resp = client.get("/api/health", headers={"Origin": "http://localhost:3000"})
 
         # CORS headers should be present
         assert resp.status_code == 200
@@ -973,7 +916,7 @@ class TestCORSHeaders:
         # Check for CORS headers (middleware should add these)
         # Note: TestClient may not fully simulate CORS behavior
         # This test documents expected headers
-        headers = dict(resp.headers)
+        dict(resp.headers)
         # The actual header presence depends on CORS middleware config
         assert resp.status_code == 200  # At minimum, request should succeed
 
@@ -1008,9 +951,7 @@ class TestContentTypeHeaders:
         assert resp.status_code == 200
 
         content_type = resp.headers.get("content-type", "")
-        assert "text/html" in content_type, (
-            f"Root should return HTML, got {content_type}"
-        )
+        assert "text/html" in content_type, f"Root should return HTML, got {content_type}"
 
 
 # =============================================================================
@@ -1024,9 +965,7 @@ class TestOpenAPISchemaValidation:
     def test_openapi_endpoint_returns_200(self, client):
         """Test /openapi.json endpoint returns 200 OK."""
         resp = client.get("/openapi.json")
-        assert resp.status_code == 200, (
-            f"Expected 200, got {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
     def test_openapi_returns_json(self, client):
         """Test /openapi.json returns valid JSON."""
@@ -1067,9 +1006,7 @@ class TestOpenAPISchemaValidation:
         # OpenAPI version should be a string like "3.0.0" or "3.1.0"
         assert openapi_version is not None, "Missing 'openapi' version"
         assert isinstance(openapi_version, str), "'openapi' should be a string"
-        assert openapi_version.startswith("3."), (
-            f"Expected OpenAPI 3.x, got {openapi_version}"
-        )
+        assert openapi_version.startswith("3."), f"Expected OpenAPI 3.x, got {openapi_version}"
 
     def test_openapi_info_has_required_fields(self, client):
         """Test OpenAPI info object has required fields."""
@@ -1133,9 +1070,7 @@ class TestOpenAPISchemaValidation:
         # Check /api/health endpoint (should have GET)
         if "/api/health" in paths:
             health_path = paths["/api/health"]
-            assert isinstance(health_path, dict), (
-                "/api/health path should be a dictionary"
-            )
+            assert isinstance(health_path, dict), "/api/health path should be a dictionary"
 
             # Should have at least one HTTP method (get, post, put, delete, patch)
             valid_methods = {"get", "post", "put", "delete", "patch", "options", "head"}
@@ -1160,19 +1095,13 @@ class TestOpenAPISchemaValidation:
             get_method = health_path.get("get")
 
             if get_method:
-                assert "responses" in get_method, (
-                    "/api/health GET should have 'responses' defined"
-                )
+                assert "responses" in get_method, "/api/health GET should have 'responses' defined"
 
                 responses = get_method.get("responses", {})
-                assert isinstance(responses, dict), (
-                    "responses should be a dictionary"
-                )
+                assert isinstance(responses, dict), "responses should be a dictionary"
 
                 # Should have at least a 200 response
-                assert len(responses) > 0, (
-                    "/api/health GET should define at least one response"
-                )
+                assert len(responses) > 0, "/api/health GET should define at least one response"
 
     def test_openapi_paths_not_empty(self, client):
         """Test OpenAPI schema documents at least some paths."""
@@ -1182,9 +1111,7 @@ class TestOpenAPISchemaValidation:
         schema = resp.json()
         paths = schema.get("paths", {})
 
-        assert len(paths) > 0, (
-            "OpenAPI schema should document at least one path/endpoint"
-        )
+        assert len(paths) > 0, "OpenAPI schema should document at least one path/endpoint"
 
     def test_openapi_has_servers_or_no_servers(self, client):
         """Test OpenAPI servers field is either present and valid or absent."""
@@ -1218,15 +1145,21 @@ class TestOpenAPISchemaValidation:
 
             # If components exists, it may contain schemas, responses, parameters, etc.
             valid_component_keys = {
-                "schemas", "responses", "parameters", "examples",
-                "requestBodies", "headers", "securitySchemes", "links", "callbacks"
+                "schemas",
+                "responses",
+                "parameters",
+                "examples",
+                "requestBodies",
+                "headers",
+                "securitySchemes",
+                "links",
+                "callbacks",
             }
 
             component_keys = set(components.keys())
             # All component keys should be valid OpenAPI component types
             assert component_keys.issubset(valid_component_keys), (
-                f"Unknown component types in schema: "
-                f"{component_keys - valid_component_keys}"
+                f"Unknown component types in schema: {component_keys - valid_component_keys}"
             )
 
     def test_openapi_schema_is_self_consistent(self, client):
@@ -1238,22 +1171,21 @@ class TestOpenAPISchemaValidation:
 
         # Verify key sections are either dicts or don't exist
         optional_dict_fields = {
-            "servers", "components", "paths", "tags",
-            "externalDocs", "security", "info"
+            "servers",
+            "components",
+            "paths",
+            "tags",
+            "externalDocs",
+            "security",
+            "info",
         }
 
         for field in optional_dict_fields:
             if field in schema:
                 value = schema[field]
                 if field in ("tags",):
-                    assert isinstance(value, list), (
-                        f"'{field}' should be a list when present"
-                    )
+                    assert isinstance(value, list), f"'{field}' should be a list when present"
                 elif field == "security":
-                    assert isinstance(value, list), (
-                        f"'{field}' should be a list when present"
-                    )
+                    assert isinstance(value, list), f"'{field}' should be a list when present"
                 else:
-                    assert isinstance(value, dict), (
-                        f"'{field}' should be a dict when present"
-                    )
+                    assert isinstance(value, dict), f"'{field}' should be a dict when present"

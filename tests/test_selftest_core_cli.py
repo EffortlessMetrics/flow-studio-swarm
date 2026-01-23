@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-
 SELFTEST_CORE_DIR = Path(__file__).parent.parent / "packages" / "selftest-core"
 
 
@@ -140,7 +139,15 @@ steps:
         import json
 
         result = subprocess.run(
-            [sys.executable, "-m", "selftest_core.cli", "plan", "--config", str(config_file), "--json"],
+            [
+                sys.executable,
+                "-m",
+                "selftest_core.cli",
+                "plan",
+                "--config",
+                str(config_file),
+                "--json",
+            ],
             capture_output=True,
             text=True,
             cwd=SELFTEST_CORE_DIR / "src",
@@ -167,7 +174,15 @@ steps:
         import json
 
         result = subprocess.run(
-            [sys.executable, "-m", "selftest_core.cli", "run", "--config", str(config_file), "--json"],
+            [
+                sys.executable,
+                "-m",
+                "selftest_core.cli",
+                "run",
+                "--config",
+                str(config_file),
+                "--json",
+            ],
             capture_output=True,
             text=True,
             cwd=SELFTEST_CORE_DIR / "src",

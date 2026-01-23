@@ -4,7 +4,7 @@ Adapters that convert source specs into StepIntent objects.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..types import FlowSpec, FlowStep, StationSpec
 from .models import CompileContext, StepIntent, _dedupe_preserve_order
@@ -20,9 +20,7 @@ def intent_from_flow_step(
     flow_key: str,
 ) -> StepIntent:
     """Adapt a FlowSpec step into a StepIntent."""
-    required_inputs = _dedupe_preserve_order(
-        list(station.io.required_inputs) + list(step.inputs)
-    )
+    required_inputs = _dedupe_preserve_order(list(station.io.required_inputs) + list(step.inputs))
     required_outputs = _dedupe_preserve_order(
         list(station.io.required_outputs) + list(step.outputs)
     )

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
+
 import yaml
 
 # Add parent directory to path to allow importing swarm
@@ -133,9 +134,7 @@ class TestRemediationPattern:
         assert pattern.matches("Coverage 85% target 90%")
         assert not pattern.matches("Coverage meets target")
 
-    def test_pattern_case_insensitive(
-        self, remediation_map_data: Dict[str, Any]
-    ) -> None:
+    def test_pattern_case_insensitive(self, remediation_map_data: Dict[str, Any]) -> None:
         """Test case-insensitive matching."""
         pattern = RemediationPattern(remediation_map_data["remediation_patterns"][0])
 
@@ -210,16 +209,12 @@ class TestRemediationSuggestionEngine:
         engine = RemediationSuggestionEngine(remediation_map_file)
 
         # Filter for GOVERNANCE only
-        result = engine.generate_suggestions(
-            sample_degradations, severity_filter="governance"
-        )
+        result = engine.generate_suggestions(sample_degradations, severity_filter="governance")
         assert result["actionable_suggestions"] == 1
         assert result["suggestions"][0]["degradation"]["severity"] == "GOVERNANCE"
 
         # Filter for OPTIONAL only
-        result = engine.generate_suggestions(
-            sample_degradations, severity_filter="optional"
-        )
+        result = engine.generate_suggestions(sample_degradations, severity_filter="optional")
         assert result["actionable_suggestions"] == 1
         assert result["suggestions"][0]["degradation"]["severity"] == "OPTIONAL"
 
@@ -275,7 +270,7 @@ class TestParseDegradationLog:
 
         # First entry should contain continuation lines
         assert "Full traceback:" in entries[0].error
-        assert "File \"/path/to/file.py\"" in entries[0].error
+        assert 'File "/path/to/file.py"' in entries[0].error
 
 
 class TestEndToEnd:
@@ -285,8 +280,9 @@ class TestEndToEnd:
         self, tmp_path: Path, remediation_map_file: Path, sample_degradation_log: Path
     ) -> None:
         """Test CLI with JSON output."""
-        from swarm.tools.selftest_suggest_remediation import main
         import sys
+
+        from swarm.tools.selftest_suggest_remediation import main
 
         # Override sys.argv for CLI testing
         original_argv = sys.argv
@@ -325,8 +321,9 @@ class TestEndToEnd:
         self, tmp_path: Path, remediation_map_file: Path, sample_degradation_log: Path
     ) -> None:
         """Test CLI with human-readable output."""
-        from swarm.tools.selftest_suggest_remediation import main
         import sys
+
+        from swarm.tools.selftest_suggest_remediation import main
 
         original_argv = sys.argv
         try:

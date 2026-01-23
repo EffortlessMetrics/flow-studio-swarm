@@ -36,7 +36,8 @@ import re
 import sys
 from datetime import datetime, timezone
 from importlib import import_module
-from importlib.metadata import PackageNotFoundError, version as dist_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as dist_version
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -50,7 +51,7 @@ TOOLS_MANIFEST_JSON = VENDOR_DIR / "TOOLS_MANIFEST.json"
 # Import candidates: official first, legacy fallback
 IMPORT_CANDIDATES: List[Tuple[str, str]] = [
     ("claude_agent_sdk", "claude-agent-sdk"),  # module name, dist name
-    ("claude_code_sdk", "claude-code-sdk"),    # legacy fallback
+    ("claude_code_sdk", "claude-code-sdk"),  # legacy fallback
 ]
 
 # Tool name extraction patterns from reference docs
@@ -110,17 +111,19 @@ def scrub_unstable_repr(s: Optional[str]) -> Optional[str]:
         return s
     # Scrub hex addresses
     s = re.sub(r" at 0x[0-9a-fA-F]+", " at 0x...", s)
-    
+
     # If the whole string is an unstable object repr (from dataclass field default)
-    if (s.startswith("<_io.TextIOWrapper") or 
-        s.startswith("<EncodedFile") or 
-        s.startswith("<tempfile._TemporaryFileWrapper")):
+    if (
+        s.startswith("<_io.TextIOWrapper")
+        or s.startswith("<EncodedFile")
+        or s.startswith("<tempfile._TemporaryFileWrapper")
+    ):
         return "<stream>"
 
     # If it's embedded in a signature (e.g. debug_stderr: Any = <...>)
     # Signature version: matches until the next parameter or end of signature
     s = re.sub(r"debug_stderr: Any = <[^,)]+>", "debug_stderr: Any = <stream>", s)
-    
+
     return s
 
 
@@ -139,15 +142,18 @@ def dataclass_fields_manifest(cls: Any) -> Optional[List[Dict[str, Any]]]:
         return None
     out: List[Dict[str, Any]] = []
     for f in dataclasses.fields(cls):
-        out.append({
-            "name": f.name,
-            "type": repr(f.type),
-            "default": scrub_unstable_repr(None if f.default is dataclasses.MISSING else repr(f.default)),
-            "default_factory": (
-                None if f.default_factory is dataclasses.MISSING
-                else repr(f.default_factory)
-            ),
-        })
+        out.append(
+            {
+                "name": f.name,
+                "type": repr(f.type),
+                "default": scrub_unstable_repr(
+                    None if f.default is dataclasses.MISSING else repr(f.default)
+                ),
+                "default_factory": (
+                    None if f.default_factory is dataclasses.MISSING else repr(f.default_factory)
+                ),
+            }
+        )
     return out
 
 
@@ -177,10 +183,13 @@ def object_manifest(name: str, obj: Any) -> Dict[str, Any]:
     if inspect.isclass(obj):
         entry["dataclass_fields"] = dataclass_fields_manifest(obj)
         # Public methods (names only) for drift detection
-        methods = sorted({
-            m for m, v in inspect.getmembers(obj)
-            if (inspect.isfunction(v) or inspect.ismethod(v)) and not m.startswith("_")
-        })
+        methods = sorted(
+            {
+                m
+                for m, v in inspect.getmembers(obj)
+                if (inspect.isfunction(v) or inspect.ismethod(v)) and not m.startswith("_")
+            }
+        )
         entry["methods"] = methods
 
     return entry
@@ -288,10 +297,7 @@ def extract_reference_metadata(reference_path: Path) -> Dict[str, Optional[str]]
 def write_json(path: Path, data: Any) -> None:
     """Write JSON to file with consistent formatting."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(data, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8"
-    )
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def read_json(path: Path) -> Any:
@@ -321,7 +327,7 @@ def cmd_status() -> int:
         return 1
 
     ver = safe_get_dist_version(dist_name) if dist_name else None
-    print(f"\nSDK Status: INSTALLED")
+    print("\nSDK Status: INSTALLED")
     print(f"  Import module: {module_name}")
     print(f"  Distribution:  {dist_name}")
     print(f"  Version:       {ver or 'unknown'}")
@@ -347,7 +353,7 @@ def cmd_status() -> int:
         try:
             cur_version = read_json(VERSION_JSON)
             if cur_version.get("version") != ver:
-                print(f"\nDRIFT DETECTED:")
+                print("\nDRIFT DETECTED:")
                 print(f"  Vendored version: {cur_version.get('version')}")
                 print(f"  Installed version: {ver}")
                 print("  Run: make vendor-agent-sdk")
@@ -413,7 +419,7 @@ def cmd_write() -> int:
     write_json(API_MANIFEST_JSON, api_payload)
     write_json(TOOLS_MANIFEST_JSON, tools_payload)
 
-    print(f"OK Wrote:")
+    print("OK Wrote:")
     print(f"  - {VERSION_JSON.relative_to(REPO_ROOT)}")
     print(f"  - {API_MANIFEST_JSON.relative_to(REPO_ROOT)}")
     print(f"  - {TOOLS_MANIFEST_JSON.relative_to(REPO_ROOT)}")
@@ -516,13 +522,15 @@ def cmd_check(strict: bool = False) -> int:
                 ok = False
                 print(f"FAIL: {REFERENCE_MD.relative_to(REPO_ROOT)} version mismatch")
                 print(f"  REFERENCE: {ref_dist} {ref_ver}")
-                print(f"  VERSION.json: {cur_version.get('distribution')} {cur_version.get('version')}")
+                print(
+                    f"  VERSION.json: {cur_version.get('distribution')} {cur_version.get('version')}"
+                )
 
     # API check (ignore generated_at)
     if not json_equal(cur_api, api_payload, ignore_keys=["generated_at"]):
         ok = False
         print(f"FAIL: {API_MANIFEST_JSON.relative_to(REPO_ROOT)} is stale")
-        
+
         # Show what changed
         cur_exports = set(cur_api.get("exported", {}).keys())
         new_exports = set(api_payload.get("exported", {}).keys())

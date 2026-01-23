@@ -34,6 +34,7 @@ from fastapi.testclient import TestClient
 def fastapi_client():
     """Create FastAPI test client for Flow Studio."""
     from swarm.tools.flow_studio_fastapi import app
+
     return TestClient(app)
 
 
@@ -41,6 +42,7 @@ def fastapi_client():
 def selftest_steps():
     """Load selftest configuration."""
     from swarm.tools.selftest_config import SELFTEST_STEPS
+
     return SELFTEST_STEPS
 
 
@@ -148,9 +150,7 @@ class TestACTraceabilityChain:
         status_ac_ids = set(ac_status.keys())
         if plan_ac_ids:
             # Plan has AC IDs, status should too
-            assert len(status_ac_ids) > 0, (
-                "Plan has AC IDs but status.governance.ac is empty"
-            )
+            assert len(status_ac_ids) > 0, "Plan has AC IDs but status.governance.ac is empty"
             # All status ACs should be in plan (and vice versa)
             assert status_ac_ids == plan_ac_ids, (
                 f"AC IDs mismatch: plan={sorted(plan_ac_ids)}, status={sorted(status_ac_ids)}"
@@ -204,9 +204,7 @@ class TestACTraceabilityChain:
             assert ac_id in ac_to_steps, (
                 f"AC {ac_id} in status.governance.ac but not claimed by any step in plan"
             )
-            assert len(ac_to_steps[ac_id]) > 0, (
-                f"AC {ac_id} has no steps; map building failed"
-            )
+            assert len(ac_to_steps[ac_id]) > 0, f"AC {ac_id} has no steps; map building failed"
 
     def test_ac_status_worst_status_wins(self, fastapi_client, selftest_steps):
         """
@@ -239,7 +237,9 @@ class TestACTraceabilityChain:
                 break
 
         if not ac_with_multiple_steps:
-            pytest.skip("No AC with multiple steps in config; aggregation logic cannot be fully tested")
+            pytest.skip(
+                "No AC with multiple steps in config; aggregation logic cannot be fully tested"
+            )
 
         ac_id, steps = ac_with_multiple_steps
 
@@ -299,9 +299,7 @@ class TestACTraceabilityChain:
                 assert ac_id.startswith("AC-"), (
                     f"Step {step.id} AC {ac_id!r} should start with 'AC-'"
                 )
-                assert ac_id not in step_ac_set, (
-                    f"Step {step.id} has duplicate AC {ac_id}"
-                )
+                assert ac_id not in step_ac_set, f"Step {step.id} has duplicate AC {ac_id}"
                 step_ac_set.add(ac_id)
                 seen_ac_ids.add(ac_id)
 
@@ -370,6 +368,4 @@ class TestACTraceabilityIntegration:
 
         # Step 4: Verify no "orphan" ACs in status
         orphan_ac = status_ac_ids - config_ac_ids
-        assert len(orphan_ac) == 0, (
-            f"Status has orphan AC IDs not in config: {sorted(orphan_ac)}"
-        )
+        assert len(orphan_ac) == 0, f"Status has orphan AC IDs not in config: {sorted(orphan_ac)}"

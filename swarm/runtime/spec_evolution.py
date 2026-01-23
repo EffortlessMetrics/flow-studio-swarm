@@ -119,9 +119,7 @@ class GraphEvolutionProposal:
     source_run_id: Optional[str] = None
     pattern_count: int = 1
     status: ProposalStatus = ProposalStatus.PENDING
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     reviewed_at: Optional[str] = None
     reviewed_by: Optional[str] = None
 
@@ -161,9 +159,7 @@ class GraphEvolutionProposal:
             source_run_id=data.get("source_run_id"),
             pattern_count=data.get("pattern_count", 1),
             status=ProposalStatus(data.get("status", "pending")),
-            created_at=data.get(
-                "created_at", datetime.now(timezone.utc).isoformat()
-            ),
+            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
             reviewed_at=data.get("reviewed_at"),
             reviewed_by=data.get("reviewed_by"),
         )
@@ -192,9 +188,7 @@ class ExtendGraphEvent:
     target: str = ""
     justification: str = ""
     why_now: Optional[Dict[str, Any]] = None
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     observations: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -239,9 +233,7 @@ def analyze_extend_graph_events(
     pattern_groups = _group_events_by_pattern(extend_graph_events)
 
     for pattern_key, events in pattern_groups.items():
-        proposal = _generate_proposal_from_events(
-            events, pattern_key, run_state.run_id
-        )
+        proposal = _generate_proposal_from_events(events, pattern_key, run_state.run_id)
         if proposal:
             proposals.append(proposal)
 
@@ -758,7 +750,7 @@ def _extract_node_id_from_proposal(proposal: GraphEvolutionProposal) -> str:
     # Remove common prefixes/suffixes
     for prefix in ["add ", "extend ", "inject ", "include "]:
         if desc.startswith(prefix):
-            desc = desc[len(prefix):]
+            desc = desc[len(prefix) :]
             break
 
     # Take first few words and slugify
@@ -872,28 +864,30 @@ def _write_proposals_summary(
             "superseded": "~",
         }.get(proposal.get("status", "pending"), "?")
 
-        lines.extend([
-            f"## [{status_emoji}] {proposal['id']}: {proposal['description'][:60]}",
-            "",
-            f"- **Type:** {proposal.get('proposal_type', 'unknown')}",
-            f"- **Target Flow:** {proposal.get('target_flow', 'unknown')}",
-            f"- **Confidence:** {proposal.get('confidence', 0):.0%}",
-            f"- **Pattern Count:** {proposal.get('pattern_count', 1)}",
-            f"- **Status:** {proposal.get('status', 'pending')}",
-            "",
-            "### Rationale",
-            "",
-            proposal.get("rationale", "No rationale provided."),
-            "",
-            "### JSON Patch Preview",
-            "",
-            "```json",
-            json.dumps(proposal.get("json_patch", []), indent=2),
-            "```",
-            "",
-            "---",
-            "",
-        ])
+        lines.extend(
+            [
+                f"## [{status_emoji}] {proposal['id']}: {proposal['description'][:60]}",
+                "",
+                f"- **Type:** {proposal.get('proposal_type', 'unknown')}",
+                f"- **Target Flow:** {proposal.get('target_flow', 'unknown')}",
+                f"- **Confidence:** {proposal.get('confidence', 0):.0%}",
+                f"- **Pattern Count:** {proposal.get('pattern_count', 1)}",
+                f"- **Status:** {proposal.get('status', 'pending')}",
+                "",
+                "### Rationale",
+                "",
+                proposal.get("rationale", "No rationale provided."),
+                "",
+                "### JSON Patch Preview",
+                "",
+                "```json",
+                json.dumps(proposal.get("json_patch", []), indent=2),
+                "```",
+                "",
+                "---",
+                "",
+            ]
+        )
 
     with open(summary_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -917,9 +911,7 @@ def load_evolution_proposals(run_base: Path) -> List[GraphEvolutionProposal]:
         with open(proposals_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        return [
-            GraphEvolutionProposal.from_dict(p) for p in data.get("proposals", [])
-        ]
+        return [GraphEvolutionProposal.from_dict(p) for p in data.get("proposals", [])]
     except (json.JSONDecodeError, KeyError) as e:
         logger.warning("Failed to load evolution proposals: %s", e)
         return []
@@ -1039,31 +1031,35 @@ def _generate_extend_graph_patch(edge_data: Dict[str, Any]) -> List[Dict[str, An
     # Add node if proposed
     if edge_data.get("proposed_node"):
         node = edge_data["proposed_node"]
-        patches.append({
-            "op": "add",
-            "path": "/nodes/-",
-            "value": {
-                "node_id": node.get("node_id") or f"suggested-{edge_data.get('to_node')}",
-                "template_id": node.get("template_id") or edge_data.get("to_node"),
-                "station_id": node.get("station_id"),
-                "params": {
-                    "objective": node.get("objective", ""),
+        patches.append(
+            {
+                "op": "add",
+                "path": "/nodes/-",
+                "value": {
+                    "node_id": node.get("node_id") or f"suggested-{edge_data.get('to_node')}",
+                    "template_id": node.get("template_id") or edge_data.get("to_node"),
+                    "station_id": node.get("station_id"),
+                    "params": {
+                        "objective": node.get("objective", ""),
+                    },
                 },
-            },
-        })
+            }
+        )
 
     # Add edge
-    patches.append({
-        "op": "add",
-        "path": "/edges/-",
-        "value": {
-            "edge_id": f"suggested-{edge_data.get('from_node', 'unknown')}-{edge_data.get('to_node', 'unknown')}",
-            "from": edge_data.get("from_node", "unknown"),
-            "to": edge_data.get("to_node", "unknown"),
-            "type": edge_data.get("edge_type", "sequence"),
-            "priority": edge_data.get("priority", 50),
-        },
-    })
+    patches.append(
+        {
+            "op": "add",
+            "path": "/edges/-",
+            "value": {
+                "edge_id": f"suggested-{edge_data.get('from_node', 'unknown')}-{edge_data.get('to_node', 'unknown')}",
+                "from": edge_data.get("from_node", "unknown"),
+                "to": edge_data.get("to_node", "unknown"),
+                "type": edge_data.get("edge_type", "sequence"),
+                "priority": edge_data.get("priority", 50),
+            },
+        }
+    )
 
     return patches
 
@@ -1095,7 +1091,9 @@ def _append_to_routing_ledger(
         "timestamp": proposal["timestamp"],
         "decision": "EXTEND_GRAPH",
         "target": proposal.get("proposed_edge", {}).get("to_node"),
-        "proposal_path": str(run_base / flow_key / "routing" / "proposals" / f"{proposal['proposal_id']}.json"),
+        "proposal_path": str(
+            run_base / flow_key / "routing" / "proposals" / f"{proposal['proposal_id']}.json"
+        ),
     }
 
     with open(ledger_path, "a", encoding="utf-8") as f:
@@ -1121,7 +1119,9 @@ def load_routing_proposals(
         flow_dirs = [run_base / flow_key]
     else:
         # Scan all flow directories
-        flow_dirs = [d for d in run_base.iterdir() if d.is_dir() and (d / "routing" / "proposals").exists()]
+        flow_dirs = [
+            d for d in run_base.iterdir() if d.is_dir() and (d / "routing" / "proposals").exists()
+        ]
 
     for flow_dir in flow_dirs:
         proposals_dir = flow_dir / "routing" / "proposals"

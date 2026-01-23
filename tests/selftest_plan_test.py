@@ -44,7 +44,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import pytest
 
@@ -56,9 +56,6 @@ try:
         SELFTEST_STEPS,
         SelfTestStep,
         SelfTestTier,
-        SelfTestSeverity,
-        SelfTestCategory,
-        get_step_by_id,
         validate_step_list,
     )
 except ImportError as e:
@@ -252,9 +249,9 @@ class TestSelfTestConfigStructure:
             assert "category" in step_data, "Missing step.category"
             assert "description" in step_data, "Missing step.description"
             assert "depends_on" in step_data, "Missing step.depends_on"
-            assert isinstance(
-                step_data["depends_on"], list
-            ), f"depends_on is not a list for {step_data['id']}"
+            assert isinstance(step_data["depends_on"], list), (
+                f"depends_on is not a list for {step_data['id']}"
+            )
 
             # Assert: Tier values are correct
             assert step_data["tier"] in [
@@ -283,9 +280,7 @@ class TestSelfTestErrorPaths:
 
         # Assert: No circular dependencies in actual config
         circular_errors = [e for e in errors if "circular" in e.lower()]
-        assert circular_errors == [], (
-            f"Circular dependencies found: {circular_errors}"
-        )
+        assert circular_errors == [], f"Circular dependencies found: {circular_errors}"
 
     def test_step_with_invalid_tier_enum(self):
         """
@@ -298,9 +293,7 @@ class TestSelfTestErrorPaths:
         # Arrange & Act & Assert
         valid_tiers = {SelfTestTier.KERNEL, SelfTestTier.GOVERNANCE, SelfTestTier.OPTIONAL}
         for step in SELFTEST_STEPS:
-            assert step.tier in valid_tiers, (
-                f"Step {step.id} has invalid tier: {step.tier}"
-            )
+            assert step.tier in valid_tiers, f"Step {step.id} has invalid tier: {step.tier}"
 
     def test_step_with_duplicate_ids(self):
         """
@@ -315,9 +308,7 @@ class TestSelfTestErrorPaths:
 
         # Assert: No duplicate IDs in actual config
         duplicate_errors = [e for e in errors if "duplicate" in e.lower()]
-        assert duplicate_errors == [], (
-            f"Duplicate step IDs found: {duplicate_errors}"
-        )
+        assert duplicate_errors == [], f"Duplicate step IDs found: {duplicate_errors}"
 
     def test_malformed_json_output_fails_validation(self):
         """
@@ -371,9 +362,7 @@ class TestSelfTestDependencies:
         for step in SELFTEST_STEPS:
             if step.dependencies:
                 for dep_id in step.dependencies:
-                    assert (
-                        dep_id in step_ids
-                    ), f"Step {step.id} has invalid dependency: {dep_id}"
+                    assert dep_id in step_ids, f"Step {step.id} has invalid dependency: {dep_id}"
 
     def test_step_dependencies_no_forward_references(self):
         """
@@ -392,9 +381,9 @@ class TestSelfTestDependencies:
                 current_idx = step_index[step.id]
                 for dep_id in step.dependencies:
                     dep_idx = step_index[dep_id]
-                    assert (
-                        dep_idx < current_idx
-                    ), f"Step {step.id} (index {current_idx}) depends on {dep_id} (index {dep_idx}), which comes after"
+                    assert dep_idx < current_idx, (
+                        f"Step {step.id} (index {current_idx}) depends on {dep_id} (index {dep_idx}), which comes after"
+                    )
 
     def test_step_descriptions_are_non_empty(self):
         """
@@ -407,9 +396,7 @@ class TestSelfTestDependencies:
         # Act & Assert
         for step in SELFTEST_STEPS:
             assert isinstance(step.description, str), f"Step {step.id} description is not a string"
-            assert (
-                len(step.description) > 0
-            ), f"Step {step.id} description is empty"
+            assert len(step.description) > 0, f"Step {step.id} description is empty"
 
 
 # ============================================================================
@@ -514,8 +501,7 @@ class TestSelfTestPlanCLI:
 
         # Assert: Exit code is 0
         assert result.returncode == 0, (
-            f"Expected exit 0, got {result.returncode}\n"
-            f"stderr: {result.stderr}"
+            f"Expected exit 0, got {result.returncode}\nstderr: {result.stderr}"
         )
 
         # Assert: Output is valid JSON
@@ -562,13 +548,9 @@ class TestSelfTestPlanCLI:
         # Assert: Each step appears in output with correct tier and description
         for step in SELFTEST_STEPS:
             assert step.id in cli_output, f"Step {step.id} not in CLI output"
-            assert (
-                step.description in cli_output
-            ), f"Description for {step.id} not in CLI output"
+            assert step.description in cli_output, f"Description for {step.id} not in CLI output"
             tier_str = step.tier.value.upper()
-            assert (
-                tier_str in cli_output
-            ), f"Tier {tier_str} for step {step.id} not in CLI output"
+            assert tier_str in cli_output, f"Tier {tier_str} for step {step.id} not in CLI output"
 
     def test_plan_json_step_counts_match_summary(self):
         """
@@ -652,9 +634,9 @@ class TestSelfTestPlanCLI:
                 )
 
             # Assert: depends_on is a list
-            assert isinstance(
-                step_data["depends_on"], list
-            ), f"Step {step_data['id']}.depends_on is not a list"
+            assert isinstance(step_data["depends_on"], list), (
+                f"Step {step_data['id']}.depends_on is not a list"
+            )
 
             # Assert: tier value is valid
             assert step_data["tier"] in [
@@ -686,9 +668,7 @@ class TestSelfTestStepMetadata:
 
     def test_step_has_non_empty_description(self, step: SelfTestStep):
         """Verify each step has a non-empty description."""
-        assert isinstance(step.description, str), (
-            f"Step {step.id} description is not a string"
-        )
+        assert isinstance(step.description, str), f"Step {step.id} description is not a string"
         assert len(step.description) > 0, f"Step {step.id} has empty description"
 
     def test_step_has_valid_command_list(self, step: SelfTestStep):
@@ -704,9 +684,7 @@ class TestSelfTestStepMetadata:
         step_ids = {s.id for s in SELFTEST_STEPS}
         if step.dependencies:
             for dep_id in step.dependencies:
-                assert (
-                    dep_id in step_ids
-                ), f"Step {step.id} depends on unknown step: {dep_id}"
+                assert dep_id in step_ids, f"Step {step.id} depends on unknown step: {dep_id}"
 
 
 # ============================================================================
@@ -755,7 +733,7 @@ class TestSelfTestPlanPerformance:
         # Log timing (advisory, no hard assertion)
         print(f"\nPlan generation timing: {elapsed_ms:.1f}ms (target: < 200ms)")
         if elapsed_ms > 200:
-            print(f"  WARNING: Exceeded advisory target of 200ms")
+            print("  WARNING: Exceeded advisory target of 200ms")
 
 
 # ============================================================================

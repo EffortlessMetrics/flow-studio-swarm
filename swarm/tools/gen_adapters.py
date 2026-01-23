@@ -32,6 +32,7 @@ __version__ = "0.5.0"
 @dataclass
 class AgentConfig:
     """Provider-neutral agent configuration."""
+
     key: str
     short_role: str
     model: str
@@ -43,6 +44,7 @@ class AgentConfig:
 @dataclass
 class PlatformConfig:
     """Platform-specific adapter profile."""
+
     name: str
     agents_dir: Path
     models: Dict[str, str]
@@ -126,7 +128,7 @@ def split_frontmatter_and_body(text: str) -> tuple[str, str]:
     for i in range(1, len(lines)):
         if lines[i].strip() == "---":
             frontmatter = "\n".join(lines[: i + 1])
-            body = "\n".join(lines[i + 1:])
+            body = "\n".join(lines[i + 1 :])
             return frontmatter, body
 
     return "", text
@@ -152,8 +154,6 @@ def get_platform_agent_override(
 
     override = agent.platforms.get(platform_name)
     return override if isinstance(override, dict) else {}
-
-
 
 
 def render_frontmatter(
@@ -222,13 +222,15 @@ def compare_frontmatter(rendered: str, actual: str, agent_path: Path) -> tuple[b
     if rendered_lines == actual_lines:
         return True, None
 
-    diff_lines = list(unified_diff(
-        actual_lines,
-        rendered_lines,
-        fromfile=str(agent_path),
-        tofile=f"{agent_path} (generated)",
-        lineterm="",
-    ))
+    diff_lines = list(
+        unified_diff(
+            actual_lines,
+            rendered_lines,
+            fromfile=str(agent_path),
+            tofile=f"{agent_path} (generated)",
+            lineterm="",
+        )
+    )
 
     diff_text = "\n".join(diff_lines)
     return False, diff_text
@@ -430,7 +432,7 @@ def main() -> None:
     print(f"\n[SUMMARY] Processed {summary['total_decisions']} decisions:")
     print(f"  By source: {summary['by_source']}")
     print(f"  By model: {summary['by_model']}")
-    if summary['changed_count'] > 0:
+    if summary["changed_count"] > 0:
         changed = control_plane.changed_agents()
         print(f"  Changed agents ({summary['changed_count']}):")
         for agent, (old, new) in sorted(changed.items()):

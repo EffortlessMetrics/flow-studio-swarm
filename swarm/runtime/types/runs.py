@@ -227,9 +227,7 @@ def run_summary_to_dict(summary: RunSummary) -> Dict[str, Any]:
     return {
         "id": summary.id,
         "spec": run_spec_to_dict(summary.spec),
-        "status": summary.status.value
-        if isinstance(summary.status, RunStatus)
-        else summary.status,
+        "status": summary.status.value if isinstance(summary.status, RunStatus) else summary.status,
         "sdlc_status": summary.sdlc_status.value
         if isinstance(summary.sdlc_status, SDLCStatus)
         else summary.sdlc_status,
@@ -261,9 +259,7 @@ def run_summary_from_dict(data: Dict[str, Any]) -> RunSummary:
 
     sdlc_status_value = data.get("sdlc_status", "unknown")
     sdlc_status = (
-        SDLCStatus(sdlc_status_value)
-        if isinstance(sdlc_status_value, str)
-        else sdlc_status_value
+        SDLCStatus(sdlc_status_value) if isinstance(sdlc_status_value, str) else sdlc_status_value
     )
 
     return RunSummary(

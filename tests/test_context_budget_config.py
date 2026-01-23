@@ -4,12 +4,10 @@ Tests the ContextBudgetConfig, ContextBudgetOverride, and ContextBudgetResolver
 classes introduced in v2.4.0.
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
 # Import path setup
 import sys
+from pathlib import Path
+
 _SWARM_ROOT = Path(__file__).resolve().parent.parent
 if str(_SWARM_ROOT) not in sys.path:
     sys.path.insert(0, str(_SWARM_ROOT))
@@ -21,33 +19,38 @@ class TestContextBudgetDefaults:
     def test_default_context_budget_chars(self):
         """Default context budget should be 200000 chars (~50k tokens)."""
         from swarm.config.runtime_config import get_context_budget_chars
+
         assert get_context_budget_chars() == 200000
 
     def test_default_history_max_recent_chars(self):
         """Default recent step budget should be 60000 chars (~15k tokens)."""
         from swarm.config.runtime_config import get_history_max_recent_chars
+
         assert get_history_max_recent_chars() == 60000
 
     def test_default_history_max_older_chars(self):
         """Default older step budget should be 10000 chars (~2.5k tokens)."""
         from swarm.config.runtime_config import get_history_max_older_chars
+
         assert get_history_max_older_chars() == 10000
 
     def test_budget_hierarchy_makes_sense(self):
         """Recent budget should be larger than older budget."""
         from swarm.config.runtime_config import (
-            get_history_max_recent_chars,
             get_history_max_older_chars,
+            get_history_max_recent_chars,
         )
+
         assert get_history_max_recent_chars() > get_history_max_older_chars()
 
     def test_total_budget_larger_than_individual(self):
         """Total budget should be larger than individual step budgets."""
         from swarm.config.runtime_config import (
             get_context_budget_chars,
-            get_history_max_recent_chars,
             get_history_max_older_chars,
+            get_history_max_recent_chars,
         )
+
         total = get_context_budget_chars()
         recent = get_history_max_recent_chars()
         older = get_history_max_older_chars()
@@ -61,6 +64,7 @@ class TestContextBudgetConfig:
     def test_dataclass_creation(self):
         """ContextBudgetConfig can be created with all fields."""
         from swarm.config.runtime_config import ContextBudgetConfig
+
         config = ContextBudgetConfig(
             context_budget_chars=300000,
             history_max_recent_chars=100000,
@@ -75,6 +79,7 @@ class TestContextBudgetConfig:
     def test_default_source_is_default(self):
         """Default source should be 'default'."""
         from swarm.config.runtime_config import ContextBudgetConfig
+
         config = ContextBudgetConfig(
             context_budget_chars=200000,
             history_max_recent_chars=60000,
@@ -89,6 +94,7 @@ class TestContextBudgetResolver:
     def test_resolver_returns_defaults_without_overrides(self):
         """Resolver returns global defaults when no overrides exist."""
         from swarm.config.runtime_config import ContextBudgetResolver
+
         resolver = ContextBudgetResolver()
         result = resolver.resolve()
         assert result.context_budget_chars == 200000
@@ -99,6 +105,7 @@ class TestContextBudgetResolver:
     def test_resolver_with_flow_key_returns_defaults_if_no_flow_override(self):
         """Resolver returns defaults for a flow with no overrides."""
         from swarm.config.runtime_config import ContextBudgetResolver
+
         resolver = ContextBudgetResolver()
         result = resolver.resolve(flow_key="signal")
         # Should still be defaults since no flow override exists
@@ -107,6 +114,7 @@ class TestContextBudgetResolver:
     def test_resolved_budgets_convenience_function(self):
         """get_resolved_context_budgets() should work as convenience wrapper."""
         from swarm.config.runtime_config import get_resolved_context_budgets
+
         result = get_resolved_context_budgets()
         assert result.context_budget_chars == 200000
         assert result.source == "default"
@@ -114,6 +122,7 @@ class TestContextBudgetResolver:
     def test_resolved_budgets_with_flow_key(self):
         """get_resolved_context_budgets() accepts flow_key parameter."""
         from swarm.config.runtime_config import get_resolved_context_budgets
+
         result = get_resolved_context_budgets(flow_key="build")
         assert isinstance(result.context_budget_chars, int)
 
@@ -124,6 +133,7 @@ class TestContextBudgetOverride:
     def test_override_dataclass_creation(self):
         """ContextBudgetOverride can be created with optional fields."""
         from swarm.config.flow_registry import ContextBudgetOverride
+
         override = ContextBudgetOverride(
             context_budget_chars=300000,
         )
@@ -134,6 +144,7 @@ class TestContextBudgetOverride:
     def test_override_merge_with_parent(self):
         """ContextBudgetOverride.merge_with() applies non-None values."""
         from swarm.config.flow_registry import ContextBudgetOverride
+
         parent = ContextBudgetOverride(
             context_budget_chars=200000,
             history_max_recent_chars=60000,
@@ -151,6 +162,7 @@ class TestContextBudgetOverride:
     def test_override_all_none_is_valid(self):
         """ContextBudgetOverride with all None is valid (inherit everything)."""
         from swarm.config.flow_registry import ContextBudgetOverride
+
         override = ContextBudgetOverride()
         assert override.context_budget_chars is None
         assert override.history_max_recent_chars is None
@@ -162,7 +174,8 @@ class TestEngineProfileContextBudgets:
 
     def test_engine_profile_has_context_budgets_field(self):
         """EngineProfile dataclass should have optional context_budgets."""
-        from swarm.config.flow_registry import EngineProfile, ContextBudgetOverride
+        from swarm.config.flow_registry import ContextBudgetOverride, EngineProfile
+
         profile = EngineProfile(
             engine="claude-step",
             mode="stub",
@@ -174,6 +187,7 @@ class TestEngineProfileContextBudgets:
     def test_engine_profile_context_budgets_defaults_to_none(self):
         """EngineProfile context_budgets should default to None."""
         from swarm.config.flow_registry import EngineProfile
+
         profile = EngineProfile()
         assert profile.context_budgets is None
 
@@ -185,9 +199,10 @@ class TestBackwardCompatibility:
         """Existing get_*() functions should continue to work."""
         from swarm.config.runtime_config import (
             get_context_budget_chars,
-            get_history_max_recent_chars,
             get_history_max_older_chars,
+            get_history_max_recent_chars,
         )
+
         # These should return integers without errors
         assert isinstance(get_context_budget_chars(), int)
         assert isinstance(get_history_max_recent_chars(), int)
@@ -197,9 +212,10 @@ class TestBackwardCompatibility:
         """Budget values should be within reasonable bounds."""
         from swarm.config.runtime_config import (
             get_context_budget_chars,
-            get_history_max_recent_chars,
             get_history_max_older_chars,
+            get_history_max_recent_chars,
         )
+
         # Minimum reasonable values
         assert get_context_budget_chars() >= 10000
         assert get_history_max_recent_chars() >= 1000

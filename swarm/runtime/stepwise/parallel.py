@@ -52,11 +52,10 @@ from typing import (
     Dict,
     List,
     Optional,
-    Tuple,
 )
 
 if TYPE_CHECKING:
-    from swarm.runtime.engines import StepContext, StepEngine, StepResult
+    from swarm.runtime.engines import StepContext, StepEngine
     from swarm.runtime.types import RunEvent, RunId
 
 logger = logging.getLogger(__name__)
@@ -126,9 +125,7 @@ class ForkConfig:
         """Create ForkConfig from dictionary."""
         return cls(
             targets=data.get("targets", []),
-            execution_policy=ExecutionPolicy(
-                data.get("execution_policy", "concurrent")
-            ),
+            execution_policy=ExecutionPolicy(data.get("execution_policy", "concurrent")),
             batch_size=data.get("batch_size", 4),
             isolation=IsolationMode(data.get("isolation", "isolated")),
             failure_policy=FailurePolicy(data.get("failure_policy", "continue_all")),
@@ -318,9 +315,7 @@ class ParallelExecutor:
                 run_id, fork_config, contexts, parallel_contexts
             )
         else:
-            results = await self._execute_batched(
-                run_id, fork_config, contexts, parallel_contexts
-            )
+            results = await self._execute_batched(run_id, fork_config, contexts, parallel_contexts)
 
         completed_at = datetime.now(timezone.utc)
 
@@ -643,9 +638,7 @@ class ParallelExecutor:
         skipped_branches: List[str] = []
 
         # Aggregate status based on strategy
-        aggregate_status = self._compute_aggregate_status(
-            statuses, join_config.aggregate_status
-        )
+        aggregate_status = self._compute_aggregate_status(statuses, join_config.aggregate_status)
 
         # Merge artifacts if configured
         merged_artifacts: List[Dict[str, Any]] = []

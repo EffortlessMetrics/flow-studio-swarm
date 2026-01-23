@@ -181,7 +181,7 @@ class StepTxnOutput:
 
 
 # Re-export RoutingContext from engines.models for convenience
-from swarm.runtime.engines.models import RoutingContext
+from swarm.runtime.engines.models import RoutingContext  # noqa: E402
 
 __all__ = [
     "VerificationCheck",

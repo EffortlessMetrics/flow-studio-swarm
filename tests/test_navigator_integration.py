@@ -10,10 +10,7 @@ The Navigator pattern uses cheap LLM calls to make intelligent routing
 decisions, with traditional tooling doing the heavy lifting.
 """
 
-import pytest
-from copy import deepcopy
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, List
 
 from swarm.runtime.navigator import (
     DetourRequest,
@@ -34,13 +31,13 @@ from swarm.runtime.navigator_integration import (
     get_current_detour_depth,
     rewrite_pause_to_detour,
 )
-from swarm.runtime.stepwise.orchestrator import MAX_DETOUR_DEPTH
 from swarm.runtime.sidequest_catalog import (
     ReturnBehavior,
     SidequestCatalog,
     SidequestDefinition,
     SidequestStep,
 )
+from swarm.runtime.stepwise.orchestrator import MAX_DETOUR_DEPTH
 from swarm.runtime.types import (
     RunState,
 )
@@ -96,7 +93,10 @@ class TestPauseRewriteToDetour:
         assert rewritten.signals.needs_human is False
 
         # Assert reasoning includes original reason
-        assert "Need clarification" in rewritten.route.reasoning or "no_human_mid_flow" in rewritten.route.reasoning
+        assert (
+            "Need clarification" in rewritten.route.reasoning
+            or "no_human_mid_flow" in rewritten.route.reasoning
+        )
 
     def test_pause_not_rewritten_when_no_clarifier(self):
         """Without clarifier in catalog, PAUSE should remain unchanged."""
@@ -129,7 +129,12 @@ class TestPauseRewriteToDetour:
 
     def test_non_pause_intents_unchanged(self):
         """Non-PAUSE intents should pass through unchanged."""
-        for intent in [RouteIntent.ADVANCE, RouteIntent.LOOP, RouteIntent.TERMINATE, RouteIntent.DETOUR]:
+        for intent in [
+            RouteIntent.ADVANCE,
+            RouteIntent.LOOP,
+            RouteIntent.TERMINATE,
+            RouteIntent.DETOUR,
+        ]:
             nav_output = NavigatorOutput(
                 route=RouteProposal(
                     intent=intent,
@@ -343,7 +348,10 @@ class TestExtendGraphInjection:
             nav_output=nav_output,
             run_state=run_state,
             current_node="3-implement",
-            station_library=["architecture-critic", "context-loader"],  # Does not include nonexistent-station
+            station_library=[
+                "architecture-critic",
+                "context-loader",
+            ],  # Does not include nonexistent-station
         )
 
         # Assert target is None (rejected)
@@ -674,9 +682,9 @@ class TestMaxDetourDepthEnforcement:
         # Push 3 interruption frames
         for i in range(3):
             run_state.push_interruption(
-                reason=f"Detour {i+1}",
+                reason=f"Detour {i + 1}",
                 return_node=f"node-{i}",
-                sidequest_id=f"sidequest-{i+1}",
+                sidequest_id=f"sidequest-{i + 1}",
             )
 
         assert get_current_detour_depth(run_state) == 3
@@ -701,9 +709,9 @@ class TestMaxDetourDepthEnforcement:
         # Push MAX_DETOUR_DEPTH interruption frames to simulate being at the limit
         for i in range(MAX_DETOUR_DEPTH):
             run_state.push_interruption(
-                reason=f"Nested detour {i+1}",
+                reason=f"Nested detour {i + 1}",
                 return_node=f"node-{i}",
-                sidequest_id=f"sidequest-{i+1}",
+                sidequest_id=f"sidequest-{i + 1}",
             )
 
         # Verify we are at the limit
@@ -751,9 +759,9 @@ class TestMaxDetourDepthEnforcement:
         # Push (MAX_DETOUR_DEPTH - 1) interruption frames to be just below the limit
         for i in range(MAX_DETOUR_DEPTH - 1):
             run_state.push_interruption(
-                reason=f"Nested detour {i+1}",
+                reason=f"Nested detour {i + 1}",
                 return_node=f"node-{i}",
-                sidequest_id=f"sidequest-{i+1}",
+                sidequest_id=f"sidequest-{i + 1}",
             )
             run_state.push_resume(f"node-{i}", {})
 

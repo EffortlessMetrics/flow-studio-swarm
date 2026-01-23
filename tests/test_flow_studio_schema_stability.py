@@ -69,9 +69,7 @@ def baseline_schema():
     """
     baseline_path = repo_root / "docs" / "flowstudio-openapi.json"
     if not baseline_path.exists():
-        pytest.skip(
-            "Baseline schema not found; run 'make dump-openapi-schema' first"
-        )
+        pytest.skip("Baseline schema not found; run 'make dump-openapi-schema' first")
     return json.loads(baseline_path.read_text(encoding="utf-8"))
 
 
@@ -95,8 +93,7 @@ class TestOpenAPISchemaStability:
         """
         current_schema = client.get("/openapi.json").json()
         assert current_schema["openapi"] == baseline_schema["openapi"], (
-            f"OpenAPI version changed: {baseline_schema['openapi']} → "
-            f"{current_schema['openapi']}"
+            f"OpenAPI version changed: {baseline_schema['openapi']} → {current_schema['openapi']}"
         )
 
     def test_info_version_unchanged_or_increased(self, client, baseline_schema):
@@ -162,22 +159,17 @@ class TestOpenAPISchemaStability:
             baseline_http_methods = {
                 k for k in baseline_methods.keys() if k.lower() in http_methods
             }
-            current_http_methods = {
-                k for k in current_methods.keys() if k.lower() in http_methods
-            }
+            current_http_methods = {k for k in current_methods.keys() if k.lower() in http_methods}
 
             removed_methods = baseline_http_methods - current_http_methods
             if removed_methods:
                 method_removals.append((path, removed_methods))
 
         assert not method_removals, (
-            f"HTTP methods removed from endpoints:\n" +
-            "\n".join(
-                f"  {path}: {sorted(methods)}"
-                for path, methods in method_removals
-            ) +
-            f"\nThis is a breaking change. If intentional, update baseline with "
-            f"'make dump-openapi-schema'"
+            "HTTP methods removed from endpoints:\n"
+            + "\n".join(f"  {path}: {sorted(methods)}" for path, methods in method_removals)
+            + "\nThis is a breaking change. If intentional, update baseline with "
+            "'make dump-openapi-schema'"
         )
 
     def test_response_definitions_present(self, client, baseline_schema):
@@ -198,9 +190,7 @@ class TestOpenAPISchemaStability:
         # Spot check: /api/flows should have responses
         flows_path = current_schema["paths"].get("/api/flows", {})
         if "get" in flows_path:
-            assert "responses" in flows_path["get"], (
-                "/api/flows GET missing 'responses' definition"
-            )
+            assert "responses" in flows_path["get"], "/api/flows GET missing 'responses' definition"
 
     def test_schema_additions_logged(self, client, baseline_schema):
         """Log schema additions for review (non-failing test).
@@ -226,18 +216,10 @@ class TestOpenAPISchemaStability:
 
         This test verifies the baseline file can be loaded and parsed.
         """
-        assert isinstance(baseline_schema, dict), (
-            "Baseline schema should be a JSON object"
-        )
-        assert "openapi" in baseline_schema, (
-            "Baseline schema should have 'openapi' version field"
-        )
-        assert "info" in baseline_schema, (
-            "Baseline schema should have 'info' metadata"
-        )
-        assert "paths" in baseline_schema, (
-            "Baseline schema should have 'paths' definitions"
-        )
+        assert isinstance(baseline_schema, dict), "Baseline schema should be a JSON object"
+        assert "openapi" in baseline_schema, "Baseline schema should have 'openapi' version field"
+        assert "info" in baseline_schema, "Baseline schema should have 'info' metadata"
+        assert "paths" in baseline_schema, "Baseline schema should have 'paths' definitions"
 
     def test_baseline_matches_current_structure(self, client, baseline_schema):
         """Test that baseline and current schemas have compatible structure.
@@ -290,6 +272,4 @@ class TestOpenAPISchemaIntegration:
         assert "paths" in current_schema
 
         # Ensure paths is not empty
-        assert len(current_schema["paths"]) > 0, (
-            "Schema should document at least one endpoint"
-        )
+        assert len(current_schema["paths"]) > 0, "Schema should document at least one endpoint"

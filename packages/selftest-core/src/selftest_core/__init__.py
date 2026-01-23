@@ -4,7 +4,8 @@ selftest-core: Core framework for layered selftest governance.
 This package provides a reusable framework for implementing layered
 selftest governance in any project. It supports:
 
-- Three-tier model: KERNEL (must pass), GOVERNANCE (should pass), OPTIONAL (nice-to-have)
+- Three-tier model: KERNEL (must pass), GOVERNANCE (should pass),
+  OPTIONAL (nice-to-have)
 - Degraded mode: Allow progress while tracking technical debt
 - Doctor diagnostic: Separate environment issues from code issues
 - JSON reporting: Machine-parseable reports for CI integration
@@ -52,15 +53,6 @@ Diagnostics:
 __version__ = "0.1.0"
 
 # Core runner exports
-from .runner import (
-    Category,
-    SelfTestRunner,
-    Severity,
-    Step,
-    StepResult,
-    Tier,
-)
-
 # Configuration exports
 from .config import (
     SelftestConfig,
@@ -71,6 +63,15 @@ from .config import (
     validate_steps,
 )
 
+# Doctor exports
+from .doctor import (
+    DiagnosticCheck,
+    SelfTestDoctor,
+    make_command_check,
+    make_env_var_check,
+    make_python_package_check,
+)
+
 # Reporter exports
 from .reporter import (
     ConsoleReporter,
@@ -79,14 +80,13 @@ from .reporter import (
     ReportSummary,
     StepReport,
 )
-
-# Doctor exports
-from .doctor import (
-    DiagnosticCheck,
-    SelfTestDoctor,
-    make_command_check,
-    make_env_var_check,
-    make_python_package_check,
+from .runner import (
+    Category,
+    SelfTestRunner,
+    Severity,
+    Step,
+    StepResult,
+    Tier,
 )
 
 __all__ = [

@@ -37,6 +37,7 @@ DEFAULT_STATUS_CACHE_TTL = int(os.getenv("FLOW_STUDIO_STATUS_TTL_SECONDS", "300"
 @dataclass
 class KernelStatus:
     """Kernel health (cargo fmt, clippy, tests)."""
+
     ok: bool
     last_run: str  # ISO format timestamp
     status: str  # HEALTHY, BROKEN
@@ -46,6 +47,7 @@ class KernelStatus:
 @dataclass
 class SelfTestStatus:
     """Governance selftest status."""
+
     mode: str  # "strict", "degraded"
     last_run: str  # ISO format timestamp
     status: str  # GREEN, YELLOW, RED
@@ -77,6 +79,7 @@ class SelfTestStatus:
 @dataclass
 class FlowsStatus:
     """Flow validity status."""
+
     total: int
     healthy: int
     degraded: int
@@ -87,18 +90,22 @@ class FlowsStatus:
 @dataclass
 class AgentsStatus:
     """Agent validity status."""
+
     total: int
-    by_status: Dict[str, int] = field(default_factory=lambda: {
-        "healthy": 0,
-        "misconfigured": 0,
-        "unknown": 0,
-    })
+    by_status: Dict[str, int] = field(
+        default_factory=lambda: {
+            "healthy": 0,
+            "misconfigured": 0,
+            "unknown": 0,
+        }
+    )
     invalid_agents: List[str] = field(default_factory=list)
 
 
 @dataclass
 class SelftestSnapshot:
     """Snapshot of selftest status from artifacts."""
+
     mode: str  # "strict", "degraded", "kernel-only", "unknown"
     status: str  # "GREEN", "YELLOW", "RED", "UNKNOWN"
     kernel_ok: bool
@@ -124,6 +131,7 @@ class SelftestSnapshot:
 @dataclass
 class Hints:
     """Hints for remediation."""
+
     if_kernel_broken: str
     if_selftest_broken: str
     how_to_heal: str
@@ -132,6 +140,7 @@ class Hints:
 @dataclass
 class ValidationStatus:
     """Validation results from validate_swarm.py."""
+
     last_run: str  # ISO format timestamp
     status: str  # PASS, FAIL, ERROR
     error_count: int = 0
@@ -149,6 +158,7 @@ class ValidationStatus:
 @dataclass
 class StatusReport:
     """Complete governance status report."""
+
     timestamp: str  # ISO format
     service: str  # "flow-studio"
     governance: Dict[str, Any]  # kernel, selftest, validation, state
@@ -368,6 +378,7 @@ class StatusProvider:
             # Import selftest config to get step→AC mapping
             import os
             import sys
+
             tools_path = os.path.dirname(__file__)
             if tools_path not in sys.path:
                 sys.path.insert(0, tools_path)
@@ -405,15 +416,26 @@ class StatusProvider:
                         step_statuses.append("PASS")
 
                 # Determine worst status (precedence: CRITICAL > FAILURE > WARNING > INFO > PASS)
-                status_precedence = {"CRITICAL": 5, "FAILURE": 4, "WARNING": 3, "INFO": 2, "PASS": 1}
-                worst_status = max(step_statuses, key=lambda s: status_precedence.get(s, 0)) if step_statuses else "PASS"
+                status_precedence = {
+                    "CRITICAL": 5,
+                    "FAILURE": 4,
+                    "WARNING": 3,
+                    "INFO": 2,
+                    "PASS": 1,
+                }
+                worst_status = (
+                    max(step_statuses, key=lambda s: status_precedence.get(s, 0))
+                    if step_statuses
+                    else "PASS"
+                )
                 ac_status[ac_id] = worst_status
 
         except Exception as e:
             # If selftest config unavailable, return empty dict
             # This is graceful degradation; the endpoint will still return status.
             import sys
-            if hasattr(sys, 'stderr'):
+
+            if hasattr(sys, "stderr"):
                 print(f"Debug: Could not aggregate AC status: {e}", file=sys.stderr)
             return {}
 
@@ -747,6 +769,7 @@ class StatusProvider:
         except (json.JSONDecodeError, KeyError, IndexError) as e:
             # Selftest not available or parsing failed
             import sys
+
             print(f"Error parsing selftest report: {e}", file=sys.stderr)
             return SelfTestStatus(
                 mode="unknown",
@@ -792,6 +815,7 @@ class StatusProvider:
         except Exception as e:
             # Selftest not available
             import sys
+
             print(f"Error checking selftest: {e}", file=sys.stderr)
             return SelfTestStatus(
                 mode="unknown",

@@ -17,6 +17,7 @@ COMPILER_VERSION = "1.0.0"
 @dataclass(frozen=True)
 class SystemPromptSpec:
     """Compiled system prompt specification."""
+
     preset: str  # "default", "claude_code", "minimal", "custom"
     preset_content: str  # Resolved preset content
     append: str  # Station identity + invariants
@@ -29,6 +30,7 @@ class SystemPromptSpec:
 @dataclass(frozen=True)
 class UserPromptSpec:
     """Compiled user prompt specification."""
+
     objective: str  # Primary objective
     scope: str  # Scope constraint
     context_section: str  # Compiled context pointers
@@ -40,6 +42,7 @@ class UserPromptSpec:
 @dataclass(frozen=True)
 class OutputFormatSpec:
     """Output format specification for handoff envelope."""
+
     handoff_path: str  # Resolved path
     schema_ref: str  # Path to JSON schema
     required_fields: Tuple[str, ...]  # Required envelope fields
@@ -50,6 +53,7 @@ class OutputFormatSpec:
 @dataclass(frozen=True)
 class SdkOptionsSpec:
     """SDK options for Claude execution."""
+
     model: str  # Full model ID
     model_tier: str  # Shorthand tier
     permission_mode: str  # "default", "acceptEdits", "plan", "bypassPermissions"
@@ -64,6 +68,7 @@ class SdkOptionsSpec:
 @dataclass(frozen=True)
 class TraceabilitySpec:
     """Traceability metadata for audit trail."""
+
     station_id: str
     station_version: int
     template_id: str  # Optional template reference
@@ -82,6 +87,7 @@ class TraceabilitySpec:
 @dataclass(frozen=True)
 class FragmentReference:
     """Reference to a loaded fragment for audit."""
+
     path: str
     hash: str  # Content hash
     version: str  # Optional version
@@ -90,6 +96,7 @@ class FragmentReference:
 @dataclass(frozen=True)
 class VerificationCommand:
     """Command for post-execution verification."""
+
     command: str
     success_pattern: str
     timeout_seconds: int
@@ -99,6 +106,7 @@ class VerificationCommand:
 @dataclass(frozen=True)
 class VerificationSpec:
     """Post-execution verification requirements."""
+
     required_artifacts: Tuple[str, ...]
     verification_commands: Tuple[VerificationCommand, ...]
     gate_status_on_fail: str  # "UNVERIFIED" or "BLOCKED"
@@ -107,6 +115,7 @@ class VerificationSpec:
 @dataclass(frozen=True)
 class StepPlan:
     """Compiled plan for a single step, ready for SDK execution."""
+
     step_id: str
     station_id: str
     system_prompt: str  # Combined system prompt
@@ -190,8 +199,7 @@ class StepPlan:
             },
             "traceability": traceability,
             "fragments_used": [
-                {"path": f.path, "hash": f.hash, "version": f.version}
-                for f in self.fragments_used
+                {"path": f.path, "hash": f.hash, "version": f.version} for f in self.fragments_used
             ],
             "verification": {
                 "required_artifacts": list(self.verification.required_artifacts),
@@ -203,6 +211,7 @@ class StepPlan:
 @dataclass
 class CompileContext:
     """Context for compilation including run information."""
+
     run_id: str = ""
     run_base: Path = field(default_factory=lambda: Path("swarm/runs/default"))
     repo_root: Optional[Path] = None
@@ -215,6 +224,7 @@ class CompileContext:
 @dataclass(frozen=True)
 class StepIntent:
     """Source-agnostic intent for a single step."""
+
     flow_id: str
     flow_key: str
     step_id: str
@@ -236,6 +246,7 @@ class StepIntent:
 @dataclass(frozen=True)
 class FlowTemplateVars:
     """Template variables for flow info, with string fallback to flow key."""
+
     id: str
     key: str
     version: str

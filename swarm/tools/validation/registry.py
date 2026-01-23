@@ -2,7 +2,6 @@
 """Registry and config file parsing for swarm validation."""
 
 import sys
-from pathlib import Path
 from typing import Any, Dict
 
 from swarm.tools.validation.constants import EXIT_FATAL_ERROR
@@ -33,14 +32,27 @@ def parse_agents_registry() -> Dict[str, Dict[str, Any]]:
                 line = line.rstrip("\n")
 
                 # Detect table header (new format with role_family and color)
-                if line.startswith("| Key") and "Role Family" in line and "Color" in line and "Short Role" in line:
+                if (
+                    line.startswith("| Key")
+                    and "Role Family" in line
+                    and "Color" in line
+                    and "Short Role" in line
+                ):
                     in_table = True
                     continue
 
                 # Fallback: old format header (for backward compatibility during migration)
-                if line.startswith("| Key") and "Category" in line and "Short Role" in line and "Role Family" not in line:
+                if (
+                    line.startswith("| Key")
+                    and "Category" in line
+                    and "Short Role" in line
+                    and "Role Family" not in line
+                ):
                     # Old format without color - log warning and continue
-                    print(f"WARNING: {AGENTS_MD} uses old format without Role Family/Color columns", file=sys.stderr)
+                    print(
+                        f"WARNING: {AGENTS_MD} uses old format without Role Family/Color columns",
+                        file=sys.stderr,
+                    )
                     in_table = True
                     continue
 
@@ -71,7 +83,7 @@ def parse_agents_registry() -> Dict[str, Dict[str, Any]]:
                             "color": color.strip(),
                             "source": source.strip(),
                             "role": role.strip(),
-                            "line": line_number
+                            "line": line_number,
                         }
                     # Old format: Key | Flows | Category | Source | Short Role
                     elif len(cols) == 5:
@@ -86,7 +98,7 @@ def parse_agents_registry() -> Dict[str, Dict[str, Any]]:
                             "category": category.strip(),
                             "source": source.strip(),
                             "role": role.strip(),
-                            "line": line_number
+                            "line": line_number,
                         }
                     else:
                         continue

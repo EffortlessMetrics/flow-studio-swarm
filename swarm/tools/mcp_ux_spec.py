@@ -22,6 +22,7 @@ Depends on:
     - ux_manifest.json (UX contract index)
     - Flow Studio API at http://localhost:5000 (for live layout screens)
 """
+
 from __future__ import annotations
 
 import json
@@ -211,6 +212,7 @@ STATIC_LAYOUT_SCREENS: List[Dict[str, Any]] = [
 # Core Functions
 # ============================================================================
 
+
 def load_ux_manifest() -> Dict[str, Any]:
     """Load the ux_manifest.json file."""
     if not MANIFEST_PATH.exists():
@@ -295,6 +297,7 @@ def get_all_known_uiids() -> List[str]:
 # Backward-Compatible Function Aliases (for test compatibility)
 # ============================================================================
 
+
 def get_ux_manifest() -> Dict[str, Any]:
     """Alias for load_ux_manifest for backward compatibility."""
     return load_ux_manifest()
@@ -313,6 +316,7 @@ def get_critique_schema() -> Dict[str, Any]:
 # ============================================================================
 # MCP Server
 # ============================================================================
+
 
 def create_server() -> Server:
     """Create and configure the MCP server."""
@@ -406,17 +410,21 @@ def create_server() -> Server:
             screen = get_screen_by_id(screen_id)
             if screen:
                 return [TextContent(type="text", text=json.dumps(screen, indent=2))]
-            return [TextContent(
-                type="text",
-                text=json.dumps({"error": f"Screen '{screen_id}' not found"}, indent=2),
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"error": f"Screen '{screen_id}' not found"}, indent=2),
+                )
+            ]
 
         elif name == "get_all_uiids":
             uiids = get_all_known_uiids()
-            return [TextContent(
-                type="text",
-                text=json.dumps({"uiids": uiids, "count": len(uiids)}, indent=2),
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"uiids": uiids, "count": len(uiids)}, indent=2),
+                )
+            ]
 
         elif name == "get_critique_schema":
             schema = load_critique_schema()
@@ -436,4 +444,5 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

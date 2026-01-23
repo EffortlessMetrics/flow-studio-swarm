@@ -433,8 +433,9 @@ class TestRunService:
         # Also patch read_summary to use our tmp_path
         orig_read_summary = storage.read_summary
         monkeypatch.setattr(
-            storage, "read_summary",
-            lambda rid, runs_dir=None: orig_read_summary(rid, runs_dir=tmp_path)
+            storage,
+            "read_summary",
+            lambda rid, runs_dir=None: orig_read_summary(rid, runs_dir=tmp_path),
         )
 
         # Get first page (limit=2, offset=0)
@@ -484,8 +485,9 @@ class TestRunService:
         monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
         orig_read_summary = storage.read_summary
         monkeypatch.setattr(
-            storage, "read_summary",
-            lambda rid, runs_dir=None: orig_read_summary(rid, runs_dir=tmp_path)
+            storage,
+            "read_summary",
+            lambda rid, runs_dir=None: orig_read_summary(rid, runs_dir=tmp_path),
         )
 
         runs, total = service.list_runs_paginated(limit=10, offset=0)
@@ -533,8 +535,9 @@ class TestRunService:
         monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
         orig_read_summary = storage.read_summary
         monkeypatch.setattr(
-            storage, "read_summary",
-            lambda rid, runs_dir=None: orig_read_summary(rid, runs_dir=tmp_path)
+            storage,
+            "read_summary",
+            lambda rid, runs_dir=None: orig_read_summary(rid, runs_dir=tmp_path),
         )
 
         # Filter by flow_key uses slow path which calls list_runs()
@@ -544,6 +547,8 @@ class TestRunService:
         assert runs[0].id == "run-signal"
 
         RunService.reset()
+
+
 class TestRunServiceCaching:
     """Test RunService caching behavior for terminal runs.
 
@@ -587,6 +592,7 @@ class TestRunServiceCaching:
         finally:
             # Cleanup
             import shutil
+
             run_path = storage.get_run_path(run_id)
             if run_path.exists():
                 shutil.rmtree(run_path)
@@ -623,6 +629,7 @@ class TestRunServiceCaching:
         finally:
             # Cleanup
             import shutil
+
             run_path = storage.get_run_path(run_id)
             if run_path.exists():
                 shutil.rmtree(run_path)
@@ -664,6 +671,7 @@ class TestRunServiceCaching:
         finally:
             # Cleanup
             import shutil
+
             run_path = storage.get_run_path(run_id)
             if run_path.exists():
                 shutil.rmtree(run_path)
@@ -704,6 +712,7 @@ class TestRunServiceCaching:
         finally:
             # Cleanup
             import shutil
+
             run_path = storage.get_run_path(run_id)
             if run_path.exists():
                 shutil.rmtree(run_path)
@@ -745,6 +754,7 @@ class TestRunServiceCaching:
         finally:
             # Cleanup
             import shutil
+
             run_path = storage.get_run_path(run_id)
             if run_path.exists():
                 shutil.rmtree(run_path)
@@ -784,6 +794,7 @@ class TestRunServiceCaching:
         finally:
             # Cleanup
             import shutil
+
             run_path = storage.get_run_path(run_id)
             if run_path.exists():
                 shutil.rmtree(run_path)
@@ -823,6 +834,7 @@ class TestRunServiceCaching:
         finally:
             # Cleanup
             import shutil
+
             for run_id in run_ids:
                 run_path = storage.get_run_path(run_id)
                 if run_path.exists():
@@ -862,6 +874,7 @@ class TestRunServiceCaching:
         finally:
             # Cleanup
             import shutil
+
             run_path = storage.get_run_path(run_id)
             if run_path.exists():
                 shutil.rmtree(run_path)

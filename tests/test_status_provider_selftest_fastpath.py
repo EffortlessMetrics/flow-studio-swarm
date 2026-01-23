@@ -9,8 +9,6 @@ as running selftest.py via subprocess, but faster (in-process).
 import sys
 from pathlib import Path
 
-import pytest
-
 # Add swarm/tools to path for imports
 tools_path = Path(__file__).resolve().parents[1] / "swarm" / "tools"
 sys.path.insert(0, str(tools_path))

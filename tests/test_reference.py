@@ -72,9 +72,7 @@ def test_valid_builtin_agent_reference(temp_repo, run_validator):
 def test_mixed_builtin_and_domain_references(valid_repo, run_validator):
     """Flow referencing both built-in and domain agents."""
     create_flow_file(
-        valid_repo,
-        "flow-2",
-        ["explore", "test-agent-1", "plan-subagent", "test-agent-2"]
+        valid_repo, "flow-2", ["explore", "test-agent-1", "plan-subagent", "test-agent-2"]
     )
 
     result = run_validator(valid_repo)

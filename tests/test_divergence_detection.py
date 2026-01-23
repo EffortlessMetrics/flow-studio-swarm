@@ -9,31 +9,33 @@ These tests verify that:
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 from typing import Any, Optional
 from unittest.mock import MagicMock, patch
 
-# Import from utility_candidates.py (single source of truth for candidate generation)
-from swarm.runtime.stepwise.routing.utility_candidates import (
-    get_utility_flow_candidates as _get_utility_flow_candidates,
-    get_utility_flow_registry,
-    set_utility_flow_registry,
-    clear_utility_flow_caches,
-)
+import pytest
 from swarm.runtime.navigator import (
     NavigatorOutput,
+    NextStepBrief,
     RouteIntent,
     RouteProposal,
-    NextStepBrief,
     UtilityFlowRequest,
 )
 from swarm.runtime.navigator_integration import apply_utility_flow_injection
-from swarm.runtime.utility_flow_injection import (
-    UtilityFlowRegistry,
-    InjectionTriggerDetector,
+from swarm.runtime.stepwise.routing.utility_candidates import (
+    clear_utility_flow_caches,
+    get_utility_flow_registry,
+    set_utility_flow_registry,
 )
 
+# Import from utility_candidates.py (single source of truth for candidate generation)
+from swarm.runtime.stepwise.routing.utility_candidates import (
+    get_utility_flow_candidates as _get_utility_flow_candidates,
+)
+from swarm.runtime.utility_flow_injection import (
+    InjectionTriggerDetector,
+    UtilityFlowRegistry,
+)
 
 # =============================================================================
 # Fixture for cache isolation
@@ -181,9 +183,7 @@ class TestUtilityFlowCandidates:
         )
 
         # Should have at least one inject_flow candidate
-        inject_candidates = [
-            c for c in candidates if c.action == "inject_flow"
-        ]
+        inject_candidates = [c for c in candidates if c.action == "inject_flow"]
         assert len(inject_candidates) >= 0  # May be 0 if trigger doesn't fire
 
         if inject_candidates:
@@ -216,9 +216,7 @@ class TestNavigatorInjectFlowSelection:
                 target_node="reset",
                 reasoning="Upstream branch diverged by 5 commits",
             ),
-            next_step_brief=NextStepBrief(
-                objective="Synchronize with upstream before continuing"
-            ),
+            next_step_brief=NextStepBrief(objective="Synchronize with upstream before continuing"),
             utility_flow_request=UtilityFlowRequest(
                 flow_id="reset",
                 reason="Branch diverged from upstream",
@@ -256,9 +254,7 @@ class TestStackPushOnInjectFlow:
         )
 
         # Mock the UtilityFlowInjector
-        with patch(
-            "swarm.runtime.navigator_integration.UtilityFlowInjector"
-        ) as MockInjector:
+        with patch("swarm.runtime.navigator_integration.UtilityFlowInjector") as MockInjector:
             mock_injector = MockInjector.return_value
             mock_injector.inject_utility_flow.return_value = FlowInjectionResult(
                 injected=True,
@@ -305,7 +301,6 @@ class TestFlowKeySwitchOnInjectFlow:
         from swarm.runtime.utility_flow_injection import (
             UtilityFlowInjector,
             UtilityFlowMetadata,
-            FlowInjectionResult,
         )
 
         run_state = MockRunState()
@@ -414,9 +409,7 @@ class TestStrictRepoRootMode:
                 repo_root=None,  # Should raise in strict mode
             )
 
-    def test_non_strict_mode_returns_empty_on_missing_repo_root(
-        self, tmp_path: Path, monkeypatch
-    ):
+    def test_non_strict_mode_returns_empty_on_missing_repo_root(self, tmp_path: Path, monkeypatch):
         """Test that non-strict mode returns empty list when repo_root is None."""
         monkeypatch.delenv("SWARM_STRICT_REPO_ROOT", raising=False)
 

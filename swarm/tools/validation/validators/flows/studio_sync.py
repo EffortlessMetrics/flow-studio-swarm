@@ -36,7 +36,7 @@ def validate_flow_studio_sync() -> ValidationResult:
                     "FLOW",
                     "http://localhost:5000/api/flows",
                     "Flow Studio API response format unexpected",
-                    "Verify Flow Studio is running and serving correct data"
+                    "Verify Flow Studio is running and serving correct data",
                 )
         except (urllib.error.URLError, urllib.error.HTTPError):
             # Server not available, don't warn (optional check)
@@ -46,7 +46,7 @@ def validate_flow_studio_sync() -> ValidationResult:
                 "FLOW",
                 "http://localhost:5000/api/flows",
                 "Flow Studio API returned invalid JSON",
-                "Verify Flow Studio is running correctly"
+                "Verify Flow Studio is running correctly",
             )
     except (ImportError, Exception):
         # If we can't import urllib or connect, just skip the check

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Bootstrap YAML configs for all agents from AGENTS.md."""
+
 from pathlib import Path
 from typing import Dict, Iterator
 
@@ -52,12 +53,12 @@ def write_stub(agent: Dict[str, str]) -> None:
         short_role = short_role[:117] + "..."
 
     text = f"""# Auto-bootstrapped from swarm/AGENTS.md
-key: {agent['key']}
+key: {agent["key"]}
 flows:
-  - {agent['flows']}
-category: {agent['role_family']}
-color: {agent['color']}
-source: {agent['source']}
+  - {agent["flows"]}
+category: {agent["role_family"]}
+color: {agent["color"]}
+source: {agent["source"]}
 short_role: "{short_role}"
 model: inherit
 """

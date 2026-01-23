@@ -13,7 +13,6 @@ regressions where module-level app creation is accidentally reintroduced.
 Related commit: 07e61d4 feat: Refactor API structure to avoid import side effects
 """
 
-import importlib
 import sys
 from pathlib import Path
 from typing import List
@@ -83,6 +82,7 @@ class TestAPIImportSideEffects:
         # If 'app' exists at module level, it should be None or not a FastAPI instance
         if app_var is not None:
             from fastapi import FastAPI
+
             assert not isinstance(app_var, FastAPI), (
                 "Module-level 'app' variable found in swarm.api.server. "
                 "This indicates import-time app creation which violates the "
@@ -122,9 +122,7 @@ class TestAPIImportSideEffects:
             pass
 
         # Singleton should still be None
-        assert sm._spec_manager is None, (
-            "SpecManager was initialized during routes import."
-        )
+        assert sm._spec_manager is None, "SpecManager was initialized during routes import."
 
     def test_create_app_initializes_spec_manager(self):
         """create_app() should properly initialize the spec manager."""
@@ -148,6 +146,7 @@ class TestAPIImportSideEffects:
 
         # Verify app is a FastAPI instance
         from fastapi import FastAPI
+
         assert isinstance(app, FastAPI)
 
     def test_set_spec_manager_works_correctly(self):
@@ -188,6 +187,7 @@ class TestAPIImportSideEffects:
 
         # get_spec_manager should raise
         import pytest
+
         with pytest.raises(RuntimeError, match="SpecManager not initialized"):
             sm.get_spec_manager()
 
@@ -224,6 +224,7 @@ class TestASGIEntrypoint:
         )
 
         from fastapi import FastAPI
+
         assert isinstance(asgi_module.app, FastAPI), (
             "swarm.api.asgi.app should be a FastAPI instance."
         )

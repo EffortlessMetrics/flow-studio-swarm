@@ -59,13 +59,33 @@ router.include_router(issue_router, prefix="/runs")
 # =============================================================================
 
 # Re-export RunStateManager and get_state_manager for backward compatibility
-from ..services.run_state import RunStateManager, get_state_manager
+from ..services.run_state import (  # noqa: E402
+    RunStateManager,
+    get_state_manager,
+)
 
 # For backward compatibility, alias the old private function
 _get_state_manager = get_state_manager
 
 # Re-export Pydantic models from runs_models
-from .runs_models import (
+# Re-export Pydantic models from autopilot_routes
+# Re-export autopilot controller getter for backward compatibility
+from .autopilot_routes import (  # noqa: E402
+    AutopilotStartRequest,
+    AutopilotStartResponse,
+    AutopilotStatusResponse,
+    AutopilotStopRequest,
+    WisdomApplyResultResponse,
+    _get_autopilot_controller,
+)
+
+# Re-export Pydantic models from issue_routes
+from .issue_routes import (  # noqa: E402
+    IssueIngestionRequest,
+    IssueIngestionResponse,
+    IssueSnapshot,
+)
+from .runs_models import (  # noqa: E402
     InjectRequest,
     InterruptionFrameResponse,
     InterruptionStackResponse,
@@ -82,25 +102,6 @@ from .runs_models import (
     StopRequest,
     StopResponse,
 )
-
-# Re-export Pydantic models from autopilot_routes
-from .autopilot_routes import (
-    AutopilotStartRequest,
-    AutopilotStartResponse,
-    AutopilotStatusResponse,
-    AutopilotStopRequest,
-    WisdomApplyResultResponse,
-)
-
-# Re-export Pydantic models from issue_routes
-from .issue_routes import (
-    IssueIngestionRequest,
-    IssueIngestionResponse,
-    IssueSnapshot,
-)
-
-# Re-export autopilot controller getter for backward compatibility
-from .autopilot_routes import _get_autopilot_controller
 
 __all__ = [
     # Main router

@@ -4,19 +4,19 @@ Tests the sanity bounds validation in ContextBudgetResolver and
 truncation tracking in step engines.
 """
 
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
 
 _SWARM_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_SWARM_ROOT))
 
 from swarm.config.runtime_config import (
-    ContextBudgetResolver,
-    ContextBudgetConfig,
-    BUDGET_MIN_CHARS,
     BUDGET_MAX_CHARS,
+    BUDGET_MIN_CHARS,
     BUDGET_WARN_THRESHOLD,
+    ContextBudgetResolver,
     _clamp_budget_value,
 )
 from swarm.runtime.engines import HistoryTruncationInfo
@@ -145,7 +145,7 @@ class TestModelRegistry:
 
     def test_builtin_models_available(self):
         """Built-in models should be available without config."""
-        from swarm.config.model_registry import list_known_models, get_model_spec
+        from swarm.config.model_registry import get_model_spec, list_known_models
 
         models = list_known_models()
         assert "claude-sonnet-4-5-20250929" in models
@@ -287,13 +287,33 @@ class TestPriorityAwarePromptBuilding:
         # Create history with mixed priorities
         history = [
             # LOW priority (will be dropped first)
-            {"step_id": "s1", "agent_key": "gh-reporter", "status": "succeeded", "output": "A" * 10000},
+            {
+                "step_id": "s1",
+                "agent_key": "gh-reporter",
+                "status": "succeeded",
+                "output": "A" * 10000,
+            },
             # CRITICAL priority (should be kept)
-            {"step_id": "s2", "agent_key": "code-implementer", "status": "succeeded", "output": "B" * 10000},
+            {
+                "step_id": "s2",
+                "agent_key": "code-implementer",
+                "status": "succeeded",
+                "output": "B" * 10000,
+            },
             # LOW priority (will be dropped first)
-            {"step_id": "s3", "agent_key": "doc-writer", "status": "succeeded", "output": "C" * 10000},
+            {
+                "step_id": "s3",
+                "agent_key": "doc-writer",
+                "status": "succeeded",
+                "output": "C" * 10000,
+            },
             # CRITICAL priority (should be kept)
-            {"step_id": "s4", "agent_key": "merge-decider", "status": "succeeded", "output": "D" * 10000},
+            {
+                "step_id": "s4",
+                "agent_key": "merge-decider",
+                "status": "succeeded",
+                "output": "D" * 10000,
+            },
         ]
 
         spec = RunSpec(
@@ -339,9 +359,24 @@ class TestPriorityAwarePromptBuilding:
 
         # History in chronological order
         history = [
-            {"step_id": "step_1", "agent_key": "risk-analyst", "status": "succeeded", "output": "Risk analysis"},
-            {"step_id": "step_2", "agent_key": "code-implementer", "status": "succeeded", "output": "Implementation"},
-            {"step_id": "step_3", "agent_key": "code-critic", "status": "succeeded", "output": "Critique"},
+            {
+                "step_id": "step_1",
+                "agent_key": "risk-analyst",
+                "status": "succeeded",
+                "output": "Risk analysis",
+            },
+            {
+                "step_id": "step_2",
+                "agent_key": "code-implementer",
+                "status": "succeeded",
+                "output": "Implementation",
+            },
+            {
+                "step_id": "step_3",
+                "agent_key": "code-critic",
+                "status": "succeeded",
+                "output": "Critique",
+            },
         ]
 
         spec = RunSpec(

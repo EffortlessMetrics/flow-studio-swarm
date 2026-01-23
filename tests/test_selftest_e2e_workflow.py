@@ -21,7 +21,6 @@ Simulates real user workflow with Flow Studio.
 
 import sys
 from pathlib import Path
-import json
 
 # Add repo root to path
 repo_root = Path(__file__).resolve().parents[1]
@@ -36,6 +35,7 @@ from fastapi.testclient import TestClient
 def fastapi_client():
     """Create FastAPI test client."""
     from swarm.tools.flow_studio_fastapi import app
+
     return TestClient(app)
 
 
@@ -47,7 +47,7 @@ def sample_governance_status():
             "selftest": {
                 "failed_steps": ["core-checks", "agents-governance"],
                 "degraded_steps": ["bdd"],
-                "status": "degraded"
+                "status": "degraded",
             }
         }
     }
@@ -58,9 +58,7 @@ def test_selftest_plan_endpoint_available(fastapi_client):
     resp = fastapi_client.get("/api/selftest/plan")
 
     # Either 200 with plan or 503 if module unavailable
-    assert resp.status_code in (200, 503), (
-        f"Expected 200 or 503, got {resp.status_code}"
-    )
+    assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}"
 
 
 def test_plan_data_complete(fastapi_client):
@@ -122,16 +120,14 @@ def test_failed_steps_generate_hints(sample_governance_status):
         "core-checks": "ruff check swarm/",
         "agents-governance": "validate_swarm.py --check-agents",
         "skills-governance": "validate_swarm.py --check-skills",
-        "policy-tests": "make policy-tests"
+        "policy-tests": "make policy-tests",
     }
 
     for step in failed_steps:
         if step in known_patterns:
             expected_command_fragment = known_patterns[step]
             # Verify pattern exists (would be used by UI to generate hint)
-            assert expected_command_fragment, (
-                f"Step {step} should have command pattern"
-            )
+            assert expected_command_fragment, f"Step {step} should have command pattern"
 
 
 def test_degraded_steps_advisory_hints(sample_governance_status):
@@ -156,7 +152,7 @@ def test_hint_commands_runnable(fastapi_client):
         "uv run swarm/tools/validate_swarm.py --check-agents",
         "uv run swarm/tools/validate_swarm.py --check-skills",
         "make policy-tests",
-        "find features/ -name '*.feature' | head"
+        "find features/ -name '*.feature' | head",
     ]
 
     for cmd in test_commands:
@@ -169,9 +165,7 @@ def test_hint_commands_runnable(fastapi_client):
 
         # Verify command looks executable (has known tools)
         known_tools = ["ruff", "python", "uv", "make", "find", "pytest"]
-        assert any(tool in cmd for tool in known_tools), (
-            f"Command should contain known tool: {cmd}"
-        )
+        assert any(tool in cmd for tool in known_tools), f"Command should contain known tool: {cmd}"
 
 
 def test_docs_links_valid_format():
@@ -182,7 +176,7 @@ def test_docs_links_valid_format():
         "CLAUDE.md § Agent Ops",
         "CLAUDE.md § Skills",
         "swarm/policies/README.md",
-        "swarm/tools/flow_studio.py"
+        "swarm/tools/flow_studio.py",
     ]
 
     for link in test_links:
@@ -201,13 +195,7 @@ def test_docs_links_valid_format():
 def test_no_failures_no_hints():
     """Test no hints when no failures."""
     clean_status = {
-        "governance": {
-            "selftest": {
-                "failed_steps": [],
-                "degraded_steps": [],
-                "status": "ok"
-            }
-        }
+        "governance": {"selftest": {"failed_steps": [], "degraded_steps": [], "status": "ok"}}
     }
 
     # Should have no failures
@@ -318,7 +306,7 @@ def test_workflow_step_3_generate_hints(sample_governance_status):
             "step": step,
             "root_cause": f"Issue in {step}",
             "command": f"uv run swarm/tools/selftest.py --step {step}",
-            "docs": "docs/SELFTEST_SYSTEM.md"
+            "docs": "docs/SELFTEST_SYSTEM.md",
         }
         hints.append(hint)
 
@@ -343,13 +331,9 @@ def test_workflow_step_4_display_commands():
         {
             "type": "failure",
             "step": "core-checks",
-            "command": "ruff check swarm/ && python -m compileall -q swarm/"
+            "command": "ruff check swarm/ && python -m compileall -q swarm/",
         },
-        {
-            "type": "advisory",
-            "step": "bdd",
-            "command": "find features/ -name '*.feature' | head"
-        }
+        {"type": "advisory", "step": "bdd", "command": "find features/ -name '*.feature' | head"},
     ]
 
     # Each hint should have copyable command

@@ -7,19 +7,12 @@ including temporary repositories, agent files, and helper functions.
 
 # Filter gherkin deprecation warning before any imports trigger it
 import warnings
+
 warnings.filterwarnings(
     "ignore",
     message="'maxsplit' is passed as positional argument",
     category=DeprecationWarning,
 )
-
-import shutil
-import subprocess
-from pathlib import Path
-from typing import Dict, List, Optional
-
-import pytest
-from fastapi.testclient import TestClient
 
 # ============================================================================
 # BDD Step Definitions (for pytest-bdd)
@@ -27,11 +20,15 @@ from fastapi.testclient import TestClient
 # Import pytest-bdd decorators and steps for step definitions
 # All actual step definitions are in tests/bdd/steps/selftest_steps.py
 # We import that module here to make them available to all tests
-import json
+import shutil
 import subprocess
 import sys
+from pathlib import Path
 from pathlib import Path as _Path
-from pytest_bdd import given, parsers, then, when
+from typing import Dict, List, Optional
+
+import pytest
+from fastapi.testclient import TestClient
 
 # Import BDD step definitions from tests/bdd/steps/ to make them available
 # to all tests (including tests/test_selftest_bdd.py)
@@ -50,6 +47,7 @@ try:
 except ImportError as e:
     # If this fails, something is wrong with the test setup
     import warnings
+
     warnings.warn(f"Could not import BDD step definitions: {e}")
 
 # ============================================================================
@@ -168,7 +166,9 @@ You are test agent {i}.
 # ============================================================================
 
 
-def create_agent_file(repo_path: Path, agent_name: str, frontmatter: Optional[Dict] = None, prompt: str = ""):
+def create_agent_file(
+    repo_path: Path, agent_name: str, frontmatter: Optional[Dict] = None, prompt: str = ""
+):
     """
     Create an agent file with specified frontmatter.
 
@@ -183,7 +183,7 @@ def create_agent_file(repo_path: Path, agent_name: str, frontmatter: Optional[Di
             "name": agent_name,
             "description": f"Test agent {agent_name}",
             "color": "green",
-            "model": "inherit"
+            "model": "inherit",
         }
 
     agent_path = repo_path / ".claude" / "agents" / f"{agent_name}.md"
@@ -251,7 +251,12 @@ Agent prompt without closing ---.
 # ============================================================================
 
 
-def add_agent_to_registry(repo_path: Path, agent_key: str, line_hint: Optional[int] = None, role_family: Optional[str] = None):
+def add_agent_to_registry(
+    repo_path: Path,
+    agent_key: str,
+    line_hint: Optional[int] = None,
+    role_family: Optional[str] = None,
+):
     """
     Add an agent entry to swarm/AGENTS.md pipe table.
 
@@ -286,7 +291,10 @@ def add_agent_to_registry(repo_path: Path, agent_key: str, line_hint: Optional[i
 | Key | Flows | Role Family | Color | Source | Short Role |
 |-----|-------|-------------|-------|--------|------------|
 """
-        new_entry = table_header + f"| {agent_key} | 1 | {role_fam} | {color} | project/user | Test agent {agent_key} |\n"
+        new_entry = (
+            table_header
+            + f"| {agent_key} | 1 | {role_fam} | {color} | project/user | Test agent {agent_key} |\n"
+        )
         agents_md.write_text(existing + new_entry)
     else:
         # Check the current table format
@@ -297,11 +305,15 @@ def add_agent_to_registry(repo_path: Path, agent_key: str, line_hint: Optional[i
                 new_entry = f"| {agent_key} | 1 | {role_fam} | {color} | project/user | Test agent {agent_key} |\n"
             else:
                 # Has Role Family but no Color - add Color column
-                new_entry = f"| {agent_key} | 1 | {role_fam} | project/user | Test agent {agent_key} |\n"
+                new_entry = (
+                    f"| {agent_key} | 1 | {role_fam} | project/user | Test agent {agent_key} |\n"
+                )
         else:
             # Old format: Key | Flows | Category | Source | Short Role
             # Just append without Role Family and Color
-            new_entry = f"| {agent_key} | 1 | implementation | project/user | Test agent {agent_key} |\n"
+            new_entry = (
+                f"| {agent_key} | 1 | implementation | project/user | Test agent {agent_key} |\n"
+            )
 
         agents_md.write_text(existing + new_entry)
 
@@ -340,12 +352,7 @@ def run_validator():
         # Use --repo to specify the target repo to validate
         cmd = ["uv", "run", "swarm/tools/validate_swarm.py", "--repo", str(repo_path)] + flags
 
-        result = subprocess.run(
-            cmd,
-            cwd=project_root,
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(cmd, cwd=project_root, capture_output=True, text=True)
 
         return result
 
@@ -381,7 +388,7 @@ def parse_errors(stderr: str) -> List[Dict[str, str]]:
             first_colon = line.find(":")
             if first_colon > 0:
                 error_type = line[6:first_colon].strip()  # Skip [FAIL] or [WARN]
-                rest = line[first_colon+1:].strip()
+                rest = line[first_colon + 1 :].strip()
 
                 # Rest contains "location problem"
                 # Location can be file:line or just file
@@ -389,7 +396,7 @@ def parse_errors(stderr: str) -> List[Dict[str, str]]:
                     "type": error_type,
                     "location": "",  # Will be extracted from rest if needed
                     "message": rest,  # Full message including location
-                    "fix": ""
+                    "fix": "",
                 }
         elif line.startswith("Fix:"):
             if current_error:
@@ -415,7 +422,9 @@ def git_repo(temp_repo):
     """
     subprocess.run(["git", "init"], cwd=temp_repo, capture_output=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_repo, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=temp_repo, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"], cwd=temp_repo, capture_output=True
+    )
 
     # Initial commit
     subprocess.run(["git", "add", "."], cwd=temp_repo, capture_output=True)
@@ -511,7 +520,9 @@ def assert_error_contains(stderr: str, expected_text: str):
 
 def assert_error_type(stderr: str, error_type: str):
     """Assert that stderr contains error of specific type."""
-    assert f"[FAIL] {error_type}:" in stderr, f"Expected error type {error_type} in stderr. Got: {stderr}"
+    assert f"[FAIL] {error_type}:" in stderr, (
+        f"Expected error type {error_type} in stderr. Got: {stderr}"
+    )
 
 
 # ============================================================================
@@ -572,6 +583,7 @@ def flowstudio_client() -> TestClient:
         sys.path.insert(0, str(repo_root))
 
     from swarm.tools.flow_studio_fastapi import app
+
     return TestClient(app)
 
 
@@ -585,6 +597,7 @@ def pytest_configure(config):
     # Suppress gherkin deprecation warnings early (before collection triggers them)
     # This is needed because -W error may process warnings before pyproject.toml filters
     import warnings
+
     warnings.filterwarnings(
         "ignore",
         message="'maxsplit' is passed as positional argument",

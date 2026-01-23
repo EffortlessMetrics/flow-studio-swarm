@@ -23,6 +23,7 @@ Governed Allowlist:
     - swarm/tools/flow_studio_ui/css/**
     - docs/FLOW_STUDIO*.md
 """
+
 from __future__ import annotations
 
 import json
@@ -67,6 +68,7 @@ GOVERNED_SURFACE_PATTERNS = [
 # ============================================================================
 # Core Functions
 # ============================================================================
+
 
 def is_path_allowed(path: str) -> bool:
     """Check if a path matches the write allowlist."""
@@ -163,27 +165,37 @@ def run_ux_tests() -> Dict[str, Any]:
             text=True,
             timeout=60,
         )
-        results["steps"].append({
-            "name": "ts-check",
-            "success": ts_check.returncode == 0,
-            "stdout": ts_check.stdout[-2000:] if len(ts_check.stdout) > 2000 else ts_check.stdout,
-            "stderr": ts_check.stderr[-2000:] if len(ts_check.stderr) > 2000 else ts_check.stderr,
-        })
+        results["steps"].append(
+            {
+                "name": "ts-check",
+                "success": ts_check.returncode == 0,
+                "stdout": ts_check.stdout[-2000:]
+                if len(ts_check.stdout) > 2000
+                else ts_check.stdout,
+                "stderr": ts_check.stderr[-2000:]
+                if len(ts_check.stderr) > 2000
+                else ts_check.stderr,
+            }
+        )
         if ts_check.returncode != 0:
             results["success"] = False
     except subprocess.TimeoutExpired:
-        results["steps"].append({
-            "name": "ts-check",
-            "success": False,
-            "error": "Timeout (60s)",
-        })
+        results["steps"].append(
+            {
+                "name": "ts-check",
+                "success": False,
+                "error": "Timeout (60s)",
+            }
+        )
         results["success"] = False
     except Exception as e:
-        results["steps"].append({
-            "name": "ts-check",
-            "success": False,
-            "error": str(e),
-        })
+        results["steps"].append(
+            {
+                "name": "ts-check",
+                "success": False,
+                "error": str(e),
+            }
+        )
         results["success"] = False
 
     # Step 2: TypeScript build
@@ -195,27 +207,37 @@ def run_ux_tests() -> Dict[str, Any]:
             text=True,
             timeout=60,
         )
-        results["steps"].append({
-            "name": "ts-build",
-            "success": ts_build.returncode == 0,
-            "stdout": ts_build.stdout[-2000:] if len(ts_build.stdout) > 2000 else ts_build.stdout,
-            "stderr": ts_build.stderr[-2000:] if len(ts_build.stderr) > 2000 else ts_build.stderr,
-        })
+        results["steps"].append(
+            {
+                "name": "ts-build",
+                "success": ts_build.returncode == 0,
+                "stdout": ts_build.stdout[-2000:]
+                if len(ts_build.stdout) > 2000
+                else ts_build.stdout,
+                "stderr": ts_build.stderr[-2000:]
+                if len(ts_build.stderr) > 2000
+                else ts_build.stderr,
+            }
+        )
         if ts_build.returncode != 0:
             results["success"] = False
     except subprocess.TimeoutExpired:
-        results["steps"].append({
-            "name": "ts-build",
-            "success": False,
-            "error": "Timeout (60s)",
-        })
+        results["steps"].append(
+            {
+                "name": "ts-build",
+                "success": False,
+                "error": "Timeout (60s)",
+            }
+        )
         results["success"] = False
     except Exception as e:
-        results["steps"].append({
-            "name": "ts-build",
-            "success": False,
-            "error": str(e),
-        })
+        results["steps"].append(
+            {
+                "name": "ts-build",
+                "success": False,
+                "error": str(e),
+            }
+        )
         results["success"] = False
 
     # Step 3: Python UX tests
@@ -233,27 +255,37 @@ def run_ux_tests() -> Dict[str, Any]:
             text=True,
             timeout=120,
         )
-        results["steps"].append({
-            "name": "pytest-ux",
-            "success": pytest_run.returncode == 0,
-            "stdout": pytest_run.stdout[-4000:] if len(pytest_run.stdout) > 4000 else pytest_run.stdout,
-            "stderr": pytest_run.stderr[-2000:] if len(pytest_run.stderr) > 2000 else pytest_run.stderr,
-        })
+        results["steps"].append(
+            {
+                "name": "pytest-ux",
+                "success": pytest_run.returncode == 0,
+                "stdout": pytest_run.stdout[-4000:]
+                if len(pytest_run.stdout) > 4000
+                else pytest_run.stdout,
+                "stderr": pytest_run.stderr[-2000:]
+                if len(pytest_run.stderr) > 2000
+                else pytest_run.stderr,
+            }
+        )
         if pytest_run.returncode != 0:
             results["success"] = False
     except subprocess.TimeoutExpired:
-        results["steps"].append({
-            "name": "pytest-ux",
-            "success": False,
-            "error": "Timeout (120s)",
-        })
+        results["steps"].append(
+            {
+                "name": "pytest-ux",
+                "success": False,
+                "error": "Timeout (120s)",
+            }
+        )
         results["success"] = False
     except Exception as e:
-        results["steps"].append({
-            "name": "pytest-ux",
-            "success": False,
-            "error": str(e),
-        })
+        results["steps"].append(
+            {
+                "name": "pytest-ux",
+                "success": False,
+                "error": str(e),
+            }
+        )
         results["success"] = False
 
     return results
@@ -291,6 +323,7 @@ def list_ui_files() -> Dict[str, Any]:
 # ============================================================================
 # MCP Server
 # ============================================================================
+
 
 def create_server() -> Server:
     """Create and configure the MCP server."""
@@ -397,13 +430,18 @@ def create_server() -> Server:
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         elif name == "get_write_allowlist":
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "patterns": WRITE_ALLOWLIST_PATTERNS,
-                    "governed_surfaces": GOVERNED_SURFACE_PATTERNS,
-                }, indent=2),
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "patterns": WRITE_ALLOWLIST_PATTERNS,
+                            "governed_surfaces": GOVERNED_SURFACE_PATTERNS,
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
 
         return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}"}))]
 
@@ -419,4 +457,5 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

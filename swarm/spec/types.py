@@ -8,12 +8,13 @@ They are the source of truth - prompts and SDK options are compiled from these s
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
 from enum import Enum
+from typing import Any, Dict, Optional, Tuple
 
 
 class RoutingKind(Enum):
     """Routing strategy for flow steps."""
+
     LINEAR = "linear"
     MICROLOOP = "microloop"
     BRANCH = "branch"
@@ -22,6 +23,7 @@ class RoutingKind(Enum):
 
 class StationCategory(Enum):
     """Role family for station classification."""
+
     SHAPING = "shaping"
     SPEC = "spec"
     DESIGN = "design"
@@ -42,6 +44,7 @@ class StationCategory(Enum):
 @dataclass(frozen=True)
 class StationSandbox:
     """Sandbox configuration for a station."""
+
     enabled: bool = True
     auto_allow_bash: bool = True
     excluded_commands: Tuple[str, ...] = ()
@@ -50,6 +53,7 @@ class StationSandbox:
 @dataclass(frozen=True)
 class StationContextBudget:
     """Context budget limits for a station."""
+
     total_chars: int = 200000
     recent_chars: int = 60000
     older_chars: int = 10000
@@ -62,11 +66,10 @@ class StationSDK:
     This defines the Claude SDK options programmatically,
     removing dependence on .claude filesystem settings.
     """
+
     model: str = "sonnet"
     permission_mode: str = "bypassPermissions"
-    allowed_tools: Tuple[str, ...] = (
-        "Read", "Write", "Edit", "Bash", "Grep", "Glob"
-    )
+    allowed_tools: Tuple[str, ...] = ("Read", "Write", "Edit", "Bash", "Grep", "Glob")
     denied_tools: Tuple[str, ...] = ()
     sandbox: StationSandbox = field(default_factory=StationSandbox)
     max_turns: int = 12
@@ -80,6 +83,7 @@ class StationIdentity:
     This is the ONLY prose that goes into the system prompt.
     Keep it short (<2000 chars) and focused on identity + invariants.
     """
+
     system_append: str
     tone: str = "neutral"  # neutral, analytical, critical, supportive
 
@@ -90,6 +94,7 @@ class StationIO:
 
     Paths are relative to run_base (e.g., "plan/adr.md").
     """
+
     required_inputs: Tuple[str, ...] = ()
     optional_inputs: Tuple[str, ...] = ()
     required_outputs: Tuple[str, ...] = ()
@@ -99,9 +104,13 @@ class StationIO:
 @dataclass(frozen=True)
 class StationHandoff:
     """Handoff contract for a station."""
+
     path_template: str = "{{run.base}}/handoff/{{step.id}}.draft.json"
     required_fields: Tuple[str, ...] = (
-        "status", "summary", "artifacts", "can_further_iteration_help"
+        "status",
+        "summary",
+        "artifacts",
+        "can_further_iteration_help",
     )
 
 
@@ -112,6 +121,7 @@ class StationRuntimePrompt:
     Fragments are loaded and concatenated.
     Template uses {{variable}} syntax for substitution.
     """
+
     fragments: Tuple[str, ...] = ()
     template: str = ""
 
@@ -119,6 +129,7 @@ class StationRuntimePrompt:
 @dataclass(frozen=True)
 class StationRoutingHints:
     """Default routing behavior for this station."""
+
     on_verified: str = "advance"
     on_unverified: str = "loop"
     on_partial: str = "advance_with_concerns"
@@ -136,6 +147,7 @@ class StationSpec:
     - Handoff contract (how I signal completion)
     - Runtime prompt template (what instructions I receive)
     """
+
     id: str
     version: int
     title: str
@@ -157,6 +169,7 @@ class StationSpec:
 @dataclass(frozen=True)
 class ContextPackConfig:
     """Context pack configuration for a flow."""
+
     include_upstream_artifacts: bool = True
     include_previous_envelopes: bool = True
     max_envelopes: int = 12
@@ -166,6 +179,7 @@ class ContextPackConfig:
 @dataclass(frozen=True)
 class FlowDefaults:
     """Default settings for all steps in a flow."""
+
     context_pack: ContextPackConfig = field(default_factory=ContextPackConfig)
     sdk_overrides: Dict[str, Any] = field(default_factory=dict)
 
@@ -173,6 +187,7 @@ class FlowDefaults:
 @dataclass(frozen=True)
 class RoutingConfig:
     """Routing configuration for a flow step."""
+
     kind: RoutingKind = RoutingKind.LINEAR
     next: Optional[str] = None
     loop_target: Optional[str] = None
@@ -185,6 +200,7 @@ class RoutingConfig:
 @dataclass(frozen=True)
 class StepTeaching:
     """Teaching metadata for a flow step."""
+
     highlight: bool = False
     note: str = ""
 
@@ -195,6 +211,7 @@ class FlowStep:
 
     References a station and provides step-specific overrides.
     """
+
     id: str
     station: str  # Station ID reference
     objective: str
@@ -212,6 +229,7 @@ class FlowSpec:
 
     The orchestrator spine: defines step sequence and routing.
     """
+
     id: str
     version: int
     title: str
@@ -233,6 +251,7 @@ class VerificationRequirements:
     Defines what artifacts must exist and what commands must pass
     for the step to be considered verified.
     """
+
     required_artifacts: Tuple[str, ...] = ()
     verification_commands: Tuple[str, ...] = ()
 
@@ -243,9 +262,13 @@ class HandoffContract:
 
     Defines where the handoff file goes and what fields it must contain.
     """
+
     path: str  # Resolved path (no templates)
     required_fields: Tuple[str, ...] = (
-        "status", "summary", "artifacts", "can_further_iteration_help"
+        "status",
+        "summary",
+        "artifacts",
+        "can_further_iteration_help",
     )
 
 
@@ -261,6 +284,7 @@ class PromptPlan:
     - handoff: Resolved handoff path and required fields
     - flow_key: Separate from flow_id for routing
     """
+
     # Traceability
     station_id: str
     station_version: int
@@ -297,9 +321,7 @@ class PromptPlan:
     )
 
     # V2: Handoff contract (resolved path, required fields)
-    handoff: HandoffContract = field(
-        default_factory=lambda: HandoffContract(path="")
-    )
+    handoff: HandoffContract = field(default_factory=lambda: HandoffContract(path=""))
 
     # V2: Flow key for routing (e.g., "build" from "3-build")
     flow_key: str = ""
@@ -308,12 +330,13 @@ class PromptPlan:
 @dataclass(frozen=True)
 class PromptReceipt:
     """Receipt tracking compilation for audit trail."""
-    prompt_hash: str           # SHA256 of combined prompts (from PromptPlan)
+
+    prompt_hash: str  # SHA256 of combined prompts (from PromptPlan)
     fragment_manifest: Tuple[str, ...] = ()  # Fragment paths used
-    context_pack_hash: str = ""     # Hash of input context
-    model_tier: str = ""            # haiku/sonnet/opus
+    context_pack_hash: str = ""  # Hash of input context
+    model_tier: str = ""  # haiku/sonnet/opus
     tool_profile: Tuple[str, ...] = ()  # Allowed tools
-    compiled_at: str = ""           # ISO timestamp
+    compiled_at: str = ""  # ISO timestamp
     compiler_version: str = "1.0.0"
     station_id: str = ""
     flow_id: str = ""
@@ -363,7 +386,9 @@ def station_spec_from_dict(data: Dict[str, Any]) -> StationSpec:
     sdk = StationSDK(
         model=sdk_data.get("model", "sonnet"),
         permission_mode=sdk_data.get("permission_mode", "bypassPermissions"),
-        allowed_tools=tuple(sdk_data.get("allowed_tools", ["Read", "Write", "Edit", "Bash", "Grep", "Glob"])),
+        allowed_tools=tuple(
+            sdk_data.get("allowed_tools", ["Read", "Write", "Edit", "Bash", "Grep", "Glob"])
+        ),
         denied_tools=tuple(sdk_data.get("denied_tools", [])),
         sandbox=sandbox,
         max_turns=sdk_data.get("max_turns", 12),
@@ -388,11 +413,15 @@ def station_spec_from_dict(data: Dict[str, Any]) -> StationSpec:
     # Support both path_template and draft_path_template for compatibility
     path_template = handoff_data.get(
         "path_template",
-        handoff_data.get("draft_path_template", "{{run.base}}/handoff/{{step.id}}.draft.json")
+        handoff_data.get("draft_path_template", "{{run.base}}/handoff/{{step.id}}.draft.json"),
     )
     handoff = StationHandoff(
         path_template=path_template,
-        required_fields=tuple(handoff_data.get("required_fields", ["status", "summary", "artifacts", "can_further_iteration_help"])),
+        required_fields=tuple(
+            handoff_data.get(
+                "required_fields", ["status", "summary", "artifacts", "can_further_iteration_help"]
+            )
+        ),
     )
 
     prompt_data = data.get("runtime_prompt", {})
@@ -486,7 +515,9 @@ def flow_spec_from_dict(data: Dict[str, Any]) -> FlowSpec:
             next=routing_data.get("next"),
             loop_target=routing_data.get("loop_target"),
             loop_condition_field=routing_data.get("loop_condition_field", "status"),
-            loop_success_values=tuple(routing_data.get("loop_success_values", ["VERIFIED", "verified"])),
+            loop_success_values=tuple(
+                routing_data.get("loop_success_values", ["VERIFIED", "verified"])
+            ),
             max_iterations=routing_data.get("max_iterations", 3),
             branches=routing_data.get("branches", {}),
         )

@@ -47,7 +47,7 @@ class TestSelfTestSchema:
     def test_all_steps_have_severity(self):
         """Every step has severity classification."""
         for step in SELFTEST_STEPS:
-            assert hasattr(step, 'severity')
+            assert hasattr(step, "severity")
             assert step.severity in [
                 SelfTestSeverity.CRITICAL,
                 SelfTestSeverity.WARNING,
@@ -57,7 +57,7 @@ class TestSelfTestSchema:
     def test_all_steps_have_category(self):
         """Every step has category classification."""
         for step in SELFTEST_STEPS:
-            assert hasattr(step, 'category')
+            assert hasattr(step, "category")
             assert step.category in [
                 SelfTestCategory.SECURITY,
                 SelfTestCategory.PERFORMANCE,
@@ -69,10 +69,10 @@ class TestSelfTestSchema:
         """Step.to_dict() includes severity and category."""
         step = SELFTEST_STEPS[0]
         step_dict = step.to_dict()
-        assert 'severity' in step_dict
-        assert 'category' in step_dict
-        assert step_dict['severity'] == step.severity.value
-        assert step_dict['category'] == step.category.value
+        assert "severity" in step_dict
+        assert "category" in step_dict
+        assert step_dict["severity"] == step.severity.value
+        assert step_dict["category"] == step.category.value
 
     def test_validate_step_list_passes(self):
         """Step list validation passes."""
@@ -107,8 +107,14 @@ class TestSelfTestStepDefinition:
         step = SELFTEST_STEPS[0]
         step_dict = step.to_dict()
         required_fields = [
-            'id', 'description', 'tier', 'severity', 'category',
-            'command', 'allow_fail_in_degraded', 'dependencies'
+            "id",
+            "description",
+            "tier",
+            "severity",
+            "category",
+            "command",
+            "allow_fail_in_degraded",
+            "dependencies",
         ]
         for field in required_fields:
             assert field in step_dict, f"Missing field: {field}"
@@ -175,49 +181,59 @@ class TestReportSchema:
     def test_report_metadata_creation(self):
         """Create valid metadata."""
         metadata = SelfTestReportMetadata(
-            run_id='test-run',
+            run_id="test-run",
             timestamp=datetime.now(timezone.utc).isoformat(),
-            hostname='test-host',
-            platform='linux',
-            git_branch='main',
-            git_commit='abc123',
-            user='testuser',
-            mode='strict',
+            hostname="test-host",
+            platform="linux",
+            git_branch="main",
+            git_commit="abc123",
+            user="testuser",
+            mode="strict",
         )
-        assert metadata.run_id == 'test-run'
-        assert metadata.platform == 'linux'
-        assert metadata.mode == 'strict'
+        assert metadata.run_id == "test-run"
+        assert metadata.platform == "linux"
+        assert metadata.mode == "strict"
 
     def test_report_step_result_creation(self):
         """Create valid step result."""
         result = SelfTestStepResult(
-            step_id='core-checks',
-            description='Test step',
-            tier='kernel',
-            severity='critical',
-            category='correctness',
-            status='PASS',
+            step_id="core-checks",
+            description="Test step",
+            tier="kernel",
+            severity="critical",
+            category="correctness",
+            status="PASS",
             exit_code=0,
             duration_ms=1000,
-            command='test',
+            command="test",
             timestamp_start=1234567890.0,
             timestamp_end=1234567891.0,
         )
-        assert result.step_id == 'core-checks'
-        assert result.status == 'PASS'
+        assert result.step_id == "core-checks"
+        assert result.status == "PASS"
         assert result.exit_code == 0
 
     def test_report_summary_creation(self):
         """Create valid summary."""
         summary = SelfTestSummary(
-            passed=8, failed=1, skipped=1, total=10,
-            critical_passed=1, critical_failed=0,
-            warning_passed=5, warning_failed=1,
-            info_passed=2, info_failed=0,
-            category_security_passed=0, category_security_failed=0,
-            category_performance_passed=0, category_performance_failed=0,
-            category_correctness_passed=2, category_correctness_failed=0,
-            category_governance_passed=6, category_governance_failed=1,
+            passed=8,
+            failed=1,
+            skipped=1,
+            total=10,
+            critical_passed=1,
+            critical_failed=0,
+            warning_passed=5,
+            warning_failed=1,
+            info_passed=2,
+            info_failed=0,
+            category_security_passed=0,
+            category_security_failed=0,
+            category_performance_passed=0,
+            category_performance_failed=0,
+            category_correctness_passed=2,
+            category_correctness_failed=0,
+            category_governance_passed=6,
+            category_governance_failed=1,
             total_duration_ms=15000,
         )
         assert summary.passed == 8
@@ -227,78 +243,94 @@ class TestReportSchema:
     def test_report_to_json(self):
         """Report serializes to valid JSON."""
         metadata = SelfTestReportMetadata(
-            run_id='test',
+            run_id="test",
             timestamp=datetime.now(timezone.utc).isoformat(),
-            hostname='test',
-            platform='linux',
-            git_branch='main',
-            git_commit='abc123',
-            user='test',
-            mode='strict',
+            hostname="test",
+            platform="linux",
+            git_branch="main",
+            git_commit="abc123",
+            user="test",
+            mode="strict",
         )
         step_result = SelfTestStepResult(
-            step_id='core-checks',
-            description='Test step',
-            tier='kernel',
-            severity='critical',
-            category='correctness',
-            status='PASS',
+            step_id="core-checks",
+            description="Test step",
+            tier="kernel",
+            severity="critical",
+            category="correctness",
+            status="PASS",
             exit_code=0,
             duration_ms=1000,
-            command='test',
+            command="test",
             timestamp_start=1234567890.0,
             timestamp_end=1234567891.0,
         )
         summary = SelfTestSummary(
-            passed=1, failed=0, skipped=0, total=1,
-            critical_passed=1, critical_failed=0,
-            warning_passed=0, warning_failed=0,
-            info_passed=0, info_failed=0,
-            category_security_passed=0, category_security_failed=0,
-            category_performance_passed=0, category_performance_failed=0,
-            category_correctness_passed=1, category_correctness_failed=0,
-            category_governance_passed=0, category_governance_failed=0,
+            passed=1,
+            failed=0,
+            skipped=0,
+            total=1,
+            critical_passed=1,
+            critical_failed=0,
+            warning_passed=0,
+            warning_failed=0,
+            info_passed=0,
+            info_failed=0,
+            category_security_passed=0,
+            category_security_failed=0,
+            category_performance_passed=0,
+            category_performance_failed=0,
+            category_correctness_passed=1,
+            category_correctness_failed=0,
+            category_governance_passed=0,
+            category_governance_failed=0,
             total_duration_ms=1000,
         )
-        report = SelfTestReport(
-            metadata=metadata,
-            results=[step_result],
-            summary=summary
-        )
+        report = SelfTestReport(metadata=metadata, results=[step_result], summary=summary)
         json_str = report.to_json()
         parsed = json.loads(json_str)
-        assert parsed['metadata']['run_id'] == 'test'
-        assert len(parsed['results']) == 1
-        assert parsed['summary']['total'] == 1
+        assert parsed["metadata"]["run_id"] == "test"
+        assert len(parsed["results"]) == 1
+        assert parsed["summary"]["total"] == 1
 
     def test_report_to_dict(self):
         """Report converts to dict correctly."""
         metadata = SelfTestReportMetadata(
-            run_id='test',
+            run_id="test",
             timestamp=datetime.now(timezone.utc).isoformat(),
-            hostname='test',
-            platform='linux',
-            git_branch='main',
-            git_commit='abc123',
-            user='test',
-            mode='strict',
+            hostname="test",
+            platform="linux",
+            git_branch="main",
+            git_commit="abc123",
+            user="test",
+            mode="strict",
         )
         summary = SelfTestSummary(
-            passed=0, failed=0, skipped=0, total=0,
-            critical_passed=0, critical_failed=0,
-            warning_passed=0, warning_failed=0,
-            info_passed=0, info_failed=0,
-            category_security_passed=0, category_security_failed=0,
-            category_performance_passed=0, category_performance_failed=0,
-            category_correctness_passed=0, category_correctness_failed=0,
-            category_governance_passed=0, category_governance_failed=0,
+            passed=0,
+            failed=0,
+            skipped=0,
+            total=0,
+            critical_passed=0,
+            critical_failed=0,
+            warning_passed=0,
+            warning_failed=0,
+            info_passed=0,
+            info_failed=0,
+            category_security_passed=0,
+            category_security_failed=0,
+            category_performance_passed=0,
+            category_performance_failed=0,
+            category_correctness_passed=0,
+            category_correctness_failed=0,
+            category_governance_passed=0,
+            category_governance_failed=0,
             total_duration_ms=0,
         )
         report = SelfTestReport(metadata=metadata, results=[], summary=summary)
         report_dict = report.to_dict()
-        assert 'metadata' in report_dict
-        assert 'results' in report_dict
-        assert 'summary' in report_dict
+        assert "metadata" in report_dict
+        assert "results" in report_dict
+        assert "summary" in report_dict
 
 
 class TestArtifactManager:
@@ -317,25 +349,25 @@ class TestArtifactManager:
         with tempfile.TemporaryDirectory() as tmpdir:
             mgr = ArtifactManager(Path(tmpdir))
             run_base = mgr.get_run_base()
-            assert 'swarm/runs' in str(run_base)
+            assert "swarm/runs" in str(run_base)
             assert mgr.run_id in str(run_base)
 
     def test_get_artifact_path(self):
         """Get artifact path."""
         with tempfile.TemporaryDirectory() as tmpdir:
             mgr = ArtifactManager(Path(tmpdir))
-            path = mgr.get_artifact_path('build', 'selftest_report.json')
-            assert 'build' in str(path)
-            assert 'selftest_report.json' in str(path)
+            path = mgr.get_artifact_path("build", "selftest_report.json")
+            assert "build" in str(path)
+            assert "selftest_report.json" in str(path)
 
     def test_write_read_artifact_json(self):
         """Write and read JSON artifact."""
         with tempfile.TemporaryDirectory() as tmpdir:
             mgr = ArtifactManager(Path(tmpdir))
             data = {"test": "data", "number": 42}
-            path = mgr.write_artifact('build', 'test.json', data)
+            path = mgr.write_artifact("build", "test.json", data)
             assert path.exists()
-            read_data = mgr.read_artifact('build', 'test.json')
+            read_data = mgr.read_artifact("build", "test.json")
             assert read_data == data
 
     def test_write_read_artifact_text(self):
@@ -343,16 +375,16 @@ class TestArtifactManager:
         with tempfile.TemporaryDirectory() as tmpdir:
             mgr = ArtifactManager(Path(tmpdir))
             text = "Hello, world!"
-            path = mgr.write_artifact('build', 'test.txt', text)
+            path = mgr.write_artifact("build", "test.txt", text)
             assert path.exists()
-            read_text = mgr.read_artifact('build', 'test.txt')
+            read_text = mgr.read_artifact("build", "test.txt")
             assert read_text == text
 
     def test_ensure_artifact_dir(self):
         """Ensure artifact directory is created."""
         with tempfile.TemporaryDirectory() as tmpdir:
             mgr = ArtifactManager(Path(tmpdir))
-            dir_path = mgr.ensure_artifact_dir('build')
+            dir_path = mgr.ensure_artifact_dir("build")
             assert dir_path.exists()
             assert dir_path.is_dir()
 
@@ -360,7 +392,7 @@ class TestArtifactManager:
         """Read nonexistent artifact returns None."""
         with tempfile.TemporaryDirectory() as tmpdir:
             mgr = ArtifactManager(Path(tmpdir))
-            result = mgr.read_artifact('build', 'nonexistent.json')
+            result = mgr.read_artifact("build", "nonexistent.json")
             assert result is None
 
 
@@ -370,80 +402,80 @@ class TestOverrideManager:
     def test_override_creation(self):
         """Create override."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = Path(tmpdir) / 'overrides.json'
+            config_file = Path(tmpdir) / "overrides.json"
             mgr = OverrideManager(config_file)
             override = mgr.create_override(
-                step_id='test-step',
-                reason='Testing',
-                approver='tester',
+                step_id="test-step",
+                reason="Testing",
+                approver="tester",
                 hours=24,
             )
-            assert override.step_id == 'test-step'
-            assert override.status == 'APPROVED'
-            assert override.reason == 'Testing'
-            assert override.approver == 'tester'
+            assert override.step_id == "test-step"
+            assert override.status == "APPROVED"
+            assert override.reason == "Testing"
+            assert override.approver == "tester"
 
     def test_override_is_active(self):
         """Check override is active."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = Path(tmpdir) / 'overrides.json'
+            config_file = Path(tmpdir) / "overrides.json"
             mgr = OverrideManager(config_file)
-            mgr.create_override('test-step', 'Testing', 'tester', 24)
-            assert mgr.is_override_active('test-step')
+            mgr.create_override("test-step", "Testing", "tester", 24)
+            assert mgr.is_override_active("test-step")
 
     def test_override_expires(self):
         """Override expires correctly."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = Path(tmpdir) / 'overrides.json'
+            config_file = Path(tmpdir) / "overrides.json"
             mgr = OverrideManager(config_file)
             # Create override that expires in the past
-            mgr.create_override('test-step', 'Testing', 'tester', -1)
-            assert not mgr.is_override_active('test-step')
+            mgr.create_override("test-step", "Testing", "tester", -1)
+            assert not mgr.is_override_active("test-step")
 
     def test_override_list(self):
         """List overrides."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = Path(tmpdir) / 'overrides.json'
+            config_file = Path(tmpdir) / "overrides.json"
             mgr = OverrideManager(config_file)
-            mgr.create_override('step1', 'Reason1', 'user1', 24)
-            mgr.create_override('step2', 'Reason2', 'user2', 24)
+            mgr.create_override("step1", "Reason1", "user1", 24)
+            mgr.create_override("step2", "Reason2", "user2", 24)
             overrides = mgr.list_overrides()
             assert len(overrides) == 2
 
     def test_override_revoke(self):
         """Revoke override."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = Path(tmpdir) / 'overrides.json'
+            config_file = Path(tmpdir) / "overrides.json"
             mgr = OverrideManager(config_file)
-            mgr.create_override('test-step', 'Testing', 'tester', 24)
-            assert mgr.is_override_active('test-step')
-            success = mgr.revoke_override('test-step')
+            mgr.create_override("test-step", "Testing", "tester", 24)
+            assert mgr.is_override_active("test-step")
+            success = mgr.revoke_override("test-step")
             assert success
-            assert not mgr.is_override_active('test-step')
+            assert not mgr.is_override_active("test-step")
 
     def test_override_revoke_nonexistent(self):
         """Revoke nonexistent override returns False."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = Path(tmpdir) / 'overrides.json'
+            config_file = Path(tmpdir) / "overrides.json"
             mgr = OverrideManager(config_file)
-            success = mgr.revoke_override('nonexistent')
+            success = mgr.revoke_override("nonexistent")
             assert not success
 
     def test_override_replaces_previous(self):
         """New override revokes previous override."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = Path(tmpdir) / 'overrides.json'
+            config_file = Path(tmpdir) / "overrides.json"
             mgr = OverrideManager(config_file)
-            mgr.create_override('test-step', 'Reason1', 'user1', 24)
-            mgr.create_override('test-step', 'Reason2', 'user2', 24)
+            mgr.create_override("test-step", "Reason1", "user1", 24)
+            mgr.create_override("test-step", "Reason2", "user2", 24)
             overrides = mgr.load_overrides()
-            approved_count = sum(1 for o in overrides if o.status == 'APPROVED')
+            approved_count = sum(1 for o in overrides if o.status == "APPROVED")
             assert approved_count == 1
 
     def test_override_load_empty(self):
         """Load empty overrides file."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = Path(tmpdir) / 'overrides.json'
+            config_file = Path(tmpdir) / "overrides.json"
             mgr = OverrideManager(config_file)
             overrides = mgr.load_overrides()
             assert overrides == []
@@ -451,9 +483,9 @@ class TestOverrideManager:
     def test_override_timestamps_iso_format(self):
         """Override timestamps are ISO format."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = Path(tmpdir) / 'overrides.json'
+            config_file = Path(tmpdir) / "overrides.json"
             mgr = OverrideManager(config_file)
-            override = mgr.create_override('test-step', 'Testing', 'tester', 24)
+            override = mgr.create_override("test-step", "Testing", "tester", 24)
             # Should be able to parse as ISO format
             created = datetime.fromisoformat(override.created_at)
             expires = datetime.fromisoformat(override.expires_at)
@@ -467,35 +499,35 @@ class TestSelfTestDoctor:
         """Run doctor diagnostics."""
         doctor = SelfTestDoctor()
         results = doctor.diagnose()
-        assert 'harness' in results
-        assert 'service' in results
-        assert 'summary' in results
-        assert 'recommendations' in results
-        assert results['summary'] in ['HEALTHY', 'HARNESS_ISSUE', 'SERVICE_ISSUE']
+        assert "harness" in results
+        assert "service" in results
+        assert "summary" in results
+        assert "recommendations" in results
+        assert results["summary"] in ["HEALTHY", "HARNESS_ISSUE", "SERVICE_ISSUE"]
 
     def test_doctor_harness_checks(self):
         """Doctor includes harness checks."""
         doctor = SelfTestDoctor()
         results = doctor.diagnose()
-        assert 'python_env' in results['harness']
-        assert 'rust_toolchain' in results['harness']
-        assert 'git_state' in results['harness']
+        assert "python_env" in results["harness"]
+        assert "rust_toolchain" in results["harness"]
+        assert "git_state" in results["harness"]
 
     def test_doctor_service_checks(self):
         """Doctor includes service checks."""
         doctor = SelfTestDoctor()
         results = doctor.diagnose()
-        assert 'python_syntax' in results['service']
-        assert 'cargo_check' in results['service']
+        assert "python_syntax" in results["service"]
+        assert "cargo_check" in results["service"]
 
     def test_doctor_check_values_valid(self):
         """Doctor check values are valid."""
         doctor = SelfTestDoctor()
         results = doctor.diagnose()
-        valid_values = ['OK', 'ERROR', 'WARNING']
-        for _, check_status in results['harness'].items():
+        valid_values = ["OK", "ERROR", "WARNING"]
+        for _, check_status in results["harness"].items():
             assert check_status in valid_values
-        for _, check_status in results['service'].items():
+        for _, check_status in results["service"].items():
             assert check_status in valid_values
 
 
@@ -505,7 +537,7 @@ class TestArtifactManagerHelpers:
     def test_get_platform_name(self):
         """Get platform name."""
         platform = get_platform_name()
-        assert platform in ['linux', 'darwin', 'win32']
+        assert platform in ["linux", "darwin", "win32"]
 
     def test_get_hostname(self):
         """Get hostname."""
@@ -557,29 +589,29 @@ class TestStepRegistry:
         """get_steps_in_order() works correctly."""
         steps = get_steps_in_order()
         assert len(steps) == 10
-        assert steps[0].id == 'core-checks'
+        assert steps[0].id == "core-checks"
 
     def test_steps_in_order_until_id(self):
         """get_steps_in_order() filters by until_id."""
-        steps = get_steps_in_order(until_id='devex-contract')
+        steps = get_steps_in_order(until_id="devex-contract")
         assert len(steps) == 7
-        assert steps[-1].id == 'devex-contract'
+        assert steps[-1].id == "devex-contract"
 
     def test_steps_in_order_filter_tier(self):
         """get_steps_in_order() filters by tier."""
         steps = get_steps_in_order(filter_tier=SelfTestTier.KERNEL)
         assert len(steps) == 1
-        assert steps[0].id == 'core-checks'
+        assert steps[0].id == "core-checks"
 
     def test_get_step_by_id(self):
         """get_step_by_id() retrieves steps."""
-        step = get_step_by_id('core-checks')
+        step = get_step_by_id("core-checks")
         assert step is not None
-        assert step.id == 'core-checks'
+        assert step.id == "core-checks"
 
     def test_get_step_by_id_nonexistent(self):
         """get_step_by_id() returns None for nonexistent step."""
-        step = get_step_by_id('nonexistent-step')
+        step = get_step_by_id("nonexistent-step")
         assert step is None
 
     def test_steps_have_valid_dependencies(self):
@@ -599,40 +631,50 @@ class TestIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             mgr = ArtifactManager(Path(tmpdir))
             metadata = SelfTestReportMetadata(
-                run_id='integration-test',
+                run_id="integration-test",
                 timestamp=datetime.now(timezone.utc).isoformat(),
-                hostname='test',
-                platform='linux',
-                git_branch='main',
-                git_commit='abc123',
-                user='test',
-                mode='strict',
+                hostname="test",
+                platform="linux",
+                git_branch="main",
+                git_commit="abc123",
+                user="test",
+                mode="strict",
             )
             summary = SelfTestSummary(
-                passed=1, failed=0, skipped=0, total=1,
-                critical_passed=1, critical_failed=0,
-                warning_passed=0, warning_failed=0,
-                info_passed=0, info_failed=0,
-                category_security_passed=0, category_security_failed=0,
-                category_performance_passed=0, category_performance_failed=0,
-                category_correctness_passed=1, category_correctness_failed=0,
-                category_governance_passed=0, category_governance_failed=0,
+                passed=1,
+                failed=0,
+                skipped=0,
+                total=1,
+                critical_passed=1,
+                critical_failed=0,
+                warning_passed=0,
+                warning_failed=0,
+                info_passed=0,
+                info_failed=0,
+                category_security_passed=0,
+                category_security_failed=0,
+                category_performance_passed=0,
+                category_performance_failed=0,
+                category_correctness_passed=1,
+                category_correctness_failed=0,
+                category_governance_passed=0,
+                category_governance_failed=0,
                 total_duration_ms=1000,
             )
             report = SelfTestReport(metadata=metadata, results=[], summary=summary)
             report_dict = report.to_dict()
-            mgr.write_artifact('build', 'selftest_report.json', report_dict)
-            retrieved = mgr.read_artifact('build', 'selftest_report.json')
+            mgr.write_artifact("build", "selftest_report.json", report_dict)
+            retrieved = mgr.read_artifact("build", "selftest_report.json")
             assert retrieved == report_dict
 
     def test_override_manager_with_steps(self):
         """OverrideManager works with actual steps."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = Path(tmpdir) / 'overrides.json'
+            config_file = Path(tmpdir) / "overrides.json"
             mgr = OverrideManager(config_file)
             # Create override for first actual step
             first_step = SELFTEST_STEPS[0]
-            mgr.create_override(first_step.id, 'Testing', 'tester', 24)
+            mgr.create_override(first_step.id, "Testing", "tester", 24)
             assert mgr.is_override_active(first_step.id)
 
     def test_step_execution_sequence(self):
@@ -655,5 +697,5 @@ class TestIntegration:
                     assert dep_index < current_index
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

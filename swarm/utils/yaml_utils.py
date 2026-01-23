@@ -1,5 +1,6 @@
 # swarm/utils/yaml_utils.py
 """YAML loading utilities with optimized loader selection."""
+
 from typing import IO, Any, Union
 
 import yaml

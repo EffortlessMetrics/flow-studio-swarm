@@ -36,6 +36,7 @@ from fastapi.testclient import TestClient
 def fastapi_client():
     """Create FastAPI test client."""
     from swarm.tools.flow_studio_fastapi import app
+
     return TestClient(app)
 
 
@@ -66,9 +67,7 @@ class TestSelfTestModalUIIntegration:
         if resp.status_code == 503:
             pytest.skip("Selftest module not available (503)")
 
-        assert resp.status_code == 200, (
-            f"Expected 200, got {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
         # Act: Parse JSON
         data = resp.json()
@@ -116,9 +115,7 @@ class TestSelfTestModalUIIntegration:
         if resp.status_code == 503:
             pytest.skip("Selftest module not available (503)")
 
-        assert resp.status_code == 200, (
-            f"Expected 200, got {resp.status_code}"
-        )
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
         # Act: Parse JSON
         data = resp.json()
@@ -174,9 +171,7 @@ class TestSelfTestModalUIIntegration:
         if resp.status_code == 503:
             pytest.skip("Selftest module not available (503)")
 
-        assert resp.status_code == 200, (
-            f"Expected 200, got {resp.status_code}"
-        )
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
         # Act: Parse JSON
         data = resp.json()
@@ -198,19 +193,16 @@ class TestSelfTestModalUIIntegration:
                 # Assert: Command doesn't contain shell metacharacters
                 # (step_id should be alphanumeric/dash only)
                 import re
+
                 assert re.match(r"^[a-zA-Z0-9\-_\./ ]+$", command), (
                     f"Command contains suspicious characters: {command}"
                 )
 
                 # Assert: Command contains the step ID
-                assert step_id in command, (
-                    f"Generated command doesn't include step ID: {command}"
-                )
+                assert step_id in command, f"Generated command doesn't include step ID: {command}"
 
             except Exception as e:
-                pytest.fail(
-                    f"copyAndRun would crash on step '{step_id}': {e}"
-                )
+                pytest.fail(f"copyAndRun would crash on step '{step_id}': {e}")
 
         # Assert: Modal can handle full list of steps
         assert len(steps) > 0, "Modal should have steps to render"
@@ -235,9 +227,7 @@ class TestSelfTestModalUIIntegration:
         if resp.status_code == 503:
             pytest.skip("Selftest module not available (503)")
 
-        assert resp.status_code == 200, (
-            f"Expected 200, got {resp.status_code}"
-        )
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
         # Act: Parse JSON
         data = resp.json()
@@ -250,6 +240,7 @@ class TestSelfTestModalUIIntegration:
 
             # Assert: ID is safe for HTML attributes (alphanumeric, dash, underscore)
             import re
+
             assert re.match(r"^[a-zA-Z0-9\-_]+$", step_id), (
                 f"Step ID '{step_id}' contains characters unsafe for HTML attributes"
             )
@@ -260,6 +251,7 @@ class TestSelfTestModalUIIntegration:
             if "<" in description or ">" in description:
                 # Only allow if it's part of escaped content like &lt; or &gt;
                 import html
+
                 # Check that if we decode entities, we don't get raw HTML
                 decoded = html.unescape(description)
                 assert "<" not in decoded or "&lt;" in description, (
@@ -270,6 +262,4 @@ class TestSelfTestModalUIIntegration:
             assert isinstance(description, str), (
                 f"Step description should be string, got {type(description)}"
             )
-            assert len(description) > 0, (
-                f"Step description is empty for '{step_id}'"
-            )
+            assert len(description) > 0, f"Step description is empty for '{step_id}'"

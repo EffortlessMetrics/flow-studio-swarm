@@ -23,7 +23,6 @@ if str(repo_root) not in sys.path:
 from swarm.runtime.engines import ClaudeStepEngine, StepContext
 from swarm.runtime.types import RunSpec
 
-
 # Skip if no API key available
 pytestmark = pytest.mark.skipif(
     not os.environ.get("ANTHROPIC_API_KEY"),
@@ -97,6 +96,7 @@ class TestClaudeSDKSmoke:
 
         # Parse and validate receipt
         import json
+
         with open(receipt_path) as f:
             receipt = json.load(f)
 
@@ -129,6 +129,7 @@ class TestClaudeSDKSmoke:
 
         # Parse and validate JSONL
         import json
+
         with open(transcript_path) as f:
             lines = [line.strip() for line in f if line.strip()]
 
@@ -157,6 +158,7 @@ class TestClaudeSDKSmoke:
 
         # Load receipt and check tokens
         import json
+
         receipt_path = run_base / "receipts" / "smoke_test-test-agent.json"
         with open(receipt_path) as f:
             receipt = json.load(f)

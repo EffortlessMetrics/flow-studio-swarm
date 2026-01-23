@@ -30,6 +30,7 @@ from swarm.utils.yaml_utils import load_yaml
 @dataclass
 class FlowSummary:
     """Summary of a single flow for list view."""
+
     key: str
     title: str
     description: str
@@ -42,6 +43,7 @@ class FlowSummary:
 @dataclass
 class GraphPayload:
     """Graph data for visualization (nodes and edges)."""
+
     nodes: List[Dict[str, Any]] = field(default_factory=list)
     edges: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -52,6 +54,7 @@ class GraphPayload:
 @dataclass
 class FlowStatusDetail:
     """Status summary for a single flow in a run."""
+
     status: str  # "complete", "partial", "missing", "not_started", "n/a"
     required_present: int = 0
     required_total: int = 0
@@ -67,6 +70,7 @@ class FlowStatusDetail:
 @dataclass
 class RunSummary:
     """Summary of a complete run with all flow statuses."""
+
     run_id: str
     run_type: str  # "active" or "example"
     path: str
@@ -79,6 +83,7 @@ class RunSummary:
 @dataclass
 class ValidationSnapshot:
     """Snapshot of validation/governance status."""
+
     timestamp: str
     service: str
     governance: Dict[str, Any] = field(default_factory=dict)
@@ -119,25 +124,25 @@ class FlowStudioCore:
 
     def _get_repo_root(self) -> Path:
         """Get repository root path."""
-        if self.config and hasattr(self.config, 'repo_root'):
+        if self.config and hasattr(self.config, "repo_root"):
             return Path(self.config.repo_root)
         return Path(__file__).resolve().parents[2]
 
     def _get_agents_dir(self) -> Path:
         """Get agents config directory."""
-        if self.config and hasattr(self.config, 'agents_dir'):
+        if self.config and hasattr(self.config, "agents_dir"):
             return Path(self.config.agents_dir)
         return self._get_repo_root() / "swarm" / "config" / "agents"
 
     def _get_flows_dir(self) -> Path:
         """Get flows config directory."""
-        if self.config and hasattr(self.config, 'flows_dir'):
+        if self.config and hasattr(self.config, "flows_dir"):
             return Path(self.config.flows_dir)
         return self._get_repo_root() / "swarm" / "config" / "flows"
 
     def _get_tours_dir(self) -> Path:
         """Get tours config directory."""
-        if self.config and hasattr(self.config, 'tours_dir'):
+        if self.config and hasattr(self.config, "tours_dir"):
             return Path(self.config.tours_dir)
         return self._get_repo_root() / "swarm" / "config" / "tours"
 
@@ -187,12 +192,14 @@ class FlowStudioCore:
                 for a in raw.get("agents") or []:
                     if isinstance(a, str):
                         agents_list.append(a.strip())
-                steps.append({
-                    "id": sid,
-                    "title": stitle,
-                    "role": role,
-                    "agents": agents_list,
-                })
+                steps.append(
+                    {
+                        "id": sid,
+                        "title": stitle,
+                        "role": role,
+                        "agents": agents_list,
+                    }
+                )
 
             flows[key] = {
                 "key": key,
@@ -255,12 +262,14 @@ class FlowStudioCore:
 
         flows: List[FlowSummary] = []
         for flow_data in self._flows_cache.values():
-            flows.append(FlowSummary(
-                key=flow_data["key"],
-                title=flow_data["title"],
-                description=flow_data["description"],
-                step_count=len(flow_data.get("steps", [])),
-            ))
+            flows.append(
+                FlowSummary(
+                    key=flow_data["key"],
+                    title=flow_data["title"],
+                    description=flow_data["description"],
+                    step_count=len(flow_data.get("steps", [])),
+                )
+            )
         return flows
 
     def get_flow_graph(self, flow_key: str) -> GraphPayload:
@@ -291,30 +300,34 @@ class FlowStudioCore:
         # Step nodes
         for idx, step in enumerate(flow.get("steps", [])):
             nid = f"step:{flow_key}:{step['id']}"
-            nodes.append({
-                "data": {
-                    "id": nid,
-                    "label": step["title"],
-                    "type": "step",
-                    "flow": flow_key,
-                    "step_id": step["id"],
-                    "order": idx,
+            nodes.append(
+                {
+                    "data": {
+                        "id": nid,
+                        "label": step["title"],
+                        "type": "step",
+                        "flow": flow_key,
+                        "step_id": step["id"],
+                        "order": idx,
+                    }
                 }
-            })
+            )
 
         # Step ordering edges
         steps = flow.get("steps", [])
         for i in range(len(steps) - 1):
             a = steps[i]
             b = steps[i + 1]
-            edges.append({
-                "data": {
-                    "id": f"edge:step:{a['id']}->{b['id']}",
-                    "source": f"step:{flow_key}:{a['id']}",
-                    "target": f"step:{flow_key}:{b['id']}",
-                    "type": "step-sequence",
+            edges.append(
+                {
+                    "data": {
+                        "id": f"edge:step:{a['id']}->{b['id']}",
+                        "source": f"step:{flow_key}:{a['id']}",
+                        "target": f"step:{flow_key}:{b['id']}",
+                        "type": "step-sequence",
+                    }
                 }
-            })
+            )
 
         # Agent nodes + step->agent edges
         seen_agents: Dict[str, bool] = {}
@@ -350,14 +363,16 @@ class FlowStudioCore:
                         }
                         nodes.append({"data": node_data})
 
-                edges.append({
-                    "data": {
-                        "id": f"edge:step:{step['id']}->agent:{agent_key}",
-                        "source": step_node_id,
-                        "target": f"agent:{agent_key}",
-                        "type": "step-agent",
+                edges.append(
+                    {
+                        "data": {
+                            "id": f"edge:step:{step['id']}->agent:{agent_key}",
+                            "source": step_node_id,
+                            "target": f"agent:{agent_key}",
+                            "type": "step-agent",
+                        }
                     }
-                })
+                )
 
         return GraphPayload(nodes=nodes, edges=edges)
 
@@ -374,6 +389,7 @@ class FlowStudioCore:
         # Try to use RunService for unified run listing
         try:
             from swarm.runtime.service import RunService
+
             repo_root = self._get_repo_root()
             service = RunService.get_instance(repo_root)
             summaries = service.list_runs(
@@ -414,6 +430,7 @@ class FlowStudioCore:
             try:
                 if self._run_inspector is None:
                     from swarm.tools.run_inspector import RunInspector
+
                     repo_root = self._get_repo_root()
                     self._run_inspector = RunInspector(repo_root=repo_root)
 
@@ -435,6 +452,7 @@ class FlowStudioCore:
         try:
             if self._run_inspector is None:
                 from swarm.tools.run_inspector import RunInspector
+
                 repo_root = self._get_repo_root()
                 self._run_inspector = RunInspector(repo_root=repo_root)
 
@@ -496,6 +514,7 @@ class FlowStudioCore:
         try:
             if self._status_provider is None:
                 from swarm.tools.status_provider import StatusProvider
+
                 repo_root = self._get_repo_root()
                 # Use default TTL from env var (5 min for UI, set lower for CI)
                 self._status_provider = StatusProvider(repo_root=repo_root)
@@ -506,12 +525,13 @@ class FlowStudioCore:
                 timestamp=status.timestamp,
                 service=status.service,
                 governance=status.governance,
-                flows=status.flows if hasattr(status, 'flows') else {},
-                agents=status.agents if hasattr(status, 'agents') else {},
-                hints=status.hints if hasattr(status, 'hints') else {},
+                flows=status.flows if hasattr(status, "flows") else {},
+                agents=status.agents if hasattr(status, "agents") else {},
+                hints=status.hints if hasattr(status, "hints") else {},
             )
         except ImportError:
             from datetime import datetime, timezone
+
             return ValidationSnapshot(
                 timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 service="flow-studio",

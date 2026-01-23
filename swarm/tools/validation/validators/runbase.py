@@ -11,8 +11,8 @@ Checks:
 
 import re
 
+from swarm.tools.validation.helpers import FLOW_SPECS_DIR, ROOT
 from swarm.validator import ValidationResult
-from swarm.tools.validation.helpers import ROOT, FLOW_SPECS_DIR
 
 
 def validate_runbase_paths() -> ValidationResult:
@@ -38,7 +38,9 @@ def validate_runbase_paths() -> ValidationResult:
     # - {RUN_BASE} (template variable syntax without slash)
     # - RUN_BASE without trailing slash (e.g., RUN_BASEsignal)
     # - run_base or run-base (lowercase or hyphenated, case-sensitive check)
-    malformed_runbase = re.compile(r"(\$RUN_BASE|RUN_BASE\}|RUN_BASE[a-zA-Z_]|\{RUN_BASE[^/]|run_base/)")
+    malformed_runbase = re.compile(
+        r"(\$RUN_BASE|RUN_BASE\}|RUN_BASE[a-zA-Z_]|\{RUN_BASE[^/]|run_base/)"
+    )
 
     for flow_path in sorted(FLOW_SPECS_DIR.glob("*.md")):
         if flow_path.is_symlink():
@@ -73,7 +75,7 @@ def validate_runbase_paths() -> ValidationResult:
                     "contains hardcoded path 'swarm/runs/<run-id>/'; should use RUN_BASE placeholder",
                     "Replace hardcoded path with 'RUN_BASE/<flow>/' in artifact instructions",
                     line_number=i,
-                    file_path=str(flow_path)
+                    file_path=str(flow_path),
                 )
 
             # Check for malformed RUN_BASE - iterate over all matches to include actual text
@@ -85,7 +87,7 @@ def validate_runbase_paths() -> ValidationResult:
                     f"malformed RUN_BASE placeholder '{bad_text}' (should be 'RUN_BASE/<flow>/', not '$RUN_BASE', '{{RUN_BASE}}', or 'RUN_BASEsignal')",
                     "Use 'RUN_BASE/<flow>/' with forward slash; valid examples: RUN_BASE/signal/, RUN_BASE/plan/, RUN_BASE/build/",
                     line_number=i,
-                    file_path=str(flow_path)
+                    file_path=str(flow_path),
                 )
 
     return result

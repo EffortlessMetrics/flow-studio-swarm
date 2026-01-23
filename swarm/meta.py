@@ -17,7 +17,7 @@ Usage:
 import sys
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 # Ensure swarm/tools is importable
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -54,7 +54,7 @@ def _count_skills() -> List[str]:
 def _get_selftest_tiers() -> Dict[str, int]:
     """Get selftest step counts by tier from selftest_config.py."""
     try:
-        from selftest_config import SELFTEST_STEPS, SelfTestTier
+        from selftest_config import SELFTEST_STEPS
 
         tiers = {"KERNEL": 0, "GOVERNANCE": 0, "OPTIONAL": 0}
         for step in SELFTEST_STEPS:
@@ -71,6 +71,7 @@ def _get_selftest_steps() -> List[Dict[str, Any]]:
     """Get selftest step details from selftest_config.py."""
     try:
         from selftest_config import SELFTEST_STEPS
+
         return [step.to_dict() for step in SELFTEST_STEPS]
     except ImportError:
         return []

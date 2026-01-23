@@ -15,7 +15,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VENDOR_DIR = REPO_ROOT / "docs" / "vendor" / "anthropic" / "agent-sdk" / "python"
 REFERENCE_MD = VENDOR_DIR / "REFERENCE.md"
@@ -80,33 +79,25 @@ class TestVendorFilesExist:
         """Verify VERSION.json exists."""
         version_file = VERSION_JSON
         if not version_file.exists():
-            pytest.skip(
-                "VERSION.json not present. Run 'make vendor-agent-sdk' to generate."
-            )
+            pytest.skip("VERSION.json not present. Run 'make vendor-agent-sdk' to generate.")
 
     def test_api_manifest_exists(self):
         """Verify API_MANIFEST.json exists."""
         api_file = VENDOR_DIR / "API_MANIFEST.json"
         if not api_file.exists():
-            pytest.skip(
-                "API_MANIFEST.json not present. Run 'make vendor-agent-sdk' to generate."
-            )
+            pytest.skip("API_MANIFEST.json not present. Run 'make vendor-agent-sdk' to generate.")
 
     def test_tools_manifest_exists(self):
         """Verify TOOLS_MANIFEST.json exists."""
         tools_file = TOOLS_MANIFEST_JSON
         if not tools_file.exists():
-            pytest.skip(
-                "TOOLS_MANIFEST.json not present. Run 'make vendor-agent-sdk' to generate."
-            )
+            pytest.skip("TOOLS_MANIFEST.json not present. Run 'make vendor-agent-sdk' to generate.")
 
     def test_mapping_json_exists(self):
         """Verify MAPPING.json exists."""
         mapping_file = VENDOR_DIR / "MAPPING.json"
         if not mapping_file.exists():
-            pytest.skip(
-                "MAPPING.json not present. Add adapter mapping for SDK symbols."
-            )
+            pytest.skip("MAPPING.json not present. Add adapter mapping for SDK symbols.")
 
 
 # =============================================================================
@@ -414,6 +405,7 @@ class TestVendorScript:
     def test_vendor_script_importable(self):
         """Verify vendor script can be imported."""
         import sys
+
         sys.path.insert(0, str(REPO_ROOT / "swarm" / "tools"))
         try:
             import vendor_agent_sdk  # noqa: F401
@@ -425,6 +417,7 @@ class TestVendorScript:
     def test_vendor_script_has_commands(self):
         """Verify vendor script exposes expected functions."""
         import sys
+
         sys.path.insert(0, str(REPO_ROOT / "swarm" / "tools"))
         try:
             import vendor_agent_sdk

@@ -22,7 +22,8 @@ class TestLegacyImports:
         """The shim file should export main()."""
         # Import through the shim path
         import swarm.tools.validate_swarm as shim
-        assert hasattr(shim, 'main')
+
+        assert hasattr(shim, "main")
         assert callable(shim.main)
 
 
@@ -32,11 +33,12 @@ class TestModularImports:
     def test_public_api_exports(self):
         """The validation package should export its public API."""
         from swarm.tools.validation import (
-            main,
-            run_validation,
             ValidatorRunner,
+            main,
             parse_agents_registry,
+            run_validation,
         )
+
         assert callable(main)
         assert callable(run_validation)
         assert callable(parse_agents_registry)
@@ -47,13 +49,14 @@ class TestModularImports:
         """Constants should be importable."""
         from swarm.tools.validation.constants import (
             BUILT_IN_AGENTS,
-            VALID_MODELS,
-            VALID_COLORS,
-            ROLE_FAMILY_COLOR_MAP,
+            EXIT_FATAL_ERROR,
             EXIT_SUCCESS,
             EXIT_VALIDATION_FAILED,
-            EXIT_FATAL_ERROR,
+            ROLE_FAMILY_COLOR_MAP,
+            VALID_COLORS,
+            VALID_MODELS,
         )
+
         assert isinstance(BUILT_IN_AGENTS, list)
         assert isinstance(VALID_MODELS, list)
         assert isinstance(VALID_COLORS, list)
@@ -65,15 +68,12 @@ class TestModularImports:
     def test_helpers_importable(self):
         """Helpers should be importable."""
         from swarm.tools.validation.helpers import (
-            safe_get_stripped,
-            find_repo_root,
-            ROOT,
             AGENTS_MD,
-            FLOW_SPECS_DIR,
-            FLOWS_CONFIG_DIR,
-            AGENTS_DIR,
-            SKILLS_DIR,
+            ROOT,
+            find_repo_root,
+            safe_get_stripped,
         )
+
         assert callable(safe_get_stripped)
         assert callable(find_repo_root)
         assert isinstance(ROOT, Path)
@@ -85,6 +85,7 @@ class TestModularImports:
             parse_agents_registry,
             parse_config_files,
         )
+
         assert callable(parse_agents_registry)
         assert callable(parse_config_files)
 
@@ -94,6 +95,7 @@ class TestModularImports:
             get_modified_files,
             should_check_file,
         )
+
         assert callable(get_modified_files)
         assert callable(should_check_file)
 
@@ -101,16 +103,17 @@ class TestModularImports:
         """All validators should be importable."""
         from swarm.tools.validation.validators import (
             validate_bijection,
-            validate_frontmatter,
+            validate_capability_registry,
             validate_colors,
             validate_config_coverage,
             validate_flow_references,
-            validate_skills,
-            validate_runbase_paths,
-            validate_prompt_sections,
+            validate_frontmatter,
             validate_microloop_phrases,
-            validate_capability_registry,
+            validate_prompt_sections,
+            validate_runbase_paths,
+            validate_skills,
         )
+
         # All should be callable
         for fn in [
             validate_bijection,
@@ -130,13 +133,14 @@ class TestModularImports:
         """Flow validators should be importable."""
         from swarm.tools.validation.validators.flows import (
             parse_flow_config,
-            validate_no_empty_flows,
-            validate_no_agentless_steps,
             validate_flow_agent_validity,
             validate_flow_documentation_completeness,
             validate_flow_studio_sync,
+            validate_no_agentless_steps,
+            validate_no_empty_flows,
             validate_utility_flow_graphs,
         )
+
         for fn in [
             parse_flow_config,
             validate_no_empty_flows,
@@ -153,10 +157,11 @@ class TestModularImports:
         from swarm.tools.validation.reporting import (
             build_report_json,
             build_report_markdown,
-            print_success,
             print_errors,
             print_json_output,
+            print_success,
         )
+
         for fn in [
             build_report_json,
             build_report_markdown,
@@ -172,6 +177,7 @@ class TestModularImports:
             ValidatorRunner,
             run_validation,
         )
+
         assert isinstance(ValidatorRunner, type)
         assert callable(run_validation)
 

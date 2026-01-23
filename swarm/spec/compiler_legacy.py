@@ -25,27 +25,23 @@ import hashlib
 import json
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from swarm.config.model_registry import resolve_station_model
 from swarm.config.tool_profiles import resolve_tool_profile
 
-from .loader import load_flow, load_fragment, load_station
-from .types import (
-    FlowSpec,
-    FlowStep,
-    HandoffContract,
-    PromptPlan,
-    RoutingKind,
-    StationSpec,
-    VerificationRequirements,
+from .compiler.facade import (
+    FlowNode,
+    MultiStepPromptPlan,
+    SpecCompiler,
+    StepTemplate,
+    extract_flow_key,
 )
 from .compiler.models import (
-    COMPILER_VERSION,
     CompileContext,
     FragmentReference,
     StepIntent,
@@ -53,18 +49,17 @@ from .compiler.models import (
     _dedupe_preserve_order,
 )
 from .compiler.prompt_parts import (
-    CLAUDE_CODE_PRESET,
     SYSTEM_PRESETS,
-    build_system_append,
-    build_system_append_v2,
     render_template,
 )
-from .compiler.facade import (
-    FlowNode,
-    MultiStepPromptPlan,
-    SpecCompiler,
-    StepTemplate,
-    extract_flow_key,
+from .loader import load_flow, load_fragment, load_station
+from .types import (
+    FlowSpec,
+    FlowStep,
+    HandoffContract,
+    PromptPlan,
+    StationSpec,
+    VerificationRequirements,
 )
 
 if TYPE_CHECKING:
@@ -142,7 +137,9 @@ def build_user_prompt(
             parts.append("## Previous Steps\n")
             for env in context_pack.previous_envelopes[-5:]:  # Last 5 envelopes
                 status = env.status.upper() if env.status else "?"
-                parts.append(f"- **{env.step_id}** [{status}]: {env.summary[:200] if env.summary else 'No summary'}")
+                parts.append(
+                    f"- **{env.step_id}** [{status}]: {env.summary[:200] if env.summary else 'No summary'}"
+                )
             parts.append("")
 
     variables = {
@@ -165,9 +162,7 @@ def build_user_prompt(
 
     # 4. Input/Output requirements
     # Merge station IO with step-specific overrides
-    required_inputs = _dedupe_preserve_order(
-        list(station.io.required_inputs) + list(step.inputs)
-    )
+    required_inputs = _dedupe_preserve_order(list(station.io.required_inputs) + list(step.inputs))
     required_outputs = _dedupe_preserve_order(
         list(station.io.required_outputs) + list(step.outputs)
     )
@@ -585,9 +580,9 @@ class _LegacySpecCompiler:
         parts: List[str] = []
 
         # 1. Claude preset (if custom)
-        preset = getattr(station.identity, 'preset', 'default')
+        preset = getattr(station.identity, "preset", "default")
         if preset == "custom":
-            preset_content = getattr(station.identity, 'preset_content', '')
+            preset_content = getattr(station.identity, "preset_content", "")
             if preset_content:
                 parts.append(preset_content)
         elif preset in SYSTEM_PRESETS:
@@ -971,11 +966,13 @@ class _LegacySpecCompiler:
             try:
                 content = load_fragment(frag_path, repo_root)
                 content_hash = hashlib.sha256(content.encode()).hexdigest()[:12]
-                refs.append(FragmentReference(
-                    path=frag_path,
-                    hash=content_hash,
-                    version="",
-                ))
+                refs.append(
+                    FragmentReference(
+                        path=frag_path,
+                        hash=content_hash,
+                        version="",
+                    )
+                )
             except FileNotFoundError:
                 logger.warning("Fragment not found for audit: %s", frag_path)
 
@@ -1004,6 +1001,7 @@ class _LegacySpecCompiler:
 
         try:
             from swarm.utils.yaml_utils import load_yaml
+
             with open(template_path, "r", encoding="utf-8") as f:
                 data = load_yaml(f)
 
@@ -1070,9 +1068,7 @@ class _LegacySpecCompiler:
             spec_hashes.append(step_plan.prompt_hash)
 
         # Compute overall spec hash
-        spec_hash = hashlib.sha256(
-            "".join(spec_hashes).encode()
-        ).hexdigest()[:16]
+        spec_hash = hashlib.sha256("".join(spec_hashes).encode()).hexdigest()[:16]
 
         return MultiStepPromptPlan(
             flow_id=flow_id,
@@ -1110,6 +1106,7 @@ class _LegacyMultiStepPromptPlan:
     This represents the output of compile_flow() and contains all the
     StepPlans needed to execute a flow sequentially.
     """
+
     flow_id: str
     steps: List[StepPlan]
     spec_hash: str  # Hash of all source specs
@@ -1185,6 +1182,7 @@ class TemplateMetadata:
     This is a lightweight structure returned by list_templates() for
     UI rendering without loading the full template specification.
     """
+
     id: str
     name: str
     description: str
@@ -1207,6 +1205,7 @@ class ExpandedTemplate:
 
     Templates are UI ergonomics, not runtime magic.
     """
+
     station_id: str
     objective: str
     routing: Dict[str, Any]
@@ -1232,7 +1231,7 @@ def _get_template_dirs(repo_root: Optional[Path] = None) -> List[Path]:
 
     dirs = [
         repo_root / "swarm" / "specs" / "templates",  # Primary: JSON templates
-        repo_root / "swarm" / "spec" / "templates",   # Legacy: YAML templates
+        repo_root / "swarm" / "spec" / "templates",  # Legacy: YAML templates
     ]
 
     return [d for d in dirs if d.exists()]
@@ -1253,6 +1252,7 @@ def _load_template_file(template_path: Path) -> Optional[Dict[str, Any]]:
                 return json.load(f)
         elif template_path.suffix in (".yaml", ".yml"):
             from swarm.utils.yaml_utils import load_yaml
+
             with open(template_path, "r", encoding="utf-8") as f:
                 return load_yaml(f)
         else:
@@ -1351,16 +1351,18 @@ def list_templates(
                 # Extract UI defaults
                 ui = data.get("ui", data.get("ui_defaults", {}))
 
-                templates.append(TemplateMetadata(
-                    id=template_id,
-                    name=data.get("name", data.get("title", template_id)),
-                    description=data.get("description", ""),
-                    category=template_category,
-                    station_id=data.get("station_id", ""),
-                    tags=template_tags,
-                    version=data.get("version", 1),
-                    ui=ui,
-                ))
+                templates.append(
+                    TemplateMetadata(
+                        id=template_id,
+                        name=data.get("name", data.get("title", template_id)),
+                        description=data.get("description", ""),
+                        category=template_category,
+                        station_id=data.get("station_id", ""),
+                        tags=template_tags,
+                        version=data.get("version", 1),
+                        ui=ui,
+                    )
+                )
 
     # Sort by category, then palette_order, then name
     def sort_key(t: TemplateMetadata) -> tuple:
@@ -1424,11 +1426,14 @@ def expand_template(
     objective = render_template(default_objective, resolved_params)
 
     # Get routing defaults
-    routing = template_data.get("routing_defaults", {
-        "kind": "linear",
-        "on_verified": "advance",
-        "on_unverified": "advance_with_concerns",
-    })
+    routing = template_data.get(
+        "routing_defaults",
+        {
+            "kind": "linear",
+            "on_verified": "advance",
+            "on_unverified": "advance_with_concerns",
+        },
+    )
 
     # Get IO schema
     io_schema = template_data.get("io_schema", {})
@@ -1439,12 +1444,10 @@ def expand_template(
 
     # Resolve any template variables in IO paths
     io["additional_inputs"] = [
-        render_template(path, {"params": resolved_params})
-        for path in io["additional_inputs"]
+        render_template(path, {"params": resolved_params}) for path in io["additional_inputs"]
     ]
     io["additional_outputs"] = [
-        render_template(path, {"params": resolved_params})
-        for path in io["additional_outputs"]
+        render_template(path, {"params": resolved_params}) for path in io["additional_outputs"]
     ]
 
     return ExpandedTemplate(
@@ -1503,7 +1506,9 @@ def expand_flow_graph(
                     "id": node["id"],
                     "station_id": node.get("station_id") or expanded.station_id,
                     "objective": node.get("objective") or expanded.objective,
-                    "agents": node.get("agents", [expanded.station_id] if expanded.station_id else []),
+                    "agents": node.get(
+                        "agents", [expanded.station_id] if expanded.station_id else []
+                    ),
                     "role": node.get("role", expanded.objective),
                     "inputs": node.get("inputs", expanded.io.get("additional_inputs", [])),
                     "outputs": node.get("outputs", expanded.io.get("additional_outputs", [])),
@@ -1573,11 +1578,13 @@ def get_template_categories(
     result = []
     for cat_id, count in sorted(category_counts.items()):
         info = category_info.get(cat_id, {"name": cat_id.title(), "order": 50})
-        result.append({
-            "id": cat_id,
-            "name": info["name"],
-            "count": count,
-            "order": info["order"],
-        })
+        result.append(
+            {
+                "id": cat_id,
+                "name": info["name"],
+                "count": count,
+                "order": info["order"],
+            }
+        )
 
     return sorted(result, key=lambda x: x["order"])

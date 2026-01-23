@@ -60,10 +60,20 @@ def load_degradations() -> List[Dict[str, Any]]:
                 try:
                     entry = json.loads(line)
                     # Validate required fields
-                    required = {"timestamp", "step_id", "step_name", "tier", "message", "severity", "remediation"}
+                    required = {
+                        "timestamp",
+                        "step_id",
+                        "step_name",
+                        "tier",
+                        "message",
+                        "severity",
+                        "remediation",
+                    }
                     missing = required - set(entry.keys())
                     if missing:
-                        print(f"Warning: Line {line_num} missing fields: {missing}", file=sys.stderr)
+                        print(
+                            f"Warning: Line {line_num} missing fields: {missing}", file=sys.stderr
+                        )
                     entries.append(entry)
                 except json.JSONDecodeError as e:
                     print(f"Warning: Line {line_num} is not valid JSON: {e}", file=sys.stderr)

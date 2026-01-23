@@ -34,8 +34,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
-from unittest.mock import MagicMock
+from typing import Callable, Dict, Optional
 
 import pytest
 
@@ -46,13 +45,10 @@ if str(repo_root) not in sys.path:
 
 from swarm.config.flow_registry import (
     FlowDefinition,
-    FlowRegistry,
     StepDefinition,
     StepRouting,
-    TeachingNotes,
 )
-from swarm.runtime.stepwise import route_step, read_receipt_field
-
+from swarm.runtime.stepwise import read_receipt_field, route_step
 
 # -----------------------------------------------------------------------------
 # Fixtures and Helpers
@@ -73,6 +69,7 @@ def make_receipt_reader(tmp_repo: Path) -> Callable[..., Optional[str]]:
     Returns a function with signature:
         (run_id, flow_key, step_id, agent_key, field_name) -> Optional[str]
     """
+
     def reader(
         run_id: str,
         flow_key: str,
@@ -88,6 +85,7 @@ def make_receipt_reader(tmp_repo: Path) -> Callable[..., Optional[str]]:
             agent_key=agent_key,
             field_name=field_name,
         )
+
     return reader
 
 
@@ -276,9 +274,7 @@ class TestMicroloopRouting:
         )
 
         # Should exit to next step (implement)
-        assert next_step_id == "implement", (
-            f"Expected next step 'implement', got '{next_step_id}'"
-        )
+        assert next_step_id == "implement", f"Expected next step 'implement', got '{next_step_id}'"
         assert "loop_exit_condition_met" in reason or "VERIFIED" in reason, (
             f"Expected reason to indicate condition met, got '{reason}'"
         )
@@ -378,9 +374,7 @@ class TestMicroloopRouting:
         )
 
         # Should exit to next step despite UNVERIFIED
-        assert next_step_id == "implement", (
-            f"Expected exit to 'implement', got '{next_step_id}'"
-        )
+        assert next_step_id == "implement", f"Expected exit to 'implement', got '{next_step_id}'"
         assert "no_further_help" in reason, (
             f"Expected reason to indicate no further help, got '{reason}'"
         )
@@ -479,9 +473,7 @@ class TestLinearRouting:
         assert next_step_id == "critique_tests", (
             f"Expected advance to 'critique_tests', got '{next_step_id}'"
         )
-        assert "linear" in reason, (
-            f"Expected reason to indicate linear routing, got '{reason}'"
-        )
+        assert "linear" in reason, f"Expected reason to indicate linear routing, got '{reason}'"
 
     def test_linear_routing_flow_complete(
         self,
@@ -515,9 +507,7 @@ class TestLinearRouting:
         )
 
         # Should return None to indicate flow complete
-        assert next_step_id is None, (
-            f"Expected None for flow complete, got '{next_step_id}'"
-        )
+        assert next_step_id is None, f"Expected None for flow complete, got '{next_step_id}'"
         assert "complete" in reason.lower(), (
             f"Expected reason to indicate completion, got '{reason}'"
         )
@@ -723,9 +713,7 @@ class TestRoutingEdgeCases:
             receipt_reader=make_receipt_reader(tmp_repo),
         )
 
-        assert next_step_id == "step2", (
-            f"Expected fallback to step2 by index, got '{next_step_id}'"
-        )
+        assert next_step_id == "step2", f"Expected fallback to step2 by index, got '{next_step_id}'"
         assert "default" in reason.lower() or "linear" in reason.lower(), (
             f"Expected default/linear reason, got '{reason}'"
         )

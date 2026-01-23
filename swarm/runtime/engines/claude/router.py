@@ -18,10 +18,12 @@ from typing import Any, Dict, Optional
 
 from swarm.runtime.routing_helpers import (
     MicroloopState,
-    check_microloop_termination as shared_check_microloop_termination,
     exit_reason_needs_human_review,
     exit_reason_to_confidence,
     should_exit_microloop,
+)
+from swarm.runtime.routing_helpers import (
+    check_microloop_termination as shared_check_microloop_termination,
 )
 from swarm.runtime.routing_utils import parse_routing_decision
 from swarm.runtime.types import (

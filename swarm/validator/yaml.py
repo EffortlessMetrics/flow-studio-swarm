@@ -170,11 +170,7 @@ class SimpleYAMLParser:
                 if not inner:
                     fields[key] = []
                 else:
-                    items = [
-                        item.strip().strip("'\"")
-                        for item in inner.split(",")
-                        if item.strip()
-                    ]
+                    items = [item.strip().strip("'\"") for item in inner.split(",") if item.strip()]
                     fields[key] = items
             else:
                 # String value - strip quotes if present

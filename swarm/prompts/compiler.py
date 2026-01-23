@@ -30,9 +30,8 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -174,8 +173,7 @@ def load_fragment(
             return content
 
     raise FileNotFoundError(
-        f"Fragment not found: {fragment_name}\n"
-        f"Searched in: {[str(p) for p in searched_paths]}"
+        f"Fragment not found: {fragment_name}\nSearched in: {[str(p) for p in searched_paths]}"
     )
 
 
@@ -355,9 +353,7 @@ def _inject_fragments(
 
         # Check for circular reference
         if fragment_name in seen_fragments:
-            logger.warning(
-                "Circular fragment reference detected: %s (skipping)", fragment_name
-            )
+            logger.warning("Circular fragment reference detected: %s (skipping)", fragment_name)
             return f"[CIRCULAR REFERENCE: {fragment_name}]"
 
         try:
@@ -448,9 +444,7 @@ def _validate_fragments(
         try:
             fragment_content = load_fragment(fragment_name, repo_root, use_cache=False)
             # Recursively validate nested fragments
-            nested_missing = _validate_fragments(
-                fragment_content, repo_root, depth + 1, seen
-            )
+            nested_missing = _validate_fragments(fragment_content, repo_root, depth + 1, seen)
             missing.extend(nested_missing)
         except FileNotFoundError:
             missing.append(fragment_name)

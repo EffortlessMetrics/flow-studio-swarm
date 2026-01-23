@@ -5,14 +5,12 @@ Tests the SkillsValidator class which validates .claude/skills/*/SKILL.md files
 for correct structure and YAML metadata.
 """
 
-import pytest
-from pathlib import Path
-
 # Import the module under test
 import sys
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "swarm" / "tools"))
 from skills_lint import SkillsValidator
-
 
 # ============================================================================
 # Happy Path Tests

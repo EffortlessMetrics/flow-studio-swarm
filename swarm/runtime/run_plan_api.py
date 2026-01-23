@@ -44,9 +44,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
-
 from swarm.config.flow_registry import get_sdlc_flow_keys
 from swarm.utils.yaml_utils import load_yaml
+
 from .types import (
     HumanPolicy,
     MacroAction,

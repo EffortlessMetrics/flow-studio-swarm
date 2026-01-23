@@ -38,7 +38,9 @@ async def api_tour_detail(tour_id: str, state: FlowStudioState = Depends(get_sta
             {
                 "error": f"Tour '{tour_id}' not found",
                 "available_tours": available,
-                "hint": f"Available tours: {', '.join(available)}" if available else "No tours loaded",
+                "hint": f"Available tours: {', '.join(available)}"
+                if available
+                else "No tours loaded",
             },
             status_code=404,
         )

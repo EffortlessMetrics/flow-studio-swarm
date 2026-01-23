@@ -54,7 +54,7 @@ from __future__ import annotations
 # =============================================================================
 # The driver's route_step() is the single entry point for all routing decisions.
 # Import it as the canonical route_step function.
-from swarm.runtime.stepwise.routing.driver import (
+from swarm.runtime.stepwise.routing.driver import (  # noqa: E402
     RoutingOutcome,
     route_step,  # Canonical routing function
 )
@@ -69,23 +69,25 @@ route_step_unified = route_step
 # These ensure existing imports like:
 #   from .routing import create_routing_signal, build_routing_context
 # continue to work unchanged.
-from swarm.runtime.stepwise._routing_legacy import (
-    # Routing signal creation
-    create_routing_signal,
-    route_step as route_step_legacy,  # Renamed to avoid collision
-    build_routing_context,
-    ReceiptReader,
+from swarm.runtime.stepwise._routing_legacy import (  # noqa: E402
     # Elephant Protocol: Stall detection types
     ProgressDelta,
     ProgressEvidence,
+    ReceiptReader,
     StallAnalysis,
+    build_routing_context,
+    compute_error_signature,
+    # Routing signal creation
+    create_routing_signal,
+    create_stall_routing_signal,
     # Elephant Protocol: Stall detection functions
     detect_stall,
-    record_progress_evidence,
-    create_stall_routing_signal,
-    compute_error_signature,
     # Candidate-set pattern
     generate_routing_candidates,
+    record_progress_evidence,
+)
+from swarm.runtime.stepwise._routing_legacy import (  # noqa: E402
+    route_step as route_step_legacy,  # Renamed to avoid collision
 )
 
 __all__ = [

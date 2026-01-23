@@ -40,10 +40,7 @@ def test_no_flask_imports_in_active_tools():
     assert tools_dir.exists(), "swarm/tools/ directory should exist"
 
     # Collect all .py files, excluding _archive/
-    python_files = [
-        f for f in tools_dir.glob("*.py")
-        if f.is_file() and f.name != "__pycache__"
-    ]
+    python_files = [f for f in tools_dir.glob("*.py") if f.is_file() and f.name != "__pycache__"]
 
     assert len(python_files) > 0, "Should have Python files in swarm/tools/"
 
@@ -58,11 +55,13 @@ def test_no_flask_imports_in_active_tools():
         has_from_flask = "from flask" in content.lower()
 
         if has_import_flask or has_from_flask:
-            flask_offenders.append({
-                "file": py_file.name,
-                "import_flask": has_import_flask,
-                "from_flask": has_from_flask,
-            })
+            flask_offenders.append(
+                {
+                    "file": py_file.name,
+                    "import_flask": has_import_flask,
+                    "from_flask": has_from_flask,
+                }
+            )
 
     # Assert no Flask imports found
     if flask_offenders:
@@ -129,9 +128,7 @@ def test_no_subdirectory_flask_in_active_tools():
             content = py_file.read_text(encoding="utf-8")
 
             if "import flask" in content.lower() or "from flask" in content.lower():
-                pytest.fail(
-                    f"Flask import found in subdirectory: {py_file.relative_to(repo_root)}"
-                )
+                pytest.fail(f"Flask import found in subdirectory: {py_file.relative_to(repo_root)}")
 
 
 # ============================================================================
@@ -170,9 +167,7 @@ def test_no_active_imports_from_archive():
 
         # Check for imports from _archive
         if "from swarm.tools._archive" in content or "from swarm.tools._archive import" in content:
-            pytest.fail(
-                f"Active code should not import from _archive: {py_file.name}"
-            )
+            pytest.fail(f"Active code should not import from _archive: {py_file.name}")
 
 
 # ============================================================================
@@ -188,9 +183,7 @@ def test_fastapi_replaces_flask_functionality():
     """
     fastapi_module = repo_root / "swarm" / "tools" / "flow_studio_fastapi.py"
 
-    assert fastapi_module.exists(), (
-        "flow_studio_fastapi.py should exist as replacement for Flask"
-    )
+    assert fastapi_module.exists(), "flow_studio_fastapi.py should exist as replacement for Flask"
 
     content = fastapi_module.read_text(encoding="utf-8")
 
@@ -216,12 +209,8 @@ def test_no_flask_in_conftest():
 
     content = conftest.read_text(encoding="utf-8")
 
-    assert "from flask import" not in content, (
-        "conftest.py should not import from flask"
-    )
-    assert "import flask" not in content, (
-        "conftest.py should not import flask"
-    )
+    assert "from flask import" not in content, "conftest.py should not import from flask"
+    assert "import flask" not in content, "conftest.py should not import flask"
 
 
 # ============================================================================
@@ -303,9 +292,7 @@ def test_no_flask_blueprint_patterns():
 
         # Blueprint is Flask-specific; fail immediately if found
         if "Blueprint" in content:
-            pytest.fail(
-                f"Flask Blueprint pattern found in: {py_file.name}"
-            )
+            pytest.fail(f"Flask Blueprint pattern found in: {py_file.name}")
 
 
 def test_no_flask_route_decorators():
@@ -322,9 +309,7 @@ def test_no_flask_route_decorators():
 
         # @app.route is Flask-specific; fail immediately if found
         if "@app.route(" in content:
-            pytest.fail(
-                f"Flask @app.route decorator found in: {py_file.name}"
-            )
+            pytest.fail(f"Flask @app.route decorator found in: {py_file.name}")
 
 
 # ============================================================================
@@ -346,9 +331,7 @@ def test_no_flask_app_initialization():
 
         # Flask(__name__) is the canonical Flask app initialization
         if "Flask(__name__)" in content:
-            pytest.fail(
-                f"Flask app initialization Flask(__name__) found in: {py_file.name}"
-            )
+            pytest.fail(f"Flask app initialization Flask(__name__) found in: {py_file.name}")
 
 
 def test_no_flask_template_rendering():
@@ -367,9 +350,7 @@ def test_no_flask_template_rendering():
         if "render_template" in content:
             # Could be Flask render_template or direct jinja2 (less likely)
             if "from flask" in content.lower() or "import flask" in content.lower():
-                pytest.fail(
-                    f"Flask render_template found in: {py_file.name}"
-                )
+                pytest.fail(f"Flask render_template found in: {py_file.name}")
 
 
 def test_all_python_files_are_importable():

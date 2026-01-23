@@ -15,12 +15,10 @@ Each test family is named after the AC ID and validates the contract.
 import json
 import re
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Tuple
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -78,9 +76,13 @@ class TestKernelFastAC:
         """
         code, out = run_command("uv run swarm/tools/kernel_smoke.py")
         if code == 0:
-            assert "Status: HEALTHY" in out, f"Exit code 0 should show 'Status: HEALTHY', got:\n{out[:500]}"
+            assert "Status: HEALTHY" in out, (
+                f"Exit code 0 should show 'Status: HEALTHY', got:\n{out[:500]}"
+            )
         elif code == 1:
-            assert "Status: BROKEN" in out, f"Exit code 1 should show 'Status: BROKEN', got:\n{out[:500]}"
+            assert "Status: BROKEN" in out, (
+                f"Exit code 1 should show 'Status: BROKEN', got:\n{out[:500]}"
+            )
 
     def test_kernel_smoke_shows_component_status(self):
         """
@@ -215,7 +217,9 @@ class TestIndividualStepsAC:
         When I run `uv run swarm/tools/selftest.py --until skills-governance`
         Then the exit code should reflect the status of steps 1-2
         """
-        code, out = run_command("uv run swarm/tools/selftest.py --until skills-governance", timeout=60)
+        code, out = run_command(
+            "uv run swarm/tools/selftest.py --until skills-governance", timeout=60
+        )
         # Should show core-checks and skills-governance executed
         assert "core-checks" in out, f"Expected 'core-checks' in output, got:\n{out[:500]}"
         assert "skills-governance" in out, (
@@ -230,9 +234,9 @@ class TestIndividualStepsAC:
         """
         code, out = run_command("uv run swarm/tools/selftest.py --step core-checks", timeout=60)
         # Should mention timing (ms, seconds, elapsed, etc.)
-        assert (
-            "ms" in out.lower() or "elapsed" in out.lower() or "second" in out.lower()
-        ), f"Expected timing info in output, got:\n{out[:500]}"
+        assert "ms" in out.lower() or "elapsed" in out.lower() or "second" in out.lower(), (
+            f"Expected timing info in output, got:\n{out[:500]}"
+        )
 
 
 # ============================================================================
@@ -305,7 +309,7 @@ class TestFailureHintsAC:
             r"make selftest --plan",  # How to see plan
             r"docs/",  # Link to docs
         ]
-        found_hints = any(re.search(p, out, re.IGNORECASE) for p in hint_patterns)
+        any(re.search(p, out, re.IGNORECASE) for p in hint_patterns)
         # If test fails, hints should be present
         if code != 0:
             # Ideally should show hints, but let's just verify output format is reasonable

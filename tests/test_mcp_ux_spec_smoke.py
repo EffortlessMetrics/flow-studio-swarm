@@ -19,13 +19,13 @@ sys.path.insert(0, str(SWARM_TOOLS))
 # Check if MCP is available
 try:
     import mcp  # noqa: F401
+
     MCP_AVAILABLE = True
 except ImportError:
     MCP_AVAILABLE = False
 
 pytestmark = pytest.mark.skipif(
-    not MCP_AVAILABLE,
-    reason="MCP package not installed. Install with: uv sync --extra mcp"
+    not MCP_AVAILABLE, reason="MCP package not installed. Install with: uv sync --extra mcp"
 )
 
 

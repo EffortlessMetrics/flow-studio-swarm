@@ -66,7 +66,9 @@ def test_validate_swarm_json_valid_schema():
         checks = agent_data["checks"]
         for check_name, check_data in checks.items():
             assert "status" in check_data, f"{agent_key}.{check_name} missing 'status'"
-            assert check_data["status"] in ["pass", "fail", "warn"], f"Invalid check status: {check_data['status']}"
+            assert check_data["status"] in ["pass", "fail", "warn"], (
+                f"Invalid check status: {check_data['status']}"
+            )
 
     # Flows structure (if any flows present)
     flows = data["flows"]

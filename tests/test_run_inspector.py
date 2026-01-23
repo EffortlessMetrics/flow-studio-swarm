@@ -84,12 +84,11 @@ if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 import pytest
-
+from swarm.runtime import service as runtime_service
+from swarm.runtime import storage
+from swarm.runtime.service import RunService
 from swarm.tools.run_inspector import (
-    ArtifactResult,
-    ArtifactStatus,
     FlowEvent,
-    FlowResult,
     FlowStatus,
     FlowTiming,
     RunInspector,
@@ -97,12 +96,7 @@ from swarm.tools.run_inspector import (
     RunTiming,
     StepResult,
     StepStatus,
-    StepTiming,
 )
-from swarm.runtime import storage
-from swarm.runtime import service as runtime_service
-from swarm.runtime.service import RunService
-
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -125,6 +119,7 @@ def _write_dummy_run(runs_dir: Path, run_id: str, flows: dict = None) -> Path:
         Path to the created run directory.
     """
     from datetime import datetime, timezone
+
     from swarm.runtime.types import (
         RunSpec,
         RunStatus,
@@ -552,9 +547,7 @@ class TestGetStepStatus:
 
     def test_get_step_status_nonexistent_run(self, inspector_with_catalog):
         """Handles missing run gracefully."""
-        result = inspector_with_catalog.get_step_status(
-            "nonexistent", "signal", "normalize"
-        )
+        result = inspector_with_catalog.get_step_status("nonexistent", "signal", "normalize")
 
         assert result.status == StepStatus.MISSING
         assert result.required_present == 0

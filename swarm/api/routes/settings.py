@@ -11,10 +11,9 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
@@ -111,9 +110,7 @@ class ModelPolicyUpdateRequest(BaseModel):
 
     @field_validator("group_assignments")
     @classmethod
-    def validate_group_assignments(
-        cls, v: Optional[Dict[str, str]]
-    ) -> Optional[Dict[str, str]]:
+    def validate_group_assignments(cls, v: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
         """Validate group assignments reference valid tier names."""
         if v is None:
             return v
@@ -359,7 +356,7 @@ async def reload_model_policy():
         _load_policy_from_disk.cache_clear()
 
         # Reload and return
-        policy = load_model_policy()
+        load_model_policy()
 
         # Get the full raw policy for response
         raw = _load_policy_raw()

@@ -11,11 +11,9 @@ B1 Acceptance: "Can install wheel in isolated venv and run `selftest --help`"
 import json
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).parent.parent
 SELFTEST_CORE_DIR = REPO_ROOT / "packages" / "selftest-core"
@@ -99,7 +97,10 @@ class TestWheelInstallation:
         )
 
         assert result.returncode == 0, f"pip install failed:\n{result.stderr}"
-        assert "Successfully installed" in result.stdout or "Requirement already satisfied" in result.stdout
+        assert (
+            "Successfully installed" in result.stdout
+            or "Requirement already satisfied" in result.stdout
+        )
 
     def test_selftest_help_works_after_install(self, built_wheel, isolated_venv):
         """Verify `selftest --help` works after wheel installation.

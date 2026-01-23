@@ -15,7 +15,8 @@ Usage:
 from __future__ import annotations
 
 import logging
-from importlib.metadata import PackageNotFoundError, version as dist_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as dist_version
 from typing import Any, Optional
 
 # Module logger
@@ -34,6 +35,7 @@ _sdk_version: Optional[str] = None
 try:
     # Prefer official Anthropic Agent SDK
     import claude_agent_sdk
+
     _sdk_module = claude_agent_sdk
     _sdk_distribution = "claude-agent-sdk"
     SDK_AVAILABLE = True
@@ -42,6 +44,7 @@ except ImportError:
     try:
         # Fallback to legacy package name
         import claude_code_sdk
+
         _sdk_module = claude_code_sdk
         _sdk_distribution = "claude-code-sdk"
         SDK_AVAILABLE = True

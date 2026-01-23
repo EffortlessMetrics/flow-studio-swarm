@@ -6,11 +6,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from .core import SpecManager
-from .etag import compute_etag_bytes, compute_file_etag
 from .errors import ConcurrencyError, SpecNotFoundError, SpecValidationError
+from .etag import compute_etag_bytes, compute_file_etag
 from .io import atomic_write
 from .models import ValidationError
-
 
 logger = logging.getLogger(__name__)
 

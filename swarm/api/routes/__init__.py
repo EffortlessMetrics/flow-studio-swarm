@@ -20,24 +20,24 @@ This package contains the FastAPI routers for:
 - preview: Preview endpoints for configuration changes
 """
 
+from .autopilot_routes import router as autopilot_routes_router
 from .boundary import router as boundary_router
 from .compile import router as compile_router
 from .db import router as db_router
 from .events import router as events_router
 from .evolution import router as evolution_router
 from .facts import router as facts_router
+from .issue_routes import router as issue_routes_router
 from .preview import router as preview_router
 from .runs import router as runs_router
-from .settings import router as settings_router
-from .specs import router as specs_router
-from .wisdom import router as wisdom_router
+from .runs_control import router as runs_control_router
 
 # Also export sub-routers for direct access
 from .runs_crud import router as runs_crud_router
-from .runs_control import router as runs_control_router
 from .runs_stack import router as runs_stack_router
-from .autopilot_routes import router as autopilot_routes_router
-from .issue_routes import router as issue_routes_router
+from .settings import router as settings_router
+from .specs import router as specs_router
+from .wisdom import router as wisdom_router
 
 __all__ = [
     "specs_router",

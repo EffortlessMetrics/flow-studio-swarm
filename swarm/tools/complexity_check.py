@@ -13,7 +13,6 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-
 DEFAULT_THRESHOLDS = {
     "line_count": 500,
     "function_count": 20,
@@ -133,7 +132,9 @@ def _collect_changed_files(repo_root: Path, base_ref: Optional[str]) -> Set[str]
     if base_ref:
         merge_base = _run_git(repo_root, ["merge-base", "HEAD", base_ref])
         if merge_base:
-            diff = _run_git(repo_root, ["diff", "--name-only", "--diff-filter=AM", f"{merge_base}...HEAD"])
+            diff = _run_git(
+                repo_root, ["diff", "--name-only", "--diff-filter=AM", f"{merge_base}...HEAD"]
+            )
             if diff:
                 files.update(line.strip() for line in diff.splitlines() if line.strip())
 
@@ -192,9 +193,7 @@ def _load_allowlist(path: Path) -> Tuple[Dict[str, Dict[str, str]], List[str]]:
             continue
 
         if expires < today:
-            errors.append(
-                f"{path}:{idx} allowlist entry expired ({expires_str}) for {rel_path}."
-            )
+            errors.append(f"{path}:{idx} allowlist entry expired ({expires_str}) for {rel_path}.")
 
         if not _reason_has_issue_ref(reason):
             errors.append(
@@ -250,19 +249,13 @@ def main() -> int:
         return 2
 
     if args.all:
-        candidate_paths = [
-            p for p in repo_root.rglob("*.py") if p.is_file()
-        ]
+        candidate_paths = [p for p in repo_root.rglob("*.py") if p.is_file()]
     else:
         base_ref = _detect_base_ref(repo_root, args.base)
         changed = _collect_changed_files(repo_root, base_ref)
-        normalized = [
-            _normalize_path(repo_root, path_str) for path_str in sorted(changed)
-        ]
+        normalized = [_normalize_path(repo_root, path_str) for path_str in sorted(changed)]
         candidate_paths = [
-            repo_root / path_str
-            for path_str in normalized
-            if path_str and path_str.endswith(".py")
+            repo_root / path_str for path_str in normalized if path_str and path_str.endswith(".py")
         ]
 
     if not candidate_paths:
@@ -286,24 +279,14 @@ def main() -> int:
         if rel_path in allowlist:
             continue
 
-        exceeded = {
-            key: value
-            for key, value in metrics.items()
-            if value > thresholds.get(key, 0)
-        }
+        exceeded = {key: value for key, value in metrics.items() if value > thresholds.get(key, 0)}
         if exceeded:
             parts = [f"{key}={value}>{thresholds[key]}" for key, value in exceeded.items()]
             violations.append(f"{rel_path}: " + ", ".join(parts))
 
     if violations:
         print("Complexity check failed.")
-        print(
-            "Thresholds: "
-            + ", ".join(
-                f"{key}={value}"
-                for key, value in thresholds.items()
-            )
-        )
+        print("Thresholds: " + ", ".join(f"{key}={value}" for key, value in thresholds.items()))
         print("Violations:")
         for violation in violations:
             print(f"- {violation}")

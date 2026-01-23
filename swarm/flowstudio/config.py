@@ -132,8 +132,7 @@ class FlowStudioConfig:
         if not self.runs_dir.exists():
             return []
         return sorted(
-            p for p in self.runs_dir.iterdir()
-            if p.is_dir() and not p.name.startswith(".")
+            p for p in self.runs_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
         )
 
     def list_examples(self) -> list[Path]:
@@ -141,8 +140,7 @@ class FlowStudioConfig:
         if not self.examples_dir.exists():
             return []
         return sorted(
-            p for p in self.examples_dir.iterdir()
-            if p.is_dir() and not p.name.startswith(".")
+            p for p in self.examples_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
         )
 
 

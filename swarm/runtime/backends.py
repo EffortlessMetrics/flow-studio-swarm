@@ -251,9 +251,7 @@ class ClaudeHarnessBackend(RunBackend):
                     if stderr:
                         error_msg = f"Flow {flow_key} failed: {stderr[:500]}"
                     else:
-                        error_msg = (
-                            f"Flow {flow_key} failed with code {process.returncode}"
-                        )
+                        error_msg = f"Flow {flow_key} failed with code {process.returncode}"
                     break
                 else:
                     storage.append_event(
@@ -264,9 +262,7 @@ class ClaudeHarnessBackend(RunBackend):
                             kind="flow_end",
                             flow_key=flow_key,
                             payload={
-                                "duration_ms": int(
-                                    (flow_end - flow_start).total_seconds() * 1000
-                                ),
+                                "duration_ms": int((flow_end - flow_start).total_seconds() * 1000),
                             },
                         ),
                     )
@@ -304,9 +300,7 @@ class ClaudeHarnessBackend(RunBackend):
             ),
         )
 
-    def _build_command(
-        self, flow_key: str, spec: RunSpec
-    ) -> Tuple[List[str], Dict[str, str]]:
+    def _build_command(self, flow_key: str, spec: RunSpec) -> Tuple[List[str], Dict[str, str]]:
         """Build the command arguments to execute a flow.
 
         Returns:
@@ -605,9 +599,7 @@ class GeminiCliBackend(RunBackend):
                             continue
                         try:
                             gemini_event = json.loads(line)
-                            mapped_event = self._map_gemini_event(
-                                run_id, flow_key, gemini_event
-                            )
+                            mapped_event = self._map_gemini_event(run_id, flow_key, gemini_event)
                             if mapped_event:
                                 storage.append_event(run_id, mapped_event)
                         except json.JSONDecodeError:
@@ -662,9 +654,7 @@ class GeminiCliBackend(RunBackend):
                             kind="flow_end",
                             flow_key=flow_key,
                             payload={
-                                "duration_ms": int(
-                                    (flow_end - flow_start).total_seconds() * 1000
-                                ),
+                                "duration_ms": int((flow_end - flow_start).total_seconds() * 1000),
                             },
                         ),
                     )
@@ -903,9 +893,7 @@ Be concise and focused on the task."""
             # Be conservative: default to False if success field is missing
             success = gemini_event.get("success")
             if success is None:
-                logger.warning(
-                    "Gemini tool_result missing 'success' field: %r", gemini_event
-                )
+                logger.warning("Gemini tool_result missing 'success' field: %r", gemini_event)
                 success = False
             payload = {
                 "tool": gemini_event.get("tool") or gemini_event.get("name"),

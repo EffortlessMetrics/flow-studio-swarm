@@ -29,6 +29,7 @@ def _utc_now_iso() -> str:
 @dataclass
 class ModelDecision:
     """Audit record for a model decision."""
+
     agent_key: str
     source: str  # "config", "override", "default"
     model: str
@@ -46,7 +47,9 @@ class ModelDecision:
         if self.previous_model and self.previous_model != self.model:
             change = f" (changed from {self.previous_model})"
         reason_str = f" [{self.reason}]" if self.reason else ""
-        return f"{self.timestamp} {self.agent_key}: {self.source} -> {self.model}{change}{reason_str}"
+        return (
+            f"{self.timestamp} {self.agent_key}: {self.source} -> {self.model}{change}{reason_str}"
+        )
 
 
 class ControlPlane:
@@ -180,6 +183,4 @@ def validate_model_value(model: str) -> None:
     Raises ValueError if invalid.
     """
     if model not in VALID_MODELS:
-        raise ValueError(
-            f"Invalid model '{model}'. Must be one of {VALID_MODELS}."
-        )
+        raise ValueError(f"Invalid model '{model}'. Must be one of {VALID_MODELS}.")

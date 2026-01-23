@@ -15,9 +15,9 @@ Checks:
 
 from typing import Any, Dict
 
-from swarm.validator import SimpleYAMLParser, ValidationResult
-from swarm.tools.validation.helpers import AGENTS_DIR, ROOT, safe_get_stripped
 from swarm.tools.validation.constants import ROLE_FAMILY_COLOR_MAP, VALID_COLORS
+from swarm.tools.validation.helpers import AGENTS_DIR, ROOT, safe_get_stripped
+from swarm.validator import SimpleYAMLParser, ValidationResult
 
 
 def validate_colors(registry: Dict[str, Dict[str, Any]]) -> ValidationResult:
@@ -67,7 +67,7 @@ def validate_colors(registry: Dict[str, Dict[str, Any]]) -> ValidationResult:
                 str(rel_path),
                 f"unknown role_family '{role_family}' in AGENTS.md (cannot validate color)",
                 "Ensure role_family is one of: " + ", ".join(ROLE_FAMILY_COLOR_MAP.keys()),
-                file_path=str(path)
+                file_path=str(path),
             )
             continue
 
@@ -86,7 +86,7 @@ def validate_colors(registry: Dict[str, Dict[str, Any]]) -> ValidationResult:
                 str(rel_path),
                 f"missing required field 'color' (expected '{expected_color}' for role family '{role_family}')",
                 f"Add `color: {expected_color}` to frontmatter",
-                file_path=str(path)
+                file_path=str(path),
             )
             continue
 
@@ -100,7 +100,7 @@ def validate_colors(registry: Dict[str, Dict[str, Any]]) -> ValidationResult:
                 str(rel_path),
                 f"invalid color value '{color}' (expected one of: {', '.join(VALID_COLORS)})",
                 f"Change `color: {color}` to a valid color",
-                file_path=str(path)
+                file_path=str(path),
             )
             continue
 
@@ -111,7 +111,7 @@ def validate_colors(registry: Dict[str, Dict[str, Any]]) -> ValidationResult:
                 str(rel_path),
                 f"color '{color}' does not match expected color '{expected_color}' for role family '{role_family}'",
                 f"Change `color: {color}` to `color: {expected_color}` to match role family in AGENTS.md",
-                file_path=str(path)
+                file_path=str(path),
             )
 
     return result

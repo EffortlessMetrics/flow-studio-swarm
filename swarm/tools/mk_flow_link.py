@@ -78,9 +78,11 @@ VALID_TABS = ["details", "run", "compare"]
 # Flow Configuration Loading
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class FlowConfig:
     """Minimal flow configuration for validation."""
+
     key: str
     title: str
     steps: List[str]
@@ -113,7 +115,9 @@ def load_flow_configs() -> Dict[str, FlowConfig]:
 
             # Extract step IDs
             steps_data = data.get("steps", [])
-            step_ids = [step.get("id") for step in steps_data if isinstance(step, dict) and step.get("id")]
+            step_ids = [
+                step.get("id") for step in steps_data if isinstance(step, dict) and step.get("id")
+            ]
 
             flows[key] = FlowConfig(
                 key=key,
@@ -131,9 +135,11 @@ def load_flow_configs() -> Dict[str, FlowConfig]:
 # Link Generator
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class LinkResult:
     """Result of link generation."""
+
     url: str
     params: Dict[str, str]
     valid: bool
@@ -244,6 +250,7 @@ class FlowStudioLinkGenerator:
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     """CLI entry point."""

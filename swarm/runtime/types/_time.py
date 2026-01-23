@@ -5,7 +5,7 @@ Provides datetime serialization helpers used by all serdes functions.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 

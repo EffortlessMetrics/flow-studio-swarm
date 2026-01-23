@@ -53,6 +53,7 @@ from fastapi.testclient import TestClient
 def fastapi_client():
     """Create FastAPI test client."""
     from swarm.tools.flow_studio_fastapi import app
+
     return TestClient(app)
 
 
@@ -196,9 +197,7 @@ class TestSelfTestAPIContractCoherence:
 
         # Assert: AC IDs (keys) are non-empty strings
         for ac_id in ac_status.keys():
-            assert isinstance(ac_id, str), (
-                f"AC ID key should be string, got {type(ac_id).__name__}"
-            )
+            assert isinstance(ac_id, str), f"AC ID key should be string, got {type(ac_id).__name__}"
             assert len(ac_id) > 0, "AC ID key cannot be empty"
 
     def test_plan_acs_match_status_acs(self, fastapi_client):
@@ -273,14 +272,11 @@ class TestSelfTestAPIContractCoherence:
         for step in steps:
             tier = step["tier"]
             assert tier in valid_tiers, (
-                f"Step '{step['id']}' has invalid tier '{tier}', "
-                f"expected one of {valid_tiers}"
+                f"Step '{step['id']}' has invalid tier '{tier}', expected one of {valid_tiers}"
             )
 
             # Assert: Tier is lowercase
-            assert tier == tier.lower(), (
-                f"Step '{step['id']}' tier '{tier}' should be lowercase"
-            )
+            assert tier == tier.lower(), f"Step '{step['id']}' tier '{tier}' should be lowercase"
 
         # Assert: Summary tier counts match step tiers
         summary = plan["summary"]
@@ -328,8 +324,7 @@ class TestSelfTestAPIContractCoherence:
 
         for ac_id, ac_value in ac_status.items():
             assert ac_value in valid_statuses, (
-                f"AC '{ac_id}' has invalid status '{ac_value}', "
-                f"expected one of {valid_statuses}"
+                f"AC '{ac_id}' has invalid status '{ac_value}', expected one of {valid_statuses}"
             )
 
             # Assert: Status value is uppercase
@@ -371,15 +366,13 @@ class TestSelfTestAPIContractCoherence:
             depends_on = step.get("depends_on", [])
 
             assert isinstance(depends_on, list), (
-                f"Step '{step_id}' depends_on should be list, "
-                f"got {type(depends_on).__name__}"
+                f"Step '{step_id}' depends_on should be list, got {type(depends_on).__name__}"
             )
 
             for dep_id in depends_on:
                 # Assert: Dependency is a string
                 assert isinstance(dep_id, str), (
-                    f"Step '{step_id}' dependency should be string, "
-                    f"got {type(dep_id).__name__}"
+                    f"Step '{step_id}' dependency should be string, got {type(dep_id).__name__}"
                 )
 
                 # Assert: Dependency exists
@@ -389,9 +382,7 @@ class TestSelfTestAPIContractCoherence:
                 )
 
                 # Assert: No self-dependencies
-                assert dep_id != step_id, (
-                    f"Step '{step_id}' has self-dependency"
-                )
+                assert dep_id != step_id, f"Step '{step_id}' has self-dependency"
 
     def test_api_response_is_stable_across_runs(self, fastapi_client):
         """
@@ -420,15 +411,12 @@ class TestSelfTestAPIContractCoherence:
         plan2 = resp2.json()
 
         # Assert: Same number of steps
-        assert len(plan1["steps"]) == len(plan2["steps"]), (
-            "Step count differs between calls"
-        )
+        assert len(plan1["steps"]) == len(plan2["steps"]), "Step count differs between calls"
 
         # Assert: Steps are in same order
         for i, (step1, step2) in enumerate(zip(plan1["steps"], plan2["steps"])):
             assert step1["id"] == step2["id"], (
-                f"Step order differs at position {i}: "
-                f"'{step1['id']}' vs '{step2['id']}'"
+                f"Step order differs at position {i}: '{step1['id']}' vs '{step2['id']}'"
             )
 
             # Assert: AC IDs are in same order
@@ -444,14 +432,10 @@ class TestSelfTestAPIContractCoherence:
             )
 
         # Assert: Summaries are identical
-        assert plan1["summary"] == plan2["summary"], (
-            "Summary differs between calls"
-        )
+        assert plan1["summary"] == plan2["summary"], "Summary differs between calls"
 
         # Assert: Versions are identical
-        assert plan1["version"] == plan2["version"], (
-            "Version differs between calls"
-        )
+        assert plan1["version"] == plan2["version"], "Version differs between calls"
 
 
 class TestCoherenceEdgeCases:
@@ -554,9 +538,7 @@ class TestCoherenceEdgeCases:
 
         # Act: Find cross-cutting ACs (appear on 5+ steps)
         cross_cutting_acs = {
-            ac_id: step_ids
-            for ac_id, step_ids in ac_to_steps.items()
-            if len(step_ids) >= 5
+            ac_id: step_ids for ac_id, step_ids in ac_to_steps.items() if len(step_ids) >= 5
         }
 
         # If no cross-cutting ACs, skip this test

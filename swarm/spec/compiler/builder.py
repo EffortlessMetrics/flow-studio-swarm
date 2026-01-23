@@ -444,11 +444,13 @@ class StepPlanBuilder:
             try:
                 content = load_fragment(frag_path, self.repo_root)
                 content_hash = hashlib.sha256(content.encode()).hexdigest()[:12]
-                refs.append(FragmentReference(
-                    path=frag_path,
-                    hash=content_hash,
-                    version="",
-                ))
+                refs.append(
+                    FragmentReference(
+                        path=frag_path,
+                        hash=content_hash,
+                        version="",
+                    )
+                )
             except FileNotFoundError:
                 logger.warning("Fragment not found for audit: %s", frag_path)
 

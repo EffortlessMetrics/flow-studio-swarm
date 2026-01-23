@@ -7,9 +7,9 @@ valid agents in the registry or built-in agent list.
 
 from typing import Any, Dict, List, Tuple
 
-from swarm.validator import ValidationResult
 from swarm.tools.validation.constants import BUILT_IN_AGENTS
 from swarm.tools.validation.helpers import FLOWS_CONFIG_DIR
+from swarm.validator import ValidationResult
 
 
 def levenshtein_distance(s1: str, s2: str) -> int:
@@ -58,8 +58,7 @@ def suggest_typos(name: str, candidates: List[str], max_dist: int = 2) -> List[s
 
 
 def validate_flow_agent_validity(
-    flow_configs: Dict[str, Dict[str, Any]],
-    registry: Dict[str, Dict[str, Any]]
+    flow_configs: Dict[str, Dict[str, Any]], registry: Dict[str, Dict[str, Any]]
 ) -> ValidationResult:
     """
     Validate that all agent references in flows are valid.
@@ -95,7 +94,7 @@ def validate_flow_agent_validity(
                         problem,
                         fix_action,
                         file_path=str(flow_file),
-                        line_number=step.get("line")
+                        line_number=step.get("line"),
                     )
 
     return result

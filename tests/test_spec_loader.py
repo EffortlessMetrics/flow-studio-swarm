@@ -4,37 +4,36 @@ This module tests loading StationSpecs, FlowSpecs, and fragments from YAML files
 Tests cover both successful loading and graceful error handling for missing files.
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import patch
-import tempfile
-import shutil
-
 # Add swarm to path
 import sys
+import tempfile
+from pathlib import Path
+
+import pytest
+
 _SWARM_ROOT = Path(__file__).resolve().parent.parent
 if str(_SWARM_ROOT) not in sys.path:
     sys.path.insert(0, str(_SWARM_ROOT))
 
 from swarm.spec.loader import (
-    load_station,
-    load_station_cached,
+    get_spec_root,
+    list_flows,
+    list_fragments,
     list_stations,
     load_flow,
     load_flow_cached,
-    list_flows,
     load_fragment,
-    load_fragments,
     load_fragment_cached,
-    list_fragments,
-    get_spec_root,
+    load_fragments,
+    load_station,
+    load_station_cached,
     validate_specs,
 )
 from swarm.spec.types import (
-    StationSpec,
     FlowSpec,
-    StationCategory,
     RoutingKind,
+    StationCategory,
+    StationSpec,
 )
 
 
@@ -219,8 +218,12 @@ class TestLoadFlow:
 
         for step in flow.steps:
             routing = step.routing
-            assert routing.kind in (RoutingKind.LINEAR, RoutingKind.MICROLOOP,
-                                    RoutingKind.BRANCH, RoutingKind.TERMINAL)
+            assert routing.kind in (
+                RoutingKind.LINEAR,
+                RoutingKind.MICROLOOP,
+                RoutingKind.BRANCH,
+                RoutingKind.TERMINAL,
+            )
 
             if routing.kind == RoutingKind.LINEAR:
                 # LINEAR steps have a next step (except terminal)
@@ -337,8 +340,7 @@ class TestLoadFragments:
     def test_load_fragments_uses_separator(self):
         """load_fragments should use the specified separator."""
         content = load_fragments(
-            ["common/invariants.md", "common/evidence.md"],
-            separator="\n\n###SEPARATOR###\n\n"
+            ["common/invariants.md", "common/evidence.md"], separator="\n\n###SEPARATOR###\n\n"
         )
 
         # Default separator or custom should be present
@@ -347,11 +349,9 @@ class TestLoadFragments:
     def test_load_fragments_handles_missing_gracefully(self):
         """load_fragments should skip missing fragments with warning."""
         # Mix of existing and nonexistent fragments
-        content = load_fragments([
-            "common/invariants.md",
-            "nonexistent/fragment.md",
-            "common/evidence.md"
-        ])
+        content = load_fragments(
+            ["common/invariants.md", "nonexistent/fragment.md", "common/evidence.md"]
+        )
 
         # Should still return content from existing fragments
         assert len(content) > 0
@@ -430,10 +430,7 @@ class TestValidateSpecs:
 
         # Critical errors: YAML/JSON parsing failures are fatal
         # These indicate corrupted spec files that need immediate attention
-        parsing_errors = [
-            e for e in result["errors"]
-            if "Invalid YAML" in e or "Invalid JSON" in e
-        ]
+        parsing_errors = [e for e in result["errors"] if "Invalid YAML" in e or "Invalid JSON" in e]
 
         assert len(parsing_errors) == 0, f"Critical parsing errors found: {parsing_errors}"
 
@@ -515,8 +512,9 @@ class TestRoutingKinds:
             flow = load_flow(flow_id)
             for step in flow.steps:
                 if step.routing.kind == RoutingKind.MICROLOOP:
-                    assert step.routing.loop_target is not None, \
+                    assert step.routing.loop_target is not None, (
                         f"Flow {flow_id} step {step.id} has MICROLOOP but no loop_target"
+                    )
 
     def test_terminal_routing_no_next(self):
         """TERMINAL routing should have no next step requirement."""

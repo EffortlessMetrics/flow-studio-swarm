@@ -3,8 +3,10 @@
 These tests ensure critical documentation files exist and cross-references are valid.
 The operator spine (8 key docs) is enforced to have audience headers.
 """
-from pathlib import Path
+
 import re
+from pathlib import Path
+
 import pytest
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -89,8 +91,9 @@ class TestReadmeLinks:
     def test_readme_links_to_index(self):
         """README should link to docs/INDEX.md."""
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-        assert "docs/INDEX.md" in readme or "INDEX.md" in readme, \
+        assert "docs/INDEX.md" in readme or "INDEX.md" in readme, (
             "README should link to docs/INDEX.md"
+        )
 
     def test_readme_links_to_golden_runs(self):
         """README should link to GOLDEN_RUNS.md."""
@@ -105,7 +108,7 @@ class TestCrossReferences:
         """All relative links in INDEX.md should resolve."""
         index_content = (DOCS_DIR / "INDEX.md").read_text(encoding="utf-8")
         # Find markdown links like [text](path.md) or [text](./path.md)
-        link_pattern = r'\[([^\]]+)\]\(([^)]+\.md)\)'
+        link_pattern = r"\[([^\]]+)\]\(([^)]+\.md)\)"
         links = re.findall(link_pattern, index_content)
 
         for text, path in links:

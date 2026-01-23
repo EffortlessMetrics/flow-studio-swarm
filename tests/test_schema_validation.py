@@ -13,13 +13,15 @@ Validates the new schema fields including:
 """
 
 import json
-import pytest
 from pathlib import Path
 
+import pytest
+
 try:
-    from jsonschema import validate, ValidationError, Draft7Validator
+    from jsonschema import Draft7Validator, ValidationError, validate
     from referencing import Registry, Resource
     from referencing.jsonschema import DRAFT7
+
     HAS_JSONSCHEMA = True
 except ImportError:
     HAS_JSONSCHEMA = False
@@ -52,7 +54,9 @@ def create_registry() -> "Registry":
         # Add with full $id URL
         resources.append((schema_id, Resource.from_contents(schema, default_specification=DRAFT7)))
         # Also add with just filename for relative references
-        resources.append((schema_file.name, Resource.from_contents(schema, default_specification=DRAFT7)))
+        resources.append(
+            (schema_file.name, Resource.from_contents(schema, default_specification=DRAFT7))
+        )
 
     return Registry().with_resources(resources)
 
@@ -92,6 +96,7 @@ def flow_graph_schema():
 # RoutingSignal Schema Tests
 # ==============================================================================
 
+
 @pytest.mark.skipif(not HAS_JSONSCHEMA, reason="jsonschema not installed")
 class TestRoutingSignalSchema:
     """Tests for routing_signal.schema.json validation."""
@@ -102,7 +107,7 @@ class TestRoutingSignalSchema:
             "decision": "advance",
             "confidence": "high",
             "reason": "All tests passed, proceeding to next step",
-            "next_step": "code-implement"
+            "next_step": "code-implement",
         }
         validate(signal, routing_signal_schema)
 
@@ -112,7 +117,7 @@ class TestRoutingSignalSchema:
             "decision": "advance",
             "confidence": "high",
             "reason": "Flow complete, transitioning to next flow",
-            "next_flow": "4-review"
+            "next_flow": "4-review",
         }
         validate(signal, routing_signal_schema)
 
@@ -121,7 +126,7 @@ class TestRoutingSignalSchema:
         signal = {
             "decision": "advance",
             "confidence": "high",
-            "reason": "Missing next_step or next_flow"
+            "reason": "Missing next_step or next_flow",
         }
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
@@ -133,17 +138,13 @@ class TestRoutingSignalSchema:
             "confidence": "medium",
             "reason": "Tests failing, need another iteration",
             "can_further_iteration_help": True,
-            "loop_count": 2
+            "loop_count": 2,
         }
         validate(signal, routing_signal_schema)
 
     def test_loop_requires_can_further_iteration_help(self, routing_signal_schema):
         """Test that loop decision requires can_further_iteration_help."""
-        signal = {
-            "decision": "loop",
-            "confidence": "medium",
-            "reason": "Tests failing"
-        }
+        signal = {"decision": "loop", "confidence": "medium", "reason": "Tests failing"}
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
 
@@ -152,7 +153,7 @@ class TestRoutingSignalSchema:
         signal = {
             "decision": "terminate",
             "confidence": "high",
-            "reason": "Critical error, cannot continue"
+            "reason": "Critical error, cannot continue",
         }
         validate(signal, routing_signal_schema)
 
@@ -162,17 +163,13 @@ class TestRoutingSignalSchema:
             "decision": "branch",
             "confidence": "high",
             "reason": "Condition met for alternative path",
-            "branch_target": "error-handler"
+            "branch_target": "error-handler",
         }
         validate(signal, routing_signal_schema)
 
     def test_branch_requires_branch_target(self, routing_signal_schema):
         """Test that branch decision requires branch_target."""
-        signal = {
-            "decision": "branch",
-            "confidence": "high",
-            "reason": "Missing branch_target"
-        }
+        signal = {"decision": "branch", "confidence": "high", "reason": "Missing branch_target"}
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
 
@@ -185,8 +182,8 @@ class TestRoutingSignalSchema:
             "skip_justification": {
                 "skip_reason": "Tests already passing from previous iteration",
                 "why_not_needed_for_exit": "Exit criteria AC-001 already satisfied by upstream step",
-                "replacement_assurance": "Coverage verified by test-critic in step 3"
-            }
+                "replacement_assurance": "Coverage verified by test-critic in step 3",
+            },
         }
         validate(signal, routing_signal_schema)
 
@@ -195,7 +192,7 @@ class TestRoutingSignalSchema:
         signal = {
             "decision": "skip",
             "confidence": "high",
-            "reason": "Want to skip but no justification"
+            "reason": "Want to skip but no justification",
         }
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
@@ -209,7 +206,7 @@ class TestRoutingSignalSchema:
             "skip_justification": {
                 "skip_reason": "Tests already passing"
                 # Missing: why_not_needed_for_exit, replacement_assurance
-            }
+            },
         }
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
@@ -222,9 +219,9 @@ class TestRoutingSignalSchema:
             "reason": "Skipping",
             "skip_justification": {
                 "skip_reason": "Tests already passing",
-                "why_not_needed_for_exit": "Already covered"
+                "why_not_needed_for_exit": "Already covered",
                 # Missing: replacement_assurance
-            }
+            },
         }
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
@@ -238,8 +235,8 @@ class TestRoutingSignalSchema:
             "next_step": "clarifier",
             "why_now": {
                 "trigger": "Tests failed with Method Not Found error",
-                "relevance_to_charter": "Cannot satisfy AC-002 without upstream fix"
-            }
+                "relevance_to_charter": "Cannot satisfy AC-002 without upstream fix",
+            },
         }
         validate(signal, routing_signal_schema)
 
@@ -257,10 +254,10 @@ class TestRoutingSignalSchema:
                 "alternatives_considered": [
                     "Use deprecated v2.2 API",
                     "Implement auth wrapper",
-                    "Defer feature to next sprint"
+                    "Defer feature to next sprint",
                 ],
-                "expected_outcome": "Risk assessment will inform go/no-go decision"
-            }
+                "expected_outcome": "Risk assessment will inform go/no-go decision",
+            },
         }
         validate(signal, routing_signal_schema)
 
@@ -271,9 +268,7 @@ class TestRoutingSignalSchema:
             "confidence": "high",
             "reason": "Missing trigger",
             "next_step": "test",
-            "why_now": {
-                "relevance_to_charter": "Important but missing trigger"
-            }
+            "why_now": {"relevance_to_charter": "Important but missing trigger"},
         }
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
@@ -285,9 +280,7 @@ class TestRoutingSignalSchema:
             "confidence": "high",
             "reason": "Missing relevance",
             "next_step": "test",
-            "why_now": {
-                "trigger": "Something happened"
-            }
+            "why_now": {"trigger": "Something happened"},
         }
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
@@ -297,7 +290,7 @@ class TestRoutingSignalSchema:
         signal = {
             "decision": "invalid_decision",
             "confidence": "high",
-            "reason": "Invalid decision type"
+            "reason": "Invalid decision type",
         }
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
@@ -309,7 +302,7 @@ class TestRoutingSignalSchema:
             signal = {
                 "decision": decision,
                 "confidence": "high",
-                "reason": f"Testing {decision} decision"
+                "reason": f"Testing {decision} decision",
             }
             # Add required fields based on decision type
             if decision == "advance":
@@ -322,7 +315,7 @@ class TestRoutingSignalSchema:
                 signal["skip_justification"] = {
                     "skip_reason": "reason",
                     "why_not_needed_for_exit": "explanation",
-                    "replacement_assurance": "assurance"
+                    "replacement_assurance": "assurance",
                 }
             validate(signal, routing_signal_schema)
 
@@ -331,7 +324,7 @@ class TestRoutingSignalSchema:
         signal = {
             "decision": "terminate",
             "confidence": "very_high",
-            "reason": "Invalid confidence"
+            "reason": "Invalid confidence",
         }
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
@@ -342,7 +335,7 @@ class TestRoutingSignalSchema:
             signal = {
                 "decision": "terminate",
                 "confidence": confidence,
-                "reason": f"Testing {confidence} confidence"
+                "reason": f"Testing {confidence} confidence",
             }
             validate(signal, routing_signal_schema)
 
@@ -354,7 +347,7 @@ class TestRoutingSignalSchema:
                 "decision": "terminate",
                 "confidence": "high",
                 "reason": "Testing confidence_score",
-                "confidence_score": score
+                "confidence_score": score,
             }
             validate(signal, routing_signal_schema)
 
@@ -363,7 +356,7 @@ class TestRoutingSignalSchema:
             "decision": "terminate",
             "confidence": "high",
             "reason": "Invalid score",
-            "confidence_score": 1.5
+            "confidence_score": 1.5,
         }
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
@@ -384,13 +377,10 @@ class TestRoutingSignalSchema:
                     "type": "missing_input",
                     "description": "plan/adr.md not found",
                     "artifact": "plan/adr.md",
-                    "recoverable": True
+                    "recoverable": True,
                 },
-                {
-                    "type": "validation_failure",
-                    "description": "Schema validation failed"
-                }
-            ]
+                {"type": "validation_failure", "description": "Schema validation failed"},
+            ],
         }
         validate(signal, routing_signal_schema)
 
@@ -400,12 +390,7 @@ class TestRoutingSignalSchema:
             "decision": "terminate",
             "confidence": "high",
             "reason": "Invalid blocker type",
-            "blockers": [
-                {
-                    "type": "invalid_type",
-                    "description": "Invalid blocker"
-                }
-            ]
+            "blockers": [{"type": "invalid_type", "description": "Invalid blocker"}],
         }
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
@@ -430,7 +415,7 @@ class TestRoutingSignalSchema:
             "decision": "terminate",
             "confidence": "high",
             "reason": "test",
-            "unknown_field": "should be rejected"
+            "unknown_field": "should be rejected",
         }
         with pytest.raises(ValidationError):
             validate(signal, routing_signal_schema)
@@ -440,24 +425,21 @@ class TestRoutingSignalSchema:
 # HandoffEnvelope Schema Tests
 # ==============================================================================
 
+
 @pytest.mark.skipif(not HAS_JSONSCHEMA, reason="jsonschema not installed")
 class TestHandoffEnvelopeSchema:
     """Tests for handoff_envelope.schema.json validation."""
 
     def _minimal_routing_signal(self) -> dict:
         """Create a minimal valid routing signal."""
-        return {
-            "decision": "terminate",
-            "confidence": "high",
-            "reason": "test"
-        }
+        return {"decision": "terminate", "confidence": "high", "reason": "test"}
 
     def test_valid_minimal_envelope(self, handoff_envelope_validator):
         """Test minimal valid envelope with required fields only."""
         envelope = {
             "status": "VERIFIED",
             "summary": "Step completed successfully",
-            "routing_signal": self._minimal_routing_signal()
+            "routing_signal": self._minimal_routing_signal(),
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) == 0, f"Unexpected errors: {errors}"
@@ -468,7 +450,7 @@ class TestHandoffEnvelopeSchema:
             envelope = {
                 "status": status,
                 "summary": f"Testing {status} status",
-                "routing_signal": self._minimal_routing_signal()
+                "routing_signal": self._minimal_routing_signal(),
             }
             errors = list(handoff_envelope_validator.iter_errors(envelope))
             assert len(errors) == 0, f"Status {status} failed: {errors}"
@@ -478,7 +460,7 @@ class TestHandoffEnvelopeSchema:
         envelope = {
             "status": "INVALID_STATUS",
             "summary": "Invalid status",
-            "routing_signal": self._minimal_routing_signal()
+            "routing_signal": self._minimal_routing_signal(),
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) > 0, "Expected validation error for invalid status"
@@ -494,7 +476,7 @@ class TestHandoffEnvelopeSchema:
                     "type": "action_taken",
                     "observation": "Refactored helper function for clarity",
                     "reason": "Part of test implementation",
-                    "priority": "low"
+                    "priority": "low",
                 },
                 {
                     "type": "action_deferred",
@@ -502,35 +484,32 @@ class TestHandoffEnvelopeSchema:
                     "reason": "I am in Flow 3 (Build), so I ignored the outdated README",
                     "suggested_action": "Add to Flow 7 backlog",
                     "target_flow": "7-wisdom",
-                    "priority": "medium"
+                    "priority": "medium",
                 },
                 {
                     "type": "optimization_opportunity",
-                    "observation": "Duplicate code pattern detected in auth module"
+                    "observation": "Duplicate code pattern detected in auth module",
                 },
-                {
-                    "type": "pattern_detected",
-                    "observation": "Recurring error handling approach"
-                }
-            ]
+                {"type": "pattern_detected", "observation": "Recurring error handling approach"},
+            ],
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) == 0, f"Observation validation failed: {errors}"
 
     def test_observation_type_enum_values(self, handoff_envelope_validator):
         """Test all valid observation type enum values."""
-        valid_types = ["action_taken", "action_deferred", "optimization_opportunity", "pattern_detected"]
+        valid_types = [
+            "action_taken",
+            "action_deferred",
+            "optimization_opportunity",
+            "pattern_detected",
+        ]
         for obs_type in valid_types:
             envelope = {
                 "status": "VERIFIED",
                 "summary": "test",
                 "routing_signal": self._minimal_routing_signal(),
-                "observations": [
-                    {
-                        "type": obs_type,
-                        "observation": f"Testing {obs_type}"
-                    }
-                ]
+                "observations": [{"type": obs_type, "observation": f"Testing {obs_type}"}],
             }
             errors = list(handoff_envelope_validator.iter_errors(envelope))
             assert len(errors) == 0, f"Observation type {obs_type} failed: {errors}"
@@ -541,12 +520,7 @@ class TestHandoffEnvelopeSchema:
             "status": "VERIFIED",
             "summary": "test",
             "routing_signal": self._minimal_routing_signal(),
-            "observations": [
-                {
-                    "type": "invalid_type",
-                    "observation": "Should fail"
-                }
-            ]
+            "observations": [{"type": "invalid_type", "observation": "Should fail"}],
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) > 0, "Expected validation error for invalid observation type"
@@ -562,7 +536,7 @@ class TestHandoffEnvelopeSchema:
                     "type": "action_taken"
                     # Missing: observation
                 }
-            ]
+            ],
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) > 0, "Expected validation error for missing observation field"
@@ -579,30 +553,30 @@ class TestHandoffEnvelopeSchema:
                     "suggested_action": "Run clarifier to resolve ambiguous requirements",
                     "reason": "AC-003 has multiple interpretations",
                     "evidence_paths": ["plan/requirements.md", "signal/bdd.feature"],
-                    "confidence": 0.85
+                    "confidence": 0.85,
                 },
                 {
                     "kind": "suggest_repeat",
                     "suggested_action": "Re-run test-author with updated context",
-                    "reason": "New edge case discovered"
+                    "reason": "New edge case discovered",
                 },
                 {
                     "kind": "suggest_subflow_injection",
                     "suggested_action": "Inject security-scanner subflow",
                     "reason": "Authentication code modified",
-                    "confidence": 0.9
+                    "confidence": 0.9,
                 },
                 {
                     "kind": "suggest_defer_to_wisdom",
                     "suggested_action": "Analyze recurring test flakiness pattern",
-                    "reason": "Third flaky test this sprint"
+                    "reason": "Third flaky test this sprint",
                 },
                 {
                     "kind": "flag_concern",
                     "suggested_action": "Review hardcoded timeout values",
-                    "reason": "May cause issues in CI environment"
-                }
-            ]
+                    "reason": "May cause issues in CI environment",
+                },
+            ],
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) == 0, f"Station opinions validation failed: {errors}"
@@ -614,7 +588,7 @@ class TestHandoffEnvelopeSchema:
             "suggest_repeat",
             "suggest_subflow_injection",
             "suggest_defer_to_wisdom",
-            "flag_concern"
+            "flag_concern",
         ]
         for kind in valid_kinds:
             envelope = {
@@ -622,12 +596,8 @@ class TestHandoffEnvelopeSchema:
                 "summary": "test",
                 "routing_signal": self._minimal_routing_signal(),
                 "station_opinions": [
-                    {
-                        "kind": kind,
-                        "suggested_action": f"Testing {kind}",
-                        "reason": "Test reason"
-                    }
-                ]
+                    {"kind": kind, "suggested_action": f"Testing {kind}", "reason": "Test reason"}
+                ],
             }
             errors = list(handoff_envelope_validator.iter_errors(envelope))
             assert len(errors) == 0, f"Opinion kind {kind} failed: {errors}"
@@ -642,9 +612,9 @@ class TestHandoffEnvelopeSchema:
                 {
                     "kind": "invalid_kind",
                     "suggested_action": "Should fail",
-                    "reason": "Invalid kind"
+                    "reason": "Invalid kind",
                 }
-            ]
+            ],
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) > 0, "Expected validation error for invalid station opinion kind"
@@ -662,9 +632,9 @@ class TestHandoffEnvelopeSchema:
                         "kind": "suggest_detour",
                         "suggested_action": "test",
                         "reason": "test",
-                        "confidence": confidence
+                        "confidence": confidence,
                     }
-                ]
+                ],
             }
             errors = list(handoff_envelope_validator.iter_errors(envelope))
             assert len(errors) == 0, f"Confidence {confidence} failed: {errors}"
@@ -679,9 +649,9 @@ class TestHandoffEnvelopeSchema:
                     "kind": "suggest_detour",
                     "suggested_action": "test",
                     "reason": "test",
-                    "confidence": 1.5
+                    "confidence": 1.5,
                 }
-            ]
+            ],
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) > 0, "Expected validation error for confidence > 1"
@@ -693,12 +663,7 @@ class TestHandoffEnvelopeSchema:
             "status": "VERIFIED",
             "summary": "test",
             "routing_signal": self._minimal_routing_signal(),
-            "station_opinions": [
-                {
-                    "suggested_action": "test",
-                    "reason": "test"
-                }
-            ]
+            "station_opinions": [{"suggested_action": "test", "reason": "test"}],
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) > 0, "Expected validation error for missing kind"
@@ -725,13 +690,10 @@ class TestHandoffEnvelopeSchema:
                     "action": "created",
                     "description": "Test execution summary",
                     "hash": "abc123",
-                    "size_bytes": 1024
+                    "size_bytes": 1024,
                 },
-                {
-                    "path": "build/receipt.json",
-                    "action": "modified"
-                }
-            ]
+                {"path": "build/receipt.json", "action": "modified"},
+            ],
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) == 0, f"Artifact validation failed: {errors}"
@@ -743,9 +705,7 @@ class TestHandoffEnvelopeSchema:
                 "status": "VERIFIED",
                 "summary": "test",
                 "routing_signal": self._minimal_routing_signal(),
-                "artifacts": [
-                    {"path": "test/file.md", "action": action}
-                ]
+                "artifacts": [{"path": "test/file.md", "action": action}],
             }
             errors = list(handoff_envelope_validator.iter_errors(envelope))
             assert len(errors) == 0, f"Action {action} failed: {errors}"
@@ -762,14 +722,10 @@ class TestHandoffEnvelopeSchema:
                     "change_type": "modified",
                     "lines_added": 15,
                     "lines_removed": 3,
-                    "summary": "Added password validation"
+                    "summary": "Added password validation",
                 },
-                {
-                    "path": "src/utils.py",
-                    "change_type": "renamed",
-                    "old_path": "src/helpers.py"
-                }
-            ]
+                {"path": "src/utils.py", "change_type": "renamed", "old_path": "src/helpers.py"},
+            ],
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) == 0, f"File change validation failed: {errors}"
@@ -781,9 +737,7 @@ class TestHandoffEnvelopeSchema:
                 "status": "VERIFIED",
                 "summary": "test",
                 "routing_signal": self._minimal_routing_signal(),
-                "file_changes": [
-                    {"path": "test.py", "change_type": change_type}
-                ]
+                "file_changes": [{"path": "test.py", "change_type": change_type}],
             }
             errors = list(handoff_envelope_validator.iter_errors(envelope))
             assert len(errors) == 0, f"Change type {change_type} failed: {errors}"
@@ -798,13 +752,10 @@ class TestHandoffEnvelopeSchema:
                 {
                     "concern": "Test coverage below 80%",
                     "severity": "high",
-                    "recommendation": "Add unit tests for edge cases"
+                    "recommendation": "Add unit tests for edge cases",
                 },
-                {
-                    "concern": "Minor code style inconsistency",
-                    "severity": "low"
-                }
-            ]
+                {"concern": "Minor code style inconsistency", "severity": "low"},
+            ],
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) == 0, f"Concerns validation failed: {errors}"
@@ -816,9 +767,7 @@ class TestHandoffEnvelopeSchema:
                 "status": "VERIFIED",
                 "summary": "test",
                 "routing_signal": self._minimal_routing_signal(),
-                "concerns": [
-                    {"concern": "test concern", "severity": severity}
-                ]
+                "concerns": [{"concern": "test concern", "severity": severity}],
             }
             errors = list(handoff_envelope_validator.iter_errors(envelope))
             assert len(errors) == 0, f"Severity {severity} failed: {errors}"
@@ -828,24 +777,18 @@ class TestHandoffEnvelopeSchema:
 # FlowGraph Schema Tests
 # ==============================================================================
 
+
 @pytest.mark.skipif(not HAS_JSONSCHEMA, reason="jsonschema not installed")
 class TestFlowGraphSchema:
     """Tests for flow_graph.schema.json validation."""
 
     def _minimal_node(self, node_id: str = "test-node") -> dict:
         """Create a minimal valid node."""
-        return {
-            "node_id": node_id,
-            "template_id": "test-template"
-        }
+        return {"node_id": node_id, "template_id": "test-template"}
 
     def _minimal_edge(self, edge_id: str, from_node: str, to_node: str) -> dict:
         """Create a minimal valid edge."""
-        return {
-            "edge_id": edge_id,
-            "from": from_node,
-            "to": to_node
-        }
+        return {"edge_id": edge_id, "from": from_node, "to": to_node}
 
     def test_valid_minimal_flow_graph(self, flow_graph_schema):
         """Test minimal valid flow graph with required fields."""
@@ -855,7 +798,7 @@ class TestFlowGraphSchema:
             "title": "Test Flow",
             "flow_number": 3,
             "nodes": [self._minimal_node()],
-            "edges": []
+            "edges": [],
         }
         validate(graph, flow_graph_schema)
 
@@ -868,7 +811,7 @@ class TestFlowGraphSchema:
                 "title": f"Flow {flow_num}",
                 "flow_number": flow_num,
                 "nodes": [self._minimal_node()],
-                "edges": []
+                "edges": [],
             }
             validate(graph, flow_graph_schema)
 
@@ -881,7 +824,7 @@ class TestFlowGraphSchema:
             "title": "Invalid Flow",
             "flow_number": 0,
             "nodes": [self._minimal_node()],
-            "edges": []
+            "edges": [],
         }
         with pytest.raises(ValidationError):
             validate(graph, flow_graph_schema)
@@ -904,18 +847,14 @@ class TestFlowGraphSchema:
             "charter": {
                 "goal": "Produces verified code that satisfies the AC Matrix",
                 "question": "Does implementation match design?",
-                "exit_criteria": [
-                    "All tests pass",
-                    "Coverage >= 80%",
-                    "No lint errors"
-                ],
+                "exit_criteria": ["All tests pass", "Coverage >= 80%", "No lint errors"],
                 "non_goals": [
                     "Updating documentation",
                     "Refactoring unrelated code",
-                    "Performance optimization"
+                    "Performance optimization",
                 ],
-                "prime_directive": "Maximize passing tests. Minimize changes. Only detach from Golden Path if build is blocked."
-            }
+                "prime_directive": "Maximize passing tests. Minimize changes. Only detach from Golden Path if build is blocked.",
+            },
         }
         validate(graph, flow_graph_schema)
 
@@ -929,9 +868,7 @@ class TestFlowGraphSchema:
             "flow_number": 3,
             "nodes": [self._minimal_node()],
             "edges": [],
-            "charter": {
-                "exit_criteria": ["All tests pass"]
-            }
+            "charter": {"exit_criteria": ["All tests pass"]},
         }
         with pytest.raises(ValidationError):
             validate(graph, flow_graph_schema)
@@ -952,8 +889,8 @@ class TestFlowGraphSchema:
             "edges": [],
             "charter": {
                 "goal": "Test goal",
-                "exit_criteria": []  # Empty array
-            }
+                "exit_criteria": [],  # Empty array
+            },
         }
         with pytest.raises(ValidationError):
             validate(graph, flow_graph_schema)
@@ -974,22 +911,22 @@ class TestFlowGraphSchema:
                             "station_id": "clarifier",
                             "typical_trigger": "When requirements have ambiguous scope",
                             "routing_type": "DETOUR",
-                            "priority": 75
+                            "priority": 75,
                         },
                         {
                             "station_id": "risk-analyst",
-                            "typical_trigger": "When security-sensitive code detected"
+                            "typical_trigger": "When security-sensitive code detected",
                         },
                         {
                             "station_id": "test-microloop",
                             "typical_trigger": "When complex feature needs iterative testing",
                             "routing_type": "INJECT_FLOW",
-                            "priority": 60
-                        }
-                    ]
+                            "priority": 60,
+                        },
+                    ],
                 }
             ],
-            "edges": []
+            "edges": [],
         }
         validate(graph, flow_graph_schema)
 
@@ -1005,12 +942,10 @@ class TestFlowGraphSchema:
                 {
                     "node_id": "test",
                     "template_id": "test",
-                    "suggested_sidequests": [
-                        {"typical_trigger": "When something happens"}
-                    ]
+                    "suggested_sidequests": [{"typical_trigger": "When something happens"}],
                 }
             ],
-            "edges": []
+            "edges": [],
         }
         with pytest.raises(ValidationError):
             validate(graph, flow_graph_schema)
@@ -1037,12 +972,12 @@ class TestFlowGraphSchema:
                             {
                                 "station_id": "clarifier",
                                 "typical_trigger": "test",
-                                "routing_type": routing_type
+                                "routing_type": routing_type,
                             }
-                        ]
+                        ],
                     }
                 ],
-                "edges": []
+                "edges": [],
             }
             validate(graph, flow_graph_schema)
 
@@ -1068,12 +1003,12 @@ class TestFlowGraphSchema:
                             {
                                 "station_id": "clarifier",
                                 "typical_trigger": "test",
-                                "priority": priority
+                                "priority": priority,
                             }
-                        ]
+                        ],
                     }
                 ],
-                "edges": []
+                "edges": [],
             }
             validate(graph, flow_graph_schema)
 
@@ -1108,14 +1043,11 @@ class TestFlowGraphSchema:
                         "height": 60,
                         "collapsed": False,
                         "hidden": False,
-                        "teaching": {
-                            "highlight": True,
-                            "note": "Heavy context loading step"
-                        }
-                    }
+                        "teaching": {"highlight": True, "note": "Heavy context loading step"},
+                    },
                 }
             ],
-            "edges": []
+            "edges": [],
         }
         validate(graph, flow_graph_schema)
 
@@ -1128,14 +1060,8 @@ class TestFlowGraphSchema:
                 "version": 1,
                 "title": "Test Flow",
                 "flow_number": 3,
-                "nodes": [
-                    {
-                        "node_id": "test",
-                        "template_id": "test",
-                        "ui": {"type": ui_type}
-                    }
-                ],
-                "edges": []
+                "nodes": [{"node_id": "test", "template_id": "test", "ui": {"type": ui_type}}],
+                "edges": [],
             }
             validate(graph, flow_graph_schema)
 
@@ -1146,10 +1072,7 @@ class TestFlowGraphSchema:
             "version": 1,
             "title": "Test Flow",
             "flow_number": 3,
-            "nodes": [
-                self._minimal_node("node-a"),
-                self._minimal_node("node-b")
-            ],
+            "nodes": [self._minimal_node("node-a"), self._minimal_node("node-b")],
             "edges": [
                 {
                     "edge_id": "e1-a-to-b",
@@ -1157,11 +1080,7 @@ class TestFlowGraphSchema:
                     "to": "node-b",
                     "type": "sequence",
                     "priority": 50,
-                    "condition": {
-                        "field": "status",
-                        "operator": "equals",
-                        "value": "VERIFIED"
-                    },
+                    "condition": {"field": "status", "operator": "equals", "value": "VERIFIED"},
                     "ui": {
                         "label": "Success",
                         "style": "solid",
@@ -1169,10 +1088,10 @@ class TestFlowGraphSchema:
                         "color": "#22c55e",
                         "width": 2,
                         "marker_end": "arrowclosed",
-                        "curve_type": "bezier"
-                    }
+                        "curve_type": "bezier",
+                    },
                 }
-            ]
+            ],
         }
         validate(graph, flow_graph_schema)
 
@@ -1185,46 +1104,40 @@ class TestFlowGraphSchema:
                 "version": 1,
                 "title": "Test Flow",
                 "flow_number": 3,
-                "nodes": [
-                    self._minimal_node("node-a"),
-                    self._minimal_node("node-b")
-                ],
-                "edges": [
-                    {
-                        "edge_id": "e1",
-                        "from": "node-a",
-                        "to": "node-b",
-                        "type": edge_type
-                    }
-                ]
+                "nodes": [self._minimal_node("node-a"), self._minimal_node("node-b")],
+                "edges": [{"edge_id": "e1", "from": "node-a", "to": "node-b", "type": edge_type}],
             }
             validate(graph, flow_graph_schema)
 
     def test_edge_condition_operators(self, flow_graph_schema):
         """Test all valid edge condition operators."""
-        operators = ["equals", "not_equals", "in", "not_in", "contains", "gt", "lt", "gte", "lte", "matches"]
+        operators = [
+            "equals",
+            "not_equals",
+            "in",
+            "not_in",
+            "contains",
+            "gt",
+            "lt",
+            "gte",
+            "lte",
+            "matches",
+        ]
         for operator in operators:
             graph = {
                 "id": "test-flow",
                 "version": 1,
                 "title": "Test Flow",
                 "flow_number": 3,
-                "nodes": [
-                    self._minimal_node("node-a"),
-                    self._minimal_node("node-b")
-                ],
+                "nodes": [self._minimal_node("node-a"), self._minimal_node("node-b")],
                 "edges": [
                     {
                         "edge_id": "e1",
                         "from": "node-a",
                         "to": "node-b",
-                        "condition": {
-                            "field": "test_field",
-                            "operator": operator,
-                            "value": "test"
-                        }
+                        "condition": {"field": "test_field", "operator": operator, "value": "test"},
                     }
-                ]
+                ],
             }
             validate(graph, flow_graph_schema)
 
@@ -1246,7 +1159,7 @@ class TestFlowGraphSchema:
                         "to_station": "clarifier",
                         "return_to": "next",
                         "max_uses": 2,
-                        "priority": 70
+                        "priority": 70,
                     }
                 ],
                 "suggested_injections": [
@@ -1255,7 +1168,7 @@ class TestFlowGraphSchema:
                         "inject_after": ["code-implement"],
                         "injection_type": "INJECT_NODES",
                         "one_shot": True,
-                        "priority": 60
+                        "priority": 60,
                     }
                 ],
                 "routing_decisions": {
@@ -1264,24 +1177,17 @@ class TestFlowGraphSchema:
                     "signal_interpretation": {
                         "on_verified": "CONTINUE",
                         "on_unverified_can_iterate": "CONTINUE",
-                        "on_blocked": "DETOUR"
-                    }
+                        "on_blocked": "DETOUR",
+                    },
                 },
-                "escalation": {
-                    "on_blocked": "continue_with_concerns",
-                    "max_unverified_streak": 3
-                },
+                "escalation": {"on_blocked": "continue_with_concerns", "max_unverified_streak": 3},
                 "timeout": {
                     "node_timeout_seconds": 600,
                     "flow_timeout_seconds": 3600,
-                    "on_timeout": "fail"
+                    "on_timeout": "fail",
                 },
-                "retry": {
-                    "enabled": True,
-                    "max_attempts": 2,
-                    "backoff_seconds": 30
-                }
-            }
+                "retry": {"enabled": True, "max_attempts": 2, "backoff_seconds": 30},
+            },
         }
         validate(graph, flow_graph_schema)
 
@@ -1296,11 +1202,7 @@ class TestFlowGraphSchema:
                 "flow_number": 3,
                 "nodes": [self._minimal_node()],
                 "edges": [],
-                "policy": {
-                    "routing_decisions": {
-                        "default_decision": decision
-                    }
-                }
+                "policy": {"routing_decisions": {"default_decision": decision}},
             }
             validate(graph, flow_graph_schema)
 
@@ -1311,13 +1213,8 @@ class TestFlowGraphSchema:
             "version": 1,
             "title": "Build Flow",
             "flow_number": 3,
-            "nodes": [
-                self._minimal_node("test-author"),
-                self._minimal_node("test-critic")
-            ],
-            "edges": [
-                self._minimal_edge("e1", "test-author", "test-critic")
-            ],
+            "nodes": [self._minimal_node("test-author"), self._minimal_node("test-critic")],
+            "edges": [self._minimal_edge("e1", "test-author", "test-critic")],
             "subflows": [
                 {
                     "subflow_id": "test-microloop",
@@ -1329,14 +1226,11 @@ class TestFlowGraphSchema:
                     "ui": {
                         "color": "#fef3c7",
                         "collapsed_by_default": False,
-                        "position": {"x": 100, "y": 100}
+                        "position": {"x": 100, "y": 100},
                     },
-                    "policy": {
-                        "allow_external_entry": False,
-                        "allow_external_exit": False
-                    }
+                    "policy": {"allow_external_entry": False, "allow_external_exit": False},
                 }
-            ]
+            ],
         }
         validate(graph, flow_graph_schema)
 
@@ -1354,9 +1248,9 @@ class TestFlowGraphSchema:
                     "subflow_id": "test-subflow",
                     "title": "Test Subflow",
                     "entry_node": "test-node",
-                    "exit_nodes": []  # Empty
+                    "exit_nodes": [],  # Empty
                 }
-            ]
+            ],
         }
         with pytest.raises(ValidationError):
             validate(graph, flow_graph_schema)
@@ -1373,12 +1267,12 @@ class TestFlowGraphSchema:
             "on_complete": {
                 "next_flow": "4-review",
                 "reason": "Build complete; proceed to PR review",
-                "pass_artifacts": ["build/receipt.json", "build/test_summary.md"]
+                "pass_artifacts": ["build/receipt.json", "build/test_summary.md"],
             },
             "on_failure": {
                 "next_flow": "2-plan",
-                "reason": "Implementation issues may require design changes"
-            }
+                "reason": "Implementation issues may require design changes",
+            },
         }
         validate(graph, flow_graph_schema)
 
@@ -1393,7 +1287,15 @@ class TestFlowGraphSchema:
         No pattern validation is enforced at the schema level.
         """
         # Valid patterns - main SDLC flows
-        valid_flows = ["1-signal", "2-plan", "3-build", "4-review", "5-gate", "6-deploy", "7-wisdom"]
+        valid_flows = [
+            "1-signal",
+            "2-plan",
+            "3-build",
+            "4-review",
+            "5-gate",
+            "6-deploy",
+            "7-wisdom",
+        ]
         for next_flow in valid_flows:
             graph = {
                 "id": "test-flow",
@@ -1402,7 +1304,7 @@ class TestFlowGraphSchema:
                 "flow_number": 3,
                 "nodes": [self._minimal_node()],
                 "edges": [],
-                "on_complete": {"next_flow": next_flow}
+                "on_complete": {"next_flow": next_flow},
             }
             validate(graph, flow_graph_schema)
 
@@ -1415,7 +1317,7 @@ class TestFlowGraphSchema:
                 "flow_number": 8,  # Utility flow
                 "nodes": [self._minimal_node()],
                 "edges": [],
-                "on_complete": {"next_flow": special_value}
+                "on_complete": {"next_flow": special_value},
             }
             validate(graph, flow_graph_schema)
 
@@ -1430,7 +1332,7 @@ class TestFlowGraphSchema:
                 "title": "Test Flow",
                 "flow_number": 3,
                 "nodes": [self._minimal_node()],
-                "edges": []
+                "edges": [],
             }
             validate(graph, flow_graph_schema)
 
@@ -1452,7 +1354,7 @@ class TestFlowGraphSchema:
                 "title": "Test Flow",
                 "flow_number": 3,
                 "nodes": [{"node_id": node_id, "template_id": "test"}],
-                "edges": []
+                "edges": [],
             }
             validate(graph, flow_graph_schema)
 
@@ -1470,7 +1372,7 @@ class TestFlowGraphSchema:
             "title": "Test",
             "flow_number": 3,
             "nodes": [self._minimal_node()],
-            "edges": []
+            "edges": [],
         }
 
         # Missing id
@@ -1509,7 +1411,7 @@ class TestFlowGraphSchema:
             "title": "Test Flow",
             "flow_number": 3,
             "nodes": [],  # Empty
-            "edges": []
+            "edges": [],
         }
         with pytest.raises(ValidationError):
             validate(graph, flow_graph_schema)
@@ -1518,6 +1420,7 @@ class TestFlowGraphSchema:
 # ==============================================================================
 # Cross-Schema Integration Tests
 # ==============================================================================
+
 
 @pytest.mark.skipif(not HAS_JSONSCHEMA, reason="jsonschema not installed")
 class TestCrossSchemaIntegration:
@@ -1535,18 +1438,15 @@ class TestCrossSchemaIntegration:
                 "next_step": "code-critic",
                 "why_now": {
                     "trigger": "Test coverage improved to 95%",
-                    "relevance_to_charter": "Meets AC-002 coverage requirement"
+                    "relevance_to_charter": "Meets AC-002 coverage requirement",
                 },
                 "confidence_score": 0.95,
-                "metadata": {
-                    "station_id": "test-author",
-                    "flow_id": "3-build"
-                }
+                "metadata": {"station_id": "test-author", "flow_id": "3-build"},
             },
             "observations": [
                 {
                     "type": "optimization_opportunity",
-                    "observation": "Could parallelize test execution"
+                    "observation": "Could parallelize test execution",
                 }
             ],
             "station_opinions": [
@@ -1554,9 +1454,9 @@ class TestCrossSchemaIntegration:
                     "kind": "suggest_defer_to_wisdom",
                     "suggested_action": "Analyze test execution time trends",
                     "reason": "Tests taking longer each sprint",
-                    "confidence": 0.7
+                    "confidence": 0.7,
                 }
-            ]
+            ],
         }
         errors = list(handoff_envelope_validator.iter_errors(envelope))
         assert len(errors) == 0, f"Integration validation failed: {errors}"
@@ -1572,16 +1472,9 @@ class TestCrossSchemaIntegration:
             "charter": {
                 "goal": "Produces verified code that satisfies the AC Matrix",
                 "question": "Does implementation match design?",
-                "exit_criteria": [
-                    "All tests pass",
-                    "Coverage >= 80%",
-                    "No critical lint errors"
-                ],
-                "non_goals": [
-                    "Updating documentation",
-                    "Refactoring unrelated code"
-                ],
-                "prime_directive": "Maximize passing tests. Minimize changes."
+                "exit_criteria": ["All tests pass", "Coverage >= 80%", "No critical lint errors"],
+                "non_goals": ["Updating documentation", "Refactoring unrelated code"],
+                "prime_directive": "Maximize passing tests. Minimize changes.",
             },
             "nodes": [
                 {
@@ -1592,7 +1485,7 @@ class TestCrossSchemaIntegration:
                             "station_id": "clarifier",
                             "typical_trigger": "When test scenarios have ambiguous scope",
                             "routing_type": "DETOUR",
-                            "priority": 70
+                            "priority": 70,
                         }
                     ],
                     "ui": {
@@ -1600,9 +1493,9 @@ class TestCrossSchemaIntegration:
                         "type": "step",
                         "teaching": {
                             "highlight": True,
-                            "note": "Author tests based on BDD scenarios"
-                        }
-                    }
+                            "note": "Author tests based on BDD scenarios",
+                        },
+                    },
                 },
                 {
                     "node_id": "test-critic",
@@ -1611,44 +1504,37 @@ class TestCrossSchemaIntegration:
                         {
                             "station_id": "risk-analyst",
                             "typical_trigger": "When security test coverage is low",
-                            "routing_type": "INJECT_NODES"
+                            "routing_type": "INJECT_NODES",
                         }
-                    ]
-                }
+                    ],
+                },
             ],
             "edges": [
                 {
                     "edge_id": "e1-author-to-critic",
                     "from": "test-author",
                     "to": "test-critic",
-                    "type": "sequence"
+                    "type": "sequence",
                 },
                 {
                     "edge_id": "e2-loop-back",
                     "from": "test-critic",
                     "to": "test-author",
                     "type": "loop",
-                    "condition": {
-                        "field": "status",
-                        "operator": "equals",
-                        "value": "UNVERIFIED"
-                    }
-                }
+                    "condition": {"field": "status", "operator": "equals", "value": "UNVERIFIED"},
+                },
             ],
             "policy": {
                 "max_loop_iterations": 3,
                 "routing_decisions": {
                     "default_decision": "CONTINUE",
-                    "signal_interpretation": {
-                        "on_verified": "CONTINUE",
-                        "on_blocked": "DETOUR"
-                    }
-                }
+                    "signal_interpretation": {"on_verified": "CONTINUE", "on_blocked": "DETOUR"},
+                },
             },
             "on_complete": {
                 "next_flow": "4-review",
-                "reason": "Build complete; proceed to PR review"
-            }
+                "reason": "Build complete; proceed to PR review",
+            },
         }
         validate(graph, flow_graph_schema)
 
@@ -1656,6 +1542,7 @@ class TestCrossSchemaIntegration:
 # ==============================================================================
 # Schema File Existence Tests
 # ==============================================================================
+
 
 class TestSchemaFileExistence:
     """Tests for schema file existence and basic structure."""
@@ -1688,7 +1575,7 @@ class TestSchemaFileExistence:
         required_schemas = [
             "routing_signal.schema.json",
             "handoff_envelope.schema.json",
-            "flow_graph.schema.json"
+            "flow_graph.schema.json",
         ]
 
         for schema_name in required_schemas:

@@ -8,7 +8,6 @@ with `--output-format stream-json`.
 from __future__ import annotations
 
 import json
-import shlex
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path

@@ -6,10 +6,9 @@ paths exist in the repository.
 
 Issue: #22
 """
+
 import json
 from pathlib import Path
-
-import pytest
 
 REPO_ROOT = Path(__file__).parent.parent
 MANIFEST_PATH = REPO_ROOT / "ux_manifest.json"
@@ -153,8 +152,8 @@ class TestLayoutSpecConsistency:
 
     def test_layout_screens_endpoint_responds(self):
         """FastAPI must serve /api/layout_screens."""
-        from swarm.tools.flow_studio_fastapi import app
         from fastapi.testclient import TestClient
+        from swarm.tools.flow_studio_fastapi import app
 
         client = TestClient(app)
         resp = client.get("/api/layout_screens")
@@ -166,8 +165,8 @@ class TestLayoutScreensAPIConsistency:
 
     def test_api_screens_have_required_fields(self):
         """Each screen from API must have id, route, regions, description."""
-        from swarm.tools.flow_studio_fastapi import app
         from fastapi.testclient import TestClient
+        from swarm.tools.flow_studio_fastapi import app
 
         client = TestClient(app)
         resp = client.get("/api/layout_screens")
@@ -185,8 +184,8 @@ class TestLayoutScreensAPIConsistency:
 
     def test_api_screens_routes_are_valid(self):
         """All screen routes should be valid URL patterns."""
-        from swarm.tools.flow_studio_fastapi import app
         from fastapi.testclient import TestClient
+        from swarm.tools.flow_studio_fastapi import app
 
         client = TestClient(app)
         resp = client.get("/api/layout_screens")
@@ -202,8 +201,8 @@ class TestLayoutScreensAPIConsistency:
 
     def test_api_screens_uiids_match_convention(self):
         """All UIIDs in screens should follow flow_studio.* convention."""
-        from swarm.tools.flow_studio_fastapi import app
         from fastapi.testclient import TestClient
+        from swarm.tools.flow_studio_fastapi import app
 
         client = TestClient(app)
         resp = client.get("/api/layout_screens")
@@ -219,8 +218,8 @@ class TestLayoutScreensAPIConsistency:
 
     def test_api_screens_count_matches_expectation(self):
         """Layout screens should have a reasonable count (1-20 for v0.5.0)."""
-        from swarm.tools.flow_studio_fastapi import app
         from fastapi.testclient import TestClient
+        from swarm.tools.flow_studio_fastapi import app
 
         client = TestClient(app)
         resp = client.get("/api/layout_screens")
@@ -256,4 +255,6 @@ class TestRunLayoutReview:
         tool_path = REPO_ROOT / "swarm/tools/run_layout_review.py"
         content = tool_path.read_text(encoding="utf-8")
 
-        assert "/api/layout_screens" in content, "run_layout_review.py must fetch from /api/layout_screens"
+        assert "/api/layout_screens" in content, (
+            "run_layout_review.py must fetch from /api/layout_screens"
+        )

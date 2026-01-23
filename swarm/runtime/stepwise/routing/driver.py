@@ -35,19 +35,18 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from swarm.runtime.sidequest_catalog import SidequestCatalog, load_default_catalog
 from swarm.runtime.types import (
+    RoutingCandidate,
     RoutingDecision,
     RoutingMode,
     RoutingSignal,
-    RoutingCandidate,
 )
 
 # Import from dedicated utility_candidates module to avoid circular imports
 # This module is the single source of truth for utility flow candidate generation
 from .utility_candidates import (
     INJECT_PREFIX,
-    get_utility_flow_detector,
-    set_utility_flow_registry,
-    clear_utility_flow_caches,
+)
+from .utility_candidates import (
     get_utility_flow_candidates as _get_utility_flow_candidates,
 )
 
@@ -86,8 +85,6 @@ def set_sidequest_catalog(catalog: SidequestCatalog) -> None:
     """
     global _sidequest_catalog
     _sidequest_catalog = catalog
-
-
 
 
 # =============================================================================
@@ -136,7 +133,9 @@ class RoutingOutcome:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
-            "decision": self.decision.value if hasattr(self.decision, "value") else str(self.decision),
+            "decision": self.decision.value
+            if hasattr(self.decision, "value")
+            else str(self.decision),
             "next_step_id": self.next_step_id,
             "reason": self.reason,
             "confidence": self.confidence,
@@ -534,7 +533,8 @@ def _get_sidequest_candidates(
                 evidence_pointers=[
                     f"trigger_mode:{sq.trigger_mode}",
                     f"cost_hint:{sq.cost_hint}",
-                ] + [f"tag:{tag}" for tag in sq.tags[:3]],  # Include up to 3 tags
+                ]
+                + [f"tag:{tag}" for tag in sq.tags[:3]],  # Include up to 3 tags
                 is_default=False,
             )
         )
@@ -1053,7 +1053,7 @@ def _track_utility_flow_if_selected(
     chosen_id = outcome.chosen_candidate_id
     if chosen_id and chosen_id.startswith(INJECT_PREFIX):
         # Extract flow ID from candidate ID (format: "inject_flow:<flow_id>")
-        flow_id = chosen_id[len(INJECT_PREFIX):]
+        flow_id = chosen_id[len(INJECT_PREFIX) :]
         logger.info(
             "Utility flow injection selected: %s (run_id=%s)",
             flow_id,
@@ -1093,9 +1093,7 @@ def _finalize_outcome(
     _enrich_outcome_with_sidequests(outcome, step, step_result, loop_state, run_id)
 
     # Enrich with utility flow candidates
-    _enrich_outcome_with_utility_flows(
-        outcome, step, step_result, run_state, git_status, repo_root
-    )
+    _enrich_outcome_with_utility_flows(outcome, step, step_result, run_state, git_status, repo_root)
 
     # Update loop state if looping
     _update_loop_state_if_looping(outcome, step, loop_state)
@@ -1208,8 +1206,13 @@ def route_step(
     # 2. Deterministic fallback (required in DETERMINISTIC_ONLY mode)
     if routing_mode == RoutingMode.DETERMINISTIC_ONLY:
         outcome = _try_deterministic(
-            step, step_result, run_state, loop_state, iteration,
-            flow_graph=flow_graph, flow_def=flow_def,
+            step,
+            step_result,
+            run_state,
+            loop_state,
+            iteration,
+            flow_graph=flow_graph,
+            flow_def=flow_def,
         )
         if outcome:
             logger.debug("Routing via deterministic: %s", outcome.reason)
@@ -1220,7 +1223,11 @@ def route_step(
     # 3. Navigator (for ASSIST/AUTHORITATIVE modes)
     if routing_mode in (RoutingMode.ASSIST, RoutingMode.AUTHORITATIVE):
         outcome = _try_navigator(
-            step, step_result, run_state, loop_state, iteration,
+            step,
+            step_result,
+            run_state,
+            loop_state,
+            iteration,
             routing_mode=routing_mode,
             run_id=run_id,
             flow_key=flow_key,
@@ -1248,8 +1255,13 @@ def route_step(
     # (for ASSIST/AUTHORITATIVE modes that didn't find Navigator route)
     if routing_mode != RoutingMode.DETERMINISTIC_ONLY:
         outcome = _try_deterministic(
-            step, step_result, run_state, loop_state, iteration,
-            flow_graph=flow_graph, flow_def=flow_def,
+            step,
+            step_result,
+            run_state,
+            loop_state,
+            iteration,
+            flow_graph=flow_graph,
+            flow_def=flow_def,
         )
         if outcome:
             logger.debug("Routing via deterministic (final attempt): %s", outcome.reason)
@@ -1257,7 +1269,8 @@ def route_step(
 
     # 6. Escalate: No routing strategy could determine next step
     outcome = _escalate(
-        step, step_result,
+        step,
+        step_result,
         reason="no_routing_strategy_matched",
     )
     return _finalize_outcome(outcome, **finalize_args)

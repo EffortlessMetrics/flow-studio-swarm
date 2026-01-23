@@ -4,31 +4,30 @@ This module tests the flow_registry module which provides the single source
 of truth for flow ordering, step definitions, and agent positions.
 """
 
-import pytest
-from pathlib import Path
-
 # Import the flow registry
 import sys
+from pathlib import Path
+
 _SWARM_ROOT = Path(__file__).resolve().parent.parent
 if str(_SWARM_ROOT) not in sys.path:
     sys.path.insert(0, str(_SWARM_ROOT))
 
 from swarm.config.flow_registry import (
-    FlowRegistry,
     FlowDefinition,
+    FlowRegistry,
     StepDefinition,
-    get_flow_keys,
-    get_flow_index,
-    get_flow_order,
-    get_flow_titles,
-    get_flow_descriptions,
-    get_flow_steps,
-    get_step_index,
     get_agent_position,
-    get_total_flows,
-    get_total_steps,
+    get_flow_descriptions,
+    get_flow_index,
+    get_flow_keys,
+    get_flow_order,
+    get_flow_steps,
+    get_flow_titles,
     get_sdlc_flow_keys,
+    get_step_index,
+    get_total_flows,
     get_total_sdlc_flows,
+    get_total_steps,
 )
 
 

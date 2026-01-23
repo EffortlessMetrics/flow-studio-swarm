@@ -23,7 +23,7 @@ See CLAUDE.md § UI Contract for full documentation.
 import re
 import sys
 from pathlib import Path
-from typing import Set, List, Tuple
+from typing import List, Tuple
 
 import pytest
 
@@ -41,20 +41,20 @@ if str(repo_root) not in sys.path:
 # Format: flow_studio[.<region>.<thing>[.subthing][:{dynamic_id}]]
 # The root "flow_studio" is also valid for the root container
 UIID_PATTERN = re.compile(
-    r"^flow_studio"                            # Screen prefix
-    r"(\.[a-z][a-z0-9_]*)+"                    # Region and components (snake_case)
-    r"(:[a-zA-Z0-9_:-]+)?$"                    # Optional dynamic ID suffix
-    r"|^flow_studio$"                          # OR just the root "flow_studio"
+    r"^flow_studio"  # Screen prefix
+    r"(\.[a-z][a-z0-9_]*)+"  # Region and components (snake_case)
+    r"(:[a-zA-Z0-9_:-]+)?$"  # Optional dynamic ID suffix
+    r"|^flow_studio$"  # OR just the root "flow_studio"
 )
 
 # Known valid regions
 VALID_REGIONS = {
-    "header",      # Top bar with search, mode toggle, etc.
-    "sidebar",     # Left navigation panel
-    "canvas",      # Main graph area
-    "inspector",   # Right details panel
-    "modal",       # Modal dialogs (selftest, shortcuts)
-    "sdlc_bar",    # SDLC progress bar
+    "header",  # Top bar with search, mode toggle, etc.
+    "sidebar",  # Left navigation panel
+    "canvas",  # Main graph area
+    "inspector",  # Right details panel
+    "modal",  # Modal dialogs (selftest, shortcuts)
+    "sdlc_bar",  # SDLC progress bar
 }
 
 # Layout-based names that should NOT be used (case-insensitive patterns)
@@ -131,7 +131,9 @@ def validate_uiid(uiid: str) -> List[str]:
     if len(parts) >= 2:
         region = parts[1].split(":")[0]  # Remove dynamic ID suffix if present
         if region not in VALID_REGIONS:
-            errors.append(f"'{uiid}' uses unknown region '{region}' (valid: {', '.join(sorted(VALID_REGIONS))})")
+            errors.append(
+                f"'{uiid}' uses unknown region '{region}' (valid: {', '.join(sorted(VALID_REGIONS))})"
+            )
 
     # Check for banned layout-based patterns
     for pattern, description in BANNED_PATTERNS:
@@ -149,6 +151,7 @@ def validate_uiid(uiid: str) -> List[str]:
 def get_flow_studio_html() -> str:
     """Load the Flow Studio HTML from the UI module."""
     from swarm.tools.flow_studio_ui import get_index_html
+
     return get_index_html()
 
 
@@ -204,8 +207,9 @@ class TestUIIDPattern:
 
         for uiid, expected_pattern in banned_examples:
             errors = validate_uiid(uiid)
-            assert any("banned" in e.lower() for e in errors), \
+            assert any("banned" in e.lower() for e in errors), (
                 f"Banned pattern '{uiid}' should be rejected (expected pattern: {expected_pattern})"
+            )
 
 
 class TestFlowStudioUIIDs:
@@ -241,7 +245,7 @@ class TestFlowStudioUIIDs:
                 seen[uiid] = line
 
         if duplicates:
-            pytest.fail(f"Duplicate data-uiid values found:\n" + "\n".join(duplicates))
+            pytest.fail("Duplicate data-uiid values found:\n" + "\n".join(duplicates))
 
     def test_required_regions_present(self):
         """All required UI regions should have data-uiid."""
@@ -363,13 +367,15 @@ class TestUIIDConsistency:
             if len(parts) < 2:
                 continue
 
-            region = parts[1].split(":")[0]
+            parts[1].split(":")[0]
 
             # Check that all parts after the region are valid
             for i, part in enumerate(parts[2:], start=2):
                 component = part.split(":")[0]
                 if not re.match(r"^[a-z][a-z0-9_]*$", component):
-                    inconsistencies.append(f"Line {line}: '{uiid}' has invalid component '{component}'")
+                    inconsistencies.append(
+                        f"Line {line}: '{uiid}' has invalid component '{component}'"
+                    )
 
         if inconsistencies:
             pytest.fail("UIID consistency errors:\n" + "\n".join(inconsistencies))
@@ -433,6 +439,7 @@ class TestUIIDSelectorUsage:
 
         # Group by UIID value
         from collections import Counter
+
         uiid_counts = Counter(uiid for uiid, _ in uiids)
 
         # Each UIID should appear exactly once
@@ -563,9 +570,7 @@ class TestUIIDIntegrationExample:
         assert selector.replace('[data-uiid="', 'data-uiid="').replace('"]', '"') in html
 
         # Extract the element's id for backwards-compatibility check
-        pattern = re.compile(
-            r'<input[^>]*data-uiid="flow_studio\.header\.search\.input"[^>]*>'
-        )
+        pattern = re.compile(r'<input[^>]*data-uiid="flow_studio\.header\.search\.input"[^>]*>')
         match = pattern.search(html)
         assert match, "Search input element should exist with data-uiid"
 
@@ -593,9 +598,7 @@ class TestUIIDIntegrationExample:
 
         # Verify it's a <select> element (important for automation)
         element_html = match.group(0)
-        assert element_html.startswith("<select"), (
-            "Run selector should be a <select> element"
-        )
+        assert element_html.startswith("<select"), "Run selector should be a <select> element"
 
     def test_mode_toggle_buttons_by_uiid(self):
         """Verify mode toggle buttons can be located by data-uiid.
@@ -629,16 +632,12 @@ class TestUIIDIntegrationExample:
         html = get_flow_studio_html()
 
         # Find the legend toggle element
-        pattern = re.compile(
-            r'<[^>]*data-uiid="flow_studio\.canvas\.legend\.toggle"[^>]*>'
-        )
+        pattern = re.compile(r'<[^>]*data-uiid="flow_studio\.canvas\.legend\.toggle"[^>]*>')
         match = pattern.search(html)
         assert match, "Legend toggle should exist"
 
         element_html = match.group(0)
-        assert 'aria-expanded=' in element_html, (
-            "Legend toggle should have aria-expanded attribute"
-        )
+        assert "aria-expanded=" in element_html, "Legend toggle should have aria-expanded attribute"
 
 
 class TestRunHistoryUIIDs:
@@ -783,9 +782,7 @@ class TestRunDetailModalUIIDs:
         html = get_flow_studio_html()
 
         # Find the run detail modal element
-        pattern = re.compile(
-            r'<[^>]*data-uiid="flow_studio\.modal\.run_detail"[^>]*>'
-        )
+        pattern = re.compile(r'<[^>]*data-uiid="flow_studio\.modal\.run_detail"[^>]*>')
         match = pattern.search(html)
         assert match, "Run detail modal should exist"
 
@@ -816,17 +813,13 @@ class TestRunDetailModalIntegration:
         css_selector = '[data-uiid="flow_studio.modal.run_detail"]'
 
         # Extract the actual element
-        pattern = re.compile(
-            r'<div[^>]*data-uiid="flow_studio\.modal\.run_detail"[^>]*>'
-        )
+        pattern = re.compile(r'<div[^>]*data-uiid="flow_studio\.modal\.run_detail"[^>]*>')
         match = pattern.search(html)
         assert match, f"Element with selector {css_selector} should exist"
 
         # Verify it's a div element with proper dialog attributes
         element_html = match.group(0)
-        assert 'role="dialog"' in element_html, (
-            "Run detail modal should be a dialog"
-        )
+        assert 'role="dialog"' in element_html, "Run detail modal should be a dialog"
 
     def test_run_detail_close_is_button(self):
         """Verify run detail close is a button element.
@@ -836,14 +829,12 @@ class TestRunDetailModalIntegration:
         html = get_flow_studio_html()
 
         # Extract the close button element
-        pattern = re.compile(
-            r'<button[^>]*data-uiid="flow_studio\.modal\.run_detail\.close"[^>]*>'
-        )
+        pattern = re.compile(r'<button[^>]*data-uiid="flow_studio\.modal\.run_detail\.close"[^>]*>')
         match = pattern.search(html)
         assert match, "Run detail close button should exist"
 
         element_html = match.group(0)
-        assert 'aria-label=' in element_html, (
+        assert "aria-label=" in element_html, (
             "Close button should have aria-label for accessibility"
         )
 
@@ -855,9 +846,7 @@ class TestRunDetailModalIntegration:
         html = get_flow_studio_html()
 
         # Extract the rerun button element
-        pattern = re.compile(
-            r'<button[^>]*data-uiid="flow_studio\.modal\.run_detail\.rerun"[^>]*>'
-        )
+        pattern = re.compile(r'<button[^>]*data-uiid="flow_studio\.modal\.run_detail\.rerun"[^>]*>')
         match = pattern.search(html)
         assert match, "Run detail rerun button should exist"
 
@@ -877,9 +866,7 @@ class TestRunHistoryIntegration:
         html = get_flow_studio_html()
 
         # Extract the run history list element
-        pattern = re.compile(
-            r'<div[^>]*data-uiid="flow_studio\.sidebar\.run_history\.list"[^>]*>'
-        )
+        pattern = re.compile(r'<div[^>]*data-uiid="flow_studio\.sidebar\.run_history\.list"[^>]*>')
         match = pattern.search(html)
         assert match, "Run history list should exist"
 
@@ -893,14 +880,12 @@ class TestRunHistoryIntegration:
         html = get_flow_studio_html()
 
         # Extract the run history list element
-        pattern = re.compile(
-            r'<div[^>]*data-uiid="flow_studio\.sidebar\.run_history\.list"[^>]*>'
-        )
+        pattern = re.compile(r'<div[^>]*data-uiid="flow_studio\.sidebar\.run_history\.list"[^>]*>')
         match = pattern.search(html)
         assert match, "Run history list should exist"
 
         element_html = match.group(0)
-        assert 'aria-label=' in element_html, (
+        assert "aria-label=" in element_html, (
             "Run history list should have aria-label for accessibility"
         )
 

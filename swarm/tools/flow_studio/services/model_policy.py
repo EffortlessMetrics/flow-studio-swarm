@@ -5,10 +5,10 @@ from typing import Any, Dict, List
 
 def preview_model_policy(category: str, model: str) -> Dict[str, Any]:
     from swarm.config.model_registry import (
-        load_model_policy,
-        resolve_station_model,
-        resolve_model_tier,
         VALID_TIERS,
+        load_model_policy,
+        resolve_model_tier,
+        resolve_station_model,
     )
 
     policy = load_model_policy()
@@ -55,8 +55,8 @@ def preview_model_policy(category: str, model: str) -> Dict[str, Any]:
 def get_model_policy_matrix() -> Dict[str, Any]:
     from swarm.config.model_registry import (
         load_model_policy,
-        resolve_tier_alias,
         resolve_model_tier,
+        resolve_tier_alias,
     )
 
     policy = load_model_policy()

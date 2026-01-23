@@ -190,7 +190,9 @@ class TestEventsStream:
 
         # Check for step_start events in deploy flow
         deploy_starts = [e for e in deploy_events if e.get("kind") == "step_start"]
-        assert len(deploy_starts) >= 5, f"Expected 5 deploy step_start events, got {len(deploy_starts)}"
+        assert len(deploy_starts) >= 5, (
+            f"Expected 5 deploy step_start events, got {len(deploy_starts)}"
+        )
 
     def test_sdlc_events_contain_wisdom_steps(self) -> None:
         """Full SDLC example events should contain wisdom flow events."""
@@ -203,7 +205,9 @@ class TestEventsStream:
 
         # Check for step_start events in wisdom flow
         wisdom_starts = [e for e in wisdom_events if e.get("kind") == "step_start"]
-        assert len(wisdom_starts) >= 6, f"Expected 6 wisdom step_start events, got {len(wisdom_starts)}"
+        assert len(wisdom_starts) >= 6, (
+            f"Expected 6 wisdom step_start events, got {len(wisdom_starts)}"
+        )
 
     def test_route_decision_events_exist(self) -> None:
         """Both examples should have route_decision events."""

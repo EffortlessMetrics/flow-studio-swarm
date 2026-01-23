@@ -44,7 +44,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     from .workspace import Workspace
@@ -98,9 +98,7 @@ class Violation:
     operation: str
     detail: str
     step_id: str = ""
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     remediation: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -145,9 +143,7 @@ class BoundaryViolationError(Exception):
 
     def __init__(self, violations: List[Violation]):
         self.violations = violations
-        super().__init__(
-            f"Critical boundary violations: {[v.type.value for v in violations]}"
-        )
+        super().__init__(f"Critical boundary violations: {[v.type.value for v in violations]}")
 
 
 # =============================================================================
@@ -292,15 +288,17 @@ class BoundaryScanner:
                 abs_path.relative_to(workspace_root)
             except ValueError:
                 # Path is outside workspace root
-                violations.append(Violation(
-                    type=ViolationType.WRITE_OUTSIDE_WORKSPACE,
-                    severity=ViolationSeverity.ERROR,
-                    path=str(file_path),
-                    operation="write",
-                    detail=f"File {file_path} is outside workspace root {workspace_root}",
-                    step_id=self._step_id,
-                    remediation="Ensure all writes go to workspace.root() or RUN_BASE",
-                ))
+                violations.append(
+                    Violation(
+                        type=ViolationType.WRITE_OUTSIDE_WORKSPACE,
+                        severity=ViolationSeverity.ERROR,
+                        path=str(file_path),
+                        operation="write",
+                        detail=f"File {file_path} is outside workspace root {workspace_root}",
+                        step_id=self._step_id,
+                        remediation="Ensure all writes go to workspace.root() or RUN_BASE",
+                    )
+                )
 
         return violations
 
@@ -320,15 +318,17 @@ class BoundaryScanner:
             and self._baseline.real_repo_ref
             and current.real_repo_ref != self._baseline.real_repo_ref
         ):
-            violations.append(Violation(
-                type=ViolationType.REAL_REPO_MODIFICATION,
-                severity=ViolationSeverity.CRITICAL,
-                path="HEAD",
-                operation="commit/reset",
-                detail=f"Real repo HEAD changed from {self._baseline.real_repo_ref[:8]} to {current.real_repo_ref[:8]}",
-                step_id=self._step_id,
-                remediation="Shadow mode should not modify real repo. Check for escaped git commands.",
-            ))
+            violations.append(
+                Violation(
+                    type=ViolationType.REAL_REPO_MODIFICATION,
+                    severity=ViolationSeverity.CRITICAL,
+                    path="HEAD",
+                    operation="commit/reset",
+                    detail=f"Real repo HEAD changed from {self._baseline.real_repo_ref[:8]} to {current.real_repo_ref[:8]}",
+                    step_id=self._step_id,
+                    remediation="Shadow mode should not modify real repo. Check for escaped git commands.",
+                )
+            )
 
         return violations
 
@@ -342,15 +342,17 @@ class BoundaryScanner:
         for file_path in current.changed_files:
             for protected in self.PROTECTED_PATHS:
                 if protected in file_path:
-                    violations.append(Violation(
-                        type=ViolationType.MAIN_BRANCH_MUTATION,
-                        severity=ViolationSeverity.WARNING,
-                        path=file_path,
-                        operation="modify",
-                        detail=f"Protected path {protected} was modified",
-                        step_id=self._step_id,
-                        remediation="Review if this modification is intentional.",
-                    ))
+                    violations.append(
+                        Violation(
+                            type=ViolationType.MAIN_BRANCH_MUTATION,
+                            severity=ViolationSeverity.WARNING,
+                            path=file_path,
+                            operation="modify",
+                            detail=f"Protected path {protected} was modified",
+                            step_id=self._step_id,
+                            remediation="Review if this modification is intentional.",
+                        )
+                    )
 
         return violations
 
@@ -365,15 +367,17 @@ class BoundaryScanner:
             file_lower = file_path.lower()
             for pattern in self.SECRET_PATTERNS:
                 if pattern in file_lower:
-                    violations.append(Violation(
-                        type=ViolationType.SECRET_EXPOSURE,
-                        severity=ViolationSeverity.WARNING,
-                        path=file_path,
-                        operation="modify",
-                        detail=f"File {file_path} may contain secrets (matched '{pattern}')",
-                        step_id=self._step_id,
-                        remediation="Review file for sensitive data before committing.",
-                    ))
+                    violations.append(
+                        Violation(
+                            type=ViolationType.SECRET_EXPOSURE,
+                            severity=ViolationSeverity.WARNING,
+                            path=file_path,
+                            operation="modify",
+                            detail=f"File {file_path} may contain secrets (matched '{pattern}')",
+                            step_id=self._step_id,
+                            remediation="Review file for sensitive data before committing.",
+                        )
+                    )
                     break  # Only one warning per file
 
         return violations

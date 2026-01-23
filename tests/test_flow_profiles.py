@@ -6,27 +6,26 @@ Profiles are portable snapshots that capture flows.yaml, flow configs,
 and agent configs in a single file.
 """
 
-import pytest
-from pathlib import Path
-import tempfile
-import shutil
-import yaml
-
 # Import the profile registry
 import sys
+from pathlib import Path
+
+import pytest
+
+import yaml
+
 _SWARM_ROOT = Path(__file__).resolve().parent.parent
 if str(_SWARM_ROOT) not in sys.path:
     sys.path.insert(0, str(_SWARM_ROOT))
 
 from swarm.config.profile_registry import (
-    ProfileRegistry,
-    Profile,
-    ProfileMeta,
-    ConfigEntry,
-    create_profile,
-    profile_to_dict,
-    profile_from_dict,
     PROFILE_EXTENSION,
+    ConfigEntry,
+    ProfileMeta,
+    ProfileRegistry,
+    create_profile,
+    profile_from_dict,
+    profile_to_dict,
 )
 
 
@@ -85,10 +84,16 @@ class TestProfileRoundTrip:
             description="A test profile for validation",
             flows_yaml="flows:\n  - key: signal\n",
             flow_configs=[
-                ConfigEntry(key="signal", path="swarm/config/flows/signal.yaml", yaml="key: signal\n"),
+                ConfigEntry(
+                    key="signal", path="swarm/config/flows/signal.yaml", yaml="key: signal\n"
+                ),
             ],
             agent_configs=[
-                ConfigEntry(key="test-agent", path="swarm/config/agents/test-agent.yaml", yaml="key: test-agent\n"),
+                ConfigEntry(
+                    key="test-agent",
+                    path="swarm/config/agents/test-agent.yaml",
+                    yaml="key: test-agent\n",
+                ),
             ],
         )
 
@@ -306,7 +311,7 @@ class TestProfileRegistry:
         registry.save_profile(profile)
 
         # Load profile (should cache it)
-        loaded1 = registry.load_profile("cache-test")
+        registry.load_profile("cache-test")
 
         # Modify the file on disk
         profile_path = tmp_path / f"cache-test{PROFILE_EXTENSION}"

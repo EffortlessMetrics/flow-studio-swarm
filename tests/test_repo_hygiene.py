@@ -1,4 +1,5 @@
 """Repo hygiene tests - prevent accidental tracking of temp files."""
+
 import subprocess
 from pathlib import Path
 
@@ -15,6 +16,5 @@ def test_no_tmpclaude_files_tracked():
     )
     tracked = result.stdout.strip()
     assert not tracked, (
-        f"Temp files are tracked by git: {tracked}\n"
-        "Remove with: git rm --cached <files>"
+        f"Temp files are tracked by git: {tracked}\nRemove with: git rm --cached <files>"
     )

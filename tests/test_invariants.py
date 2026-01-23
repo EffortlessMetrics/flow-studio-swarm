@@ -27,8 +27,6 @@ Authoritative counts for v3.0:
 import sys
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # Add swarm/tools to path for importing config
@@ -72,8 +70,7 @@ class TestSelftestStepInvariants:
 
         kernel_steps = [s for s in SELFTEST_STEPS if s.tier == SelfTestTier.KERNEL]
         assert len(kernel_steps) == 1, (
-            f"Expected 1 KERNEL step, got {len(kernel_steps)}: "
-            f"{[s.id for s in kernel_steps]}"
+            f"Expected 1 KERNEL step, got {len(kernel_steps)}: {[s.id for s in kernel_steps]}"
         )
         assert kernel_steps[0].id == "core-checks", (
             f"Expected KERNEL step to be 'core-checks', got '{kernel_steps[0].id}'"
@@ -231,8 +228,7 @@ class TestSkillsCountInvariants:
 
         missing_core = CORE_SKILLS - actual_skills
         assert not missing_core, (
-            f"Missing core skills: {sorted(missing_core)}\n"
-            f"These skills must always exist."
+            f"Missing core skills: {sorted(missing_core)}\nThese skills must always exist."
         )
 
     def test_skills_have_skill_md(self):
@@ -250,9 +246,7 @@ class TestSkillsCountInvariants:
                 if not skill_file.exists():
                     skills_without_md.append(skill_path.name)
 
-        assert not skills_without_md, (
-            f"Skills missing SKILL.md: {sorted(skills_without_md)}"
-        )
+        assert not skills_without_md, f"Skills missing SKILL.md: {sorted(skills_without_md)}"
 
     def test_skills_count_reasonable(self):
         """
@@ -262,14 +256,13 @@ class TestSkillsCountInvariants:
         """
         skills_dir = REPO_ROOT / ".claude" / "skills"
         skill_count = sum(
-            1 for skill_path in skills_dir.iterdir()
+            1
+            for skill_path in skills_dir.iterdir()
             if skill_path.is_dir() and (skill_path / "SKILL.md").exists()
         )
 
         # Should have at least the 4 core skills
-        assert skill_count >= 4, (
-            f"Expected at least 4 skills, got {skill_count}."
-        )
+        assert skill_count >= 4, f"Expected at least 4 skills, got {skill_count}."
 
 
 # ============================================================================
@@ -286,8 +279,7 @@ class TestCrossValidation:
 
         ids = [s.id for s in SELFTEST_STEPS]
         assert len(ids) == len(set(ids)), (
-            f"Duplicate step IDs found: "
-            f"{[id for id in ids if ids.count(id) > 1]}"
+            f"Duplicate step IDs found: {[id for id in ids if ids.count(id) > 1]}"
         )
 
     def test_agent_files_are_markdown(self):
@@ -295,17 +287,16 @@ class TestCrossValidation:
         agents_dir = REPO_ROOT / ".claude" / "agents"
         # Exclude common editor temp files: .swp, ~, .bak, etc.
         non_md_files = [
-            f.name for f in agents_dir.iterdir()
+            f.name
+            for f in agents_dir.iterdir()
             if f.is_file()
             and not f.name.endswith(".md")
             and not f.name.startswith(".")  # hidden/temp files
-            and not f.name.endswith("~")    # backup files
-            and not f.name.endswith(".bak") # backup files
+            and not f.name.endswith("~")  # backup files
+            and not f.name.endswith(".bak")  # backup files
         ]
 
-        assert len(non_md_files) == 0, (
-            f"Non-markdown files in .claude/agents/: {non_md_files}"
-        )
+        assert len(non_md_files) == 0, f"Non-markdown files in .claude/agents/: {non_md_files}"
 
     def test_no_persistent_hidden_files_in_agents(self):
         """No persistent hidden files in .claude/agents/ (temp editor files allowed)."""
@@ -313,11 +304,10 @@ class TestCrossValidation:
         # Filter out common editor temp files (.swp, .swo, etc.)
         TEMP_FILE_PATTERNS = {".swp", ".swo", ".swn", ".orig", ".bak"}
         hidden_files = [
-            f.name for f in agents_dir.iterdir()
+            f.name
+            for f in agents_dir.iterdir()
             if f.name.startswith(".")
             and not any(f.name.endswith(ext) for ext in TEMP_FILE_PATTERNS)
         ]
 
-        assert len(hidden_files) == 0, (
-            f"Persistent hidden files in .claude/agents/: {hidden_files}"
-        )
+        assert len(hidden_files) == 0, f"Persistent hidden files in .claude/agents/: {hidden_files}"

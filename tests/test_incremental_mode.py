@@ -21,6 +21,7 @@ def get_modified_files_direct(repo_path: Path) -> Optional[Set[str]]:
     Used to test the logic without importing from validator script.
     """
     try:
+
         def _ref_exists(ref: str) -> bool:
             """Check if a git ref exists (local or remote)."""
             result = subprocess.run(
@@ -28,7 +29,7 @@ def get_modified_files_direct(repo_path: Path) -> Optional[Set[str]]:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
             return result.returncode == 0
 
@@ -41,7 +42,7 @@ def get_modified_files_direct(repo_path: Path) -> Optional[Set[str]]:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
             if result.returncode == 0:
                 # Result is like "refs/remotes/origin/main"
@@ -75,7 +76,7 @@ def get_modified_files_direct(repo_path: Path) -> Optional[Set[str]]:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
             if result.returncode == 0:
                 diff_output = result.stdout
@@ -94,7 +95,7 @@ def get_modified_files_direct(repo_path: Path) -> Optional[Set[str]]:
             cwd=repo_path,
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
         )
 
         if result_status.returncode == 0:
@@ -137,8 +138,9 @@ def test_incremental_mode_resolves_default_branch_dynamically(tmp_path):
     subprocess.run(["git", "init", "--bare", "-b", "main"], cwd=origin, check=True)
 
     # Clone and configure local repo
-    subprocess.run(["git", "clone", str(origin), str(repo)],
-                   cwd=tmp_path, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "clone", str(origin), str(repo)], cwd=tmp_path, capture_output=True, check=True
+    )
 
     # Configure git user for commits
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo)
@@ -148,17 +150,21 @@ def test_incremental_mode_resolves_default_branch_dynamically(tmp_path):
     (repo / "test.txt").write_text("initial")
     subprocess.run(["git", "add", "test.txt"], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-m", "initial"], cwd=repo, check=True)
-    subprocess.run(["git", "push", "-u", "origin", "main"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "push", "-u", "origin", "main"], cwd=repo, check=True, capture_output=True
+    )
 
     # Verify origin/HEAD is set (may not be automatic, set it manually)
-    subprocess.run(["git", "remote", "set-head", "origin", "main"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "remote", "set-head", "origin", "main"], cwd=repo, check=True, capture_output=True
+    )
 
     # Verify origin/HEAD is set
     result = subprocess.run(
         ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
         cwd=repo,
         capture_output=True,
-        text=True
+        text=True,
     )
 
     # origin/HEAD should point to origin/main
@@ -251,10 +257,7 @@ def test_incremental_mode_includes_uncommitted_changes(tmp_path):
     # For now, test that we can at least detect uncommitted files via git status
 
     result = subprocess.run(
-        ["git", "status", "--porcelain"],
-        cwd=repo,
-        capture_output=True,
-        text=True
+        ["git", "status", "--porcelain"], cwd=repo, capture_output=True, text=True
     )
 
     # Should see the untracked file
@@ -280,8 +283,7 @@ def test_incremental_mode_handles_non_main_default_branch(tmp_path):
     subprocess.run(["git", "init", "--bare", "-b", "master"], cwd=origin, check=True)
 
     # Clone and verify
-    subprocess.run(["git", "clone", str(origin), str(repo)],
-                   cwd=tmp_path, capture_output=True)
+    subprocess.run(["git", "clone", str(origin), str(repo)], cwd=tmp_path, capture_output=True)
 
     # Create initial commit
     (repo / "test.txt").write_text("initial")
@@ -291,15 +293,14 @@ def test_incremental_mode_handles_non_main_default_branch(tmp_path):
     subprocess.run(["git", "commit", "-m", "initial"], cwd=repo, check=True)
 
     # Try to push (may fail if tracking is not set up, but that's OK for this test)
-    subprocess.run(["git", "push", "-u", "origin", "master"], cwd=repo,
-                   capture_output=True)
+    subprocess.run(["git", "push", "-u", "origin", "master"], cwd=repo, capture_output=True)
 
     # Check that we can resolve the branch
     result = subprocess.run(
         ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
         cwd=repo,
         capture_output=True,
-        text=True
+        text=True,
     )
 
     # If origin/HEAD is set, it should NOT hardcode to 'main'
@@ -335,7 +336,7 @@ def test_incremental_mode_graceful_fallback_to_main(tmp_path):
         ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
         cwd=repo,
         capture_output=True,
-        text=True
+        text=True,
     )
 
     # Should fail (no remote)
@@ -366,7 +367,9 @@ def test_validator_with_check_modified_flag(tmp_path):
 
     # Initialize git
     subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"], cwd=repo, capture_output=True
+    )
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, capture_output=True)
     subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "initial"], cwd=repo, check=True, capture_output=True)
@@ -375,6 +378,7 @@ def test_validator_with_check_modified_flag(tmp_path):
     real_validator = Path(__file__).parent.parent / "swarm" / "tools" / "validate_swarm.py"
     if real_validator.exists():
         import shutil
+
         shutil.copy(real_validator, repo / "swarm" / "tools" / "validate_swarm.py")
 
     # Run with --check-modified flag (should not crash)
@@ -383,7 +387,7 @@ def test_validator_with_check_modified_flag(tmp_path):
         cwd=repo,
         capture_output=True,
         text=True,
-        timeout=10
+        timeout=10,
     )
 
     # Should succeed (empty repo is valid)

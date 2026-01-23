@@ -110,8 +110,7 @@ def export_whitepaper(output_path: Path, format: str) -> int:
 
     except FileNotFoundError:
         print(
-            "Error: pandoc command failed to execute.\n"
-            "Ensure pandoc is properly installed.",
+            "Error: pandoc command failed to execute.\nEnsure pandoc is properly installed.",
             file=sys.stderr,
         )
         return 1

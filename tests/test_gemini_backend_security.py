@@ -123,9 +123,7 @@ class TestGeminiCliBackendSecurityInjection:
         # Ensure it's contained within the prompt string
         assert f"Run ID: {malicious_run_id}" in prompt_arg
 
-    def test_env_isolation_from_command_stub_mode(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_env_isolation_from_command_stub_mode(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify environment dict is separate from command list in stub mode."""
         monkeypatch.setenv("SWARM_GEMINI_STUB", "1")
         backend = GeminiCliBackend()

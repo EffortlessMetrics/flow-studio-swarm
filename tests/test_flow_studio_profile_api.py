@@ -30,6 +30,7 @@ from fastapi.testclient import TestClient
 def fastapi_client():
     """Create FastAPI test client."""
     from swarm.tools.flow_studio_fastapi import app
+
     return TestClient(app)
 
 
@@ -46,9 +47,7 @@ class TestProfileEndpoint:
         resp = fastapi_client.get("/api/profile")
 
         # Either 200 with profile data or 503 if profile registry unavailable
-        assert resp.status_code in (200, 503), (
-            f"Expected 200 or 503, got {resp.status_code}"
-        )
+        assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}"
 
     def test_profile_endpoint_response_structure(self, fastapi_client):
         """Test /api/profile response has expected structure."""
@@ -106,9 +105,9 @@ class TestProfileEndpoint:
                 assert profile["loaded_at"] is None or isinstance(profile["loaded_at"], str), (
                     "profile.loaded_at should be string or null"
                 )
-                assert profile["source_branch"] is None or isinstance(profile["source_branch"], str), (
-                    "profile.source_branch should be string or null"
-                )
+                assert profile["source_branch"] is None or isinstance(
+                    profile["source_branch"], str
+                ), "profile.source_branch should be string or null"
 
 
 # ============================================================================
@@ -124,9 +123,7 @@ class TestProfilesListEndpoint:
         resp = fastapi_client.get("/api/profiles")
 
         # Either 200 with profiles list or 503 if profile registry unavailable
-        assert resp.status_code in (200, 503), (
-            f"Expected 200 or 503, got {resp.status_code}"
-        )
+        assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}"
 
     def test_profiles_endpoint_response_structure(self, fastapi_client):
         """Test /api/profiles response has expected structure."""
@@ -159,9 +156,7 @@ class TestProfilesListEndpoint:
                 # Each profile summary should have these fields
                 expected_fields = ["id", "label", "description"]
                 for field in expected_fields:
-                    assert field in profile, (
-                        f"Profile {i} missing expected field '{field}'"
-                    )
+                    assert field in profile, f"Profile {i} missing expected field '{field}'"
                 # Validate types
                 assert isinstance(profile["id"], str), f"Profile {i}.id should be string"
                 assert isinstance(profile["label"], str), f"Profile {i}.label should be string"

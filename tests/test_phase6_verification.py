@@ -42,8 +42,8 @@ repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from swarm.runtime import storage
 from swarm.runtime import service as runtime_service
+from swarm.runtime import storage
 from swarm.runtime.service import RunService
 from swarm.runtime.types import (
     RunEvent,
@@ -54,7 +54,6 @@ from swarm.runtime.types import (
     SDLCStatus,
     generate_run_id,
 )
-
 
 # -----------------------------------------------------------------------------
 # Fixtures
@@ -406,9 +405,7 @@ class TestPhase6Verification:
         # Verify event sequence numbers are monotonic
         seqs = [e.seq for e in events_after]
         for i in range(1, len(seqs)):
-            assert seqs[i] > seqs[i - 1], (
-                f"Event sequence numbers should be monotonic: {seqs}"
-            )
+            assert seqs[i] > seqs[i - 1], f"Event sequence numbers should be monotonic: {seqs}"
 
     def test_projection_rebuild_from_journal(self, temp_run_dir: Dict[str, Path]) -> None:
         """Rebuild: events.jsonl can reconstruct run state.
@@ -560,11 +557,13 @@ class TestPhase6Verification:
                 runs_dir=env["runs_dir"],
             )
 
-            loop_iterations.append({
-                "step": "author_reqs",
-                "iteration": iteration,
-                "status": status,
-            })
+            loop_iterations.append(
+                {
+                    "step": "author_reqs",
+                    "iteration": iteration,
+                    "status": status,
+                }
+            )
 
             # If not verified, go to critique
             if status != "VERIFIED":
@@ -592,11 +591,13 @@ class TestPhase6Verification:
                     ),
                     runs_dir=env["runs_dir"],
                 )
-                loop_iterations.append({
-                    "step": "critique_reqs",
-                    "iteration": iteration,
-                    "status": "UNVERIFIED",
-                })
+                loop_iterations.append(
+                    {
+                        "step": "critique_reqs",
+                        "iteration": iteration,
+                        "status": "UNVERIFIED",
+                    }
+                )
 
         # Write final loop state
         final_loop_state = RunState(
@@ -625,8 +626,7 @@ class TestPhase6Verification:
 
         # Count author_reqs step_completed events
         author_completions = [
-            e for e in events
-            if e.kind == "step_completed" and e.step_id == "author_reqs"
+            e for e in events if e.kind == "step_completed" and e.step_id == "author_reqs"
         ]
         assert len(author_completions) == 3, (
             f"Should have 3 author_reqs completions, got {len(author_completions)}"

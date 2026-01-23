@@ -25,7 +25,7 @@ To add a new exception, add an entry to ALLOWED_VIOLATIONS with:
 
 import re
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Tuple
 
 import pytest
 
@@ -222,9 +222,7 @@ class TestFlowOrderGuardrail:
                 )
                 for line_num, pattern_name, matched_text in violations:
                     relative_path = py_file.relative_to(project_root)
-                    all_violations.append(
-                        (relative_path, line_num, pattern_name, matched_text)
-                    )
+                    all_violations.append((relative_path, line_num, pattern_name, matched_text))
 
         if all_violations:
             msg = (
@@ -248,7 +246,7 @@ class TestFlowOrderGuardrail:
 
     def test_flow_registry_provides_order(self):
         """Verify flow registry is the source of truth for flow ordering."""
-        from swarm.config.flow_registry import get_flow_order, get_flow_index
+        from swarm.config.flow_registry import get_flow_order
 
         order = get_flow_order()
 
@@ -274,7 +272,7 @@ class TestFlowOrderGuardrail:
 
     def test_flow_registry_has_review_flow(self):
         """Ensure the registry includes the review flow (prevents 6-flow regression)."""
-        from swarm.config.flow_registry import get_flow_order, get_flow_index
+        from swarm.config.flow_registry import get_flow_index, get_flow_order
 
         order = get_flow_order()
 
@@ -291,16 +289,14 @@ class TestFlowOrderGuardrail:
 
     def test_flow_indices_are_sequential(self):
         """Verify flow indices are sequential starting from 1."""
-        from swarm.config.flow_registry import get_flow_order, get_flow_index
+        from swarm.config.flow_registry import get_flow_index, get_flow_order
 
         order = get_flow_order()
         indices = [get_flow_index(key) for key in order]
 
         # Indices should be sequential 1, 2, 3, ...
         expected = list(range(1, len(order) + 1))
-        assert indices == expected, (
-            f"Flow indices should be sequential {expected}, got {indices}"
-        )
+        assert indices == expected, f"Flow indices should be sequential {expected}, got {indices}"
 
 
 class TestFlowOrderGuardrailPatterns:
@@ -308,74 +304,74 @@ class TestFlowOrderGuardrailPatterns:
 
     def test_pattern_detects_6_flow_list(self):
         """Pattern should detect 6-flow lists (missing review)."""
-        code = '''
+        code = """
 flows = ["signal", "plan", "build", "gate", "deploy", "wisdom"]
-'''
+"""
         violations = _find_violations(code, Path("test.py"))
         assert len(violations) > 0, "Should detect 6-flow list"
 
     def test_pattern_detects_7_flow_list(self):
         """Pattern should detect 7-flow lists."""
-        code = '''
+        code = """
 flows = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
-'''
+"""
         violations = _find_violations(code, Path("test.py"))
         assert len(violations) > 0, "Should detect 7-flow list"
 
     def test_pattern_detects_partial_list(self):
         """Pattern should detect lists starting with signal/plan/build."""
-        code = '''
+        code = """
 FIRST_FLOWS = ["signal", "plan", "build"]
-'''
+"""
         violations = _find_violations(code, Path("test.py"))
         assert len(violations) > 0, "Should detect partial flow list"
 
     def test_pattern_detects_tuple_variant(self):
         """Pattern should detect tuple variants."""
-        code = '''
+        code = """
 FLOWS = ("signal", "plan", "build", "gate", "deploy", "wisdom")
-'''
+"""
         violations = _find_violations(code, Path("test.py"))
         assert len(violations) > 0, "Should detect flow tuple"
 
     def test_pattern_ignores_comments(self):
         """Pattern should ignore commented lines."""
-        code = '''
+        code = """
 # flows = ["signal", "plan", "build", "gate", "deploy", "wisdom"]
-'''
+"""
         violations = _find_violations(code, Path("test.py"))
         assert len(violations) == 0, "Should ignore commented lines"
 
     def test_pattern_allows_single_flow_references(self):
         """Pattern should allow single flow key references."""
-        code = '''
+        code = """
 flow_key = "signal"
 if flow == "build":
     do_something()
-'''
+"""
         violations = _find_violations(code, Path("test.py"))
         assert len(violations) == 0, "Should allow single flow references"
 
     def test_pattern_allows_get_flow_order_usage(self):
         """Pattern should allow proper get_flow_order() usage."""
-        code = '''
+        code = """
 from swarm.config.flow_registry import get_flow_order
 flows = get_flow_order()
 for flow in flows:
     print(flow)
-'''
+"""
         violations = _find_violations(code, Path("test.py"))
         assert len(violations) == 0, "Should allow get_flow_order() usage"
 
     def test_pattern_detects_multiline_list(self):
         """Pattern should detect flow lists even with different spacing."""
-        code = '''
+        code = """
 flows = [
     "signal",
     "plan", "build", "gate",
     "deploy", "wisdom"
 ]
-'''
+"""
         # This won't be detected by current patterns since they're single-line.
         # That's acceptable - the main risk is copy-paste of inline lists.
         # Multiline lists are less common and easier to spot in review.
@@ -469,13 +465,15 @@ class TestFlowOrderGuardrailAllowlist:
 
                 if not has_pattern:
                     stale_entries.append(
-                        (relative_path, line_num, f"No flow list pattern found (justification: {justification})")
+                        (
+                            relative_path,
+                            line_num,
+                            f"No flow list pattern found (justification: {justification})",
+                        )
                     )
 
         if stale_entries:
-            msg = (
-                "Stale entries in ALLOWED_VIOLATIONS - lines no longer have flow lists:\n"
-            )
+            msg = "Stale entries in ALLOWED_VIOLATIONS - lines no longer have flow lists:\n"
             for path, line_num, reason in stale_entries:
                 msg += f"  - {path}:{line_num} - {reason}\n"
             msg += "\nRemove these stale entries from ALLOWED_VIOLATIONS."

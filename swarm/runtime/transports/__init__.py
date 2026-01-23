@@ -16,6 +16,11 @@ Design Principles:
 4. Transports can gracefully degrade when features aren't supported
 """
 
+from .claude_sdk_transport import (
+    ClaudeSDKTransport,
+    ClaudeSDKTransportSession,
+    create_claude_sdk_transport,
+)
 from .port import (
     CLAUDE_CLI_CAPABILITIES,
     CLAUDE_SDK_CAPABILITIES,
@@ -24,11 +29,6 @@ from .port import (
     StepSessionProtocol,
     TransportCapabilities,
     TransportProtocol,
-)
-from .claude_sdk_transport import (
-    ClaudeSDKTransport,
-    ClaudeSDKTransportSession,
-    create_claude_sdk_transport,
 )
 
 __all__ = [

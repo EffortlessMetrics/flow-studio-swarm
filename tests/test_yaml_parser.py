@@ -335,7 +335,6 @@ You are a bad agent.
 
     # Import the frontmatter validator module and helpers
     from swarm.tools.validation.validators import frontmatter as frontmatter_module
-    from swarm.tools.validation import helpers
 
     # Use monkeypatch to patch the module-level constants in the frontmatter module
     # This is necessary because frontmatter.py imports AGENTS_DIR directly,
@@ -354,8 +353,6 @@ You are a bad agent.
     # ValidationError uses 'problem' attribute, not 'message'
     error_problems = [e.problem for e in result.errors]
     yaml_error_found = any(
-        "Malformed YAML" in prob or "YAML parse error" in prob
-        for prob in error_problems
+        "Malformed YAML" in prob or "YAML parse error" in prob for prob in error_problems
     )
-    assert yaml_error_found, \
-        f"Expected YAML error in messages, got: {error_problems}"
+    assert yaml_error_found, f"Expected YAML error in messages, got: {error_problems}"

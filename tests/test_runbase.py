@@ -13,8 +13,6 @@ BDD Scenarios covered:
 - Scenario 30: Detect typo in RUN_BASE placeholder
 """
 
-import pytest
-
 from conftest import (
     assert_error_contains,
     assert_error_type,
@@ -370,7 +368,7 @@ This describes the RUN_BASE_DIR environment variable (not the same as RUN_BASE).
 Output: RUN_BASE/signal/requirements.md
 """)
 
-    result = run_validator(temp_repo)
+    run_validator(temp_repo)
     # RUN_BASE_DIR in prose should not trigger error (only RUN_BASE_ as path should)
     # Exact behavior depends on implementation
 

@@ -811,9 +811,7 @@ Be concise. The next worker needs actionable instructions, not essays."""
 
             # Extract and validate chosen_candidate_id (candidate-set pattern)
             chosen_candidate_id = data.get("chosen_candidate_id")
-            valid_candidate_ids = {
-                c.get("candidate_id") for c in nav_input.routing_candidates
-            }
+            valid_candidate_ids = {c.get("candidate_id") for c in nav_input.routing_candidates}
 
             # Validate chosen_candidate_id if routing_candidates were provided
             if nav_input.routing_candidates and chosen_candidate_id:
@@ -827,13 +825,14 @@ Be concise. The next worker needs actionable instructions, not essays."""
                         )
                         # Fall back to default candidate
                         default_candidates = [
-                            c for c in nav_input.routing_candidates
-                            if c.get("is_default")
+                            c for c in nav_input.routing_candidates if c.get("is_default")
                         ]
                         if default_candidates:
                             chosen_candidate_id = default_candidates[0].get("candidate_id")
                         elif nav_input.routing_candidates:
-                            chosen_candidate_id = nav_input.routing_candidates[0].get("candidate_id")
+                            chosen_candidate_id = nav_input.routing_candidates[0].get(
+                                "candidate_id"
+                            )
 
             # Parse route
             route_data = data.get("route", {})
@@ -988,8 +987,10 @@ Be concise. The next worker needs actionable instructions, not essays."""
         if nav_input.routing_candidates:
             # Find candidate matching the route
             for candidate in nav_input.routing_candidates:
-                if (candidate.get("action") == route.intent.value and
-                    candidate.get("target_node") == route.target_node):
+                if (
+                    candidate.get("action") == route.intent.value
+                    and candidate.get("target_node") == route.target_node
+                ):
                     chosen_candidate_id = candidate.get("candidate_id")
                     break
             # Fall back to default if no match

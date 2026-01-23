@@ -11,12 +11,8 @@ These tests verify that the validator:
 from __future__ import annotations
 
 import json
-from pathlib import Path
-
-import pytest
 
 from swarm.runtime.event_validator import (
-    EventContractViolation,
     validate_event_stream,
     validate_run_from_disk,
 )
@@ -43,7 +39,13 @@ class TestSeqOrdering:
         events = [
             {"event_id": "evt-1", "seq": 1, "kind": "run_start", "payload": {}},
             {"event_id": "evt-2", "seq": 2, "kind": "step_start", "step_id": "1", "payload": {}},
-            {"event_id": "evt-3", "seq": 2, "kind": "step_end", "step_id": "1", "payload": {}},  # Duplicate!
+            {
+                "event_id": "evt-3",
+                "seq": 2,
+                "kind": "step_end",
+                "step_id": "1",
+                "payload": {},
+            },  # Duplicate!
         ]
         violations = validate_event_stream("test-run", events)
 
@@ -56,7 +58,13 @@ class TestSeqOrdering:
         """Seq gaps are detected as warnings (not errors by default)."""
         events = [
             {"event_id": "evt-1", "seq": 1, "kind": "run_start", "payload": {}},
-            {"event_id": "evt-2", "seq": 5, "kind": "step_start", "step_id": "1", "payload": {}},  # Gap!
+            {
+                "event_id": "evt-2",
+                "seq": 5,
+                "kind": "step_start",
+                "step_id": "1",
+                "payload": {},
+            },  # Gap!
         ]
         violations = validate_event_stream("test-run", events)
 
@@ -68,7 +76,13 @@ class TestSeqOrdering:
         """Seq gaps become errors in strict mode."""
         events = [
             {"event_id": "evt-1", "seq": 1, "kind": "run_start", "payload": {}},
-            {"event_id": "evt-2", "seq": 5, "kind": "step_start", "step_id": "1", "payload": {}},  # Gap!
+            {
+                "event_id": "evt-2",
+                "seq": 5,
+                "kind": "step_start",
+                "step_id": "1",
+                "payload": {},
+            },  # Gap!
         ]
         violations = validate_event_stream("test-run", events, strict=True)
 
@@ -80,7 +94,13 @@ class TestSeqOrdering:
         """Seq going backwards is detected as error."""
         events = [
             {"event_id": "evt-1", "seq": 5, "kind": "run_start", "payload": {}},
-            {"event_id": "evt-2", "seq": 3, "kind": "step_start", "step_id": "1", "payload": {}},  # Regression!
+            {
+                "event_id": "evt-2",
+                "seq": 3,
+                "kind": "step_start",
+                "step_id": "1",
+                "payload": {},
+            },  # Regression!
         ]
         violations = validate_event_stream("test-run", events)
 
@@ -135,7 +155,13 @@ class TestStepPairing:
         """step_end without step_start is detected."""
         events = [
             {"event_id": "evt-1", "seq": 1, "kind": "run_start", "payload": {}},
-            {"event_id": "evt-2", "seq": 2, "kind": "step_end", "step_id": "1", "payload": {}},  # No start!
+            {
+                "event_id": "evt-2",
+                "seq": 2,
+                "kind": "step_end",
+                "step_id": "1",
+                "payload": {},
+            },  # No start!
         ]
         violations = validate_event_stream("test-run", events)
 
@@ -160,7 +186,12 @@ class TestStepPairing:
         events = [
             {"event_id": "evt-1", "seq": 1, "kind": "run_start", "payload": {}},
             {"event_id": "evt-2", "seq": 2, "kind": "step_start", "step_id": "1", "payload": {}},
-            {"event_id": "evt-3", "seq": 3, "kind": "run_completed", "payload": {}},  # Run complete!
+            {
+                "event_id": "evt-3",
+                "seq": 3,
+                "kind": "run_completed",
+                "payload": {},
+            },  # Run complete!
         ]
         violations = validate_event_stream("test-run", events)
 
@@ -172,7 +203,13 @@ class TestStepPairing:
         events = [
             {"event_id": "evt-1", "seq": 1, "kind": "run_start", "payload": {}},
             {"event_id": "evt-2", "seq": 2, "kind": "step_start", "step_id": "1", "payload": {}},
-            {"event_id": "evt-3", "seq": 3, "kind": "step_start", "step_id": "1", "payload": {}},  # Double!
+            {
+                "event_id": "evt-3",
+                "seq": 3,
+                "kind": "step_start",
+                "step_id": "1",
+                "payload": {},
+            },  # Double!
         ]
         violations = validate_event_stream("test-run", events)
 
@@ -201,7 +238,12 @@ class TestToolPairing:
         """tool_end without tool_start is detected (warning)."""
         events = [
             {"event_id": "evt-1", "seq": 1, "kind": "run_start", "payload": {}},
-            {"event_id": "evt-2", "seq": 2, "kind": "tool_end", "payload": {"tool_use_id": "t1"}},  # No start!
+            {
+                "event_id": "evt-2",
+                "seq": 2,
+                "kind": "tool_end",
+                "payload": {"tool_use_id": "t1"},
+            },  # No start!
             {"event_id": "evt-3", "seq": 3, "kind": "run_completed", "payload": {}},
         ]
         violations = validate_event_stream("test-run", events)

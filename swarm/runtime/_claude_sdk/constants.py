@@ -97,15 +97,28 @@ BLOCKED_COMMAND_PATTERNS: List[str] = [
 # allowed_tools AND disallowed_tools to be set. allowed_tools alone may only
 # affect permission prompting, not actual enforcement.
 # See: platform.claude.com/cookbook/claude-agent-sdk-02
-ALL_STANDARD_TOOLS = frozenset([
-    "Read", "Write", "Edit", "MultiEdit",
-    "Bash", "Glob", "Grep",
-    "BashOutput", "KillBash",
-    "WebFetch", "WebSearch",
-    "TodoRead", "TodoWrite",
-    "Task", "Agent",
-    "NotebookEdit", "NotebookRead",
-    "AskUserQuestion",
-    "ExitPlanMode",
-    "ListMcpResources", "ReadMcpResource",
-])
+ALL_STANDARD_TOOLS = frozenset(
+    [
+        "Read",
+        "Write",
+        "Edit",
+        "MultiEdit",
+        "Bash",
+        "Glob",
+        "Grep",
+        "BashOutput",
+        "KillBash",
+        "WebFetch",
+        "WebSearch",
+        "TodoRead",
+        "TodoWrite",
+        "Task",
+        "Agent",
+        "NotebookEdit",
+        "NotebookRead",
+        "AskUserQuestion",
+        "ExitPlanMode",
+        "ListMcpResources",
+        "ReadMcpResource",
+    ]
+)

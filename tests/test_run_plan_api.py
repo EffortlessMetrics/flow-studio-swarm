@@ -9,28 +9,24 @@ These tests verify:
 5. Plan cloning
 """
 
-import pytest
 from pathlib import Path
-from datetime import datetime, timezone
 
+import pytest
 from swarm.runtime.run_plan_api import (
+    PlanMetadata,
     RunPlanAPI,
     StoredPlan,
-    PlanMetadata,
     create_run_plan_api,
-    load_run_plan,
     list_run_plans,
-    stored_plan_to_dict,
-    stored_plan_from_dict,
-    plan_metadata_to_dict,
+    load_run_plan,
     plan_metadata_from_dict,
+    plan_metadata_to_dict,
+    stored_plan_from_dict,
+    stored_plan_to_dict,
 )
 from swarm.runtime.types import (
     RunPlanSpec,
-    MacroPolicy,
-    HumanPolicy,
 )
-
 
 # =============================================================================
 # PlanMetadata Tests
@@ -54,7 +50,7 @@ class TestPlanMetadata:
         assert meta.name == "Test Plan"
         assert meta.created_by == "tester"
         assert "test" in meta.tags
-        assert meta.is_default == False
+        assert not meta.is_default
 
     def test_metadata_serialization(self):
         """Test PlanMetadata round-trip serialization."""
@@ -126,7 +122,7 @@ class TestRunPlanAPI:
 
     def test_api_creates_plans_directory(self, tmp_path: Path):
         """Test that API creates plans directory on init."""
-        api = RunPlanAPI(tmp_path)
+        RunPlanAPI(tmp_path)
         plans_dir = tmp_path / "swarm" / "plans"
         assert plans_dir.exists()
 
@@ -160,7 +156,7 @@ class TestRunPlanAPI:
         assert plan.metadata.name == "My Custom Plan"
         assert plan.spec.flow_sequence == ["signal", "build", "gate"]
         assert plan.spec.max_total_flows == 15
-        assert plan.metadata.is_default == False
+        assert not plan.metadata.is_default
 
     def test_create_duplicate_plan_fails(self, tmp_path: Path):
         """Test that creating a duplicate plan raises error."""
@@ -180,7 +176,7 @@ class TestRunPlanAPI:
 
         assert plan is not None
         assert plan.metadata.plan_id == "default-autopilot"
-        assert plan.metadata.is_default == True
+        assert plan.metadata.is_default
         assert len(plan.spec.flow_sequence) == 7  # Full SDLC (includes review)
 
     def test_load_nonexistent_plan(self, tmp_path: Path):
@@ -200,6 +196,7 @@ class TestRunPlanAPI:
         # Modify and save
         plan.spec.max_total_flows = 99
         import time
+
         time.sleep(0.01)  # Ensure timestamp difference
         api.save_plan(plan)
 
@@ -217,7 +214,7 @@ class TestRunPlanAPI:
         assert api.load_plan("delete-me") is not None
 
         result = api.delete_plan("delete-me")
-        assert result == True
+        assert result
         assert api.load_plan("delete-me") is None
 
     def test_cannot_delete_default_plan(self, tmp_path: Path):
@@ -225,7 +222,7 @@ class TestRunPlanAPI:
         api = RunPlanAPI(tmp_path)
 
         result = api.delete_plan("default-autopilot")
-        assert result == False
+        assert not result
         assert api.load_plan("default-autopilot") is not None
 
     def test_list_plans(self, tmp_path: Path):
@@ -259,7 +256,7 @@ class TestRunPlanAPI:
         assert cloned is not None
         assert cloned.metadata.plan_id == "my-autopilot-clone"
         assert cloned.metadata.name == "My Autopilot Clone"
-        assert cloned.metadata.is_default == False
+        assert not cloned.metadata.is_default
 
         # Spec should match source
         original = api.load_plan("default-autopilot")
@@ -374,7 +371,15 @@ class TestDefaultPlans:
         plan = api.load_plan("default-autopilot")
 
         assert plan is not None
-        assert plan.spec.flow_sequence == ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
+        assert plan.spec.flow_sequence == [
+            "signal",
+            "plan",
+            "build",
+            "review",
+            "gate",
+            "deploy",
+            "wisdom",
+        ]
         assert plan.spec.human_policy.mode == "run_end"
         assert plan.spec.max_total_flows == 20
 

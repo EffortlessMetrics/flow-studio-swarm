@@ -126,9 +126,7 @@ def generate_by_flow_section(flows: Dict[str, Any]) -> str:
 
 
 def generate_by_agent_section(
-    agents: Dict[str, Any],
-    agent_flows: Dict[str, List[str]],
-    flows: Dict[str, Any]
+    agents: Dict[str, Any], agent_flows: Dict[str, List[str]], flows: Dict[str, Any]
 ) -> str:
     """Generate 'By Agent' section with flows per agent."""
     lines = ["## By Agent\n"]
@@ -149,11 +147,7 @@ def generate_by_agent_section(
     }
 
     sorted_agents = sorted(
-        agents.items(),
-        key=lambda x: (
-            category_order.get(x[1].get("category", ""), 99),
-            x[0]
-        )
+        agents.items(), key=lambda x: (category_order.get(x[1].get("category", ""), 99), x[0])
     )
 
     for agent_key, agent_data in sorted_agents:
@@ -175,9 +169,7 @@ def generate_by_agent_section(
 
 
 def generate_quick_reference_section(
-    flows: Dict[str, Any],
-    agents: Dict[str, Any],
-    agent_flows: Dict[str, List[str]]
+    flows: Dict[str, Any], agents: Dict[str, Any], agent_flows: Dict[str, List[str]]
 ) -> str:
     """Generate quick reference lookups."""
     lines = ["## Quick Reference\n"]
@@ -191,8 +183,15 @@ def generate_quick_reference_section(
     # Agent count by category
     lines.append("### Agents by Category\n")
     category_order = [
-        "shaping", "spec", "design", "implementation",
-        "critic", "verification", "analytics", "reporter", "infra"
+        "shaping",
+        "spec",
+        "design",
+        "implementation",
+        "critic",
+        "verification",
+        "analytics",
+        "reporter",
+        "infra",
     ]
 
     for category in category_order:
@@ -317,13 +316,9 @@ def check_index(content: str) -> bool:
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Generate flows ↔ agents index document"
-    )
+    parser = argparse.ArgumentParser(description="Generate flows ↔ agents index document")
     parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Check if index is up-to-date (don't regenerate)"
+        "--check", action="store_true", help="Check if index is up-to-date (don't regenerate)"
     )
     args = parser.parse_args()
 

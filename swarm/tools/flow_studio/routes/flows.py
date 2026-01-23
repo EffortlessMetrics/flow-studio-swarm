@@ -50,7 +50,9 @@ async def api_graph(flow_key: str, state: FlowStudioState = Depends(get_state)):
             {
                 "error": f"Flow '{flow_key}' not found",
                 "available_flows": available,
-                "hint": f"Available flows: {', '.join(available)}" if available else "No flows loaded",
+                "hint": f"Available flows: {', '.join(available)}"
+                if available
+                else "No flows loaded",
             },
             status_code=404,
         )
@@ -64,7 +66,9 @@ async def api_flow_detail(flow_key: str, state: FlowStudioState = Depends(get_st
             {
                 "error": f"Flow '{flow_key}' not found",
                 "available_flows": available,
-                "hint": f"Available flows: {', '.join(available)}" if available else "No flows loaded",
+                "hint": f"Available flows: {', '.join(available)}"
+                if available
+                else "No flows loaded",
             },
             status_code=404,
         )
@@ -125,7 +129,9 @@ async def api_graph_artifacts(
             {
                 "error": f"Flow '{flow_key}' not found",
                 "available_flows": available,
-                "hint": f"Available flows: {', '.join(available)}" if available else "No flows loaded",
+                "hint": f"Available flows: {', '.join(available)}"
+                if available
+                else "No flows loaded",
             },
             status_code=404,
         )
@@ -141,5 +147,7 @@ async def api_graph_artifacts(
 
 
 @router.get("/api/search", response_model=schema.SearchResponse if schema else None)
-async def api_search(q: str = Query("", description="Search query"), state: FlowStudioState = Depends(get_state)):
+async def api_search(
+    q: str = Query("", description="Search query"), state: FlowStudioState = Depends(get_state)
+):
     return search(state.flows_cache, state.agents_cache, q, state.agent_flow_index)

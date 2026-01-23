@@ -56,6 +56,12 @@ ignore = [
     "E501",  # line length handled elsewhere
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# Test files commonly modify sys.path before imports
+"tests/**" = ["E402"]
+# Package test directories also do sys.path manipulation
+"packages/**/tests/**" = ["E402"]
+
 [tool.mypy]
 python_version = "3.13"
 files = ["swarm/tools/validate_swarm.py", "swarm/validator"]

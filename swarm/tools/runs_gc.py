@@ -263,7 +263,9 @@ def cmd_list(args: argparse.Namespace) -> int:
     if eligible_for_deletion:
         logger.info("")
         logger.info(f"CLEANUP CANDIDATES: {len(eligible_for_deletion)} runs")
-        logger.info(f"  Would free: {format_size(sum(r.size_bytes for r in eligible_for_deletion))}")
+        logger.info(
+            f"  Would free: {format_size(sum(r.size_bytes for r in eligible_for_deletion))}"
+        )
         logger.info("  Run 'runs-gc prune' to apply retention policy")
 
     return 0
@@ -411,7 +413,9 @@ def main() -> int:
 
     # quarantine command
     quarantine_parser = subparsers.add_parser("quarantine", help="Move corrupt runs to quarantine")
-    quarantine_parser.add_argument("--dry-run", action="store_true", help="Show what would be moved")
+    quarantine_parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be moved"
+    )
 
     args = parser.parse_args()
 

@@ -12,10 +12,9 @@ Usage:
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
 import yaml
-
 from swarm.config.flow_registry import ContextBudgetOverride
 from swarm.utils.yaml_utils import load_yaml
 
@@ -33,6 +32,7 @@ def _utc_now_iso() -> str:
 @dataclass
 class CurrentProfileInfo:
     """Info about the currently loaded profile."""
+
     id: str
     label: str
     loaded_at: str
@@ -42,6 +42,7 @@ class CurrentProfileInfo:
 @dataclass
 class ProfileMeta:
     """Metadata for a swarm profile."""
+
     id: str
     label: str
     description: str = ""
@@ -52,6 +53,7 @@ class ProfileMeta:
 @dataclass
 class ConfigEntry:
     """A single config file entry (flow or agent)."""
+
     key: str
     path: str
     yaml: str
@@ -64,6 +66,7 @@ class RuntimeSettings:
     Allows profiles to customize execution behavior without modifying
     the global runtime.yaml configuration.
     """
+
     context_budgets: Optional[ContextBudgetOverride] = None
     # Future: timeout_settings, engine_preferences, etc.
 
@@ -71,6 +74,7 @@ class RuntimeSettings:
 @dataclass
 class Profile:
     """A complete swarm profile."""
+
     meta: ProfileMeta
     flows_yaml: str
     flow_configs: List[ConfigEntry] = field(default_factory=list)
@@ -264,11 +268,13 @@ def _runtime_settings_to_dict(settings: Optional[RuntimeSettings]) -> Optional[D
     if settings.context_budgets is not None:
         cb = settings.context_budgets
         result["context_budgets"] = {
-            k: v for k, v in {
+            k: v
+            for k, v in {
                 "context_budget_chars": cb.context_budget_chars,
                 "history_max_recent_chars": cb.history_max_recent_chars,
                 "history_max_older_chars": cb.history_max_older_chars,
-            }.items() if v is not None
+            }.items()
+            if v is not None
         }
     return result if result else None
 
@@ -329,15 +335,9 @@ def profile_from_dict(data: Dict[str, Any]) -> Profile:
     """Parse a profile from dict."""
     meta = _parse_profile_meta(data.get("meta", {}))
 
-    flow_configs = [
-        _parse_config_entry(entry)
-        for entry in data.get("flow_configs", [])
-    ]
+    flow_configs = [_parse_config_entry(entry) for entry in data.get("flow_configs", [])]
 
-    agent_configs = [
-        _parse_config_entry(entry)
-        for entry in data.get("agent_configs", [])
-    ]
+    agent_configs = [_parse_config_entry(entry) for entry in data.get("agent_configs", [])]
 
     runtime_settings = _parse_runtime_settings(data.get("runtime_settings"))
 

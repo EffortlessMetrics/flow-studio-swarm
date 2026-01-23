@@ -28,10 +28,11 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from swarm.config.flow_registry import ContextBudgetOverride
 from swarm.utils.yaml_utils import load_yaml
 
 # Module logger for budget validation warnings
@@ -117,6 +118,7 @@ class ContextBudgetConfig:
     This represents the final effective budgets after cascade resolution:
     Step override > Flow override > Profile override > Global defaults
     """
+
     context_budget_chars: int
     history_max_recent_chars: int
     history_max_older_chars: int
@@ -183,7 +185,13 @@ def _default_config() -> Dict[str, Any]:
         "flows": {
             "signal": {"recommended_backends": ["claude-harness", "gemini-step-orchestrator"]},
             "plan": {"recommended_backends": ["claude-harness", "gemini-step-orchestrator"]},
-            "build": {"recommended_backends": ["claude-harness", "gemini-step-orchestrator", "claude-step-orchestrator"]},
+            "build": {
+                "recommended_backends": [
+                    "claude-harness",
+                    "gemini-step-orchestrator",
+                    "claude-step-orchestrator",
+                ]
+            },
             "gate": {"recommended_backends": ["claude-harness", "claude-step-orchestrator"]},
             "deploy": {"recommended_backends": ["claude-harness"]},
             "wisdom": {"recommended_backends": ["claude-harness"]},
@@ -441,42 +449,50 @@ class ContextBudgetResolver:
 
     def __init__(self, profile_id: Optional[str] = None):
         self._profile_id = profile_id
-        self._profile_budgets: Optional["ContextBudgetOverride"] = None
+        self._profile_budgets: Optional[ContextBudgetOverride] = None
         if profile_id:
             self._profile_budgets = self._load_profile_budgets(profile_id)
 
-    def _load_profile_budgets(self, profile_id: str) -> Optional["ContextBudgetOverride"]:
+    def _load_profile_budgets(self, profile_id: str) -> Optional[ContextBudgetOverride]:
         """Load context budget overrides from a profile."""
         try:
             from swarm.config.profile_registry import load_profile
+
             profile = load_profile(profile_id)
-            if profile and hasattr(profile, 'runtime_settings') and profile.runtime_settings:
+            if profile and hasattr(profile, "runtime_settings") and profile.runtime_settings:
                 return profile.runtime_settings.context_budgets
         except Exception:
             pass
         return None
 
-    def _load_flow_budgets(self, flow_key: str) -> Optional["ContextBudgetOverride"]:
+    def _load_flow_budgets(self, flow_key: str) -> Optional[ContextBudgetOverride]:
         """Load context budget overrides from a flow definition."""
         try:
             from swarm.config.flow_registry import FlowRegistry
+
             registry = FlowRegistry.get_instance()
             flow_def = registry.get_flow(flow_key)
-            if flow_def and hasattr(flow_def, 'context_budgets'):
+            if flow_def and hasattr(flow_def, "context_budgets"):
                 return flow_def.context_budgets
         except Exception:
             pass
         return None
 
-    def _load_step_budgets(self, flow_key: str, step_id: str) -> Optional["ContextBudgetOverride"]:
+    def _load_step_budgets(self, flow_key: str, step_id: str) -> Optional[ContextBudgetOverride]:
         """Load context budget overrides from a step's engine profile."""
         try:
             from swarm.config.flow_registry import FlowRegistry
+
             registry = FlowRegistry.get_instance()
             flow_def = registry.get_flow(flow_key)
             if flow_def:
                 for step in flow_def.steps:
-                    if step.id == step_id and step.engine_profile and hasattr(step.engine_profile, 'context_budgets') and step.engine_profile.context_budgets:
+                    if (
+                        step.id == step_id
+                        and step.engine_profile
+                        and hasattr(step.engine_profile, "context_budgets")
+                        and step.engine_profile.context_budgets
+                    ):
                         return step.engine_profile.context_budgets
         except Exception:
             pass

@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from swarm.runtime.routing_helpers import MicroloopState, should_exit_microloop
 
-from .base import Edge, FlowGraph, RunContext, RoutingContext, RoutingResult
+from .base import Edge, FlowGraph, RoutingContext, RoutingResult, RunContext
 from .cel_evaluator import CELEvaluator
 
 logger = logging.getLogger(__name__)
@@ -103,9 +103,7 @@ class StepRouter:
                 ),
             )
 
-        return self.llm_tiebreak(
-            candidates, context, elimination_log, edges_considered, start_time
-        )
+        return self.llm_tiebreak(candidates, context, elimination_log, edges_considered, start_time)
 
     def get_adjacent_edges(self, node_id: str, flow_graph: FlowGraph) -> List[Edge]:
         """Get all edges originating from a node."""
@@ -357,6 +355,7 @@ def emit_routing_event(
 ) -> None:
     """Emit a routing decision event to the events table."""
     from datetime import datetime, timezone
+
     from swarm.runtime.types import RunEvent
 
     if append_event_fn is None:

@@ -77,17 +77,11 @@ class TestRouteCanonicalisation:
 
         # Verify the correct HTTP methods are documented
         runs_path = paths.get("/api/runs", {})
-        assert "post" in runs_path, (
-            "POST method should be documented for /api/runs"
-        )
-        assert "get" in runs_path, (
-            "GET method should be documented for /api/runs"
-        )
+        assert "post" in runs_path, "POST method should be documented for /api/runs"
+        assert "get" in runs_path, "GET method should be documented for /api/runs"
 
         autopilot_path = paths.get("/api/runs/autopilot", {})
-        assert "post" in autopilot_path, (
-            "POST method should be documented for /api/runs/autopilot"
-        )
+        assert "post" in autopilot_path, "POST method should be documented for /api/runs/autopilot"
 
     def test_trailing_slash_variants_not_primary(self, api_app):
         """
@@ -220,8 +214,8 @@ class TestRouteCanonicalSummary:
 
         # Document expected canonical routes (without trailing slash)
         expected_canonical = [
-            "/api/runs",           # POST: create, GET: list
-            "/api/runs/autopilot", # POST: start autopilot
+            "/api/runs",  # POST: create, GET: list
+            "/api/runs/autopilot",  # POST: start autopilot
         ]
 
         missing = []
@@ -294,7 +288,7 @@ class TestOperationIdUniqueness:
                 dup_details.append(f"  {op_id} ({count} occurrences): {routes}")
 
             assert False, (
-                f"Duplicate OpenAPI operation IDs found:\n"
+                "Duplicate OpenAPI operation IDs found:\n"
                 + "\n".join(dup_details)
                 + "\n\nFix by adding explicit operation_id to route decorators "
                 "or removing duplicate endpoints."
@@ -309,23 +303,24 @@ class TestOperationIdUniqueness:
         - Duplicates indicate router composition bugs (e.g., same route registered twice)
         """
         from collections import Counter
+
         from fastapi.routing import APIRoute
 
         routes = []
         for route in api_app.routes:
             if isinstance(route, APIRoute):
                 # Get methods excluding HEAD and OPTIONS (auto-generated)
-                methods = tuple(
-                    sorted(m for m in route.methods if m not in {"HEAD", "OPTIONS"})
-                )
+                methods = tuple(sorted(m for m in route.methods if m not in {"HEAD", "OPTIONS"}))
                 routes.append((methods, route.path))
 
         duplicates = {k: v for k, v in Counter(routes).items() if v > 1}
 
         if duplicates:
-            dup_details = [f"  {methods} {path} ({count}x)" for (methods, path), count in duplicates.items()]
+            dup_details = [
+                f"  {methods} {path} ({count}x)" for (methods, path), count in duplicates.items()
+            ]
             assert False, (
-                f"Duplicate route registrations found:\n"
+                "Duplicate route registrations found:\n"
                 + "\n".join(dup_details)
                 + "\n\nThis indicates a router composition bug - check include_router calls."
             )

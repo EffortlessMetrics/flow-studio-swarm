@@ -18,16 +18,15 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 from . import __version__
-from .config import load_config, load_steps_from_yaml, SelftestConfig
+from .config import load_config, load_steps_from_yaml
 from .doctor import SelfTestDoctor
 from .reporter import ConsoleReporter, ReportGenerator
 from .runner import SelfTestRunner, Step
 
 
-def find_config_file() -> Optional[Path]:
+def find_config_file() -> Path | None:
     """Find selftest configuration file in common locations."""
     candidates = [
         Path("selftest.yaml"),
@@ -43,7 +42,7 @@ def find_config_file() -> Optional[Path]:
     return None
 
 
-def load_steps_from_config() -> List[Step]:
+def load_steps_from_config() -> list[Step]:
     """Load steps from configuration file if present."""
     config_file = find_config_file()
     if config_file:
@@ -62,7 +61,10 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     if not steps:
         print("Error: No steps configured.", file=sys.stderr)
-        print("Create a selftest.yaml file or use --config to specify one.", file=sys.stderr)
+        print(
+            "Create a selftest.yaml file or use --config to specify one.",
+            file=sys.stderr,
+        )
         return 2
 
     # Determine mode
@@ -161,8 +163,13 @@ def cmd_plan(args: argparse.Namespace) -> int:
             tier = step["tier"].upper()
             severity = step["severity"].upper()
             category = step["category"].upper()
-            deps = f" (depends: {', '.join(step['dependencies'])})" if step["dependencies"] else ""
-            print(f"[{i}] {step['id']:20s} [{tier:10s}] [{severity:8s}] [{category:12s}] {step['description']}{deps}")
+            deps = ""
+            if step["dependencies"]:
+                deps = f" (depends: {', '.join(step['dependencies'])})"
+            print(
+                f"[{i}] {step['id']:20s} [{tier:10s}] [{severity:8s}] "
+                f"[{category:12s}] {step['description']}{deps}"
+            )
         print()
         summary = plan["summary"]
         print(f"Total steps: {summary['total']}")
@@ -210,7 +217,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Main entry point for CLI."""
     parser = argparse.ArgumentParser(
         prog="selftest",
@@ -227,7 +234,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     # Run command
     run_parser = subparsers.add_parser("run", help="Run selftest steps")
     run_parser.add_argument(
-        "--config", "-c",
+        "--config",
+        "-c",
         type=str,
         help="Path to configuration file",
     )
@@ -247,7 +255,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Run only the specified step",
     )
     run_parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Verbose output",
     )
@@ -270,7 +279,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     # Plan command
     plan_parser = subparsers.add_parser("plan", help="Show execution plan")
     plan_parser.add_argument(
-        "--config", "-c",
+        "--config",
+        "-c",
         type=str,
         help="Path to configuration file",
     )
@@ -296,7 +306,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     # List command
     list_parser = subparsers.add_parser("list", help="List available steps")
     list_parser.add_argument(
-        "--config", "-c",
+        "--config",
+        "-c",
         type=str,
         help="Path to configuration file",
     )

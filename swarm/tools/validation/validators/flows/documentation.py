@@ -5,8 +5,8 @@ Validates that each flow config has corresponding markdown documentation
 with the required autogen markers.
 """
 
+from swarm.tools.validation.helpers import FLOW_SPECS_DIR, FLOWS_CONFIG_DIR, ROOT
 from swarm.validator import ValidationResult
-from swarm.tools.validation.helpers import ROOT, FLOW_SPECS_DIR, FLOWS_CONFIG_DIR
 
 
 def validate_flow_documentation_completeness() -> ValidationResult:
@@ -34,7 +34,7 @@ def validate_flow_documentation_completeness() -> ValidationResult:
                 location,
                 f"Flow '{flow_id}' config exists but documentation file is missing",
                 f"Create {doc_file.relative_to(ROOT)} with flow specification",
-                file_path=str(config_file)
+                file_path=str(config_file),
             )
             continue
 
@@ -52,7 +52,7 @@ def validate_flow_documentation_completeness() -> ValidationResult:
                     location,
                     "Flow documentation missing autogen markers",
                     f"Add '<!-- FLOW AUTOGEN START -->' and '<!-- FLOW AUTOGEN END -->' markers to {location}",
-                    file_path=str(doc_file)
+                    file_path=str(doc_file),
                 )
         except Exception as e:
             result.add_error(
@@ -60,7 +60,7 @@ def validate_flow_documentation_completeness() -> ValidationResult:
                 str(doc_file.relative_to(ROOT)),
                 f"Failed to read flow documentation: {e}",
                 "Check file permissions and encoding",
-                file_path=str(doc_file)
+                file_path=str(doc_file),
             )
 
     return result

@@ -19,9 +19,7 @@ Test automation should use:
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Any
-
-import pytest
+from typing import Dict, List
 
 # Add repo root to path so swarm imports work
 repo_root = Path(__file__).resolve().parents[1]
@@ -37,6 +35,7 @@ if str(repo_root) not in sys.path:
 def get_flow_studio_html() -> str:
     """Load the Flow Studio HTML from the UI module."""
     from swarm.tools.flow_studio_ui import get_index_html
+
     return get_index_html()
 
 
@@ -57,9 +56,9 @@ def get_ts_sources() -> Dict[str, str]:
 def extract_sdk_methods(ts_content: str) -> List[str]:
     """Extract method names from FlowStudioSDK interface."""
     # Look for methods defined in the interface
-    pattern = re.compile(r'^\s+(\w+)\s*[:(]', re.MULTILINE)
+    pattern = re.compile(r"^\s+(\w+)\s*[:(]", re.MULTILINE)
     matches = pattern.findall(ts_content)
-    return [m for m in matches if m not in ('getState', 'interface')]
+    return [m for m in matches if m not in ("getState", "interface")]
 
 
 def extract_uiids_from_html(html: str) -> List[str]:
@@ -99,7 +98,7 @@ class TestBaselineHealthCheck:
         html = get_flow_studio_html()
 
         # The initial state should be "loading"
-        assert 'data-ui-ready="loading"' in html or 'data-ui-ready' in html, (
+        assert 'data-ui-ready="loading"' in html or "data-ui-ready" in html, (
             "HTML should have data-ui-ready attribute for UI readiness tracking"
         )
 
@@ -181,18 +180,14 @@ class TestSearchAndNavigation:
         domain_ts = sources.get("domain.ts", "")
 
         # Check that the SDK interface includes setActiveFlow
-        assert 'setActiveFlow' in domain_ts, (
-            "SDK should expose setActiveFlow for navigation"
-        )
+        assert "setActiveFlow" in domain_ts, "SDK should expose setActiveFlow for navigation"
 
     def test_sdk_has_select_step(self):
         """SDK should expose selectStep for programmatic step selection."""
         sources = get_ts_sources()
         domain_ts = sources.get("domain.ts", "")
 
-        assert 'selectStep' in domain_ts, (
-            "SDK should expose selectStep for step selection"
-        )
+        assert "selectStep" in domain_ts, "SDK should expose selectStep for step selection"
 
 
 # ============================================================================
@@ -226,12 +221,8 @@ class TestDeepLinking:
         app_ts = sources.get("flow-studio-app.ts", "")
 
         # Check for URL param handling
-        assert 'getURLParams' in app_ts, (
-            "URL parameter handling should be implemented"
-        )
-        assert 'applyDeepLinkParams' in app_ts, (
-            "Deep link params should be applied on load"
-        )
+        assert "getURLParams" in app_ts, "URL parameter handling should be implemented"
+        assert "applyDeepLinkParams" in app_ts, "Deep link params should be applied on load"
 
     def test_url_includes_selection_params(self):
         """URL management should include step/agent selection params."""
@@ -239,21 +230,15 @@ class TestDeepLinking:
         app_ts = sources.get("flow-studio-app.ts", "")
 
         # Check for step and agent params in URL handling
-        assert '"step"' in app_ts or "'step'" in app_ts, (
-            "URL should support step parameter"
-        )
-        assert '"agent"' in app_ts or "'agent'" in app_ts, (
-            "URL should support agent parameter"
-        )
+        assert '"step"' in app_ts or "'step'" in app_ts, "URL should support step parameter"
+        assert '"agent"' in app_ts or "'agent'" in app_ts, "URL should support agent parameter"
 
     def test_popstate_handler_exists(self):
         """Browser back/forward navigation should be handled."""
         sources = get_ts_sources()
         app_ts = sources.get("flow-studio-app.ts", "")
 
-        assert 'popstate' in app_ts, (
-            "popstate handler should exist for back/forward navigation"
-        )
+        assert "popstate" in app_ts, "popstate handler should exist for back/forward navigation"
 
 
 # ============================================================================
@@ -290,38 +275,31 @@ class TestSelectionStateSync:
         domain_ts = sources.get("domain.ts", "")
 
         # Check that SDK state includes selection
-        assert 'selectedNodeId' in domain_ts, (
-            "SDK state should include selectedNodeId"
-        )
-        assert 'selectedNodeType' in domain_ts, (
-            "SDK state should include selectedNodeType"
-        )
+        assert "selectedNodeId" in domain_ts, "SDK state should include selectedNodeId"
+        assert "selectedNodeType" in domain_ts, "SDK state should include selectedNodeType"
 
     def test_unified_selection_module_exists(self):
         """There should be a unified selection module for consistency."""
         sources = get_ts_sources()
 
-        assert "selection.ts" in sources, (
-            "Unified selection module should exist"
-        )
+        assert "selection.ts" in sources, "Unified selection module should exist"
 
     def test_selection_module_has_select_node(self):
         """Selection module should have a unified selectNode function."""
         sources = get_ts_sources()
         selection_ts = sources.get("selection.ts", "")
 
-        assert 'export async function selectNode' in selection_ts or 'export function selectNode' in selection_ts, (
-            "Selection module should expose selectNode function"
-        )
+        assert (
+            "export async function selectNode" in selection_ts
+            or "export function selectNode" in selection_ts
+        ), "Selection module should expose selectNode function"
 
     def test_selection_updates_url(self):
         """Selection should update URL for shareable links."""
         sources = get_ts_sources()
         selection_ts = sources.get("selection.ts", "")
 
-        assert 'updateURL' in selection_ts, (
-            "Selection should trigger URL update"
-        )
+        assert "updateURL" in selection_ts, "Selection should trigger URL update"
 
 
 # ============================================================================
@@ -355,17 +333,13 @@ class TestTourNavigation:
         html = get_flow_studio_html()
 
         # Tour dropdown or button should exist
-        assert 'tour' in html.lower(), (
-            "Tour functionality should be present in UI"
-        )
+        assert "tour" in html.lower(), "Tour functionality should be present in UI"
 
     def test_tours_module_exists(self):
         """Tours module should exist for tour functionality."""
         sources = get_ts_sources()
 
-        assert "tours.ts" in sources, (
-            "Tours module should exist"
-        )
+        assert "tours.ts" in sources, "Tours module should exist"
 
 
 # ============================================================================
@@ -406,9 +380,7 @@ class TestSelftestDrilldown:
         """Selftest UI module should exist."""
         sources = get_ts_sources()
 
-        assert "selftest_ui.ts" in sources, (
-            "Selftest UI module should exist"
-        )
+        assert "selftest_ui.ts" in sources, "Selftest UI module should exist"
 
 
 # ============================================================================
@@ -430,36 +402,28 @@ class TestFocusManagement:
         sources = get_ts_sources()
         utils_ts = sources.get("utils.ts", "")
 
-        assert 'createFocusTrap' in utils_ts, (
-            "Focus trap utility should exist"
-        )
+        assert "createFocusTrap" in utils_ts, "Focus trap utility should exist"
 
     def test_modal_focus_manager_exists(self):
         """Modal focus manager should be available."""
         sources = get_ts_sources()
         utils_ts = sources.get("utils.ts", "")
 
-        assert 'createModalFocusManager' in utils_ts, (
-            "Modal focus manager should exist"
-        )
+        assert "createModalFocusManager" in utils_ts, "Modal focus manager should exist"
 
     def test_shortcuts_modal_uses_focus_manager(self):
         """Shortcuts modal should use focus management."""
         sources = get_ts_sources()
         shortcuts_ts = sources.get("shortcuts.ts", "")
 
-        assert 'createModalFocusManager' in shortcuts_ts, (
-            "Shortcuts modal should use focus manager"
-        )
+        assert "createModalFocusManager" in shortcuts_ts, "Shortcuts modal should use focus manager"
 
     def test_selftest_modal_uses_focus_manager(self):
         """Selftest modal should use focus management."""
         sources = get_ts_sources()
         selftest_ts = sources.get("selftest_ui.ts", "")
 
-        assert 'createModalFocusManager' in selftest_ts, (
-            "Selftest modal should use focus manager"
-        )
+        assert "createModalFocusManager" in selftest_ts, "Selftest modal should use focus manager"
 
 
 # ============================================================================
@@ -476,19 +440,19 @@ class TestCSSTokens:
         css_content = css_file.read_text(encoding="utf-8")
 
         # Check for token definitions
-        assert ':root' in css_content, "CSS should define :root for tokens"
-        assert '--fs-color-' in css_content, "CSS should define color tokens"
-        assert '--fs-spacing-' in css_content, "CSS should define spacing tokens"
-        assert '--fs-radius-' in css_content, "CSS should define radius tokens"
+        assert ":root" in css_content, "CSS should define :root for tokens"
+        assert "--fs-color-" in css_content, "CSS should define color tokens"
+        assert "--fs-spacing-" in css_content, "CSS should define spacing tokens"
+        assert "--fs-radius-" in css_content, "CSS should define radius tokens"
 
     def test_state_components_defined(self):
         """CSS should define state components (empty, error, loading)."""
         css_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "css" / "flow-studio.base.css"
         css_content = css_file.read_text(encoding="utf-8")
 
-        assert '.fs-empty' in css_content, "CSS should define empty state component"
-        assert '.fs-error' in css_content, "CSS should define error state component"
-        assert '.fs-loading' in css_content, "CSS should define loading state component"
+        assert ".fs-empty" in css_content, "CSS should define empty state component"
+        assert ".fs-error" in css_content, "CSS should define error state component"
+        assert ".fs-loading" in css_content, "CSS should define loading state component"
 
 
 # ============================================================================
@@ -507,53 +471,45 @@ class TestSDKContract:
         sources = get_ts_sources()
         domain_ts = sources.get("domain.ts", "")
 
-        assert 'interface FlowStudioSDK' in domain_ts, (
-            "SDK interface should be defined"
-        )
+        assert "interface FlowStudioSDK" in domain_ts, "SDK interface should be defined"
 
     def test_sdk_has_get_state(self):
         """SDK should expose getState method."""
         sources = get_ts_sources()
         domain_ts = sources.get("domain.ts", "")
 
-        assert 'getState()' in domain_ts, (
-            "SDK should expose getState method"
-        )
+        assert "getState()" in domain_ts, "SDK should expose getState method"
 
     def test_sdk_has_get_graph_state(self):
         """SDK should expose getGraphState method."""
         sources = get_ts_sources()
         domain_ts = sources.get("domain.ts", "")
 
-        assert 'getGraphState()' in domain_ts, (
-            "SDK should expose getGraphState method"
-        )
+        assert "getGraphState()" in domain_ts, "SDK should expose getGraphState method"
 
     def test_sdk_has_selection_methods(self):
         """SDK should expose selection methods."""
         sources = get_ts_sources()
         domain_ts = sources.get("domain.ts", "")
 
-        assert 'selectStep' in domain_ts, "SDK should expose selectStep"
-        assert 'selectAgent' in domain_ts, "SDK should expose selectAgent"
-        assert 'clearSelection' in domain_ts, "SDK should expose clearSelection"
+        assert "selectStep" in domain_ts, "SDK should expose selectStep"
+        assert "selectAgent" in domain_ts, "SDK should expose selectAgent"
+        assert "clearSelection" in domain_ts, "SDK should expose clearSelection"
 
     def test_sdk_has_uiid_helpers(self):
         """SDK should expose UIID query helpers."""
         sources = get_ts_sources()
         domain_ts = sources.get("domain.ts", "")
 
-        assert 'qsByUiid' in domain_ts, "SDK should expose qsByUiid"
-        assert 'qsAllByUiidPrefix' in domain_ts, "SDK should expose qsAllByUiidPrefix"
+        assert "qsByUiid" in domain_ts, "SDK should expose qsByUiid"
+        assert "qsAllByUiidPrefix" in domain_ts, "SDK should expose qsAllByUiidPrefix"
 
     def test_sdk_exported_in_app(self):
         """SDK should be exported on window.__flowStudio."""
         sources = get_ts_sources()
         app_ts = sources.get("flow-studio-app.ts", "")
 
-        assert 'window.__flowStudio' in app_ts, (
-            "SDK should be exported on window.__flowStudio"
-        )
+        assert "window.__flowStudio" in app_ts, "SDK should be exported on window.__flowStudio"
 
 
 # ============================================================================
@@ -568,27 +524,21 @@ class TestGraphOutline:
         """Graph outline module should exist."""
         sources = get_ts_sources()
 
-        assert "graph_outline.ts" in sources, (
-            "Graph outline module should exist"
-        )
+        assert "graph_outline.ts" in sources, "Graph outline module should exist"
 
     def test_outline_has_get_current_state(self):
         """Outline should expose getCurrentGraphState."""
         sources = get_ts_sources()
         outline_ts = sources.get("graph_outline.ts", "")
 
-        assert 'getCurrentGraphState' in outline_ts, (
-            "Outline should expose getCurrentGraphState"
-        )
+        assert "getCurrentGraphState" in outline_ts, "Outline should expose getCurrentGraphState"
 
     def test_outline_has_render_function(self):
         """Outline should expose renderFlowOutline."""
         sources = get_ts_sources()
         outline_ts = sources.get("graph_outline.ts", "")
 
-        assert 'renderFlowOutline' in outline_ts, (
-            "Outline should expose renderFlowOutline"
-        )
+        assert "renderFlowOutline" in outline_ts, "Outline should expose renderFlowOutline"
 
     def test_outline_container_has_uiid(self):
         """Outline container should have data-uiid."""

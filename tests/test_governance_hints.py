@@ -28,9 +28,6 @@ repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-import pytest
-import json
-
 
 # Mock the JavaScript hint patterns in Python for testing
 HINT_PATTERNS = {
@@ -38,44 +35,44 @@ HINT_PATTERNS = {
         "type": "failure",
         "root_cause": "Python lint or compile errors in swarm/ directory",
         "command": "ruff check swarm/ && python -m compileall -q swarm/",
-        "docs": "docs/SELFTEST_SYSTEM.md"
+        "docs": "docs/SELFTEST_SYSTEM.md",
     },
     "skills-governance": {
         "type": "failure",
         "root_cause": "Invalid or missing skill YAML frontmatter",
         "command": "uv run swarm/tools/validate_swarm.py --check-skills",
-        "docs": "CLAUDE.md § Skills"
+        "docs": "CLAUDE.md § Skills",
     },
     "agents-governance": {
         "type": "failure",
         "root_cause": "Agent bijection, color, or frontmatter validation failed",
         "command": "uv run swarm/tools/validate_swarm.py --check-agents",
-        "docs": "CLAUDE.md § Agent Ops"
+        "docs": "CLAUDE.md § Agent Ops",
     },
     "bdd": {
         "type": "advisory",
         "root_cause": "BDD feature files missing or malformed",
         "command": "find features/ -name '*.feature' | head",
-        "docs": "docs/SELFTEST_SYSTEM.md"
+        "docs": "docs/SELFTEST_SYSTEM.md",
     },
     "ac-status": {
         "type": "advisory",
         "root_cause": "Acceptance criteria tracking incomplete",
         "command": "uv run swarm/tools/selftest.py --step ac-status",
-        "docs": "docs/SELFTEST_SYSTEM.md"
+        "docs": "docs/SELFTEST_SYSTEM.md",
     },
     "policy-tests": {
         "type": "failure",
         "root_cause": "OPA policy validation failed",
         "command": "make policy-tests",
-        "docs": "swarm/policies/README.md"
+        "docs": "swarm/policies/README.md",
     },
     "flowstudio-smoke": {
         "type": "workaround",
         "root_cause": "Flow Studio smoke tests failed (may be missing deps)",
         "command": "uv run pytest tests/test_flow_studio_fastapi_smoke.py -v",
-        "docs": "swarm/tools/flow_studio.py"
-    }
+        "docs": "swarm/tools/flow_studio.py",
+    },
 }
 
 
@@ -100,34 +97,40 @@ def generate_resolution_hints_python(governance_status):
     for step in failed_steps:
         pattern = HINT_PATTERNS.get(step)
         if pattern:
-            hints.append({
-                "type": "failure",
-                "step": step,
-                "root_cause": pattern["root_cause"],
-                "command": pattern["command"],
-                "docs": pattern["docs"]
-            })
+            hints.append(
+                {
+                    "type": "failure",
+                    "step": step,
+                    "root_cause": pattern["root_cause"],
+                    "command": pattern["command"],
+                    "docs": pattern["docs"],
+                }
+            )
         else:
             # Fallback for unknown steps
-            hints.append({
-                "type": "failure",
-                "step": step,
-                "root_cause": "Check selftest output for details",
-                "command": f"uv run swarm/tools/selftest.py --step {step}",
-                "docs": "docs/SELFTEST_SYSTEM.md"
-            })
+            hints.append(
+                {
+                    "type": "failure",
+                    "step": step,
+                    "root_cause": "Check selftest output for details",
+                    "command": f"uv run swarm/tools/selftest.py --step {step}",
+                    "docs": "docs/SELFTEST_SYSTEM.md",
+                }
+            )
 
     # Generate hints for degraded steps (advisory)
     for step in degraded_steps:
         pattern = HINT_PATTERNS.get(step)
         if pattern:
-            hints.append({
-                "type": "advisory",
-                "step": step,
-                "root_cause": pattern["root_cause"] + " (non-blocking in degraded mode)",
-                "command": pattern["command"],
-                "docs": pattern["docs"]
-            })
+            hints.append(
+                {
+                    "type": "advisory",
+                    "step": step,
+                    "root_cause": pattern["root_cause"] + " (non-blocking in degraded mode)",
+                    "command": pattern["command"],
+                    "docs": pattern["docs"],
+                }
+            )
 
     return hints
 
@@ -135,12 +138,7 @@ def generate_resolution_hints_python(governance_status):
 def test_generate_hints_returns_array():
     """Test generateResolutionHints returns array of hints."""
     governance_status = {
-        "governance": {
-            "selftest": {
-                "failed_steps": ["core-checks"],
-                "degraded_steps": []
-            }
-        }
+        "governance": {"selftest": {"failed_steps": ["core-checks"], "degraded_steps": []}}
     }
 
     hints = generate_resolution_hints_python(governance_status)
@@ -153,10 +151,7 @@ def test_failed_steps_map_to_patterns():
     """Test failed steps map to correct root cause patterns."""
     governance_status = {
         "governance": {
-            "selftest": {
-                "failed_steps": ["core-checks", "agents-governance"],
-                "degraded_steps": []
-            }
+            "selftest": {"failed_steps": ["core-checks", "agents-governance"], "degraded_steps": []}
         }
     }
 
@@ -170,9 +165,7 @@ def test_failed_steps_map_to_patterns():
     assert "Python lint" in core_hint["root_cause"], (
         f"Unexpected root cause: {core_hint['root_cause']}"
     )
-    assert "ruff" in core_hint["command"], (
-        f"Expected ruff command, got: {core_hint['command']}"
-    )
+    assert "ruff" in core_hint["command"], f"Expected ruff command, got: {core_hint['command']}"
 
     # Check agents-governance hint
     agents_hint = next((h for h in hints if h["step"] == "agents-governance"), None)
@@ -188,12 +181,7 @@ def test_failed_steps_map_to_patterns():
 def test_advisory_hints_for_degraded():
     """Test advisory hints appear when governance fails but kernel passes."""
     governance_status = {
-        "governance": {
-            "selftest": {
-                "failed_steps": [],
-                "degraded_steps": ["bdd", "ac-status"]
-            }
-        }
+        "governance": {"selftest": {"failed_steps": [], "degraded_steps": ["bdd", "ac-status"]}}
     }
 
     hints = generate_resolution_hints_python(governance_status)
@@ -201,9 +189,7 @@ def test_advisory_hints_for_degraded():
     assert len(hints) == 2, f"Expected 2 advisory hints, got {len(hints)}"
 
     for hint in hints:
-        assert hint["type"] == "advisory", (
-            f"Expected type 'advisory', got '{hint['type']}'"
-        )
+        assert hint["type"] == "advisory", f"Expected type 'advisory', got '{hint['type']}'"
         assert "non-blocking in degraded mode" in hint["root_cause"], (
             f"Advisory hint should mention degraded mode: {hint['root_cause']}"
         )
@@ -212,12 +198,7 @@ def test_advisory_hints_for_degraded():
 def test_workaround_hints_for_optional():
     """Test hints for optional failures (flowstudio-smoke)."""
     governance_status = {
-        "governance": {
-            "selftest": {
-                "failed_steps": ["flowstudio-smoke"],
-                "degraded_steps": []
-            }
-        }
+        "governance": {"selftest": {"failed_steps": ["flowstudio-smoke"], "degraded_steps": []}}
     }
 
     hints = generate_resolution_hints_python(governance_status)
@@ -230,19 +211,14 @@ def test_workaround_hints_for_optional():
     assert hint["type"] == "failure", (
         f"Expected type 'failure' (from failed_steps), got '{hint['type']}'"
     )
-    assert "Flow Studio" in hint["root_cause"], (
-        f"Unexpected root cause: {hint['root_cause']}"
-    )
+    assert "Flow Studio" in hint["root_cause"], f"Unexpected root cause: {hint['root_cause']}"
 
 
 def test_hints_include_commands():
     """Test each hint includes runnable command."""
     governance_status = {
         "governance": {
-            "selftest": {
-                "failed_steps": ["core-checks", "policy-tests"],
-                "degraded_steps": []
-            }
+            "selftest": {"failed_steps": ["core-checks", "policy-tests"], "degraded_steps": []}
         }
     }
 
@@ -262,7 +238,7 @@ def test_hints_include_docs_links():
         "governance": {
             "selftest": {
                 "failed_steps": ["skills-governance", "agents-governance"],
-                "degraded_steps": []
+                "degraded_steps": [],
             }
         }
     }
@@ -271,26 +247,21 @@ def test_hints_include_docs_links():
 
     for hint in hints:
         assert "docs" in hint, f"Hint missing 'docs': {hint}"
-        assert isinstance(hint["docs"], str), (
-            f"Docs should be string, got {type(hint['docs'])}"
-        )
+        assert isinstance(hint["docs"], str), f"Docs should be string, got {type(hint['docs'])}"
         assert len(hint["docs"]) > 0, "Docs reference should not be empty"
 
         # Check docs path format
-        assert "CLAUDE.md" in hint["docs"] or "SELFTEST_SYSTEM.md" in hint["docs"] or "README.md" in hint["docs"], (
-            f"Unexpected docs reference: {hint['docs']}"
-        )
+        assert (
+            "CLAUDE.md" in hint["docs"]
+            or "SELFTEST_SYSTEM.md" in hint["docs"]
+            or "README.md" in hint["docs"]
+        ), f"Unexpected docs reference: {hint['docs']}"
 
 
 def test_unknown_step_gets_fallback():
     """Test unknown steps get generic fallback hint."""
     governance_status = {
-        "governance": {
-            "selftest": {
-                "failed_steps": ["unknown-step-xyz"],
-                "degraded_steps": []
-            }
-        }
+        "governance": {"selftest": {"failed_steps": ["unknown-step-xyz"], "degraded_steps": []}}
     }
 
     hints = generate_resolution_hints_python(governance_status)
@@ -318,7 +289,7 @@ def test_hint_types_correct():
         "governance": {
             "selftest": {
                 "failed_steps": ["core-checks", "flowstudio-smoke"],
-                "degraded_steps": ["bdd"]
+                "degraded_steps": ["bdd"],
             }
         }
     }
@@ -327,9 +298,7 @@ def test_hint_types_correct():
 
     # core-checks should be failure
     core_hint = next((h for h in hints if h["step"] == "core-checks"), None)
-    assert core_hint["type"] == "failure", (
-        f"core-checks should be failure, got {core_hint['type']}"
-    )
+    assert core_hint["type"] == "failure", f"core-checks should be failure, got {core_hint['type']}"
 
     # flowstudio-smoke in failed_steps should be failure
     # (pattern type is "workaround", but failed_steps override to "failure")
@@ -347,14 +316,7 @@ def test_hint_types_correct():
 
 def test_no_hints_when_no_failures():
     """Test no hints generated when there are no failures."""
-    governance_status = {
-        "governance": {
-            "selftest": {
-                "failed_steps": [],
-                "degraded_steps": []
-            }
-        }
-    }
+    governance_status = {"governance": {"selftest": {"failed_steps": [], "degraded_steps": []}}}
 
     hints = generate_resolution_hints_python(governance_status)
 
@@ -365,9 +327,7 @@ def test_core_checks_pattern():
     """Test core-checks maps to ruff/compile commands."""
     pattern = HINT_PATTERNS["core-checks"]
 
-    assert pattern["type"] == "failure", (
-        f"core-checks should be failure, got {pattern['type']}"
-    )
+    assert pattern["type"] == "failure", f"core-checks should be failure, got {pattern['type']}"
     assert "ruff check swarm/" in pattern["command"], (
         f"Expected ruff check command: {pattern['command']}"
     )

@@ -34,6 +34,8 @@ from swarm.config.runtime_config import (
 # Use the unified SDK adapter
 from swarm.runtime.claude_sdk import (
     check_sdk_available as check_claude_sdk_available,
+)
+from swarm.runtime.claude_sdk import (
     get_sdk_distribution,
     get_sdk_module_name,
     get_sdk_version,

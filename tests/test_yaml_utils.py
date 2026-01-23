@@ -1,12 +1,11 @@
 """Tests for swarm/utils/yaml_utils.py."""
 
 from io import StringIO
-from unittest.mock import patch
 
 import pytest
-import yaml
-
 from swarm.utils.yaml_utils import SafeLoader, load_yaml
+
+import yaml
 
 
 class TestLoadYaml:
