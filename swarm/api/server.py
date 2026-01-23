@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -325,9 +326,24 @@ def create_app(
 
     # Add CORS middleware
     if enable_cors:
+        # Define default allowed origins (localhost for development)
+        default_origins = [
+            "http://localhost:5000",
+            "http://localhost:5001",
+            "http://127.0.0.1:5000",
+            "http://127.0.0.1:5001",
+        ]
+
+        # Get extra allowed origins from environment
+        env_origins = os.environ.get("SWARM_ALLOWED_ORIGINS", "").split(",")
+        extra_origins = [origin.strip() for origin in env_origins if origin.strip()]
+
+        # Combine and deduplicate
+        allowed_origins = list(set(default_origins + extra_origins))
+
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],
+            allow_origins=allowed_origins,
             allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=["*"],
             expose_headers=["ETag", "If-Match", "If-None-Match"],
