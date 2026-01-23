@@ -6,7 +6,7 @@
 // - Error states (loading failures)
 // - Key-value displays
 // - Mode-specific hints (author vs operator)
-import { escapeHtml } from "./utils.js";
+import { escapeHtml, createCopyButton } from "./utils.js";
 // ============================================================================
 // Empty States
 // ============================================================================
@@ -14,14 +14,34 @@ import { escapeHtml } from "./utils.js";
  * Render an empty state for "no runs" in the sidebar.
  */
 export function renderNoRuns() {
-    return `
-    <div class="fs-empty" style="padding: 16px 12px;">
-      <div class="fs-empty-icon">\u{1F4C2}</div>
-      <p class="fs-empty-title">No runs yet</p>
-      <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
-      <code class="mono fs-empty-command">make demo-run</code>
-    </div>
-  `;
+    const container = document.createElement("div");
+    container.className = "fs-empty";
+    container.style.padding = "16px 12px";
+    const icon = document.createElement("div");
+    icon.className = "fs-empty-icon";
+    icon.textContent = "\u{1F4C2}";
+    const title = document.createElement("p");
+    title.className = "fs-empty-title";
+    title.textContent = "No runs yet";
+    const desc = document.createElement("p");
+    desc.className = "fs-empty-description";
+    desc.textContent = "Generate example data to explore Flow Studio.";
+    const cmdContainer = document.createElement("div");
+    cmdContainer.style.display = "flex";
+    cmdContainer.style.alignItems = "center";
+    cmdContainer.style.justifyContent = "center";
+    cmdContainer.style.marginTop = "12px";
+    const code = document.createElement("code");
+    code.className = "mono fs-empty-command";
+    code.textContent = "make demo-run";
+    const btn = createCopyButton("make demo-run");
+    cmdContainer.appendChild(code);
+    cmdContainer.appendChild(btn);
+    container.appendChild(icon);
+    container.appendChild(title);
+    container.appendChild(desc);
+    container.appendChild(cmdContainer);
+    return container;
 }
 /**
  * Render an empty state for "no flows configured" in the sidebar.

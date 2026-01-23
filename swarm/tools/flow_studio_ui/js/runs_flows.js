@@ -110,7 +110,8 @@ export async function loadRuns() {
             // Show empty state hint in sidebar
             const listEl = document.getElementById("flow-list");
             if (listEl) {
-                listEl.innerHTML = renderNoRuns();
+                listEl.innerHTML = "";
+                listEl.appendChild(renderNoRuns());
             }
             // Show canvas empty state
             updateCanvasEmptyState(false);

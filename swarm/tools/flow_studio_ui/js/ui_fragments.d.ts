@@ -1,7 +1,7 @@
 /**
  * Render an empty state for "no runs" in the sidebar.
  */
-export declare function renderNoRuns(): string;
+export declare function renderNoRuns(): HTMLElement;
 /**
  * Render an empty state for "no flows configured" in the sidebar.
  */
