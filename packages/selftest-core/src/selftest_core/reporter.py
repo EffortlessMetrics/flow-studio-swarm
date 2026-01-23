@@ -125,8 +125,7 @@ class ReportGenerator:
         """Get current git branch name."""
         try:
             result = subprocess.run(
-                "git rev-parse --abbrev-ref HEAD",
-                shell=True,
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -139,8 +138,7 @@ class ReportGenerator:
         """Get current git commit hash."""
         try:
             result = subprocess.run(
-                "git rev-parse --short HEAD",
-                shell=True,
+                ["git", "rev-parse", "--short", "HEAD"],
                 capture_output=True,
                 text=True,
                 timeout=5,

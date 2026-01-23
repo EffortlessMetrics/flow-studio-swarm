@@ -34,9 +34,42 @@ Example usage:
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
+import re
+import shlex
 import subprocess
 import time
+
+
+# Shell metacharacters that indicate potential command injection
+# These require explicit opt-in if the user truly needs shell features
+SHELL_METACHAR_PATTERN = re.compile(r'[|;&$`><]|\$\(')
+
+
+def parse_command(command: Union[str, List[str]]) -> List[str]:
+    """
+    Parse a command into an argv list for shell=False execution.
+
+    Args:
+        command: Either a string command or pre-parsed argv list
+
+    Returns:
+        List of command arguments suitable for subprocess with shell=False
+
+    Raises:
+        ValueError: If command contains shell metacharacters
+    """
+    if isinstance(command, list):
+        return command
+
+    # Check for shell metacharacters that could indicate injection
+    if SHELL_METACHAR_PATTERN.search(command):
+        raise ValueError(
+            f"Command contains shell metacharacters which are not supported: {command!r}. "
+            "Use an argv list instead or redesign the step to avoid shell features."
+        )
+
+    return shlex.split(command)
 
 
 class Tier(Enum):
@@ -94,7 +127,9 @@ class Step:
     Attributes:
         id: Unique identifier (e.g., 'core-checks')
         tier: Tier classification (KERNEL, GOVERNANCE, OPTIONAL)
-        command: Shell command to execute
+        command: Command to execute - either a string or argv list.
+            String commands are parsed with shlex.split and executed with shell=False.
+            Shell metacharacters (|, &, ;, $, `, >, <) are rejected for security.
         description: Human-readable description of what this step checks
         severity: Severity level (CRITICAL, WARNING, INFO)
         category: Category for filtering (SECURITY, PERFORMANCE, etc.)
@@ -104,7 +139,7 @@ class Step:
     """
     id: str
     tier: Tier
-    command: str
+    command: Union[str, List[str]]
     description: str = ""
     severity: Severity = Severity.WARNING
     category: Category = Category.CORRECTNESS
@@ -266,9 +301,11 @@ class SelfTestRunner:
         # Execute the command
         start = time.time()
         try:
+            # Parse command to argv list (rejects shell metacharacters)
+            argv = parse_command(step.command)
             proc = subprocess.run(
-                step.command,
-                shell=True,
+                argv,
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=step.timeout,
@@ -281,6 +318,12 @@ class SelfTestRunner:
             status = "FAIL"
             output = ""
             error = f"Timeout after {step.timeout}s"
+            exit_code = -1
+        except ValueError as e:
+            # parse_command raised due to shell metacharacters
+            status = "FAIL"
+            output = ""
+            error = str(e)
             exit_code = -1
         except Exception as e:
             status = "FAIL"

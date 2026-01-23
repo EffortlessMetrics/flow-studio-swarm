@@ -55,8 +55,7 @@ class SelfTestDoctor:
         # Check Rust toolchain
         try:
             result = subprocess.run(
-                "rustc --version",
-                shell=True,
+                ["rustc", "--version"],
                 capture_output=True,
                 timeout=5,
             )
@@ -73,16 +72,14 @@ class SelfTestDoctor:
         try:
             # Check if in git repo
             result = subprocess.run(
-                "git status",
-                shell=True,
+                ["git", "status"],
                 capture_output=True,
                 timeout=5,
             )
             if result.returncode == 0:
                 # Check for dirty tree
                 result = subprocess.run(
-                    "git diff --quiet",
-                    shell=True,
+                    ["git", "diff", "--quiet"],
                     capture_output=True,
                     timeout=5,
                 )
@@ -101,8 +98,7 @@ class SelfTestDoctor:
         # Check Python syntax
         try:
             result = subprocess.run(
-                "python3 -m py_compile swarm/tools/selftest.py",
-                shell=True,
+                [sys.executable, "-m", "py_compile", "swarm/tools/selftest.py"],
                 capture_output=True,
                 timeout=5,
             )
@@ -124,8 +120,7 @@ class SelfTestDoctor:
         else:
             try:
                 result = subprocess.run(
-                    "cargo check",
-                    shell=True,
+                    ["cargo", "check"],
                     capture_output=True,
                     timeout=30,
                 )

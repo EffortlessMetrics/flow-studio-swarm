@@ -29,16 +29,14 @@ def get_git_info() -> Tuple[str, str]:
     """Return (branch, commit_sha)"""
     try:
         branch = subprocess.run(
-            "git rev-parse --abbrev-ref HEAD",
-            shell=True,
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             capture_output=True,
             text=True,
             timeout=5,
         ).stdout.strip()
 
         commit = subprocess.run(
-            "git rev-parse --short HEAD",
-            shell=True,
+            ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -79,8 +77,7 @@ class ArtifactManager:
         # Try git
         try:
             branch = subprocess.run(
-                "git rev-parse --abbrev-ref HEAD",
-                shell=True,
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -91,8 +88,7 @@ class ArtifactManager:
 
             # Fallback to commit hash
             commit = subprocess.run(
-                "git rev-parse --short HEAD",
-                shell=True,
+                ["git", "rev-parse", "--short", "HEAD"],
                 capture_output=True,
                 text=True,
                 timeout=5,

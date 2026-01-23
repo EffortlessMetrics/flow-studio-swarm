@@ -28,7 +28,7 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 
 @dataclass
@@ -123,8 +123,7 @@ class SelfTestDoctor:
         try:
             # Check if in git repo
             result = subprocess.run(
-                "git status",
-                shell=True,
+                ["git", "status"],
                 capture_output=True,
                 timeout=5,
             )
@@ -133,8 +132,7 @@ class SelfTestDoctor:
 
             # Check for dirty tree
             result = subprocess.run(
-                "git diff --quiet",
-                shell=True,
+                ["git", "diff", "--quiet"],
                 capture_output=True,
                 timeout=5,
             )
@@ -153,8 +151,7 @@ class SelfTestDoctor:
         try:
             # Try to compile a basic Python check
             result = subprocess.run(
-                f"{sys.executable} -c 'import sys; print(sys.version)'",
-                shell=True,
+                [sys.executable, "-c", "import sys; print(sys.version)"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -247,17 +244,18 @@ class SelfTestDoctor:
 
 def make_command_check(
     name: str,
-    command: str,
+    command: Union[str, List[str]],
     category: str = "harness",
     timeout: int = 5,
     error_message: Optional[str] = None,
 ) -> DiagnosticCheck:
     """
-    Create a diagnostic check that runs a shell command.
+    Create a diagnostic check that runs a command.
 
     Args:
         name: Check name
-        command: Shell command to run
+        command: Command to run - either a string or argv list.
+            String commands are parsed with shlex.split and executed with shell=False.
         category: 'harness' or 'service'
         timeout: Command timeout in seconds
         error_message: Custom error message on failure
@@ -265,21 +263,30 @@ def make_command_check(
     Returns:
         DiagnosticCheck instance
     """
+    import shlex
+
+    # Parse command to argv if it's a string
+    if isinstance(command, str):
+        argv = shlex.split(command)
+        cmd_display = command
+    else:
+        argv = command
+        cmd_display = " ".join(command)
+
     def check_fn() -> tuple:
         try:
             result = subprocess.run(
-                command,
-                shell=True,
+                argv,
                 capture_output=True,
                 timeout=timeout,
             )
             if result.returncode == 0:
                 return ("OK", None)
             else:
-                msg = error_message or f"Command '{command}' failed"
+                msg = error_message or f"Command '{cmd_display}' failed"
                 return ("ERROR", msg)
         except subprocess.TimeoutExpired:
-            return ("ERROR", f"Command '{command}' timed out")
+            return ("ERROR", f"Command '{cmd_display}' timed out")
         except Exception as e:
             return ("ERROR", f"Command failed: {e}")
 
@@ -309,8 +316,7 @@ def make_python_package_check(
     def check_fn() -> tuple:
         try:
             result = subprocess.run(
-                f"{sys.executable} -c 'import {import_name}'",
-                shell=True,
+                [sys.executable, "-c", f"import {import_name}"],
                 capture_output=True,
                 timeout=5,
             )
