@@ -64,54 +64,11 @@
 </div>
 
 <!-- Run Detail Modal -->
-<div id="run-detail-modal" class="run-detail-modal" role="dialog" aria-modal="true" aria-labelledby="run-detail-modal-title" data-uiid="flow_studio.modal.run_detail">
-  <div class="run-detail-content">
-    <button id="run-detail-close" class="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
-    <h3 id="run-detail-modal-title">Run Details</h3>
-    <div id="run-detail-body" data-uiid="flow_studio.modal.run_detail.body">
-      <div class="run-detail-section">
-        <div class="kv-label">RUN ID</div>
-        <div id="run-detail-id" class="mono">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">STATUS</div>
-        <div id="run-detail-status">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">BACKEND</div>
-        <div id="run-detail-backend">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">PROFILE</div>
-        <div id="run-detail-profile">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">FLOWS</div>
-        <div id="run-detail-flows">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">CREATED</div>
-        <div id="run-detail-created">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">COMPLETED</div>
-        <div id="run-detail-completed">-</div>
-      </div>
-      <div class="run-detail-section" id="run-detail-error-section" style="display: none;">
-        <div class="kv-label">ERROR</div>
-        <div id="run-detail-error" class="run-detail-error">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">TAGS</div>
-        <div id="run-detail-tags">-</div>
-      </div>
-      <div class="run-detail-actions">
-        <button id="run-detail-rerun" class="btn-primary" data-uiid="flow_studio.modal.run_detail.rerun">Re-run</button>
-        <label class="exemplar-toggle">
-          <input type="checkbox" id="run-detail-exemplar" />
-          <span>Exemplar (teaching)</span>
-        </label>
-      </div>
+<div id="run-detail-modal" class="selftest-modal" role="dialog" aria-modal="true" aria-labelledby="run-detail-modal-title" data-uiid="flow_studio.modal.run_detail">
+  <div class="selftest-step-content" data-uiid="flow_studio.modal.run_detail.body">
+    <button class="selftest-modal-close" id="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
+    <div id="run-detail-modal-content">
+      <div class="muted">Loading...</div>
     </div>
   </div>
 </div>
