@@ -36,8 +36,8 @@ from typing import TYPE_CHECKING, AsyncIterator, Dict, List, Optional
 if TYPE_CHECKING:
     from .db import StatsDB
 
-from .storage import RUNS_DIR, list_runs
 from .safe_paths import validate_path_component
+from .storage import RUNS_DIR, list_runs
 
 logger = logging.getLogger(__name__)
 
