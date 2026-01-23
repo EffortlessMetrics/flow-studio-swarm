@@ -52,25 +52,25 @@ logger = logging.getLogger(__name__)
 
 # SDK availability and module access
 # Compatibility helpers
-from swarm.runtime._claude_sdk.compat import (
+from swarm.runtime._claude_sdk.compat import (  # noqa: E402
     _dict_to_normalized_tool_call,
 )
 
 # Hook factory functions
-from swarm.runtime._claude_sdk.hooks import (
+from swarm.runtime._claude_sdk.hooks import (  # noqa: E402
     create_dangerous_command_hook,
     create_telemetry_hook,
 )
 
 # Options builder functions
-from swarm.runtime._claude_sdk.options import (
+from swarm.runtime._claude_sdk.options import (  # noqa: E402
     create_high_trust_options,
     create_options_from_plan,
     step_plan_to_agent_options,
 )
 
 # Tool policy and restriction helpers
-from swarm.runtime._claude_sdk.policy import (
+from swarm.runtime._claude_sdk.policy import (  # noqa: E402
     ALL_STANDARD_TOOLS,
     compute_disallowed_tools,
     create_tool_policy_hook,
@@ -78,17 +78,17 @@ from swarm.runtime._claude_sdk.policy import (
 )
 
 # Query helpers
-from swarm.runtime._claude_sdk.query import (
+from swarm.runtime._claude_sdk.query import (  # noqa: E402
     query_simple,
     query_with_options,
 )
 
 # Structured output schemas
-from swarm.runtime._claude_sdk.schemas import (
+from swarm.runtime._claude_sdk.schemas import (  # noqa: E402
     HANDOFF_ENVELOPE_SCHEMA,
     ROUTING_SIGNAL_SCHEMA,
 )
-from swarm.runtime._claude_sdk.sdk_import import (
+from swarm.runtime._claude_sdk.sdk_import import (  # noqa: E402
     SDK_AVAILABLE,
     _sdk_module,
     check_sdk_available,
@@ -99,12 +99,12 @@ from swarm.runtime._claude_sdk.sdk_import import (
 )
 
 # Session management
-from swarm.runtime._claude_sdk.session import (
+from swarm.runtime._claude_sdk.session import (  # noqa: E402
     StepSessionClient,
 )
 
 # SDK surface shims (optional exports)
-from swarm.runtime._claude_sdk.shims import (
+from swarm.runtime._claude_sdk.shims import (  # noqa: E402
     AssistantMessage,
     BaseHookInput,
     ContentBlock,
@@ -135,7 +135,7 @@ from swarm.runtime._claude_sdk.shims import (
 )
 
 # Telemetry data structures
-from swarm.runtime._claude_sdk.telemetry import (
+from swarm.runtime._claude_sdk.telemetry import (  # noqa: E402
     TelemetryData,
 )
 

@@ -32,6 +32,7 @@ Example usage:
     print(f"Status: {result['status']}")
 """
 
+import os
 import re
 import shlex
 import subprocess
@@ -41,9 +42,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-# Shell metacharacters that indicate potential command injection
+# Shell operators that indicate potential command injection
 # These require explicit opt-in if the user truly needs shell features
-SHELL_METACHAR_PATTERN = re.compile(r"[|;&$`><]|\$\(")
+SHELL_METACHAR_PATTERN = re.compile(r"(\|\||&&|[|;<>`]|\$\()")
 
 
 def parse_command(command: str | list[str]) -> list[str]:
@@ -70,7 +71,7 @@ def parse_command(command: str | list[str]) -> list[str]:
             "avoid shell features."
         )
 
-    return shlex.split(command)
+    return shlex.split(command, posix=(os.name != "nt"))
 
 
 class Tier(Enum):

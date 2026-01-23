@@ -29,21 +29,21 @@ if _repo_override is not None:
     set_repo_root(_repo_override)
 
 # Now import validation modules (they will use the configured repo root)
-from swarm.tools.validation.constants import (
+from swarm.tools.validation.constants import (  # noqa: E402
     EXIT_FATAL_ERROR,
     EXIT_SUCCESS,
     EXIT_VALIDATION_FAILED,
 )
-from swarm.tools.validation.registry import parse_agents_registry
-from swarm.tools.validation.reporting import (
+from swarm.tools.validation.registry import parse_agents_registry  # noqa: E402
+from swarm.tools.validation.reporting import (  # noqa: E402
     build_report_json,
     build_report_markdown,
     print_errors,
     print_json_output,
     print_success,
 )
-from swarm.tools.validation.runner import run_validation
-from swarm.tools.validation.validators.flows import parse_flow_config
+from swarm.tools.validation.runner import run_validation  # noqa: E402
+from swarm.tools.validation.validators.flows import parse_flow_config  # noqa: E402
 
 
 def main() -> None:

@@ -269,7 +269,7 @@ def make_command_check(
 
     # Parse command to argv if it's a string
     if isinstance(command, str):
-        argv = shlex.split(command)
+        argv = shlex.split(command, posix=(os.name != "nt"))
         cmd_display = command
     else:
         argv = command

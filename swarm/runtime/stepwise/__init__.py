@@ -32,7 +32,7 @@ Backwards Compatibility:
 # =============================================================================
 # Public API: Orchestrator
 # =============================================================================
-from .orchestrator import StepwiseOrchestrator, get_orchestrator
+from .orchestrator import StepwiseOrchestrator, get_orchestrator  # noqa: E402
 
 # Backwards compatibility alias
 GeminiStepOrchestrator = StepwiseOrchestrator
@@ -44,17 +44,17 @@ GeminiStepOrchestrator = StepwiseOrchestrator
 # Internal helpers (re-exported for backwards compatibility)
 # Keep imports minimal - most code should use routing/ subpackage directly
 # =============================================================================
-from .envelope import ensure_step_envelope
-from .graph_bridge import build_flow_graph_from_definition
-from .models import (
+from .envelope import ensure_step_envelope  # noqa: E402
+from .graph_bridge import build_flow_graph_from_definition  # noqa: E402
+from .models import (  # noqa: E402
     FlowExecutionResult,
     FlowStepwiseSummary,
     ResolvedNode,
     # Note: RoutingOutcome is now imported from .routing (driver.py version)
 )
-from .node_resolver import find_step_index, get_next_node_id, resolve_node
-from .receipt_compat import read_receipt_field, update_receipt_routing
-from .routing import (
+from .node_resolver import find_step_index, get_next_node_id, resolve_node  # noqa: E402
+from .receipt_compat import read_receipt_field, update_receipt_routing  # noqa: E402
+from .routing import (  # noqa: E402
     # Elephant Protocol
     ProgressDelta,
     ProgressEvidence,
@@ -80,7 +80,7 @@ from .routing import (
 #
 # For backwards compatibility, this package exports route_step_legacy as route_step.
 # New code should import from swarm.runtime.stepwise.routing for the driver version.
-from .routing import (
+from .routing import (  # noqa: E402
     # Re-export legacy route_step for backwards compatibility
     route_step_legacy as route_step,  # Legacy signature - for existing code
 )
@@ -88,8 +88,8 @@ from .routing import (
 # =============================================================================
 # Public API: Spec Loading
 # =============================================================================
-from .spec_facade import SpecFacade, load_flow_spec, load_station_spec
-from .types import (
+from .spec_facade import SpecFacade, load_flow_spec, load_station_spec  # noqa: E402
+from .types import (  # noqa: E402
     StepTxnInput,
     StepTxnOutput,
     VerificationCheck,
