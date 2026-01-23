@@ -157,18 +157,27 @@ class RunStateManager:
             return runs
 
         # Get directories sorted by modification time
-        run_dirs = []
+        # Optimization: Sort candidates by mtime BEFORE checking for run_state.json
+        # This avoids expensive file existence checks for thousands of old runs
+        candidates = []
         with os.scandir(self.runs_root) as it:
             for entry in it:
                 if entry.is_dir():
-                    run_state_path = os.path.join(entry.path, "run_state.json")
-                    if os.path.exists(run_state_path):
-                        run_dirs.append((entry.stat().st_mtime, Path(entry.path)))
+                    candidates.append(entry)
 
-        run_dirs.sort(key=lambda x: x[0], reverse=True)
+        # entry.stat() is typically cached from scandir
+        candidates.sort(key=lambda x: x.stat().st_mtime, reverse=True)
 
-        for _, run_dir in run_dirs[:limit]:
+        for entry in candidates:
+            if len(runs) >= limit:
+                break
+
+            run_dir = Path(entry.path)
             state_path = run_dir / "run_state.json"
+
+            if not state_path.exists():
+                continue
+
             try:
                 state = json.loads(state_path.read_text(encoding="utf-8"))
                 runs.append(
