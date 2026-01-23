@@ -93,7 +93,7 @@
         </button>
       </div>
       <div id="run-control-status" class="run-control-status" data-uiid="flow_studio.sidebar.run_control.status">
-        <span id="run-control-status-text" class="muted">No active run</span>
+        <span id="run-control-status-text" class="muted" aria-live="polite">No active run</span>
       </div>
     </div>
     <div style="margin-bottom: 12px;" data-uiid="flow_studio.sidebar.run_selector">
@@ -10434,11 +10434,14 @@ export function copyToClipboard(text) {
 /**
  * Create a copy button element
  */
-export function createCopyButton(text, label = "Copy") {
+export function createCopyButton(text, label = "Copy", ariaLabel) {
     const btn = document.createElement("button");
     btn.className = "copy-btn";
     btn.textContent = label;
     btn.title = "Copy to clipboard";
+    if (ariaLabel) {
+        btn.setAttribute("aria-label", ariaLabel);
+    }
     btn.addEventListener("click", () => {
         void copyToClipboard(text);
         btn.textContent = "Copied!";
@@ -10460,7 +10463,7 @@ export function createPathWithCopy(path) {
     pathSpan.className = "mono";
     pathSpan.textContent = path;
     container.appendChild(pathSpan);
-    container.appendChild(createCopyButton(path, "Copy"));
+    container.appendChild(createCopyButton(path, "Copy", `Copy path ${path}`));
     return container;
 }
 /**
@@ -10480,7 +10483,7 @@ export function createQuickCommands(commands) {
         cmdText.className = "command-text";
         cmdText.textContent = "$ " + cmd;
         line.appendChild(cmdText);
-        line.appendChild(createCopyButton(cmd, "Copy"));
+        line.appendChild(createCopyButton(cmd, "Copy", `Copy command ${cmd}`));
         container.appendChild(line);
     });
     return container;
@@ -14135,8 +14138,10 @@ export async function stopRun() {
         return;
     }
     const runId = _state.activeRunId;
-    _state.isLoading = true;
+    const prevState = _state.runState; // Capture for restoration on error
     // Set intermediate "stopping" state
+    // IMPORTANT: Don't set isLoading=true here - it would mask the "Stopping..." UI
+    // The stopping state already disables buttons via updateUI()
     _state.runState = "stopping";
     updateUI();
     // Fire the stopping callback
@@ -14171,9 +14176,8 @@ export async function stopRun() {
         updateUI();
     }
     catch (err) {
-        _state.isLoading = false;
-        // Revert to previous state on error
-        _state.runState = "running"; // or paused - we lost track, but running is safer
+        // Revert to previous state on error (running or paused)
+        _state.runState = prevState;
         _state.error = err.message || "Failed to stop run";
         console.error("Failed to stop run", err);
         updateUI();
@@ -14276,13 +14280,20 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopping", activeRunId);
             }
             break;
-        case "run_stopped":
+        case "run_stopped": {
+            // Idempotency guard: If we already finalized from the POST fallback,
+            // don't fire callbacks twice. Just capture stop_report_path if missing.
+            if (_state.runState === "stopped") {
+                const p = event.payload?.stop_report_path || null;
+                if (!_state.stopReportPath && p) {
+                    _state.stopReportPath = p;
+                }
+                break;
+            }
             // Run has been stopped cleanly (final state)
             _state.runState = "stopped";
-            _state.stopReportPath = event.payload?.stop_report_path || null;
+            _state.stopReportPath = event.payload?.stop_report_path || _state.stopReportPath;
             _state.error = null; // Stopped is clean, not an error
-            // Keep subscription open for a moment to catch any final events
-            // But mark the run as stopped
             if (_callbacks.onRunStopped) {
                 _callbacks.onRunStopped(activeRunId, _state.stopReportPath || undefined);
             }
@@ -14290,6 +14301,7 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopped", activeRunId);
             }
             break;
+        }
         case "error":
             _state.runState = "failed";
             _state.error = event.payload?.error || "Run failed";
@@ -14349,8 +14361,8 @@ export async function setActiveRun(runId) {
         _state.currentStep = data.current_step;
         _state.etag = etag;
         _state.error = data.error;
-        // Subscribe to events if run is active
-        if (_state.runState === "running" || _state.runState === "paused") {
+        // Subscribe to events if run is active (including stopping state for reload safety)
+        if (_state.runState === "running" || _state.runState === "paused" || _state.runState === "stopping") {
             subscribeToRunEvents(runId);
         }
         updateUI();
