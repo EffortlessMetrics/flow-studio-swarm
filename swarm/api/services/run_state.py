@@ -156,19 +156,32 @@ class RunStateManager:
         if not self.runs_root.exists():
             return runs
 
-        # Get directories sorted by modification time
-        run_dirs = []
+        # Get all candidates sorted by modification time (descending)
+        # We defer checking for run_state.json until after sorting to minimize syscalls
+        candidates = []
         with os.scandir(self.runs_root) as it:
             for entry in it:
                 if entry.is_dir():
-                    run_state_path = os.path.join(entry.path, "run_state.json")
-                    if os.path.exists(run_state_path):
-                        run_dirs.append((entry.stat().st_mtime, Path(entry.path)))
+                    try:
+                        # Cache mtime and path while iterator is active
+                        candidates.append((entry.stat().st_mtime, entry.path))
+                    except OSError:
+                        # Skip if we can't stat the directory
+                        continue
 
-        run_dirs.sort(key=lambda x: x[0], reverse=True)
+        candidates.sort(key=lambda x: x[0], reverse=True)
 
-        for _, run_dir in run_dirs[:limit]:
+        # Process candidates until we have enough valid runs
+        for _, run_path_str in candidates:
+            if len(runs) >= limit:
+                break
+
+            run_dir = Path(run_path_str)
             state_path = run_dir / "run_state.json"
+
+            if not state_path.exists():
+                continue
+
             try:
                 state = json.loads(state_path.read_text(encoding="utf-8"))
                 runs.append(
