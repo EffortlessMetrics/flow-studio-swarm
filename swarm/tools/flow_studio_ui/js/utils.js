@@ -71,11 +71,14 @@ export function copyToClipboard(text) {
 /**
  * Create a copy button element
  */
-export function createCopyButton(text, label = "Copy") {
+export function createCopyButton(text, label = "Copy", ariaLabel) {
     const btn = document.createElement("button");
     btn.className = "copy-btn";
     btn.textContent = label;
     btn.title = "Copy to clipboard";
+    if (ariaLabel) {
+        btn.setAttribute("aria-label", ariaLabel);
+    }
     btn.addEventListener("click", () => {
         void copyToClipboard(text);
         btn.textContent = "Copied!";
@@ -97,7 +100,7 @@ export function createPathWithCopy(path) {
     pathSpan.className = "mono";
     pathSpan.textContent = path;
     container.appendChild(pathSpan);
-    container.appendChild(createCopyButton(path, "Copy"));
+    container.appendChild(createCopyButton(path, "Copy", `Copy path ${path}`));
     return container;
 }
 /**
@@ -117,7 +120,7 @@ export function createQuickCommands(commands) {
         cmdText.className = "command-text";
         cmdText.textContent = "$ " + cmd;
         line.appendChild(cmdText);
-        line.appendChild(createCopyButton(cmd, "Copy"));
+        line.appendChild(createCopyButton(cmd, "Copy", `Copy command ${cmd}`));
         container.appendChild(line);
     });
     return container;
