@@ -50,16 +50,16 @@ export async function renderRunTimeline(container) {
             const time = formatTime(event.timestamp);
             const duration = event.duration_ms ? formatDuration(event.duration_ms / 1000) : '';
             html += `
-        <div class="timeline-event ${event.status || ''}">
+        <div class="timeline-event ${escapeHtml(event.status || null) || ''}">
           <span class="timeline-time">${time}</span>
           <span class="timeline-icon">${icon}</span>
-          <span class="timeline-flow">${event.flow}</span>
-          <span class="timeline-status">${event.status || ''}</span>
+        <span class="timeline-flow">${escapeHtml(event.flow)}</span>
+          <span class="timeline-status">${escapeHtml(event.status || null) || ''}</span>
           ${duration ? `<span class="timeline-duration">(${duration})</span>` : ''}
         </div>
       `;
             if (event.note) {
-                html += `<div class="timeline-note">\u2514\u2500 ${event.note}</div>`;
+                html += `<div class="timeline-note">\u2514\u2500 ${escapeHtml(event.note || null)}</div>`;
             }
         });
         // Add total duration if available
@@ -128,7 +128,7 @@ export async function renderFlowTiming(container, flowKey) {
                     const isSlow = (step.duration_seconds || 0) > timing.duration_seconds * 0.3;
                     html += `
             <div class="timing-bar-label">
-              <span>${step.step_id}</span>
+              <span>${escapeHtml(step.step_id)}</span>
               <span>${formatDuration(step.duration_seconds || 0)}</span>
             </div>
             <div class="timing-bar">
@@ -459,7 +459,7 @@ function renderRoutingDecision(routing) {
         const exitClass = routing.reason.toLowerCase().includes('verified') ? 'success' : 'warning';
         html += `<div class="routing-detail">
       <span class="routing-label">Reason</span>
-      <span class="routing-value exit-reason ${exitClass}">${routing.reason}</span>
+      <span class="routing-value exit-reason ${exitClass}">${escapeHtml(routing.reason)}</span>
     </div>`;
     }
     html += '</div>';
@@ -593,16 +593,16 @@ export async function showStepDetails(data, callbacks = {}) {
     let nodeTabHtml = `
     <div class="author-only">
       <div class="kv-label">Step id</div>
-      <div class="mono">${data.step_id || ""}</div>
+      <div class="mono">${escapeHtml(data.step_id || null)}</div>
       <div class="kv-label">Flow</div>
-      <div class="mono">${data.flow || ""}</div>
+      <div class="mono">${escapeHtml(data.flow || null)}</div>
     </div>
   `;
     // What this step does section
     nodeTabHtml += `
     <div class="kv-section">
       <div class="kv-label">What this step does</div>
-      <div class="fs-text-body" style="line-height: 1.4;">${stepDescription || data.role || "\u2014"}</div>
+      <div class="fs-text-body" style="line-height: 1.4;">${escapeHtml(stepDescription || data.role || "\u2014")}</div>
     </div>
   `;
     // Agents section (placeholder - will add interactive links below)
@@ -830,18 +830,18 @@ export async function showAgentDetails(data, callbacks = {}) {
     descSection.className = "kv-section";
     descSection.innerHTML = `
     <div class="kv-label">What this agent does</div>
-    <div class="fs-text-body" style="line-height: 1.4;">${agentDescription || "\u2014"}</div>
+    <div class="fs-text-body" style="line-height: 1.4;">${escapeHtml(agentDescription || "\u2014")}</div>
   `;
     const meta = document.createElement("div");
     meta.innerHTML = `
     <div class="author-only">
       <div class="kv-label">Agent key</div>
-      <div class="mono">${agentKey}</div>
+      <div class="mono">${escapeHtml(agentKey)}</div>
     </div>
     <div class="kv-label">Category</div>
-    <div>${data.category || "unknown"}</div>
+    <div>${escapeHtml(data.category || "unknown")}</div>
     <div class="kv-label">Model</div>
-    <div class="mono">${data.model || "inherit"}</div>
+    <div class="mono">${escapeHtml(data.model || "inherit")}</div>
   `;
     // Fetch agent usage
     const usageSection = document.createElement("div");
@@ -911,15 +911,15 @@ export function showArtifactDetails(data) {
     const meta = document.createElement("div");
     meta.innerHTML = `
     <div class="kv-label">Filename</div>
-    <div class="mono">${data.filename || data.label}</div>
+    <div class="mono">${escapeHtml(data.filename || data.label)}</div>
     <div class="kv-label">Type</div>
     <div>${data.required ? "Required" : "Optional"}</div>
     <div class="kv-label">Status</div>
-    <div class="${statusClass}" style="font-weight: 600;">${statusIcon} ${(data.status || "unknown").toUpperCase()}</div>
+    <div class="${statusClass}" style="font-weight: 600;">${statusIcon} ${escapeHtml((data.status || "unknown").toUpperCase())}</div>
     ${data.is_decision ? '<div class="kv-label">Decision Artifact</div><div style="color: #3b82f6; font-weight: 600;">Yes - This is the flow\'s decision artifact</div>' : ''}
     <div class="kv-label">Produced by Step</div>
-    <div class="mono">${data.step_id || ""}</div>
-    ${data.note ? '<div class="kv-label">Note</div><div class="muted" style="font-style: italic;">' + data.note + '</div>' : ''}
+    <div class="mono">${escapeHtml(data.step_id || null)}</div>
+    ${data.note ? '<div class="kv-label">Note</div><div class="muted" style="font-style: italic;">' + escapeHtml(data.note || null) + '</div>' : ''}
   `;
     const pathSection = document.createElement("div");
     pathSection.className = "author-only";
