@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from .db import StatsDB
 
 from .storage import RUNS_DIR, list_runs
+from .safe_paths import validate_path_component
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,7 @@ class RunTailer:
         Raises:
             TailerError: If ingestion fails (offset will NOT be advanced).
         """
+        validate_path_component(run_id, "run_id")
         events_file = self._runs_dir / run_id / "events.jsonl"
 
         if not events_file.exists():
