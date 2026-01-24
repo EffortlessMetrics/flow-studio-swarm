@@ -14,6 +14,7 @@
 // Core state and utilities
 import { state } from "./state.js";
 import { Api } from "./api.js";
+import { copyToClipboard } from "./utils.js";
 import type {
   FlowKey,
   NodeData,
@@ -897,6 +898,20 @@ window.addEventListener("load", async () => {
     const btn = document.getElementById("reload-btn");
     if (btn) {
       btn.addEventListener("click", reloadConfig);
+    }
+
+    // Copy dev-check command handler
+    const copyDevCheckBtn = document.getElementById("copy-dev-check-btn");
+    if (copyDevCheckBtn) {
+      copyDevCheckBtn.addEventListener("click", () => {
+        void copyToClipboard("make dev-check");
+        copyDevCheckBtn.textContent = "Copied!";
+        copyDevCheckBtn.classList.add("copied");
+        setTimeout(() => {
+          copyDevCheckBtn.textContent = "Copy";
+          copyDevCheckBtn.classList.remove("copied");
+        }, 1500);
+      });
     }
 
     // Help button handler
