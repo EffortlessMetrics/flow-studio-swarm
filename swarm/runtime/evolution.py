@@ -723,6 +723,29 @@ def validate_evolution_patch(
 
     # Check target file exists
     target_path = repo_root / patch.target_file
+
+    # SECURITY: Ensure target path is within repo root
+    try:
+        # resolve() handles '..' and symlinks.
+        # We assume strict=False because the file might not exist yet (e.g. for new config).
+        resolved_target = target_path.resolve()
+        resolved_root = repo_root.resolve()
+
+        if not resolved_target.is_relative_to(resolved_root):
+            errors.append(
+                f"Target path '{patch.target_file}' attempts to access files outside repository"
+            )
+            return PatchValidationResult(
+                valid=False,
+                errors=errors,
+            )
+    except Exception as e:
+        errors.append(f"Invalid path: {e}")
+        return PatchValidationResult(
+            valid=False,
+            errors=errors,
+        )
+
     target_exists = target_path.exists()
 
     if not target_exists and patch.patch_type != PatchType.CONFIG:
