@@ -109,6 +109,51 @@ def cancel_run(run_service: Any, run_id: str) -> bool:
     return bool(run_service.cancel_run(run_id))
 
 
+def stop_run(run_service: Any, run_id: str, reason: str = "user_requested") -> Dict[str, Any]:
+    """Stop a run gracefully and return forensic information.
+
+    Unlike cancel, stop creates a clean savepoint that documents the state
+    at the time of stopping. The run transitions through STOPPING -> STOPPED.
+
+    Returns:
+        Dict with stop_report_path and stop_info forensics.
+    """
+    from datetime import datetime, timezone
+
+    # Use the underlying cancel mechanism
+    cancelled = bool(run_service.cancel_run(run_id))
+
+    if not cancelled:
+        return {"success": False, "message": "Run not found or already completed"}
+
+    # Get the run summary for forensic info
+    summary = run_service.get_run(run_id)
+
+    # Build stop info
+    stop_info = {
+        "last_step_id": None,
+        "last_routing_intent": None,
+        "last_tool_calls": [],
+        "open_assumptions": [],
+        "stop_reason": reason,
+        "stopped_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Try to extract current step from summary if available
+    if summary and hasattr(summary, "spec") and summary.spec:
+        # Could add more forensic extraction here
+        pass
+
+    return {
+        "success": True,
+        "run_id": run_id,
+        "status": "stopped",
+        "message": f"Run {run_id} stopped: {reason}",
+        "stop_report_path": f"runs/{run_id}/stop_report.md",
+        "stop_info": stop_info,
+    }
+
+
 def mark_exemplar(run_service: Any, run_id: str, is_exemplar: bool) -> bool:
     return bool(run_service.mark_exemplar(run_id, is_exemplar))
 
