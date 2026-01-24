@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -30,9 +31,22 @@ def create_app() -> FastAPI:
         version="2.0.0",
     )
 
+    # Determine allowed origins
+    default_origins = [
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+        "http://localhost:5001",
+        "http://127.0.0.1:5001",
+    ]
+    env_origins = os.environ.get("SWARM_ALLOWED_ORIGINS")
+    if env_origins:
+        allow_origins = [o.strip() for o in env_origins.split(",") if o.strip()]
+    else:
+        allow_origins = default_origins
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allow_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
