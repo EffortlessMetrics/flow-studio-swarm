@@ -17,6 +17,7 @@ import { qsByUiid, qsAllByUiidPrefix } from "./domain.js";
 import { configure as configureSelection, selectNode, selectStep, selectAgent, clearSelection, getSelectionForUrl, parseStepParam } from "./selection.js";
 // Details panel
 import { showStepDetails as showStepDetailsBase, showAgentDetails as showAgentDetailsBase, showArtifactDetails, showEmptyState, renderRunTimeline, renderFlowTiming } from "./details.js";
+import { renderGettingStartedHint } from "./ui_fragments.js";
 // Graph
 import { renderGraphCore } from "./graph.js";
 // Runs/flows orchestration
@@ -520,20 +521,7 @@ function showFlowDetails(detail) {
   `;
     const hint = document.createElement("div");
     hint.className = "welcome-panel author-only";
-    hint.innerHTML = `
-    <div class="welcome-section" style="margin-bottom: 12px;">
-      <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">
-        Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
-      </div>
-      <div style="font-size: 11px; color: #9ca3af;">
-        Artifacts: <code class="mono" style="font-size: 10px;">swarm/runs/&lt;run&gt;/${flow.key || "&lt;flow&gt;"}/</code>
-      </div>
-    </div>
-    <div class="welcome-section">
-      <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">Edit flow:</div>
-      <pre class="mono" style="font-size: 10px; margin: 0;">$EDITOR swarm/config/flows/${flow.key || "&lt;key&gt;"}.yaml</pre>
-    </div>
-  `;
+    hint.innerHTML = renderGettingStartedHint(flow.key || "");
     const operatorHint = document.createElement("div");
     operatorHint.className = "operator-only";
     operatorHint.id = "flow-overview-timeline";
