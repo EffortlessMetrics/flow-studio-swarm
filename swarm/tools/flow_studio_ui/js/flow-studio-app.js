@@ -12,6 +12,7 @@
 // Core state and utilities
 import { state } from "./state.js";
 import { Api } from "./api.js";
+import { copyToClipboard } from "./utils.js";
 import { qsByUiid, qsAllByUiidPrefix } from "./domain.js";
 // Selection management
 import { configure as configureSelection, selectNode, selectStep, selectAgent, clearSelection, getSelectionForUrl, parseStepParam } from "./selection.js";
@@ -691,6 +692,19 @@ window.addEventListener("load", async () => {
         const btn = document.getElementById("reload-btn");
         if (btn) {
             btn.addEventListener("click", reloadConfig);
+        }
+        // Copy dev-check command handler
+        const copyDevCheckBtn = document.getElementById("copy-dev-check-btn");
+        if (copyDevCheckBtn) {
+            copyDevCheckBtn.addEventListener("click", () => {
+                void copyToClipboard("make dev-check");
+                copyDevCheckBtn.textContent = "Copied!";
+                copyDevCheckBtn.classList.add("copied");
+                setTimeout(() => {
+                    copyDevCheckBtn.textContent = "Copy";
+                    copyDevCheckBtn.classList.remove("copied");
+                }, 1500);
+            });
         }
         // Help button handler
         const helpBtn = document.getElementById("help-btn");

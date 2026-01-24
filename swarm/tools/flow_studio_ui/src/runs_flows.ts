@@ -571,6 +571,7 @@ export async function loadFlows(): Promise<Flow[]> {
   const listEl = document.getElementById("flow-list");
   if (!listEl) return flows;
 
+  listEl.classList.remove("fs-loading");
   listEl.innerHTML = "";
 
   if (!flows.length) {

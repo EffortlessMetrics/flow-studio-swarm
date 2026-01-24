@@ -484,6 +484,7 @@ export async function loadFlows() {
     const listEl = document.getElementById("flow-list");
     if (!listEl)
         return flows;
+    listEl.classList.remove("fs-loading");
     listEl.innerHTML = "";
     if (!flows.length) {
         listEl.innerHTML = renderNoFlows();
