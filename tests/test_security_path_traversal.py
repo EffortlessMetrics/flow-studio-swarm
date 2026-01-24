@@ -200,4 +200,7 @@ def test_run_tailer_path_validation(tmp_path):
         tailer.tail_run("../etc/passwd")
 
     with pytest.raises(ValueError, match="run_id"):
+        tailer.tail_run("..\\windows\\system32")
+
+    with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")

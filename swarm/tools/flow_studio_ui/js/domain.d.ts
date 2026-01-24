@@ -11,8 +11,13 @@
  * - TypeScript frontend (browser modules)
  * - Tests and tooling
  */
-/** Valid flow keys in the SDLC (core + demo flows) */
-export type FlowKey = "signal" | "plan" | "build" | "review" | "gate" | "deploy" | "wisdom" | "reset" | "stepwise-demo";
+/**
+ * Valid flow keys derived from FLOW_KEYS constant.
+ * Imported from flow_constants.ts and re-exported for backwards compatibility.
+ * The canonical source is flow_constants.ts - do not define FlowKey manually.
+ */
+import type { FlowKey as FlowKeyType } from "./flow_constants.js";
+export type FlowKey = FlowKeyType;
 /** Run types distinguish examples from active work */
 export type RunType = "example" | "active";
 /** Status values for steps/artifacts */
