@@ -168,7 +168,7 @@ graph TD
 
 | # | Step | Agents | Role |
 | - | ---- | ------ | ---- |
-| 1 | `branch` | `repo-operator` — Git workflows: branch, commit, merge, tag. Safe Bash only. | Ensure clean tree, create feature branch with conventional naming. |
+| 1 | `branch` | `repo-operator` — Git workflows: branch, commit, merge, tag, reset operations. Safe Bash only. | Ensure clean tree, create feature branch with conventional naming. |
 | 2 | `load_context` | `context-loader` — Load relevant code/tests/specs for subtask → subtask_context_manifest.json. | Load relevant context for subtask → subtask_context_manifest.json. |
 | 3 | `clarify` | `clarifier` — Detect ambiguities, draft clarification questions. | Detect ambiguities, draft clarification questions → clarification_questions.md. |
 | 4 | `author_tests` | `test-author` — Write/update tests → tests/*, test_changes_summary.md. | Write/update tests → tests/*, test_changes_summary.md. |
@@ -179,7 +179,7 @@ graph TD
 | 9 | `fix` | `fixer` — Apply targeted fixes from critics/mutation → fix_summary.md. | Apply targeted fixes from critics and mutations → fix_summary.md. |
 | 10 | `docs` | `doc-writer` — Update inline docs, READMEs, API docs → doc_updates.md. | Update docs, READMEs, API docs → doc_updates.md. |
 | 11 | `self_review` | `self-reviewer` — Final review → self_review.md, build_receipt.json. | Final review → self_review.md, build_receipt.json with per-dimension verdicts. |
-| 12 | `commit` | `repo-operator` — Git workflows: branch, commit, merge, tag. Safe Bash only. | Stage changes, compose commit message, commit to feature branch. |
+| 12 | `commit` | `repo-operator` — Git workflows: branch, commit, merge, tag, reset operations. Safe Bash only. | Stage changes, compose commit message, commit to feature branch. |
 <!-- FLOW AUTOGEN END -->
 
 ---
