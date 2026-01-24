@@ -26,6 +26,7 @@ These components are built and integrated:
 | **Boundary Review API** | `swarm/api/routes/boundary.py` | Aggregated assumptions/decisions/detours |
 | **Run Control** | `swarm/tools/flow_studio_ui/src/run_control.ts` | SSE-driven state management |
 | **Inventory Counts** | `swarm/tools/flow_studio_ui/src/components/InventoryCounts.ts` | Real-time fact marker dashboard |
+| **Security Hardening** | `swarm/tools/flow_studio_ui/`, `tests/` | XSS prevention, shell injection guards, path traversal blocks |
 
 ### Architectural Shifts
 
@@ -171,6 +172,31 @@ A new user should be able to:
 
 ---
 
+### 0. Security Hardening ✓
+
+**Goal:** Defense-in-depth against injection attacks across UI and backend.
+
+**Vulnerabilities Addressed:**
+
+| Vector | Location | Mitigation |
+|--------|----------|------------|
+| **Stored XSS** | `details.ts` innerHTML calls | `escapeHtml()` sanitization on all dynamic content |
+| **Shell Injection** | Python subprocess calls | Eliminated `shell=True`; guardrail test prevents regression |
+| **Command Injection** | `ClaudeHarnessBackend` | `run_id` sanitization before shell operations |
+| **Path Traversal** | Storage layer, SpecManager, RunStateManager | Path validation and canonicalization |
+
+**Tasks:**
+- [x] Audit all `innerHTML` assignments in Flow Studio UI
+- [x] Apply `escapeHtml()` to: event.status, event.flow, event.note, step_id, routing.reason, agentDescription, filename
+- [x] Eliminate `shell=True` from all subprocess calls
+- [x] Add guardrail test: `test_no_shell_true_in_codebase.py`
+- [x] Validate `run_id` format before use in shell operations
+- [x] Implement path traversal checks in storage layer
+
+**Implementation:** Security fixes shipped in PRs #236 (XSS) and #238 (shell injection). Guardrail tests prevent regression.
+
+---
+
 ### 1. Event Contract Alignment ✓
 
 **Goal:** Every state transition produces one event. UI should not infer state.
@@ -250,6 +276,23 @@ A new user should be able to:
 ---
 
 ## Near-Term Features (v3.1)
+
+### Accessibility (a11y) Improvements ✓
+
+**Goal:** WCAG 2.1 Level AA compliance for Flow Studio UI.
+
+**Completed:**
+- [x] Skip-to-content link for keyboard navigation (WCAG 2.4.1 Bypass Blocks)
+- [x] Decorative icons hidden from screen readers (`aria-hidden="true"`)
+- [x] Semantic buttons for profile badge, legend toggle, header controls
+- [x] ARIA attributes on tab components and modals
+- [x] Keyboard shortcuts modal with close button
+- [x] `.fs-icon-button` utility class for consistent icon button styling
+
+**Remaining:**
+- [ ] Color contrast audit (WCAG 1.4.3)
+- [ ] Focus indicator visibility improvements
+- [ ] Screen reader testing with NVDA/VoiceOver
 
 ### Context Curator Station
 
@@ -524,6 +567,13 @@ Run this checklist to verify alignment:
    - [x] Guardrail tests don't fail on unrelated PRs (vendor SDK check is now path-filtered)
    - [x] Vendor artifact regen is deterministic or gated (confirmed in audit; gen scripts are deterministic)
    - [x] Clean PR doesn't fail for historical reasons (integration test masking fixed; cross-PR docs added)
+
+6. **Security Hardening** ✓
+   - [x] XSS prevention: All `innerHTML` calls sanitized via `escapeHtml()` in details.ts
+   - [x] Shell injection prevention: `shell=True` eliminated from subprocess calls
+   - [x] Guardrail test prevents reintroduction of `shell=True`
+   - [x] Command injection: `run_id` sanitization in ClaudeHarnessBackend
+   - [x] Path traversal: Validation in SpecManager, RunStateManager, storage layer
 
 ---
 
