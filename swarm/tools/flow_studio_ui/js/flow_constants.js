@@ -2,7 +2,7 @@
 // Do not edit manually. Run: make gen-flow-constants
 /** Canonical flow ordering in SDLC sequence */
 export const FLOW_KEYS = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom", "reset", "stepwise-demo"];
-/** Flow key to numeric index (1-6) */
+/** Flow key to numeric index (1-9) */
 export const FLOW_INDEX = {
     signal: 1,
     plan: 2,

@@ -1,12 +1,13 @@
 // AUTO-GENERATED from swarm/config/flows.yaml
 // Do not edit manually. Run: make gen-flow-constants
 
-import type { FlowKey } from "./domain.js";
-
 /** Canonical flow ordering in SDLC sequence */
-export const FLOW_KEYS: FlowKey[] = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom", "reset", "stepwise-demo"];
+export const FLOW_KEYS = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom", "reset", "stepwise-demo"] as const;
 
-/** Flow key to numeric index (1-6) */
+/** Valid flow keys derived from FLOW_KEYS constant */
+export type FlowKey = typeof FLOW_KEYS[number];
+
+/** Flow key to numeric index (1-9) */
 export const FLOW_INDEX: Record<FlowKey, number> = {
   signal: 1,
   plan: 2,

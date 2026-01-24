@@ -30,12 +30,13 @@ OUTPUT_TS = PROJECT_ROOT / "swarm" / "tools" / "flow_studio_ui" / "src" / "flow_
 TEMPLATE = """// AUTO-GENERATED from swarm/config/flows.yaml
 // Do not edit manually. Run: make gen-flow-constants
 
-import type {{ FlowKey }} from "./domain.js";
-
 /** Canonical flow ordering in SDLC sequence */
-export const FLOW_KEYS: FlowKey[] = {keys};
+export const FLOW_KEYS = {keys} as const;
 
-/** Flow key to numeric index (1-6) */
+/** Valid flow keys derived from FLOW_KEYS constant */
+export type FlowKey = typeof FLOW_KEYS[number];
+
+/** Flow key to numeric index (1-9) */
 export const FLOW_INDEX: Record<FlowKey, number> = {{
 {index_entries}
 }};
