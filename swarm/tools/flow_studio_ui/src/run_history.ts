@@ -419,8 +419,9 @@ function renderRunHistoryEmpty(): string {
  */
 function renderRunHistoryLoading(): string {
   return `
-    <div class="run-history-loading muted">
-      Loading runs...
+    <div class="fs-loading">
+      <div class="fs-loading-spinner"></div>
+      <div class="fs-loading-text">Loading runs...</div>
     </div>
   `;
 }

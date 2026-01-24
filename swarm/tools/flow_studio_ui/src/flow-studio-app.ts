@@ -172,6 +172,17 @@ import type {
 // Inventory Counts - marker statistics
 import { InventoryCounts } from "./components/InventoryCounts.js";
 
+// Import utilities
+import {
+  formatDuration,
+  formatTime,
+  formatDateTime,
+  createQuickCommands,
+  createPathWithCopy,
+  escapeHtml,
+  copyToClipboard
+} from "./utils.js";
+
 // ============================================================================
 // Details Wrappers
 // ============================================================================
@@ -897,6 +908,20 @@ window.addEventListener("load", async () => {
     const btn = document.getElementById("reload-btn");
     if (btn) {
       btn.addEventListener("click", reloadConfig);
+    }
+
+    // Header copy button handler
+    const copyDevCheckBtn = document.getElementById("copy-dev-check-btn");
+    if (copyDevCheckBtn) {
+      copyDevCheckBtn.addEventListener("click", () => {
+        void copyToClipboard("make dev-check");
+        copyDevCheckBtn.textContent = "Copied!";
+        copyDevCheckBtn.classList.add("copied");
+        setTimeout(() => {
+          copyDevCheckBtn.textContent = "Copy";
+          copyDevCheckBtn.classList.remove("copied");
+        }, 1500);
+      });
     }
 
     // Help button handler
