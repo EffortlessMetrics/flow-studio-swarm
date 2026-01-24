@@ -157,18 +157,23 @@ class RunStateManager:
             return runs
 
         # Get directories sorted by modification time
+        # Optimization: Defer file existence checks until after sorting
         run_dirs = []
         with os.scandir(self.runs_root) as it:
             for entry in it:
                 if entry.is_dir():
-                    run_state_path = os.path.join(entry.path, "run_state.json")
-                    if os.path.exists(run_state_path):
-                        run_dirs.append((entry.stat().st_mtime, Path(entry.path)))
+                    run_dirs.append(entry)
 
-        run_dirs.sort(key=lambda x: x[0], reverse=True)
+        run_dirs.sort(key=lambda x: x.stat().st_mtime, reverse=True)
 
-        for _, run_dir in run_dirs[:limit]:
+        for entry in run_dirs:
+            run_dir = Path(entry.path)
             state_path = run_dir / "run_state.json"
+
+            # Check existence only for top candidates
+            if not state_path.exists():
+                continue
+
             try:
                 state = json.loads(state_path.read_text(encoding="utf-8"))
                 runs.append(
@@ -183,6 +188,9 @@ class RunStateManager:
                 )
             except Exception as e:
                 logger.warning("Failed to load run state %s: %s", run_dir, e)
+
+            if len(runs) >= limit:
+                break
 
         return runs
 
