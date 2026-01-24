@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Flow Studio UX
 - **Copy button on canvas empty state**: One-click copy of example commands
 - **Copy button on artifact details path**: Quick path copying for file navigation
+- **Copy button for dev-check command**: One-click copy of `make dev-check` in header
 
 ### Changed
 
@@ -27,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **JS import parsing**: Single-pass regex reduces parse time
 
 #### Accessibility (a11y)
+- **Skip-to-content link**: Keyboard users can bypass header/sidebar to main content (WCAG 2.4.1)
+- **Decorative icons hidden**: `aria-hidden="true"` on icons to reduce screen reader noise
 - **Profile badge**: Converted to semantic button with correct ARIA placement
 - **Tab components**: Proper ARIA attributes for screen readers
 - **Keyboard shortcuts modal**: Added close button
@@ -38,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 #### Security
+- **XSS prevention in details panel** (HIGH): Sanitize all dynamic content rendered via `innerHTML` in details.ts to prevent stored XSS attacks
+- **Shell injection prevention**: Eliminate `shell=True` in subprocess calls with guardrail test to prevent reintroduction
 - **Command injection prevention**: Sanitize `run_id` in ClaudeHarnessBackend
 - **Path traversal prevention**: Validate paths in SpecManager and RunStateManager
 - **Storage layer hardening**: Comprehensive path traversal prevention
