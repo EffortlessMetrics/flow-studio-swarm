@@ -1316,15 +1316,6 @@
     .shortcut-row:last-child {
       border-bottom: none;
     }
-    .shortcut-key {
-      display: inline-block;
-      padding: 2px 8px;
-      background: #f3f4f6;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      font-size: 11px;
-    }
     .shortcut-desc {
       font-size: 12px;
       color: #4b5563;
@@ -1696,11 +1687,14 @@
 
     /* Keyboard hint styling */
     .fs-kbd {
+      display: inline-block;
+      padding: 2px 6px;
       background: #f3f4f6;
-      padding: 1px 4px;
-      border-radius: 2px;
-      font-size: 10px;
-      font-family: var(--fs-font-mono);
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--fs-font-family-mono);
+      line-height: 1;
     }
 
     /* Error state - something went wrong */

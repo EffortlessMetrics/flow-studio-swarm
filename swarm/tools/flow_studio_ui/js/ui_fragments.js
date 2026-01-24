@@ -170,7 +170,7 @@ export function renderGettingStartedHint(flowKey) {
     return `
     <div class="welcome-section" style="margin-bottom: 12px;">
       <div class="fs-text-sm fs-text-muted" style="margin-bottom: 8px;">
-        Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
+        Click a node for details. Press <kbd class="fs-kbd">?</kbd> for shortcuts.
       </div>
       <div class="fs-text-sm fs-text-subtle">
         Artifacts: <code class="mono fs-text-xs">swarm/runs/&lt;run&gt;/${escapeHtml(flowKey || "<flow>")}/</code>

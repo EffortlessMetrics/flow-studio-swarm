@@ -1,3 +1,3 @@
-## 2026-01-21 - Empty State Actions
-**Learning:** Empty states are prime real estate for "micro-onboarding". Adding a copyable command to the empty state transforms a dead end ("No run selected") into an actionable starting point ("Run this command to start").
-**Action:** Always look for static commands/paths in UI text and wrap them with a one-click copy action.
+## 2025-05-19 - Standardized Keyboard Shortcut Styling
+**Learning:** Inconsistent usage of `<kbd>` vs `<span class="shortcut-key">` and duplicate CSS definitions led to visual discrepancies in keyboard hints across the UI.
+**Action:** Standardized on `<kbd class="fs-kbd">` for all keyboard shortcuts. Updated `.fs-kbd` CSS to include a border and proper padding, matching the previous `.shortcut-key` style which was then removed. This ensures semantic correctness (using `<kbd>`) while maintaining visual polish.
