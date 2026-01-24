@@ -186,3 +186,25 @@ def test_run_state_manager_path_validation(tmp_path):
             await manager.update_run("..", {"status": "running"})
 
     asyncio.run(run_tests())
+
+
+def test_run_tailer_validation(tmp_path):
+    """Test that RunTailer validates run_id against path traversal."""
+    from unittest.mock import Mock
+    from swarm.runtime.run_tailer import RunTailer
+
+    # Mock DB
+    mock_db = Mock()
+    mock_db.get_ingestion_offset.return_value = (0, 0)
+
+    tailer = RunTailer(db=mock_db, runs_dir=tmp_path)
+
+    # tail_run validates run_id
+    with pytest.raises(ValueError, match="run_id"):
+        tailer.tail_run("../etc/passwd")
+
+    with pytest.raises(ValueError, match="run_id"):
+        tailer.tail_run("..")
+
+    with pytest.raises(ValueError, match="run_id"):
+        tailer.tail_run("foo/bar")
