@@ -157,32 +157,39 @@ class RunStateManager:
             return runs
 
         # Get directories sorted by modification time
-        run_dirs = []
+        # Optimization: We first collect all directories and sort by mtime,
+        # then check for run_state.json only for the top candidates.
+        # This avoids thousands of unnecessary stat calls for older runs.
+        candidates = []
         with os.scandir(self.runs_root) as it:
             for entry in it:
                 if entry.is_dir():
-                    run_state_path = os.path.join(entry.path, "run_state.json")
-                    if os.path.exists(run_state_path):
-                        run_dirs.append((entry.stat().st_mtime, Path(entry.path)))
+                    candidates.append((entry.stat().st_mtime, entry))
 
-        run_dirs.sort(key=lambda x: x[0], reverse=True)
+        candidates.sort(key=lambda x: x[0], reverse=True)
 
-        for _, run_dir in run_dirs[:limit]:
-            state_path = run_dir / "run_state.json"
-            try:
-                state = json.loads(state_path.read_text(encoding="utf-8"))
-                runs.append(
-                    {
-                        "run_id": state.get("run_id", run_dir.name),
-                        "flow_key": state.get("flow_id", "").split("-")[-1]
-                        if state.get("flow_id")
-                        else None,
-                        "status": state.get("status"),
-                        "timestamp": state.get("created_at"),
-                    }
-                )
-            except Exception as e:
-                logger.warning("Failed to load run state %s: %s", run_dir, e)
+        for _, entry in candidates:
+            if len(runs) >= limit:
+                break
+
+            run_state_path = os.path.join(entry.path, "run_state.json")
+            if os.path.exists(run_state_path):
+                run_dir = Path(entry.path)
+                state_path = run_dir / "run_state.json"
+                try:
+                    state = json.loads(state_path.read_text(encoding="utf-8"))
+                    runs.append(
+                        {
+                            "run_id": state.get("run_id", run_dir.name),
+                            "flow_key": state.get("flow_id", "").split("-")[-1]
+                            if state.get("flow_id")
+                            else None,
+                            "status": state.get("status"),
+                            "timestamp": state.get("created_at"),
+                        }
+                    )
+                except Exception as e:
+                    logger.warning("Failed to load run state %s: %s", run_dir, e)
 
         return runs
 
