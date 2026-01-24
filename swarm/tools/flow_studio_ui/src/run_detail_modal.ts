@@ -12,6 +12,7 @@ import { escapeHtml, formatDateTime, createModalFocusManager, type ModalFocusMan
 import type { RunSummary, FlowKey, FlowStatusData, RunEvent, WisdomSummary } from "./domain.js";
 import { updateCompactInventory, injectInventoryCSS } from "./inventory_counts.js";
 import { updateBoundaryReviewPanel, injectBoundaryReviewCSS } from "./boundary_review.js";
+import { FLOW_KEYS, FLOW_TITLES } from "./flow_constants.js";
 
 // ============================================================================
 // Types
@@ -340,16 +341,9 @@ function renderFlowProgress(flows: Record<FlowKey, FlowStatusData> | undefined):
     return '<div class="muted fs-text-sm">No flow data available</div>';
   }
 
-  const flowOrder: FlowKey[] = ["signal", "plan", "build", "gate", "deploy", "wisdom", "stepwise-demo"];
-  const flowLabels: Record<FlowKey, string> = {
-    signal: "Signal",
-    plan: "Plan",
-    build: "Build",
-    gate: "Gate",
-    deploy: "Deploy",
-    wisdom: "Wisdom",
-    "stepwise-demo": "Stepwise"
-  };
+  // Use canonical flow ordering and titles from flow_constants
+  const flowOrder = FLOW_KEYS;
+  const flowLabels = FLOW_TITLES;
 
   const flowItems = flowOrder.map(key => {
     const flowData = flows[key];

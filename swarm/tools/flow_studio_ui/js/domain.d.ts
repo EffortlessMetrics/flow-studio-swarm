@@ -12,7 +12,7 @@
  * - Tests and tooling
  */
 /** Valid flow keys in the SDLC (core + demo flows) */
-export type FlowKey = "signal" | "plan" | "build" | "gate" | "deploy" | "wisdom" | "stepwise-demo";
+export type FlowKey = "signal" | "plan" | "build" | "review" | "gate" | "deploy" | "wisdom" | "reset" | "stepwise-demo";
 /** Run types distinguish examples from active work */
 export type RunType = "example" | "active";
 /** Status values for steps/artifacts */

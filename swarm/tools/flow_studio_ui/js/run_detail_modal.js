@@ -10,6 +10,7 @@ import { Api } from "./api.js";
 import { escapeHtml, formatDateTime, createModalFocusManager } from "./utils.js";
 import { updateCompactInventory, injectInventoryCSS } from "./inventory_counts.js";
 import { updateBoundaryReviewPanel, injectBoundaryReviewCSS } from "./boundary_review.js";
+import { FLOW_KEYS, FLOW_TITLES } from "./flow_constants.js";
 // ============================================================================
 // Module State
 // ============================================================================
@@ -283,16 +284,9 @@ function renderFlowProgress(flows) {
     if (!flows) {
         return '<div class="muted fs-text-sm">No flow data available</div>';
     }
-    const flowOrder = ["signal", "plan", "build", "gate", "deploy", "wisdom", "stepwise-demo"];
-    const flowLabels = {
-        signal: "Signal",
-        plan: "Plan",
-        build: "Build",
-        gate: "Gate",
-        deploy: "Deploy",
-        wisdom: "Wisdom",
-        "stepwise-demo": "Stepwise"
-    };
+    // Use canonical flow ordering and titles from flow_constants
+    const flowOrder = FLOW_KEYS;
+    const flowLabels = FLOW_TITLES;
     const flowItems = flowOrder.map(key => {
         const flowData = flows[key];
         const status = flowData?.status || "not_started";
