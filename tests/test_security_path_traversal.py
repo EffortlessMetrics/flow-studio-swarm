@@ -186,3 +186,18 @@ def test_run_state_manager_path_validation(tmp_path):
             await manager.update_run("..", {"status": "running"})
 
     asyncio.run(run_tests())
+
+def test_run_tailer_path_validation(tmp_path):
+    """Test that RunTailer validates run_id against path traversal."""
+    from swarm.runtime.db import StatsDB
+    from swarm.runtime.run_tailer import RunTailer
+
+    # Mock DB or use dummy
+    db = StatsDB(db_path=None)
+    tailer = RunTailer(db, tmp_path)
+
+    with pytest.raises(ValueError, match="run_id"):
+        tailer.tail_run("../etc/passwd")
+
+    with pytest.raises(ValueError, match="run_id"):
+        tailer.tail_run("..")
