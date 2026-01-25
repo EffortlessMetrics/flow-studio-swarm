@@ -1,11 +1,10 @@
-
-import pytest
-from pathlib import Path
-from swarm.api.services.run_state import RunStateManager
 import json
-import time
 import os
+import time
 from datetime import datetime, timezone
+
+from swarm.api.services.run_state import RunStateManager
+
 
 def create_run_state(run_dir, run_id):
     state = {
