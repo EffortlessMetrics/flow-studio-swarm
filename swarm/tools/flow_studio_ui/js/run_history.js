@@ -9,6 +9,7 @@
 import { Api } from "./api.js";
 import { state, STATUS_ICONS } from "./state.js";
 import { escapeHtml, formatDateTime } from "./utils.js";
+import { renderLoading } from "./ui_fragments.js";
 import { getDefaultRunHistoryFilter } from "./teaching_mode.js";
 let _callbacks = {};
 /**
@@ -338,11 +339,7 @@ function renderRunHistoryEmpty() {
  * Render loading state.
  */
 function renderRunHistoryLoading() {
-    return `
-    <div class="run-history-loading muted">
-      Loading runs...
-    </div>
-  `;
+    return renderLoading("Loading runs...");
 }
 /**
  * Render error state.

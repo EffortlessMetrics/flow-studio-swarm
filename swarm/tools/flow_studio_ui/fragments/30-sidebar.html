@@ -57,7 +57,12 @@
     <!-- Inventory Counts Panel -->
     <div id="inventory-counts-container" class="inventory-counts-container operator-only" data-uiid="flow_studio.sidebar.inventory_counts">
     </div>
-    <nav id="flow-list" class="muted" role="navigation" aria-label="Flow list" data-uiid="flow_studio.sidebar.flow_list">Loading...</nav>
+    <nav id="flow-list" class="muted" role="navigation" aria-label="Flow list" data-uiid="flow_studio.sidebar.flow_list">
+      <div class="fs-loading" style="padding: 12px;">
+        <div class="fs-loading-spinner" style="width: 24px; height: 24px; margin-bottom: 8px;"></div>
+        <div class="fs-loading-text fs-text-xs">Loading flows...</div>
+      </div>
+    </nav>
     <!-- Run History Panel (collapsible) -->
     <div class="run-history-section" data-uiid="flow_studio.sidebar.run_history">
       <div class="section-header run-history-header" style="margin-top: 16px;">
@@ -72,7 +77,10 @@
         <button type="button" aria-pressed="false" class="filter-btn" data-filter="active">Active</button>
       </div>
       <div id="run-history-list" class="run-history-list" role="list" aria-label="Run history" data-uiid="flow_studio.sidebar.run_history.list">
-        <div class="muted" style="padding: 8px; font-size: 11px;">Loading...</div>
+        <div class="fs-loading" style="padding: 12px;">
+          <div class="fs-loading-spinner" style="width: 24px; height: 24px; margin-bottom: 8px;"></div>
+          <div class="fs-loading-text fs-text-xs">Loading runs...</div>
+        </div>
       </div>
     </div>
   </aside>

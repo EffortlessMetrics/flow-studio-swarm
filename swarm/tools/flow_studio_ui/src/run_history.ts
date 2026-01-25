@@ -10,6 +10,7 @@
 import { Api } from "./api.js";
 import { state, STATUS_ICONS } from "./state.js";
 import { escapeHtml, formatDateTime } from "./utils.js";
+import { renderLoading } from "./ui_fragments.js";
 import { getDefaultRunHistoryFilter } from "./teaching_mode.js";
 import type { Run, RunType, StepStatus } from "./domain.js";
 
@@ -418,11 +419,7 @@ function renderRunHistoryEmpty(): string {
  * Render loading state.
  */
 function renderRunHistoryLoading(): string {
-  return `
-    <div class="run-history-loading muted">
-      Loading runs...
-    </div>
-  `;
+  return renderLoading("Loading runs...");
 }
 
 /**
