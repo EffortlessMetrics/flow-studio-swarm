@@ -1,5 +1,6 @@
 import os
 from unittest import mock
+
 from swarm.utils.cors_config import get_allowed_origins
 
 
