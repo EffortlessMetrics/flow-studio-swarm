@@ -157,7 +157,8 @@ SELFTEST_STEPS = [
         severity=SelfTestSeverity.CRITICAL,
         category=SelfTestCategory.CORRECTNESS,
         command=[
-            "bash -c 'uv run ruff check swarm/tools swarm/validator && uv run python -m compileall -x \"_archive\" swarm/tools swarm/validator'",
+            "uv run ruff check swarm/tools swarm/validator",
+            "uv run python -m compileall -x _archive swarm/tools swarm/validator",
         ],
         ac_ids=["AC-SELFTEST-KERNEL-FAST", "AC-SELFTEST-FAILURE-HINTS"],
         allow_fail_in_degraded=False,
@@ -257,7 +258,9 @@ SELFTEST_STEPS = [
         severity=SelfTestSeverity.WARNING,
         category=SelfTestCategory.GOVERNANCE,
         command=[
-            "bash -c 'uv run swarm/tools/validate_swarm.py && uv run swarm/tools/gen_flows.py --check && uv run swarm/tools/gen_adapters.py --platform claude --mode check-all'",
+            "uv run swarm/tools/validate_swarm.py",
+            "uv run swarm/tools/gen_flows.py --check",
+            "uv run swarm/tools/gen_adapters.py --platform claude --mode check-all",
         ],
         ac_ids=[
             "AC-SELFTEST-INTROSPECTABLE",
@@ -380,7 +383,8 @@ SELFTEST_STEPS = [
         severity=SelfTestSeverity.INFO,
         category=SelfTestCategory.GOVERNANCE,
         command=[
-            "bash -c 'uv run swarm/tools/wisdom_summarizer.py stepwise-claude --dry-run --output quiet && uv run swarm/tools/wisdom_aggregate_runs.py --output /dev/null'",
+            "uv run swarm/tools/wisdom_summarizer.py stepwise-claude --dry-run --output quiet",
+            "uv run swarm/tools/wisdom_aggregate_runs.py",
         ],
         ac_ids=["AC-SELFTEST-WISDOM-SMOKE"],
         allow_fail_in_degraded=True,

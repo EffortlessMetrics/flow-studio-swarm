@@ -611,40 +611,55 @@ class SelfTestRunner:
 
         result.timestamp_start = time.time()
         try:
-            # Use Popen with start_new_session=True to create a new process group.
-            # This ensures we can kill all child processes on timeout, not just the shell.
-            # Parse command string into list for safe execution (avoids shell injection)
-            cmd_args = shlex.split(step.full_command())
-            proc = subprocess.Popen(
-                cmd_args,
-                shell=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                start_new_session=True,  # Create new process group for proper cleanup
-            )
-            try:
-                stdout, stderr = proc.communicate(timeout=step.timeout)
-                result.exit_code = proc.returncode
-                result.stdout = stdout
-                result.stderr = stderr
-                if proc.returncode == 0:
-                    result.status = StepStatus.PASS
-                else:
-                    result.status = StepStatus.FAIL
-                    result.reason = "nonzero_exit"
-            except subprocess.TimeoutExpired:
-                # Kill the entire process group, not just the shell
+            # Execute commands sequentially, stopping on first failure.
+            # This avoids shell operator issues (&&) and works cross-platform.
+            all_stdout: list[str] = []
+            all_stderr: list[str] = []
+
+            for cmd in step.command:
+                # Parse command string into list for safe execution (avoids shell injection)
+                cmd_args = shlex.split(cmd)
+                # Use Popen with start_new_session=True to create a new process group.
+                # This ensures we can kill all child processes on timeout, not just the shell.
+                proc = subprocess.Popen(
+                    cmd_args,
+                    shell=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    start_new_session=True,  # Create new process group for proper cleanup
+                )
                 try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                except (ProcessLookupError, OSError):
-                    # Process may have already terminated
-                    proc.kill()
-                proc.wait()  # Clean up zombie process
-                result.status = StepStatus.TIMEOUT
-                result.reason = "timeout"
-                result.exit_code = -1
-                result.stderr = f"Command timed out after {step.timeout} seconds"
+                    stdout, stderr = proc.communicate(timeout=step.timeout)
+                    all_stdout.append(stdout)
+                    all_stderr.append(stderr)
+                    if proc.returncode != 0:
+                        # Stop on first failure (mimics && behavior)
+                        result.exit_code = proc.returncode
+                        result.stdout = "\n".join(all_stdout)
+                        result.stderr = "\n".join(all_stderr)
+                        result.status = StepStatus.FAIL
+                        result.reason = "nonzero_exit"
+                        break
+                except subprocess.TimeoutExpired:
+                    # Kill the entire process group, not just the shell
+                    try:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
+                        # Process may have already terminated
+                        proc.kill()
+                    proc.wait()  # Clean up zombie process
+                    result.status = StepStatus.TIMEOUT
+                    result.reason = "timeout"
+                    result.exit_code = -1
+                    result.stderr = f"Command timed out after {step.timeout} seconds"
+                    break
+            else:
+                # All commands passed
+                result.exit_code = 0
+                result.stdout = "\n".join(all_stdout)
+                result.stderr = "\n".join(all_stderr)
+                result.status = StepStatus.PASS
         except Exception as e:
             result.status = StepStatus.FAIL
             result.reason = "exception"
