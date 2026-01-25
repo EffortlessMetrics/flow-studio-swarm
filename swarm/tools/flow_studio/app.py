@@ -24,6 +24,8 @@ from .ui.assets import check_ui_assets, mount_static
 
 
 def create_app() -> FastAPI:
+    settings = FlowStudioSettings.from_env()
+
     app = FastAPI(
         title="Flow Studio API",
         description="Interactive visualization of swarm flows, steps, agents, and artifacts",
@@ -32,14 +34,13 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
     repo_root = Path(__file__).resolve().parents[3]
-    settings = FlowStudioSettings.from_env()
 
     state = create_state(repo_root)
     app.state.flow_studio = state

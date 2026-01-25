@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -185,6 +186,24 @@ class ErrorResponse(BaseModel):
 # =============================================================================
 
 
+def _get_allowed_origins() -> List[str]:
+    """Get allowed origins for CORS from environment or defaults."""
+    # Default allowed origins
+    origins = [
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+        "http://localhost:5001",
+        "http://127.0.0.1:5001",
+    ]
+
+    # Add env var origins
+    env_origins = os.getenv("SWARM_ALLOWED_ORIGINS", "")
+    if env_origins:
+        origins.extend([o.strip() for o in env_origins.split(",") if o.strip()])
+
+    return origins
+
+
 def create_app(
     repo_root: Optional[Path] = None,
     enable_cors: bool = True,
@@ -327,7 +346,7 @@ def create_app(
     if enable_cors:
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],
+            allow_origins=_get_allowed_origins(),
             allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=["*"],
             expose_headers=["ETag", "If-Match", "If-None-Match"],
