@@ -201,3 +201,59 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_validate_evolution_patch_traversal(tmp_path):
+    """Test that EvolutionPatch validation rejects path traversal."""
+    from swarm.runtime.evolution import validate_evolution_patch, EvolutionPatch, PatchType, ConfidenceLevel
+
+    # Setup repo root
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "safe.txt").write_text("safe")
+
+    # Sensitive file outside repo
+    sensitive = tmp_path / "sensitive.txt"
+    sensitive.write_text("secret")
+
+    # Case 1: Traversal
+    patch_traversal = EvolutionPatch(
+        id="TEST-001",
+        target_file="../sensitive.txt",
+        patch_type=PatchType.CONFIG,
+        content="hack",
+        confidence=ConfidenceLevel.LOW,
+        reasoning="test",
+    )
+
+    result = validate_evolution_patch(patch_traversal, repo_root=repo_root)
+    assert not result.valid
+    assert any("escapes repository root" in err for err in result.errors)
+
+    # Case 2: Absolute path
+    patch_absolute = EvolutionPatch(
+        id="TEST-002",
+        target_file=str(sensitive.resolve()),
+        patch_type=PatchType.CONFIG,
+        content="hack",
+        confidence=ConfidenceLevel.LOW,
+        reasoning="test",
+    )
+
+    result = validate_evolution_patch(patch_absolute, repo_root=repo_root)
+    assert not result.valid
+    assert any("escapes repository root" in err for err in result.errors)
+
+    # Case 3: Valid relative path
+    patch_valid = EvolutionPatch(
+        id="TEST-003",
+        target_file="safe.txt",
+        patch_type=PatchType.CONFIG,
+        content="safe update",
+        confidence=ConfidenceLevel.LOW,
+        reasoning="test",
+    )
+
+    result = validate_evolution_patch(patch_valid, repo_root=repo_root)
+    # It might fail due to other validations (e.g. content) but not traversal
+    for err in result.errors:
+        assert "escapes repository root" not in err
