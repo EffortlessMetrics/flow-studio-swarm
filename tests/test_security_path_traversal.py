@@ -257,3 +257,31 @@ def test_validate_evolution_patch_traversal(tmp_path):
     # It might fail due to other validations (e.g. content) but not traversal
     for err in result.errors:
         assert "escapes repository root" not in err
+
+    # Case 4: Nested traversal (foo/../../sensitive.txt)
+    patch_nested = EvolutionPatch(
+        id="TEST-004",
+        target_file="subdir/../../sensitive.txt",
+        patch_type=PatchType.CONFIG,
+        content="hack",
+        confidence=ConfidenceLevel.LOW,
+        reasoning="test",
+    )
+
+    result = validate_evolution_patch(patch_nested, repo_root=repo_root)
+    assert not result.valid
+    assert any("escapes repository root" in err for err in result.errors)
+
+    # Case 5: Path with redundant dots that stays valid (./safe.txt)
+    patch_dotslash = EvolutionPatch(
+        id="TEST-005",
+        target_file="./safe.txt",
+        patch_type=PatchType.CONFIG,
+        content="safe update",
+        confidence=ConfidenceLevel.LOW,
+        reasoning="test",
+    )
+
+    result = validate_evolution_patch(patch_dotslash, repo_root=repo_root)
+    for err in result.errors:
+        assert "escapes repository root" not in err
