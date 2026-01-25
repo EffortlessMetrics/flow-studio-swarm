@@ -311,10 +311,11 @@ class RunService:
                     seen_ids.add(rid)
                     all_ids.append(rid)
 
-        # Active runs with meta.json
-        active_ids = storage.list_runs()
-        # Legacy runs without meta.json
-        legacy_ids = storage.discover_legacy_runs() if include_legacy else []
+        if include_legacy:
+            active_ids, legacy_ids = storage.scan_runs()
+        else:
+            active_ids = storage.list_runs()
+            legacy_ids = []
 
         # Combine active and legacy, sort by ID descending
         # Assumption: run_id lexicographical order ~= chronological order
