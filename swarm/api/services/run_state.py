@@ -172,10 +172,9 @@ class RunStateManager:
             if len(runs) >= limit:
                 break
 
-            run_state_path = os.path.join(entry.path, "run_state.json")
-            if os.path.exists(run_state_path):
-                run_dir = Path(entry.path)
-                state_path = run_dir / "run_state.json"
+            run_dir = Path(entry.path)
+            state_path = run_dir / "run_state.json"
+            if state_path.exists():
                 try:
                     state = json.loads(state_path.read_text(encoding="utf-8"))
                     runs.append(
