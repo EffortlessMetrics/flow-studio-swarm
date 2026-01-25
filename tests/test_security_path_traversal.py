@@ -204,7 +204,12 @@ def test_run_tailer_path_validation(tmp_path):
 
 def test_validate_evolution_patch_traversal(tmp_path):
     """Test that EvolutionPatch validation rejects path traversal."""
-    from swarm.runtime.evolution import validate_evolution_patch, EvolutionPatch, PatchType, ConfidenceLevel
+    from swarm.runtime.evolution import (
+        ConfidenceLevel,
+        EvolutionPatch,
+        PatchType,
+        validate_evolution_patch,
+    )
 
     # Setup repo root
     repo_root = tmp_path / "repo"
