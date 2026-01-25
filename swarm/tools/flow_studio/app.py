@@ -18,6 +18,7 @@ from .routes import (
     tours_router,
     validation_router,
 )
+from swarm.utils.cors_config import get_allowed_origins
 from .settings import FlowStudioSettings
 from .state import create_state
 from .ui.assets import check_ui_assets, mount_static
@@ -32,7 +33,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=get_allowed_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
