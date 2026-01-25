@@ -8,7 +8,7 @@
 // - Re-run and close actions
 
 import { Api } from "./api.js";
-import { escapeHtml, formatDateTime, createModalFocusManager, type ModalFocusManager } from "./utils.js";
+import { escapeHtml, formatDateTime, createModalFocusManager, type ModalFocusManager, copyToClipboard } from "./utils.js";
 import type { RunSummary, FlowKey, FlowStatusData, RunEvent, WisdomSummary } from "./domain.js";
 import { updateCompactInventory, injectInventoryCSS } from "./inventory_counts.js";
 import { updateBoundaryReviewPanel, injectBoundaryReviewCSS } from "./boundary_review.js";
@@ -69,6 +69,14 @@ export function configure(callbacks: RunDetailCallbacks = {}): void {
  */
 function getOrCreateModal(): HTMLElement {
   let modal = document.getElementById("run-detail-modal");
+
+  // Check if existing modal has the expected structure (dynamic version)
+  // The static version in index.html lacks #run-detail-modal-content
+  if (modal && !modal.querySelector("#run-detail-modal-content")) {
+    modal.remove();
+    modal = null;
+  }
+
   if (modal) return modal;
 
   // Create modal structure
@@ -215,7 +223,10 @@ export function renderRunDetailContent(runId: string, summary: ExtendedRunSummar
     <div class="selftest-step-metadata" style="grid-template-columns: 1fr 1fr 1fr;">
       <div class="selftest-metadata-row">
         <div class="selftest-metadata-label">Run ID</div>
-        <div class="selftest-metadata-value mono" style="font-size: 11px; word-break: break-all;">${escapeHtml(runId)}</div>
+        <div class="selftest-metadata-value mono" style="display: flex; align-items: center; gap: 6px; font-size: 11px; word-break: break-all;">
+          <span>${escapeHtml(runId)}</span>
+          <button class="copy-btn" data-copy-text="${escapeHtml(runId)}" aria-label="Copy Run ID" title="Copy Run ID" style="margin-left: 0;">Copy</button>
+        </div>
       </div>
       <div class="selftest-metadata-row">
         <div class="selftest-metadata-label">Backend</div>
@@ -286,7 +297,10 @@ export function renderRunDetailContent(runId: string, summary: ExtendedRunSummar
 
     ${summary.error_message ? `
       <div class="selftest-dependencies" style="background: #fee2e2; border-left-color: #ef4444; margin-top: 16px;">
-        <div class="selftest-dependencies-title" style="color: #991b1b;">Error</div>
+        <div class="selftest-dependencies-title" style="color: #991b1b; display: flex; justify-content: space-between; align-items: center;">
+          <span>Error</span>
+          <button class="copy-btn" data-copy-text="${escapeHtml(summary.error_message)}" aria-label="Copy error message" title="Copy error message" style="background: rgba(255,255,255,0.5); border-color: rgba(239,68,68,0.3);">Copy</button>
+        </div>
         <div class="fs-text-sm" style="color: #7f1d1d; word-break: break-word;">${escapeHtml(summary.error_message)}</div>
       </div>
     ` : ""}
@@ -506,6 +520,25 @@ function attachActionHandlers(modal: HTMLElement, runId: string, summary?: Exten
   // Inject CSS for inventory and boundary components
   injectInventoryCSS();
   injectBoundaryReviewCSS();
+
+  // Copy buttons
+  const copyButtons = modal.querySelectorAll(".copy-btn[data-copy-text]");
+  copyButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const button = btn as HTMLButtonElement;
+      const text = button.getAttribute("data-copy-text");
+      if (text) {
+        void copyToClipboard(text);
+        const originalText = button.textContent;
+        button.textContent = "Copied!";
+        button.classList.add("copied");
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.classList.remove("copied");
+        }, 1500);
+      }
+    });
+  });
 
   // Load inventory counts immediately (compact view)
   const inventoryContainer = modal.querySelector("#run-detail-inventory-container") as HTMLElement | null;
