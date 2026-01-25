@@ -41,6 +41,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 # Import SpecManager from services
+from swarm.utils.cors_config import get_allowed_origins
 from .services.spec_manager import SpecManager, get_spec_manager, set_spec_manager
 
 # Configure logging
@@ -327,7 +328,7 @@ def create_app(
     if enable_cors:
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],
+            allow_origins=get_allowed_origins(),
             allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=["*"],
             expose_headers=["ETag", "If-Match", "If-None-Match"],
