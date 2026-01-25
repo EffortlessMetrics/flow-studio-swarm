@@ -82,48 +82,21 @@ Flow 4 also reads from Flows 1-2 for context:
 ---
 
 <!-- FLOW AUTOGEN START -->
-### Flow structure
+## Steps Overview
 
-```mermaid
-graph TD
-  review_run_prep["1. run_prep\n(run-prep)"]
-  review_branch["2. branch\n(repo-operator)"]
-  review_pr_create["3. pr_create\n(pr-creator)"]
-  review_harvest["4. harvest\n(pr-feedback-harvester)"]
-  review_cluster["5. cluster\n(review-worklist-writer)"]
-  review_worklist_loop["6. worklist_loop\n(review-worklist-writer, test-author, code-implementer, fixer, doc-writer, design-optioneer, test-executor)"]
-  review_close_pr["7. close_pr\n(pr-commenter, pr-status-manager)"]
-  review_cleanup["8. cleanup\n(review-cleanup, build-cleanup)"]
-  review_sanitize["9. sanitize\n(secrets-sanitizer)"]
-  review_commit["10. commit\n(repo-operator)"]
-  review_gh_update["11. gh_update\n(gh-issue-manager, gh-reporter)"]
-  review_run_prep --> review_branch
-  review_branch --> review_pr_create
-  review_pr_create --> review_harvest
-  review_harvest --> review_cluster
-  review_cluster --> review_worklist_loop
-  review_worklist_loop --> review_close_pr
-  review_close_pr --> review_cleanup
-  review_cleanup --> review_sanitize
-  review_sanitize --> review_commit
-  review_commit --> review_gh_update
-```
-
-### Steps
-
-| # | Step | Agents | Role |
-| - | ---- | ------ | ---- |
-| 1 | `run_prep` | `run-prep` — Establish run directory and flow infrastructure. Creates RUN_BASE/<flow>/ structure. | Establish run directory and .runs/<run-id>/review/ infrastructure. |
-| 2 | `branch` | `repo-operator` — Git workflows: branch, commit, merge, tag, reset operations. Safe Bash only. | Ensure run branch run/<run-id> exists and is current. |
-| 3 | `pr_create` | `pr-creator` — Create Draft PR if missing. Idempotent: skips if PR already exists. | Ensure Draft PR exists; create if missing → pr_creation_status.md. |
-| 4 | `harvest` | `pr-feedback-harvester` — Pull all bot/human feedback from PR. Non-blocking: returns what's available now. | Pull all bot/human feedback from PR → pr_feedback.md, pr_feedback_raw.json. |
-| 5 | `cluster` | `review-worklist-writer` — Cluster PR feedback into actionable Work Items with stable RW-NNN IDs. | Cluster feedback into actionable Work Items → review_worklist.md, review_worklist.json. |
-| 6 | `worklist_loop` | `review-worklist-writer` — Cluster PR feedback into actionable Work Items with stable RW-NNN IDs.<br>`test-author` — Write/update tests → tests/*, test_changes_summary.md.<br>`code-implementer` — Write code to pass tests, following ADR → src/*, impl_changes_summary.md.<br>`fixer` — Apply targeted fixes from critics/mutation → fix_summary.md.<br>`doc-writer` — Update inline docs, READMEs, API docs → doc_updates.md.<br>`design-optioneer` — Propose 2-3 architecture options with trade-offs → design_options.md.<br>`test-executor` — Execute test suites to verify fixes. Uses test-runner skill. | Unbounded microloop: pull next batch, route to fix-lane agent, update worklist, checkpoint, repeat until complete. |
-| 7 | `close_pr` | `pr-commenter` — Post idempotent summary comments to PR. Updates existing comments.<br>`pr-status-manager` — Flip Draft PR to Ready when review complete. Keeps Draft if incomplete. | Post resolution checklist to PR, flip Draft to Ready if complete. |
-| 8 | `cleanup` | `review-cleanup` — Write review_receipt.json and finalize review artifacts. Update run index.<br>`build-cleanup` — Reseal build receipt if code changed during review. Update checksums. | Write review_receipt.json, reseal build receipt, update index. |
-| 9 | `sanitize` | `secrets-sanitizer` — Scan staged surface for secrets. Emit Gate Result (safe_to_commit, safe_to_publish). | Publish gate: scan for secrets/hygiene → secrets_scan.md, secrets_status.json. |
-| 10 | `commit` | `repo-operator` — Git workflows: branch, commit, merge, tag, reset operations. Safe Bash only. | Commit and push changes (gated on secrets-sanitizer). |
-| 11 | `gh_update` | `gh-issue-manager` — Update GitHub issue board. Link PRs to issues, update labels and status.<br>`gh-reporter` — Post summaries to GitHub issues/PRs at flow boundaries. | Update issue board, post summary to GitHub (gated on proceed_to_github_ops). |
+| Step | Agent(s) | Purpose |
+|------|----------|---------|
+| run_prep | run-prep | Establish review directory |
+| branch | repo-operator | Ensure run branch exists |
+| pr_create | pr-creator | Create Draft PR if missing (for bot feedback) |
+| harvest | pr-feedback-harvester | Pull all PR feedback |
+| cluster | review-worklist-writer | Group feedback into work items |
+| worklist_loop | Multiple | **Microloop**: resolve work items |
+| finalize | pr-commenter | Update PR with resolution summary (informational) |
+| cleanup | review-cleanup, build-cleanup | Write review_receipt.json |
+| sanitize | secrets-sanitizer | Scan for secrets |
+| commit | repo-operator | Commit and push |
+| gh_update | gh-issue-manager, gh-reporter | Update GitHub |
 <!-- FLOW AUTOGEN END -->
 
 ### The Worklist Loop
