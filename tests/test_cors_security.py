@@ -9,7 +9,6 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 from swarm.api.server import create_app as create_api_app
 from swarm.tools.flow_studio.app import create_app as create_ui_app
