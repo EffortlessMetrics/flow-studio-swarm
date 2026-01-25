@@ -206,7 +206,7 @@
 uv run swarm/tools/gen_flows.py
 make validate-swarm</pre>
       <p style="margin-top: 12px; font-size: 12px; color: #6b7280;">
-        <strong>Keyboard shortcuts:</strong> Press <kbd>?</kbd> for help, <kbd>1-6</kbd> to jump to flows.
+        <strong>Keyboard shortcuts:</strong> Press <kbd class="fs-kbd">?</kbd> for help, <kbd class="fs-kbd">1-6</kbd> to jump to flows.
       </p>
     </div>
     <div class="muted operator-only">
@@ -253,47 +253,47 @@ make validate-swarm</pre>
     <h3 id="shortcuts-modal-title">Keyboard Shortcuts</h3>
     <div class="shortcut-row">
       <span class="shortcut-desc">Focus search</span>
-      <span class="shortcut-key">/</span>
+      <kbd class="fs-kbd">/</kbd>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Close dropdown / modal</span>
-      <span class="shortcut-key">Esc</span>
+      <kbd class="fs-kbd">Esc</kbd>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Previous step</span>
-      <span class="shortcut-key">&#8592;</span>
+      <kbd class="fs-kbd">&#8592;</kbd>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Next step</span>
-      <span class="shortcut-key">&#8594;</span>
+      <kbd class="fs-kbd">&#8594;</kbd>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 1</span>
-      <span class="shortcut-key">1</span>
+      <kbd class="fs-kbd">1</kbd>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 2</span>
-      <span class="shortcut-key">2</span>
+      <kbd class="fs-kbd">2</kbd>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 3</span>
-      <span class="shortcut-key">3</span>
+      <kbd class="fs-kbd">3</kbd>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 4</span>
-      <span class="shortcut-key">4</span>
+      <kbd class="fs-kbd">4</kbd>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 5</span>
-      <span class="shortcut-key">5</span>
+      <kbd class="fs-kbd">5</kbd>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 6</span>
-      <span class="shortcut-key">6</span>
+      <kbd class="fs-kbd">6</kbd>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Show this help</span>
-      <span class="shortcut-key">?</span>
+      <kbd class="fs-kbd">?</kbd>
     </div>
     <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
       <div>Full documentation: <code style="background: #f3f4f6; padding: 2px 4px; border-radius: 3px;">docs/FLOW_STUDIO.md</code></div>
@@ -1980,15 +1980,7 @@ make validate-swarm</pre>
     .shortcut-row:last-child {
       border-bottom: none;
     }
-    .shortcut-key {
-      display: inline-block;
-      padding: 2px 8px;
-      background: #f3f4f6;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      font-size: 11px;
-    }
+    /* .shortcut-key is deprecated - use .fs-kbd */
     .shortcut-desc {
       font-size: 12px;
       color: #4b5563;
@@ -2360,11 +2352,15 @@ make validate-swarm</pre>
 
     /* Keyboard hint styling */
     .fs-kbd {
-      background: #f3f4f6;
+      display: inline-block;
       padding: 1px 4px;
-      border-radius: 2px;
-      font-size: 10px;
+      background: #f3f4f6;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
       font-family: var(--fs-font-mono);
+      font-size: 10px;
+      line-height: 1.2;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.05);
     }
 
     /* Error state - something went wrong */
@@ -6206,7 +6202,7 @@ function showFlowDetails(detail) {
     hint.innerHTML = `
     <div class="welcome-section" style="margin-bottom: 12px;">
       <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">
-        Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
+        Click a node for details. Press <kbd class="fs-kbd">?</kbd> for shortcuts.
       </div>
       <div style="font-size: 11px; color: #9ca3af;">
         Artifacts: <code class="mono" style="font-size: 10px;">swarm/runs/&lt;run&gt;/${flow.key || "&lt;flow&gt;"}/</code>
@@ -10235,7 +10231,7 @@ export function renderGettingStartedHint(flowKey) {
     return `
     <div class="welcome-section" style="margin-bottom: 12px;">
       <div class="fs-text-sm fs-text-muted" style="margin-bottom: 8px;">
-        Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
+        Click a node for details. Press <kbd class="fs-kbd">?</kbd> for shortcuts.
       </div>
       <div class="fs-text-sm fs-text-subtle">
         Artifacts: <code class="mono fs-text-xs">swarm/runs/&lt;run&gt;/${escapeHtml(flowKey || "<flow>")}/</code>
@@ -14135,8 +14131,10 @@ export async function stopRun() {
         return;
     }
     const runId = _state.activeRunId;
-    _state.isLoading = true;
+    const prevState = _state.runState; // Capture for restoration on error
     // Set intermediate "stopping" state
+    // IMPORTANT: Don't set isLoading=true here - it would mask the "Stopping..." UI
+    // The stopping state already disables buttons via updateUI()
     _state.runState = "stopping";
     updateUI();
     // Fire the stopping callback
@@ -14171,9 +14169,8 @@ export async function stopRun() {
         updateUI();
     }
     catch (err) {
-        _state.isLoading = false;
-        // Revert to previous state on error
-        _state.runState = "running"; // or paused - we lost track, but running is safer
+        // Revert to previous state on error (running or paused)
+        _state.runState = prevState;
         _state.error = err.message || "Failed to stop run";
         console.error("Failed to stop run", err);
         updateUI();
@@ -14276,13 +14273,20 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopping", activeRunId);
             }
             break;
-        case "run_stopped":
+        case "run_stopped": {
+            // Idempotency guard: If we already finalized from the POST fallback,
+            // don't fire callbacks twice. Just capture stop_report_path if missing.
+            if (_state.runState === "stopped") {
+                const p = event.payload?.stop_report_path || null;
+                if (!_state.stopReportPath && p) {
+                    _state.stopReportPath = p;
+                }
+                break;
+            }
             // Run has been stopped cleanly (final state)
             _state.runState = "stopped";
-            _state.stopReportPath = event.payload?.stop_report_path || null;
+            _state.stopReportPath = event.payload?.stop_report_path || _state.stopReportPath;
             _state.error = null; // Stopped is clean, not an error
-            // Keep subscription open for a moment to catch any final events
-            // But mark the run as stopped
             if (_callbacks.onRunStopped) {
                 _callbacks.onRunStopped(activeRunId, _state.stopReportPath || undefined);
             }
@@ -14290,6 +14294,7 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopped", activeRunId);
             }
             break;
+        }
         case "error":
             _state.runState = "failed";
             _state.error = event.payload?.error || "Run failed";
@@ -14349,8 +14354,8 @@ export async function setActiveRun(runId) {
         _state.currentStep = data.current_step;
         _state.etag = etag;
         _state.error = data.error;
-        // Subscribe to events if run is active
-        if (_state.runState === "running" || _state.runState === "paused") {
+        // Subscribe to events if run is active (including stopping state for reload safety)
+        if (_state.runState === "running" || _state.runState === "paused" || _state.runState === "stopping") {
             subscribeToRunEvents(runId);
         }
         updateUI();
