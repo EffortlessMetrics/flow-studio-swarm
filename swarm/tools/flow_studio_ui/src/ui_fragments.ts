@@ -19,7 +19,7 @@ import { escapeHtml } from "./utils.js";
 export function renderNoRuns(): string {
   return `
     <div class="fs-empty" style="padding: 16px 12px;">
-      <div class="fs-empty-icon">\u{1F4C2}</div>
+      <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">No runs yet</p>
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
       <code class="mono fs-empty-command">make demo-run</code>
@@ -33,7 +33,7 @@ export function renderNoRuns(): string {
 export function renderNoFlows(): string {
   return `
     <div class="fs-empty" style="padding: 16px 12px;">
-      <div class="fs-empty-icon">\u{1F527}</div>
+      <div class="fs-empty-icon" aria-hidden="true">\u{1F527}</div>
       <p class="fs-empty-title">No flows configured</p>
       <p class="fs-empty-description">Add flow configs to <code class="mono fs-text-xs">swarm/config/flows/</code></p>
     </div>
@@ -47,7 +47,7 @@ export function renderNoFlows(): string {
 export function renderSelectNodeHint(): string {
   return `
     <div class="fs-empty" style="height: 100%; padding: 20px 16px; align-items: flex-start;">
-      <div class="fs-empty-icon">\u{1F446}</div>
+      <div class="fs-empty-icon" aria-hidden="true">\u{1F446}</div>
       <p class="fs-empty-title">Select a node</p>
       <p class="fs-empty-description">Click a step or agent in the graph.</p>
 
@@ -122,7 +122,7 @@ export function renderSelectNodeHint(): string {
 export function renderRunsLoadError(): string {
   return `
     <div class="fs-error" style="margin: 8px;">
-      <div class="fs-error-icon">\u26A0\uFE0F</div>
+      <div class="fs-error-icon" aria-hidden="true">\u26A0\uFE0F</div>
       <p class="fs-error-title">Failed to load runs</p>
       <p class="fs-error-description">Check that the Flow Studio server is running.</p>
       <button class="fs-error-action" onclick="location.reload()">Retry</button>
@@ -140,7 +140,7 @@ export function renderErrorState(title: string, message: string, actionLabel?: s
 
   return `
     <div class="fs-error" style="margin: 8px;">
-      <div class="fs-error-icon">\u26A0\uFE0F</div>
+      <div class="fs-error-icon" aria-hidden="true">\u26A0\uFE0F</div>
       <p class="fs-error-title">${escapeHtml(title)}</p>
       <p class="fs-error-description">${escapeHtml(message)}</p>
       ${actionHtml}
@@ -212,7 +212,7 @@ export function renderOperatorFlowHint(): string {
  * Render a loading placeholder.
  */
 export function renderLoading(message = "Loading..."): string {
-  return `<div class="muted">${escapeHtml(message)}</div>`;
+  return `<div class="muted" role="status">${escapeHtml(message)}</div>`;
 }
 
 // ============================================================================
