@@ -148,27 +148,36 @@ class RunStateManager:
     def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
         """List recent runs.
 
-        Uses os.scandir for efficient directory traversal - DirEntry objects
-        are lighter than Path objects and cache stat results.
+        Uses os.scandir for efficient directory traversal.
+        Optimized to sort by mtime BEFORE checking file existence,
+        reducing I/O overhead (stat calls) for large run histories.
         """
         runs = []
 
         if not self.runs_root.exists():
             return runs
 
-        # Get directories sorted by modification time
-        run_dirs = []
+        # Get directories and their modification times
+        candidates = []
         with os.scandir(self.runs_root) as it:
             for entry in it:
                 if entry.is_dir():
-                    run_state_path = os.path.join(entry.path, "run_state.json")
-                    if os.path.exists(run_state_path):
-                        run_dirs.append((entry.stat().st_mtime, Path(entry.path)))
+                    # capture mtime and path
+                    # entry.stat() is cached from scandir
+                    candidates.append((entry.stat().st_mtime, Path(entry.path)))
 
-        run_dirs.sort(key=lambda x: x[0], reverse=True)
+        # Sort by mtime descending (newest first)
+        candidates.sort(key=lambda x: x[0], reverse=True)
 
-        for _, run_dir in run_dirs[:limit]:
+        # Check for valid runs (run_state.json exists) in sorted order
+        for _, run_dir in candidates:
+            if len(runs) >= limit:
+                break
+
             state_path = run_dir / "run_state.json"
+            if not state_path.exists():
+                continue
+
             try:
                 state = json.loads(state_path.read_text(encoding="utf-8"))
                 runs.append(
