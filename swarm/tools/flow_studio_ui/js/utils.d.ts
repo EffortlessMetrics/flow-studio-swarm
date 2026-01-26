@@ -15,6 +15,12 @@ export declare function formatDateTime(isoString: string | null): string;
  */
 export declare function escapeHtml(text: string | null): string;
 /**
+ * Sanitize a string for use as a CSS class name.
+ * Replaces non-alphanumeric characters (except hyphens and underscores) with hyphens,
+ * and converts to lowercase.
+ */
+export declare function sanitizeClassName(text: string): string;
+/**
  * Copy text to clipboard
  */
 export declare function copyToClipboard(text: string): Promise<void>;

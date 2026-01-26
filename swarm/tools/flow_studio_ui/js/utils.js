@@ -57,6 +57,17 @@ export function escapeHtml(text) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 }
+/**
+ * Sanitize a string for use as a CSS class name.
+ * Replaces non-alphanumeric characters (except hyphens and underscores) with hyphens,
+ * and converts to lowercase.
+ */
+export function sanitizeClassName(text) {
+    if (!text)
+        return "";
+    // Replace non-alphanumeric chars (except - and _) with -
+    return text.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
+}
 // ============================================================================
 // Clipboard Utilities
 // ============================================================================

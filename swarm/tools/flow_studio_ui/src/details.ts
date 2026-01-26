@@ -16,7 +16,8 @@ import {
   formatDateTime,
   createQuickCommands,
   createPathWithCopy,
-  escapeHtml
+  escapeHtml,
+  sanitizeClassName
 } from "./utils.js";
 import type {
   FlowKey,
@@ -446,7 +447,7 @@ function renderTranscript(resp: StepTranscriptResponse): string {
   }
 
   resp.messages.forEach(msg => {
-    const roleClass = `transcript-role-${msg.role}`;
+    const roleClass = `transcript-role-${sanitizeClassName(msg.role)}`;
     const contentPreview = msg.content.length > 500 ? msg.content.substring(0, 500) + '...' : msg.content;
     html += `
       <div class="transcript-message ${roleClass}">
@@ -498,19 +499,19 @@ function renderReceiptBadges(resp: StepReceiptResponse): string {
 
   // Engine badge
   if (receipt.engine) {
-    const engineClass = receipt.engine.replace(/\s+/g, '-').toLowerCase();
+    const engineClass = sanitizeClassName(receipt.engine);
     badges.push(`<span class="run-badge engine ${engineClass}" title="Execution engine">${escapeHtml(receipt.engine)}</span>`);
   }
 
   // Mode badge
   if (receipt.mode) {
-    const modeClass = receipt.mode.toLowerCase();
+    const modeClass = sanitizeClassName(receipt.mode);
     badges.push(`<span class="run-badge mode ${modeClass}" title="Execution mode">${escapeHtml(receipt.mode)}</span>`);
   }
 
   // Provider badge
   if (receipt.provider) {
-    const providerClass = receipt.provider.toLowerCase();
+    const providerClass = sanitizeClassName(receipt.provider);
     badges.push(`<span class="run-badge provider ${providerClass}" title="LLM provider">${escapeHtml(receipt.provider)}</span>`);
   }
 

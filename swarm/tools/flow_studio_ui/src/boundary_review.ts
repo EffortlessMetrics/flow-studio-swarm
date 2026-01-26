@@ -9,6 +9,7 @@
 // - Evolution suggestions (if present)
 
 import { Api } from "./api.js";
+import { escapeHtml } from "./utils.js";
 import type {
   BoundaryReviewResponse,
   AssumptionSummary,
@@ -55,10 +56,10 @@ function renderAssumptionCard(assumption: AssumptionSummary): string {
   const statusClass = assumption.status === "active" ? "status-active" : "status-resolved";
 
   return `
-    <div class="boundary-card assumption-card ${confidenceClass}" data-assumption-id="${assumption.assumption_id}">
+    <div class="boundary-card assumption-card ${confidenceClass}" data-assumption-id="${escapeHtml(assumption.assumption_id)}">
       <div class="card-header">
-        <span class="card-id">${assumption.assumption_id}</span>
-        <span class="card-status ${statusClass}">${assumption.status}</span>
+        <span class="card-id">${escapeHtml(assumption.assumption_id)}</span>
+        <span class="card-status ${statusClass}">${escapeHtml(assumption.status)}</span>
         <span class="card-confidence confidence-${assumption.confidence}">${assumption.confidence}</span>
       </div>
       <div class="card-statement">${escapeHtml(assumption.statement)}</div>
@@ -95,9 +96,9 @@ function renderAssumptionCard(assumption: AssumptionSummary): string {
 
 function renderDecisionCard(decision: DecisionSummary): string {
   return `
-    <div class="boundary-card decision-card" data-decision-id="${decision.decision_id}">
+    <div class="boundary-card decision-card" data-decision-id="${escapeHtml(decision.decision_id)}">
       <div class="card-header">
-        <span class="card-id">${decision.decision_id}</span>
+        <span class="card-id">${escapeHtml(decision.decision_id)}</span>
         <span class="card-type">${escapeHtml(decision.decision_type)}</span>
       </div>
       <div class="card-subject">${escapeHtml(decision.subject)}</div>
@@ -137,9 +138,9 @@ function renderDecisionCard(decision: DecisionSummary): string {
 
 function renderDetourCard(detour: DetourSummary): string {
   return `
-    <div class="boundary-card detour-card" data-detour-id="${detour.detour_id}">
+    <div class="boundary-card detour-card" data-detour-id="${escapeHtml(detour.detour_id)}">
       <div class="card-header">
-        <span class="card-id">${detour.detour_id}</span>
+        <span class="card-id">${escapeHtml(detour.detour_id)}</span>
         <span class="card-type">${escapeHtml(detour.detour_type)}</span>
       </div>
       <div class="card-path">
@@ -161,7 +162,7 @@ function renderVerificationCard(verification: VerificationSummary): string {
   const icon = verification.verified ? "✓" : "✗";
 
   return `
-    <div class="boundary-card verification-card ${statusClass}" data-step-id="${verification.step_id}">
+    <div class="boundary-card verification-card ${statusClass}" data-step-id="${escapeHtml(verification.step_id)}">
       <div class="card-header">
         <span class="status-icon">${icon}</span>
         <span class="card-id">${escapeHtml(verification.step_id)}</span>
@@ -376,11 +377,7 @@ export async function updateBoundaryReviewPanel(
 // Utility
 // =============================================================================
 
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
-}
+// Using shared escapeHtml from utils.js
 
 // =============================================================================
 // CSS (injected on first use)
