@@ -4659,7 +4659,7 @@ export async function renderRunTimeline(container) {
             html += `
         <div class="timeline-event ${escapeHtml(event.status || null) || ''}">
           <span class="timeline-time">${time}</span>
-          <span class="timeline-icon">${icon}</span>
+          <span class="timeline-icon" aria-hidden="true">${icon}</span>
           <span class="timeline-flow">${escapeHtml(event.flow)}</span>
           <span class="timeline-status">${escapeHtml(event.status || null) || ''}</span>
           ${duration ? `<span class="timeline-duration">(${duration})</span>` : ''}
@@ -4854,7 +4854,7 @@ function renderTeachingCallout(teachingNote) {
         return "";
     return `
     <div class="teaching-callout" data-uiid="flow_studio.inspector.teaching_note">
-      <span class="teaching-callout-icon">&#x1F4A1;</span>
+      <span class="teaching-callout-icon" aria-hidden="true">&#x1F4A1;</span>
       <div class="teaching-callout-content">
         <div class="teaching-callout-label">Teaching Note</div>
         <div class="teaching-callout-text">${teachingNote}</div>
@@ -4878,12 +4878,12 @@ function renderStructuredTeachingNotes(notes) {
         return "";
     let html = `<div class="teaching-notes-structured" data-uiid="flow_studio.inspector.teaching_notes_structured">
     <div class="teaching-notes-header">
-      <span class="teaching-notes-icon">&#x1F4D6;</span>
+      <span class="teaching-notes-icon" aria-hidden="true">&#x1F4D6;</span>
       <span class="teaching-notes-title">Step Context</span>
     </div>`;
     if (notes.inputs?.length) {
         html += `<div class="teaching-notes-section">
-      <div class="teaching-notes-label">&#x1F4E5; Inputs</div>
+      <div class="teaching-notes-label"><span aria-hidden="true">&#x1F4E5;</span> Inputs</div>
       <ul class="teaching-notes-list inputs">
         ${notes.inputs.map(p => `<li class="mono">${p}</li>`).join('')}
       </ul>
@@ -4891,7 +4891,7 @@ function renderStructuredTeachingNotes(notes) {
     }
     if (notes.outputs?.length) {
         html += `<div class="teaching-notes-section">
-      <div class="teaching-notes-label">&#x1F4E4; Outputs</div>
+      <div class="teaching-notes-label"><span aria-hidden="true">&#x1F4E4;</span> Outputs</div>
       <ul class="teaching-notes-list outputs">
         ${notes.outputs.map(p => `<li class="mono">${p}</li>`).join('')}
       </ul>
@@ -4899,7 +4899,7 @@ function renderStructuredTeachingNotes(notes) {
     }
     if (notes.emphasizes?.length) {
         html += `<div class="teaching-notes-section">
-      <div class="teaching-notes-label">&#x2728; Emphasizes</div>
+      <div class="teaching-notes-label"><span aria-hidden="true">&#x2728;</span> Emphasizes</div>
       <ul class="teaching-notes-list emphasizes">
         ${notes.emphasizes.map(e => `<li>${e}</li>`).join('')}
       </ul>
@@ -4907,7 +4907,7 @@ function renderStructuredTeachingNotes(notes) {
     }
     if (notes.constraints?.length) {
         html += `<div class="teaching-notes-section">
-      <div class="teaching-notes-label">&#x26D4; Constraints</div>
+      <div class="teaching-notes-label"><span aria-hidden="true">&#x26D4;</span> Constraints</div>
       <ul class="teaching-notes-list constraints">
         ${notes.constraints.map(c => `<li>${c}</li>`).join('')}
       </ul>
@@ -10081,7 +10081,7 @@ import { escapeHtml } from "./utils.js";
 export function renderNoRuns() {
     return `
     <div class="fs-empty" style="padding: 16px 12px;">
-      <div class="fs-empty-icon">\u{1F4C2}</div>
+      <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">No runs yet</p>
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
       <code class="mono fs-empty-command">make demo-run</code>
@@ -10094,7 +10094,7 @@ export function renderNoRuns() {
 export function renderNoFlows() {
     return `
     <div class="fs-empty" style="padding: 16px 12px;">
-      <div class="fs-empty-icon">\u{1F527}</div>
+      <div class="fs-empty-icon" aria-hidden="true">\u{1F527}</div>
       <p class="fs-empty-title">No flows configured</p>
       <p class="fs-empty-description">Add flow configs to <code class="mono fs-text-xs">swarm/config/flows/</code></p>
     </div>
@@ -10107,7 +10107,7 @@ export function renderNoFlows() {
 export function renderSelectNodeHint() {
     return `
     <div class="fs-empty" style="height: 100%; padding: 20px 16px; align-items: flex-start;">
-      <div class="fs-empty-icon">\u{1F446}</div>
+      <div class="fs-empty-icon" aria-hidden="true">\u{1F446}</div>
       <p class="fs-empty-title">Select a node</p>
       <p class="fs-empty-description">Click a step or agent in the graph.</p>
 
@@ -10180,7 +10180,7 @@ export function renderSelectNodeHint() {
 export function renderRunsLoadError() {
     return `
     <div class="fs-error" style="margin: 8px;">
-      <div class="fs-error-icon">\u26A0\uFE0F</div>
+      <div class="fs-error-icon" aria-hidden="true">\u26A0\uFE0F</div>
       <p class="fs-error-title">Failed to load runs</p>
       <p class="fs-error-description">Check that the Flow Studio server is running.</p>
       <button class="fs-error-action" onclick="location.reload()">Retry</button>
@@ -10196,7 +10196,7 @@ export function renderErrorState(title, message, actionLabel, actionOnClick) {
         : "";
     return `
     <div class="fs-error" style="margin: 8px;">
-      <div class="fs-error-icon">\u26A0\uFE0F</div>
+      <div class="fs-error-icon" aria-hidden="true">\u26A0\uFE0F</div>
       <p class="fs-error-title">${escapeHtml(title)}</p>
       <p class="fs-error-description">${escapeHtml(message)}</p>
       ${actionHtml}
@@ -10261,7 +10261,7 @@ export function renderOperatorFlowHint() {
  * Render a loading placeholder.
  */
 export function renderLoading(message = "Loading...") {
-    return `<div class="muted">${escapeHtml(message)}</div>`;
+    return `<div class="muted" role="status">${escapeHtml(message)}</div>`;
 }
 // ============================================================================
 // Tour Menu Items
@@ -14135,8 +14135,10 @@ export async function stopRun() {
         return;
     }
     const runId = _state.activeRunId;
-    _state.isLoading = true;
+    const prevState = _state.runState; // Capture for restoration on error
     // Set intermediate "stopping" state
+    // IMPORTANT: Don't set isLoading=true here - it would mask the "Stopping..." UI
+    // The stopping state already disables buttons via updateUI()
     _state.runState = "stopping";
     updateUI();
     // Fire the stopping callback
@@ -14171,9 +14173,8 @@ export async function stopRun() {
         updateUI();
     }
     catch (err) {
-        _state.isLoading = false;
-        // Revert to previous state on error
-        _state.runState = "running"; // or paused - we lost track, but running is safer
+        // Revert to previous state on error (running or paused)
+        _state.runState = prevState;
         _state.error = err.message || "Failed to stop run";
         console.error("Failed to stop run", err);
         updateUI();
@@ -14276,13 +14277,20 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopping", activeRunId);
             }
             break;
-        case "run_stopped":
+        case "run_stopped": {
+            // Idempotency guard: If we already finalized from the POST fallback,
+            // don't fire callbacks twice. Just capture stop_report_path if missing.
+            if (_state.runState === "stopped") {
+                const p = event.payload?.stop_report_path || null;
+                if (!_state.stopReportPath && p) {
+                    _state.stopReportPath = p;
+                }
+                break;
+            }
             // Run has been stopped cleanly (final state)
             _state.runState = "stopped";
-            _state.stopReportPath = event.payload?.stop_report_path || null;
+            _state.stopReportPath = event.payload?.stop_report_path || _state.stopReportPath;
             _state.error = null; // Stopped is clean, not an error
-            // Keep subscription open for a moment to catch any final events
-            // But mark the run as stopped
             if (_callbacks.onRunStopped) {
                 _callbacks.onRunStopped(activeRunId, _state.stopReportPath || undefined);
             }
@@ -14290,6 +14298,7 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopped", activeRunId);
             }
             break;
+        }
         case "error":
             _state.runState = "failed";
             _state.error = event.payload?.error || "Run failed";
@@ -14349,8 +14358,8 @@ export async function setActiveRun(runId) {
         _state.currentStep = data.current_step;
         _state.etag = etag;
         _state.error = data.error;
-        // Subscribe to events if run is active
-        if (_state.runState === "running" || _state.runState === "paused") {
+        // Subscribe to events if run is active (including stopping state for reload safety)
+        if (_state.runState === "running" || _state.runState === "paused" || _state.runState === "stopping") {
             subscribeToRunEvents(runId);
         }
         updateUI();
