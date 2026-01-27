@@ -115,7 +115,7 @@ export async function renderRunTimeline(container: HTMLElement): Promise<void> {
       html += `
         <div class="timeline-event ${escapeHtml(event.status || null) || ''}">
           <span class="timeline-time">${time}</span>
-          <span class="timeline-icon">${icon}</span>
+          <span class="timeline-icon" aria-hidden="true">${icon}</span>
           <span class="timeline-flow">${escapeHtml(event.flow)}</span>
           <span class="timeline-status">${escapeHtml(event.status || null) || ''}</span>
           ${duration ? `<span class="timeline-duration">(${duration})</span>` : ''}
@@ -338,7 +338,7 @@ function renderTeachingCallout(teachingNote: string): string {
 
   return `
     <div class="teaching-callout" data-uiid="flow_studio.inspector.teaching_note">
-      <span class="teaching-callout-icon">&#x1F4A1;</span>
+      <span class="teaching-callout-icon" aria-hidden="true">&#x1F4A1;</span>
       <div class="teaching-callout-content">
         <div class="teaching-callout-label">Teaching Note</div>
         <div class="teaching-callout-text">${teachingNote}</div>
@@ -365,13 +365,13 @@ function renderStructuredTeachingNotes(notes: { inputs?: string[]; outputs?: str
 
   let html = `<div class="teaching-notes-structured" data-uiid="flow_studio.inspector.teaching_notes_structured">
     <div class="teaching-notes-header">
-      <span class="teaching-notes-icon">&#x1F4D6;</span>
+      <span class="teaching-notes-icon" aria-hidden="true">&#x1F4D6;</span>
       <span class="teaching-notes-title">Step Context</span>
     </div>`;
 
   if (notes.inputs?.length) {
     html += `<div class="teaching-notes-section">
-      <div class="teaching-notes-label">&#x1F4E5; Inputs</div>
+      <div class="teaching-notes-label"><span aria-hidden="true">&#x1F4E5;</span> Inputs</div>
       <ul class="teaching-notes-list inputs">
         ${notes.inputs.map(p => `<li class="mono">${p}</li>`).join('')}
       </ul>
@@ -380,7 +380,7 @@ function renderStructuredTeachingNotes(notes: { inputs?: string[]; outputs?: str
 
   if (notes.outputs?.length) {
     html += `<div class="teaching-notes-section">
-      <div class="teaching-notes-label">&#x1F4E4; Outputs</div>
+      <div class="teaching-notes-label"><span aria-hidden="true">&#x1F4E4;</span> Outputs</div>
       <ul class="teaching-notes-list outputs">
         ${notes.outputs.map(p => `<li class="mono">${p}</li>`).join('')}
       </ul>
@@ -389,7 +389,7 @@ function renderStructuredTeachingNotes(notes: { inputs?: string[]; outputs?: str
 
   if (notes.emphasizes?.length) {
     html += `<div class="teaching-notes-section">
-      <div class="teaching-notes-label">&#x2728; Emphasizes</div>
+      <div class="teaching-notes-label"><span aria-hidden="true">&#x2728;</span> Emphasizes</div>
       <ul class="teaching-notes-list emphasizes">
         ${notes.emphasizes.map(e => `<li>${e}</li>`).join('')}
       </ul>
@@ -398,7 +398,7 @@ function renderStructuredTeachingNotes(notes: { inputs?: string[]; outputs?: str
 
   if (notes.constraints?.length) {
     html += `<div class="teaching-notes-section">
-      <div class="teaching-notes-label">&#x26D4; Constraints</div>
+      <div class="teaching-notes-label"><span aria-hidden="true">&#x26D4;</span> Constraints</div>
       <ul class="teaching-notes-list constraints">
         ${notes.constraints.map(c => `<li>${c}</li>`).join('')}
       </ul>
