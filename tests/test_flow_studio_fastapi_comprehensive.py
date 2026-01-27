@@ -898,27 +898,39 @@ class TestErrorHandling:
 class TestCORSHeaders:
     """Tests for CORS configuration."""
 
-    def test_cors_allows_all_origins(self, client):
-        """Test CORS middleware allows all origins."""
+    def test_cors_preflight(self, client):
+        """Test CORS preflight request."""
         # Make a preflight-like request
-        resp = client.options("/api/health")
+        resp = client.options(
+            "/api/health",
+            headers={
+                "Origin": "http://localhost:5000",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
 
         # OPTIONS should not fail
-        assert resp.status_code in (200, 204, 405), f"OPTIONS request failed: {resp.status_code}"
+        assert resp.status_code in (200, 204), f"OPTIONS request failed: {resp.status_code}"
 
-    def test_cors_header_present(self, client):
-        """Test Access-Control headers are present."""
-        resp = client.get("/api/health", headers={"Origin": "http://localhost:3000"})
+        # Should have CORS headers for allowed origin
+        assert "access-control-allow-origin" in resp.headers
+        assert resp.headers["access-control-allow-origin"] == "http://localhost:5000"
 
-        # CORS headers should be present
+    def test_cors_allowed_origin(self, client):
+        """Test Access-Control headers are present for allowed origin."""
+        resp = client.get("/api/health", headers={"Origin": "http://localhost:5000"})
+
         assert resp.status_code == 200
+        assert "access-control-allow-origin" in resp.headers
+        assert resp.headers["access-control-allow-origin"] == "http://localhost:5000"
 
-        # Check for CORS headers (middleware should add these)
-        # Note: TestClient may not fully simulate CORS behavior
-        # This test documents expected headers
-        dict(resp.headers)
-        # The actual header presence depends on CORS middleware config
-        assert resp.status_code == 200  # At minimum, request should succeed
+    def test_cors_disallowed_origin(self, client):
+        """Test Access-Control headers are missing for disallowed origin."""
+        resp = client.get("/api/health", headers={"Origin": "http://example.com"})
+
+        assert resp.status_code == 200
+        # Disallowed origin should not receive CORS headers
+        assert "access-control-allow-origin" not in resp.headers
 
 
 # =============================================================================

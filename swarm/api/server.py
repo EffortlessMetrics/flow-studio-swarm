@@ -38,6 +38,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
+from swarm.utils.cors import get_cors_origins
 from pydantic import BaseModel
 
 # Import SpecManager from services
@@ -327,7 +329,7 @@ def create_app(
     if enable_cors:
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],
+            allow_origins=get_cors_origins(),
             allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=["*"],
             expose_headers=["ETag", "If-Match", "If-None-Match"],
