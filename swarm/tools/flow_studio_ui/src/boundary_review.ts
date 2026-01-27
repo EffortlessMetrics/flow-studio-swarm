@@ -9,6 +9,7 @@
 // - Evolution suggestions (if present)
 
 import { Api } from "./api.js";
+import { sanitizeClassName } from "./utils.js";
 import type {
   BoundaryReviewResponse,
   AssumptionSummary,
@@ -51,7 +52,7 @@ function getConfidenceLabel(score: number): string {
 // =============================================================================
 
 function renderAssumptionCard(assumption: AssumptionSummary): string {
-  const confidenceClass = `assumption-${assumption.confidence}`;
+  const confidenceClass = `assumption-${sanitizeClassName(assumption.confidence)}`;
   const statusClass = assumption.status === "active" ? "status-active" : "status-resolved";
 
   return `

@@ -60,6 +60,16 @@ export function escapeHtml(text: string | null): string {
     .replace(/'/g, "&#039;");
 }
 
+/**
+ * Sanitize a string for use as a CSS class name.
+ * Replaces invalid characters with hyphens to prevent injection attacks.
+ * Allowed characters: a-z, 0-9, -, _
+ */
+export function sanitizeClassName(text: string | null): string {
+  if (!text) return "";
+  return text.toLowerCase().replace(/[^a-z0-9-_]/g, "-");
+}
+
 // ============================================================================
 // Clipboard Utilities
 // ============================================================================
