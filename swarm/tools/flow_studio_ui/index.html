@@ -147,15 +147,17 @@
   </aside>
   <main id="graph" role="main" aria-label="Flow graph visualization" data-uiid="flow_studio.canvas">
     <!-- Empty state shown when no run is loaded -->
-    <div id="canvas-empty-state" class="fs-empty" style="display: none; position: absolute; inset: 0; z-index: 5;" data-uiid="flow_studio.canvas.empty">
-      <div class="fs-empty-icon" aria-hidden="true">📊</div>
-      <p class="fs-empty-title">Welcome to Flow Studio</p>
-      <p class="fs-empty-description">Select a run from the sidebar to visualize flows.</p>
-      <div style="margin-top: 16px; text-align: center;">
-        <p class="fs-text-sm fs-text-muted">Generate a demo run with:</p>
-        <div style="display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 12px; background: #f3f4f6; border-radius: 4px;">
-          <code class="mono" style="font-size: 12px;">make stepwise-sdlc-stub</code>
-          <button class="copy-btn" onclick="navigator.clipboard.writeText('make stepwise-sdlc-stub').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard" aria-label="Copy demo command to clipboard">Copy</button>
+    <div id="canvas-empty-state" class="fs-empty" style="display: none; position: absolute; inset: 0; z-index: 5; pointer-events: none;" data-uiid="flow_studio.canvas.empty">
+      <div style="pointer-events: auto; display: flex; flex-direction: column; align-items: center;">
+        <div class="fs-empty-icon" aria-hidden="true">📊</div>
+        <p class="fs-empty-title">Welcome to Flow Studio</p>
+        <p class="fs-empty-description">Select a run from the sidebar to visualize flows.</p>
+        <div style="margin-top: 16px; text-align: center;">
+          <p class="fs-text-sm fs-text-muted">Generate a demo run with:</p>
+          <div style="display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 12px; background: #f3f4f6; border-radius: 4px;">
+            <code class="mono" style="font-size: 12px;">make stepwise-sdlc-stub</code>
+            <button class="copy-btn" onclick="navigator.clipboard.writeText('make stepwise-sdlc-stub').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard" aria-label="Copy demo command to clipboard">Copy</button>
+          </div>
         </div>
       </div>
     </div>
@@ -202,9 +204,19 @@
         <li><code>swarm/runs/&lt;run&gt;/&lt;flow&gt;/</code> (artifacts)</li>
       </ul>
       <strong>To change a flow:</strong>
-      <pre class="mono">$EDITOR swarm/config/flows/&lt;key&gt;.yaml
-uv run swarm/tools/gen_flows.py
-make validate-swarm</pre>
+      <div class="quick-commands">
+        <div class="command-line">
+           <span class="command-text">$EDITOR swarm/config/flows/&lt;key&gt;.yaml</span>
+        </div>
+        <div class="command-line">
+           <span class="command-text">uv run swarm/tools/gen_flows.py</span>
+           <button class="copy-btn" onclick="navigator.clipboard.writeText('uv run swarm/tools/gen_flows.py').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard">Copy</button>
+        </div>
+        <div class="command-line">
+           <span class="command-text">make validate-swarm</span>
+           <button class="copy-btn" onclick="navigator.clipboard.writeText('make validate-swarm').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard">Copy</button>
+        </div>
+      </div>
       <p style="margin-top: 12px; font-size: 12px; color: #6b7280;">
         <strong>Keyboard shortcuts:</strong> Press <kbd>?</kbd> for help, <kbd>1-6</kbd> to jump to flows.
       </p>
@@ -1798,7 +1810,7 @@ make validate-swarm</pre>
       padding: 8px 12px;
       font-size: 11px;
       pointer-events: auto;
-      z-index: 100;
+      z-index: 4;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       transition: all 0.2s ease;
     }
@@ -5695,6 +5707,7 @@ export function getSDKIfReady() {
 // Core state and utilities
 import { state } from "./state.js";
 import { Api } from "./api.js";
+import { createQuickCommands } from "./utils.js";
 import { qsByUiid, qsAllByUiidPrefix } from "./domain.js";
 // Selection management
 import { configure as configureSelection, selectNode, selectStep, selectAgent, clearSelection, getSelectionForUrl, parseStepParam } from "./selection.js";
@@ -6203,20 +6216,38 @@ function showFlowDetails(detail) {
   `;
     const hint = document.createElement("div");
     hint.className = "welcome-panel author-only";
-    hint.innerHTML = `
-    <div class="welcome-section" style="margin-bottom: 12px;">
-      <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">
-        Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
-      </div>
-      <div style="font-size: 11px; color: #9ca3af;">
-        Artifacts: <code class="mono" style="font-size: 10px;">swarm/runs/&lt;run&gt;/${flow.key || "&lt;flow&gt;"}/</code>
-      </div>
+    const welcomeSection = document.createElement("div");
+    welcomeSection.className = "welcome-section";
+    welcomeSection.style.marginBottom = "12px";
+    welcomeSection.innerHTML = `
+    <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">
+      Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
     </div>
-    <div class="welcome-section">
-      <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">Edit flow:</div>
-      <pre class="mono" style="font-size: 10px; margin: 0;">$EDITOR swarm/config/flows/${flow.key || "&lt;key&gt;"}.yaml</pre>
+    <div style="font-size: 11px; color: #9ca3af;">
+      Artifacts: <code class="mono" style="font-size: 10px;">swarm/runs/&lt;run&gt;/${flow.key || "&lt;flow&gt;"}/</code>
     </div>
   `;
+    hint.appendChild(welcomeSection);
+    const editSection = document.createElement("div");
+    editSection.className = "welcome-section";
+    const editLabel = document.createElement("div");
+    editLabel.style.fontSize = "11px";
+    editLabel.style.color = "#6b7280";
+    editLabel.style.marginBottom = "4px";
+    editLabel.textContent = "Edit flow:";
+    editSection.appendChild(editLabel);
+    const commands = [
+        `$EDITOR swarm/config/flows/${flow.key || "<key>"}.yaml`,
+        "uv run swarm/tools/gen_flows.py",
+        "make validate-swarm"
+    ];
+    const quickCmds = createQuickCommands(commands);
+    // Remove the "Quick commands" label added by util since we have "Edit flow:"
+    const utilLabel = quickCmds.querySelector(".kv-label");
+    if (utilLabel)
+        utilLabel.remove();
+    editSection.appendChild(quickCmds);
+    hint.appendChild(editSection);
     const operatorHint = document.createElement("div");
     operatorHint.className = "operator-only";
     operatorHint.id = "flow-overview-timeline";
@@ -14135,8 +14166,10 @@ export async function stopRun() {
         return;
     }
     const runId = _state.activeRunId;
-    _state.isLoading = true;
+    const prevState = _state.runState; // Capture for restoration on error
     // Set intermediate "stopping" state
+    // IMPORTANT: Don't set isLoading=true here - it would mask the "Stopping..." UI
+    // The stopping state already disables buttons via updateUI()
     _state.runState = "stopping";
     updateUI();
     // Fire the stopping callback
@@ -14171,9 +14204,8 @@ export async function stopRun() {
         updateUI();
     }
     catch (err) {
-        _state.isLoading = false;
-        // Revert to previous state on error
-        _state.runState = "running"; // or paused - we lost track, but running is safer
+        // Revert to previous state on error (running or paused)
+        _state.runState = prevState;
         _state.error = err.message || "Failed to stop run";
         console.error("Failed to stop run", err);
         updateUI();
@@ -14276,13 +14308,20 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopping", activeRunId);
             }
             break;
-        case "run_stopped":
+        case "run_stopped": {
+            // Idempotency guard: If we already finalized from the POST fallback,
+            // don't fire callbacks twice. Just capture stop_report_path if missing.
+            if (_state.runState === "stopped") {
+                const p = event.payload?.stop_report_path || null;
+                if (!_state.stopReportPath && p) {
+                    _state.stopReportPath = p;
+                }
+                break;
+            }
             // Run has been stopped cleanly (final state)
             _state.runState = "stopped";
-            _state.stopReportPath = event.payload?.stop_report_path || null;
+            _state.stopReportPath = event.payload?.stop_report_path || _state.stopReportPath;
             _state.error = null; // Stopped is clean, not an error
-            // Keep subscription open for a moment to catch any final events
-            // But mark the run as stopped
             if (_callbacks.onRunStopped) {
                 _callbacks.onRunStopped(activeRunId, _state.stopReportPath || undefined);
             }
@@ -14290,6 +14329,7 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopped", activeRunId);
             }
             break;
+        }
         case "error":
             _state.runState = "failed";
             _state.error = event.payload?.error || "Run failed";
@@ -14349,8 +14389,8 @@ export async function setActiveRun(runId) {
         _state.currentStep = data.current_step;
         _state.etag = etag;
         _state.error = data.error;
-        // Subscribe to events if run is active
-        if (_state.runState === "running" || _state.runState === "paused") {
+        // Subscribe to events if run is active (including stopping state for reload safety)
+        if (_state.runState === "running" || _state.runState === "paused" || _state.runState === "stopping") {
             subscribeToRunEvents(runId);
         }
         updateUI();
