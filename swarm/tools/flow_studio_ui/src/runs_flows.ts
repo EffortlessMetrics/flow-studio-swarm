@@ -565,8 +565,7 @@ export function updateFlowListStatus(): void {
 /**
  * Load flows and populate the flow list sidebar.
  */
-export async function loadFlows(options: { autoSelect?: boolean } = {}): Promise<Flow[]> {
-  const { autoSelect = true } = options;
+export async function loadFlows(): Promise<Flow[]> {
   const data = await Api.getFlows();
   const flows = data.flows || [];
   const listEl = document.getElementById("flow-list");
@@ -626,7 +625,7 @@ export async function loadFlows(options: { autoSelect?: boolean } = {}): Promise
   }
 
   // Select the first flow by default
-  if (autoSelect && flows.length) {
+  if (flows.length) {
     await setActiveFlow(flows[0].key);
   }
 

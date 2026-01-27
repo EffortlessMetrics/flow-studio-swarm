@@ -764,25 +764,20 @@ window.addEventListener("load", async () => {
             loadTours()
         ]);
         // Phase 2: Critical path - runs and flows are needed for main UI
-        // Load runs and flows in parallel to speed up initialization
-        const [runsResult, flowsResult] = await Promise.allSettled([
-            loadRuns(),
-            loadFlows({ autoSelect: false })
-        ]);
-        if (runsResult.status === "rejected") {
-            console.error("Failed to load runs", runsResult.reason);
+        // Load runs first (populates run selector), then flows (renders graph)
+        try {
+            await loadRuns();
         }
-        if (flowsResult.status === "rejected") {
+        catch (err) {
+            console.error("Failed to load runs", err);
+        }
+        try {
+            await loadFlows();
+        }
+        catch (err) {
             const listEl = document.getElementById("flow-list");
             if (listEl)
-                listEl.textContent = "Failed to load flows: " + flowsResult.reason.message;
-        }
-        else {
-            const flows = flowsResult.value;
-            // Select the first flow by default if we have flows and no current flow
-            if (flows.length && !state.currentFlowKey) {
-                await setActiveFlow(flows[0].key);
-            }
+                listEl.textContent = "Failed to load flows: " + err.message;
         }
         // Initialize tour system (sync handlers only)
         initTourHandlers();

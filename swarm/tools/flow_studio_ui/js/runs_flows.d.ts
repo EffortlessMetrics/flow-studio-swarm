@@ -66,9 +66,7 @@ export declare function updateFlowListStatus(): void;
 /**
  * Load flows and populate the flow list sidebar.
  */
-export declare function loadFlows(options?: {
-    autoSelect?: boolean;
-}): Promise<Flow[]>;
+export declare function loadFlows(): Promise<Flow[]>;
 /**
  * Mark active flow in sidebar and SDLC bar.
  */
