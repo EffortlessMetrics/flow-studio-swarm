@@ -478,7 +478,8 @@ export function updateFlowListStatus() {
 /**
  * Load flows and populate the flow list sidebar.
  */
-export async function loadFlows() {
+export async function loadFlows(options = {}) {
+    const { autoSelect = true } = options;
     const data = await Api.getFlows();
     const flows = data.flows || [];
     const listEl = document.getElementById("flow-list");
@@ -526,7 +527,7 @@ export async function loadFlows() {
         _updateFlowListGovernance();
     }
     // Select the first flow by default
-    if (flows.length) {
+    if (autoSelect && flows.length) {
         await setActiveFlow(flows[0].key);
     }
     return flows;
