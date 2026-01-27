@@ -78,10 +78,7 @@ export function renderSearchResults(results) {
             '</div>';
     }).join("");
     dropdown.classList.add("open");
-    // Add click handlers
-    dropdown.querySelectorAll(".search-result").forEach((el, idx) => {
-        el.addEventListener("click", () => selectSearchResult(idx));
-    });
+    // Click handlers are managed via event delegation in initSearchHandlers
 }
 /**
  * Close the search dropdown and reset state.
@@ -201,6 +198,22 @@ export function initSearchHandlers() {
             closeSearchDropdown();
         }
     });
+    // Event delegation for search results
+    if (dropdown) {
+        dropdown.addEventListener("click", (e) => {
+            const target = e.target;
+            const resultItem = target.closest(".search-result");
+            if (resultItem) {
+                const indexStr = resultItem.getAttribute("data-index");
+                if (indexStr) {
+                    const index = parseInt(indexStr, 10);
+                    if (!isNaN(index)) {
+                        selectSearchResult(index);
+                    }
+                }
+            }
+        });
+    }
 }
 /**
  * Focus the search input.

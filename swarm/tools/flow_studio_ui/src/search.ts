@@ -91,10 +91,7 @@ export function renderSearchResults(results: SearchResult[]): void {
 
   dropdown.classList.add("open");
 
-  // Add click handlers
-  dropdown.querySelectorAll(".search-result").forEach((el, idx) => {
-    el.addEventListener("click", () => selectSearchResult(idx));
-  });
+  // Click handlers are managed via event delegation in initSearchHandlers
 }
 
 /**
@@ -212,6 +209,23 @@ export function initSearchHandlers(): void {
       closeSearchDropdown();
     }
   });
+
+  // Event delegation for search results
+  if (dropdown) {
+    dropdown.addEventListener("click", (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const resultItem = target.closest(".search-result");
+      if (resultItem) {
+        const indexStr = resultItem.getAttribute("data-index");
+        if (indexStr) {
+          const index = parseInt(indexStr, 10);
+          if (!isNaN(index)) {
+            selectSearchResult(index);
+          }
+        }
+      }
+    });
+  }
 }
 
 /**
