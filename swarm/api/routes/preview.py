@@ -20,6 +20,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/preview", tags=["preview"])
@@ -405,6 +407,18 @@ async def preview_station(station_id: str):
         500: If preview computation fails.
     """
     try:
+        try:
+            validate_path_component(station_id, "station_id")
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_station_id",
+                    "message": str(e),
+                    "details": {"station_id": station_id},
+                },
+            )
+
         station_spec = _load_station_spec(station_id)
 
         if not station_spec:
@@ -512,6 +526,18 @@ async def validate_flow(flow_id: str):
         500: If validation fails.
     """
     try:
+        try:
+            validate_path_component(flow_id, "flow_id")
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_flow_id",
+                    "message": str(e),
+                    "details": {"flow_id": flow_id},
+                },
+            )
+
         flow_graph = _load_flow_graph(flow_id)
 
         if not flow_graph:
