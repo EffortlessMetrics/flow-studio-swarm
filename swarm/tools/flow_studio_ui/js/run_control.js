@@ -192,10 +192,8 @@ export async function stopRun() {
         return;
     }
     const runId = _state.activeRunId;
-    const prevState = _state.runState; // Capture for restoration on error
+    _state.isLoading = true;
     // Set intermediate "stopping" state
-    // IMPORTANT: Don't set isLoading=true here - it would mask the "Stopping..." UI
-    // The stopping state already disables buttons via updateUI()
     _state.runState = "stopping";
     updateUI();
     // Fire the stopping callback
@@ -230,8 +228,9 @@ export async function stopRun() {
         updateUI();
     }
     catch (err) {
-        // Revert to previous state on error (running or paused)
-        _state.runState = prevState;
+        _state.isLoading = false;
+        // Revert to previous state on error
+        _state.runState = "running"; // or paused - we lost track, but running is safer
         _state.error = err.message || "Failed to stop run";
         console.error("Failed to stop run", err);
         updateUI();
@@ -334,20 +333,13 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopping", activeRunId);
             }
             break;
-        case "run_stopped": {
-            // Idempotency guard: If we already finalized from the POST fallback,
-            // don't fire callbacks twice. Just capture stop_report_path if missing.
-            if (_state.runState === "stopped") {
-                const p = event.payload?.stop_report_path || null;
-                if (!_state.stopReportPath && p) {
-                    _state.stopReportPath = p;
-                }
-                break;
-            }
+        case "run_stopped":
             // Run has been stopped cleanly (final state)
             _state.runState = "stopped";
-            _state.stopReportPath = event.payload?.stop_report_path || _state.stopReportPath;
+            _state.stopReportPath = event.payload?.stop_report_path || null;
             _state.error = null; // Stopped is clean, not an error
+            // Keep subscription open for a moment to catch any final events
+            // But mark the run as stopped
             if (_callbacks.onRunStopped) {
                 _callbacks.onRunStopped(activeRunId, _state.stopReportPath || undefined);
             }
@@ -355,7 +347,6 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopped", activeRunId);
             }
             break;
-        }
         case "error":
             _state.runState = "failed";
             _state.error = event.payload?.error || "Run failed";
@@ -415,8 +406,8 @@ export async function setActiveRun(runId) {
         _state.currentStep = data.current_step;
         _state.etag = etag;
         _state.error = data.error;
-        // Subscribe to events if run is active (including stopping state for reload safety)
-        if (_state.runState === "running" || _state.runState === "paused" || _state.runState === "stopping") {
+        // Subscribe to events if run is active
+        if (_state.runState === "running" || _state.runState === "paused") {
             subscribeToRunEvents(runId);
         }
         updateUI();

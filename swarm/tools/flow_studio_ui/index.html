@@ -253,47 +253,47 @@ make validate-swarm</pre>
     <h3 id="shortcuts-modal-title">Keyboard Shortcuts</h3>
     <div class="shortcut-row">
       <span class="shortcut-desc">Focus search</span>
-      <kbd class="fs-kbd">/</kbd>
+      <span class="shortcut-key">/</span>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Close dropdown / modal</span>
-      <kbd class="fs-kbd">Esc</kbd>
+      <span class="shortcut-key">Esc</span>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Previous step</span>
-      <kbd class="fs-kbd">&#8592;</kbd>
+      <span class="shortcut-key">&#8592;</span>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Next step</span>
-      <kbd class="fs-kbd">&#8594;</kbd>
+      <span class="shortcut-key">&#8594;</span>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 1</span>
-      <kbd class="fs-kbd">1</kbd>
+      <span class="shortcut-key">1</span>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 2</span>
-      <kbd class="fs-kbd">2</kbd>
+      <span class="shortcut-key">2</span>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 3</span>
-      <kbd class="fs-kbd">3</kbd>
+      <span class="shortcut-key">3</span>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 4</span>
-      <kbd class="fs-kbd">4</kbd>
+      <span class="shortcut-key">4</span>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 5</span>
-      <kbd class="fs-kbd">5</kbd>
+      <span class="shortcut-key">5</span>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Jump to Flow 6</span>
-      <kbd class="fs-kbd">6</kbd>
+      <span class="shortcut-key">6</span>
     </div>
     <div class="shortcut-row">
       <span class="shortcut-desc">Show this help</span>
-      <kbd class="fs-kbd">?</kbd>
+      <span class="shortcut-key">?</span>
     </div>
     <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
       <div>Full documentation: <code style="background: #f3f4f6; padding: 2px 4px; border-radius: 3px;">docs/FLOW_STUDIO.md</code></div>
@@ -1979,6 +1979,15 @@ make validate-swarm</pre>
     }
     .shortcut-row:last-child {
       border-bottom: none;
+    }
+    .shortcut-key {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #f3f4f6;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 11px;
     }
     .shortcut-desc {
       font-size: 12px;
@@ -6197,7 +6206,7 @@ function showFlowDetails(detail) {
     hint.innerHTML = `
     <div class="welcome-section" style="margin-bottom: 12px;">
       <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">
-        Click a node for details. Press <kbd class="fs-kbd">?</kbd> for shortcuts.
+        Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
       </div>
       <div style="font-size: 11px; color: #9ca3af;">
         Artifacts: <code class="mono" style="font-size: 10px;">swarm/runs/&lt;run&gt;/${flow.key || "&lt;flow&gt;"}/</code>
@@ -10072,7 +10081,7 @@ import { escapeHtml } from "./utils.js";
 export function renderNoRuns() {
     return `
     <div class="fs-empty" style="padding: 16px 12px;">
-      <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
+      <div class="fs-empty-icon">\u{1F4C2}</div>
       <p class="fs-empty-title">No runs yet</p>
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
       <code class="mono fs-empty-command">make demo-run</code>
@@ -10085,7 +10094,7 @@ export function renderNoRuns() {
 export function renderNoFlows() {
     return `
     <div class="fs-empty" style="padding: 16px 12px;">
-      <div class="fs-empty-icon" aria-hidden="true">\u{1F527}</div>
+      <div class="fs-empty-icon">\u{1F527}</div>
       <p class="fs-empty-title">No flows configured</p>
       <p class="fs-empty-description">Add flow configs to <code class="mono fs-text-xs">swarm/config/flows/</code></p>
     </div>
@@ -10098,7 +10107,7 @@ export function renderNoFlows() {
 export function renderSelectNodeHint() {
     return `
     <div class="fs-empty" style="height: 100%; padding: 20px 16px; align-items: flex-start;">
-      <div class="fs-empty-icon" aria-hidden="true">\u{1F446}</div>
+      <div class="fs-empty-icon">\u{1F446}</div>
       <p class="fs-empty-title">Select a node</p>
       <p class="fs-empty-description">Click a step or agent in the graph.</p>
 
@@ -10171,7 +10180,7 @@ export function renderSelectNodeHint() {
 export function renderRunsLoadError() {
     return `
     <div class="fs-error" style="margin: 8px;">
-      <div class="fs-error-icon" aria-hidden="true">\u26A0\uFE0F</div>
+      <div class="fs-error-icon">\u26A0\uFE0F</div>
       <p class="fs-error-title">Failed to load runs</p>
       <p class="fs-error-description">Check that the Flow Studio server is running.</p>
       <button class="fs-error-action" onclick="location.reload()">Retry</button>
@@ -10187,7 +10196,7 @@ export function renderErrorState(title, message, actionLabel, actionOnClick) {
         : "";
     return `
     <div class="fs-error" style="margin: 8px;">
-      <div class="fs-error-icon" aria-hidden="true">\u26A0\uFE0F</div>
+      <div class="fs-error-icon">\u26A0\uFE0F</div>
       <p class="fs-error-title">${escapeHtml(title)}</p>
       <p class="fs-error-description">${escapeHtml(message)}</p>
       ${actionHtml}
@@ -10226,7 +10235,7 @@ export function renderGettingStartedHint(flowKey) {
     return `
     <div class="welcome-section" style="margin-bottom: 12px;">
       <div class="fs-text-sm fs-text-muted" style="margin-bottom: 8px;">
-        Click a node for details. Press <kbd class="fs-kbd">?</kbd> for shortcuts.
+        Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
       </div>
       <div class="fs-text-sm fs-text-subtle">
         Artifacts: <code class="mono fs-text-xs">swarm/runs/&lt;run&gt;/${escapeHtml(flowKey || "<flow>")}/</code>
@@ -14126,10 +14135,8 @@ export async function stopRun() {
         return;
     }
     const runId = _state.activeRunId;
-    const prevState = _state.runState; // Capture for restoration on error
+    _state.isLoading = true;
     // Set intermediate "stopping" state
-    // IMPORTANT: Don't set isLoading=true here - it would mask the "Stopping..." UI
-    // The stopping state already disables buttons via updateUI()
     _state.runState = "stopping";
     updateUI();
     // Fire the stopping callback
@@ -14164,8 +14171,9 @@ export async function stopRun() {
         updateUI();
     }
     catch (err) {
-        // Revert to previous state on error (running or paused)
-        _state.runState = prevState;
+        _state.isLoading = false;
+        // Revert to previous state on error
+        _state.runState = "running"; // or paused - we lost track, but running is safer
         _state.error = err.message || "Failed to stop run";
         console.error("Failed to stop run", err);
         updateUI();
@@ -14268,20 +14276,13 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopping", activeRunId);
             }
             break;
-        case "run_stopped": {
-            // Idempotency guard: If we already finalized from the POST fallback,
-            // don't fire callbacks twice. Just capture stop_report_path if missing.
-            if (_state.runState === "stopped") {
-                const p = event.payload?.stop_report_path || null;
-                if (!_state.stopReportPath && p) {
-                    _state.stopReportPath = p;
-                }
-                break;
-            }
+        case "run_stopped":
             // Run has been stopped cleanly (final state)
             _state.runState = "stopped";
-            _state.stopReportPath = event.payload?.stop_report_path || _state.stopReportPath;
+            _state.stopReportPath = event.payload?.stop_report_path || null;
             _state.error = null; // Stopped is clean, not an error
+            // Keep subscription open for a moment to catch any final events
+            // But mark the run as stopped
             if (_callbacks.onRunStopped) {
                 _callbacks.onRunStopped(activeRunId, _state.stopReportPath || undefined);
             }
@@ -14289,7 +14290,6 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopped", activeRunId);
             }
             break;
-        }
         case "error":
             _state.runState = "failed";
             _state.error = event.payload?.error || "Run failed";
@@ -14349,8 +14349,8 @@ export async function setActiveRun(runId) {
         _state.currentStep = data.current_step;
         _state.etag = etag;
         _state.error = data.error;
-        // Subscribe to events if run is active (including stopping state for reload safety)
-        if (_state.runState === "running" || _state.runState === "paused" || _state.runState === "stopping") {
+        // Subscribe to events if run is active
+        if (_state.runState === "running" || _state.runState === "paused") {
             subscribeToRunEvents(runId);
         }
         updateUI();

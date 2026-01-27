@@ -523,7 +523,7 @@ function showFlowDetails(detail) {
     hint.innerHTML = `
     <div class="welcome-section" style="margin-bottom: 12px;">
       <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">
-        Click a node for details. Press <kbd class="fs-kbd">?</kbd> for shortcuts.
+        Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
       </div>
       <div style="font-size: 11px; color: #9ca3af;">
         Artifacts: <code class="mono" style="font-size: 10px;">swarm/runs/&lt;run&gt;/${flow.key || "&lt;flow&gt;"}/</code>
