@@ -723,6 +723,18 @@ def validate_evolution_patch(
 
     # Check target file exists
     target_path = repo_root / patch.target_file
+
+    # Security check: Prevent path traversal
+    try:
+        resolved_target = target_path.resolve()
+        resolved_root = repo_root.resolve()
+        if not resolved_target.is_relative_to(resolved_root):
+            errors.append(f"Target file path traverses outside repository root: {patch.target_file}")
+            return PatchValidationResult(valid=False, errors=errors)
+    except Exception as e:
+        errors.append(f"Failed to resolve file path: {e}")
+        return PatchValidationResult(valid=False, errors=errors)
+
     target_exists = target_path.exists()
 
     if not target_exists and patch.patch_type != PatchType.CONFIG:
