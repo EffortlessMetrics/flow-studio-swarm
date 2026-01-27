@@ -723,6 +723,23 @@ def validate_evolution_patch(
 
     # Check target file exists
     target_path = repo_root / patch.target_file
+
+    # Prevent path traversal
+    try:
+        if not target_path.resolve().is_relative_to(repo_root.resolve()):
+            errors.append(f"Path traversal detected: {patch.target_file}")
+            return PatchValidationResult(
+                valid=False,
+                errors=errors,
+            )
+    except ValueError:
+        # Can happen if paths are on different drives on Windows, etc.
+        errors.append(f"Invalid path: {patch.target_file}")
+        return PatchValidationResult(
+            valid=False,
+            errors=errors,
+        )
+
     target_exists = target_path.exists()
 
     if not target_exists and patch.patch_type != PatchType.CONFIG:
