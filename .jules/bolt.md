@@ -1,0 +1,3 @@
+## 2025-01-28 - Optimized Run Listing with Single-Pass Directory Scan
+**Learning:** The `RunService.list_runs_paginated` method was performing two separate traversals of the runs directory when `include_legacy` was enabled (default). `storage.list_runs()` scanned for active runs, and `storage.discover_legacy_runs()` scanned again for legacy runs. This doubled the I/O operations (stat calls) needed to list runs.
+**Action:** Replaced the separate calls with `storage.scan_runs()`, which classifies active and legacy runs in a single pass over the directory using `os.scandir` and checks `meta.json` existence efficiently. This reduces I/O overhead by ~50% for the listing operation.
