@@ -9,7 +9,7 @@
 
 import { Api } from "./api.js";
 import { state, STATUS_ICONS } from "./state.js";
-import { escapeHtml, formatDateTime } from "./utils.js";
+import { copyToClipboard, escapeHtml, formatDateTime } from "./utils.js";
 import { getDefaultRunHistoryFilter } from "./teaching_mode.js";
 import type { Run, RunType, StepStatus } from "./domain.js";
 
@@ -400,16 +400,28 @@ function renderRunHistoryEmpty(): string {
     ? "No runs available"
     : `No ${_state.currentFilter} runs`;
 
+  const cmd = "make demo-run";
+  const showCmd = _state.currentFilter === "all" || _state.currentFilter === "example" || _state.currentFilter === "active";
+
+  const commandBlock = `
+    <div class="path-with-copy" style="justify-content: center; margin-top: 8px;">
+      <code class="mono fs-text-xs" style="background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 4px;">${cmd}</code>
+      <button class="copy-cmd-btn copy-btn" data-cmd="${cmd}" aria-label="Copy command" title="Copy to clipboard">
+        Copy
+      </button>
+    </div>
+  `;
+
   return `
     <div class="fs-empty run-history-empty">
-      <div class="fs-empty-icon">\u{1F4C2}</div>
+      <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">${filterText}</p>
       <p class="fs-empty-description">
         ${_state.currentFilter === "all"
           ? "Generate example data to explore Flow Studio."
-          : `Try changing the filter or run <code class="mono fs-text-xs">make demo-run</code>`}
+          : `Try changing the filter or run:`}
       </p>
-      ${_state.currentFilter === "all" ? '<code class="mono fs-empty-command">make demo-run</code>' : ""}
+      ${showCmd ? commandBlock : ""}
     </div>
   `;
 }
@@ -481,6 +493,31 @@ function renderPaginationInfo(): string {
       ${_state.hasMore ? `<span class="pagination-hint">(use CLI: <code>make runs-list-v</code>)</span>` : ""}
     </div>
   `;
+}
+
+/**
+ * Attach listeners for empty state interactions (copy button).
+ */
+function attachEmptyStateListeners(container: HTMLElement): void {
+  const copyBtns = container.querySelectorAll(".copy-cmd-btn");
+  copyBtns.forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const target = e.currentTarget as HTMLElement;
+      const cmd = target.dataset.cmd;
+      if (cmd) {
+        void copyToClipboard(cmd);
+        // Visual feedback
+        const originalText = target.textContent;
+        target.textContent = "Copied!";
+        target.classList.add("copied");
+        setTimeout(() => {
+          target.textContent = originalText;
+          target.classList.remove("copied");
+        }, 1500);
+      }
+    });
+  });
 }
 
 // ============================================================================
@@ -562,6 +599,9 @@ function attachEventListeners(container: HTMLElement): void {
       });
     });
   }
+
+  // Attach empty state listeners
+  attachEmptyStateListeners(container);
 }
 
 // ============================================================================
@@ -638,6 +678,7 @@ function renderRunListItems(): void {
 
   if (_state.filteredRuns.length === 0) {
     listContainer.innerHTML = renderRunHistoryEmpty();
+    attachEmptyStateListeners(listContainer);
     return;
   }
 
