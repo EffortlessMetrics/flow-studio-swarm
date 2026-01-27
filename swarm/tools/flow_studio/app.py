@@ -5,8 +5,6 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from swarm.utils.cors import get_cors_origins
-
 from .routes import (
     agents_router,
     flows_router,
@@ -34,7 +32,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=get_cors_origins(),
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
