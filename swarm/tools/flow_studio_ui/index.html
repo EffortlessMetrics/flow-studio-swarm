@@ -57,7 +57,7 @@
       </button>
       <div class="muted author-only" style="display: flex; align-items: center; gap: 8px;" data-uiid="flow_studio.header.reload">
         <span class="mono">make dev-check</span>
-        <button class="copy-btn" onclick="navigator.clipboard.writeText('make dev-check').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
+        <button id="copy-dev-check-btn" class="copy-btn" title="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
         <button id="reload-btn" class="fs-button-small" data-uiid="flow_studio.header.reload.btn">Reload</button>
       </div>
       <button id="help-btn" class="fs-icon-button" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
@@ -126,7 +126,10 @@
     <!-- Inventory Counts Panel -->
     <div id="inventory-counts-container" class="inventory-counts-container operator-only" data-uiid="flow_studio.sidebar.inventory_counts">
     </div>
-    <nav id="flow-list" class="muted" role="navigation" aria-label="Flow list" data-uiid="flow_studio.sidebar.flow_list">Loading...</nav>
+    <nav id="flow-list" class="fs-loading" role="navigation" aria-label="Flow list" data-uiid="flow_studio.sidebar.flow_list">
+      <div class="fs-loading-spinner"></div>
+      <div class="fs-loading-text">Loading flows...</div>
+    </nav>
     <!-- Run History Panel (collapsible) -->
     <div class="run-history-section" data-uiid="flow_studio.sidebar.run_history">
       <div class="section-header run-history-header" style="margin-top: 16px;">
@@ -5745,6 +5748,8 @@ import { screens as layoutScreens, getScreenById as getLayoutScreenByIdImpl, get
 import { BoundaryReview, createBoundaryReview, extractBoundaryReviewData, } from "./components/BoundaryReview.js";
 // Inventory Counts - marker statistics
 import { InventoryCounts } from "./components/InventoryCounts.js";
+// Import utilities
+import { formatDuration, formatTime, formatDateTime, createQuickCommands, createPathWithCopy, escapeHtml, copyToClipboard } from "./utils.js";
 // ============================================================================
 // Details Wrappers
 // ============================================================================
@@ -6405,6 +6410,19 @@ window.addEventListener("load", async () => {
         const btn = document.getElementById("reload-btn");
         if (btn) {
             btn.addEventListener("click", reloadConfig);
+        }
+        // Header copy button handler
+        const copyDevCheckBtn = document.getElementById("copy-dev-check-btn");
+        if (copyDevCheckBtn) {
+            copyDevCheckBtn.addEventListener("click", () => {
+                void copyToClipboard("make dev-check");
+                copyDevCheckBtn.textContent = "Copied!";
+                copyDevCheckBtn.classList.add("copied");
+                setTimeout(() => {
+                    copyDevCheckBtn.textContent = "Copy";
+                    copyDevCheckBtn.classList.remove("copied");
+                }, 1500);
+            });
         }
         // Help button handler
         const helpBtn = document.getElementById("help-btn");
@@ -8437,6 +8455,8 @@ export async function loadFlows() {
     const listEl = document.getElementById("flow-list");
     if (!listEl)
         return flows;
+    // Remove loading state class if present
+    listEl.classList.remove("fs-loading");
     listEl.innerHTML = "";
     if (!flows.length) {
         listEl.innerHTML = renderNoFlows();
@@ -11411,8 +11431,9 @@ function renderRunHistoryEmpty() {
  */
 function renderRunHistoryLoading() {
     return `
-    <div class="run-history-loading muted">
-      Loading runs...
+    <div class="fs-loading">
+      <div class="fs-loading-spinner"></div>
+      <div class="fs-loading-text">Loading runs...</div>
     </div>
   `;
 }
