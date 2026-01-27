@@ -46,62 +46,62 @@ export function renderSelectNodeHint() {
       <p class="fs-empty-title">Select a node</p>
       <p class="fs-empty-description">Click a step or agent in the graph.</p>
 
-      <div style="width: 100%; margin-top: 12px;">
+      <dl style="width: 100%; margin-top: 12px;">
 
         <div style="margin-bottom: 12px;">
-          <div class="kv-label" style="margin-top: 0;">What is a flow?</div>
-          <div class="fs-text-body" style="line-height: 1.5; color: #374151;">
+          <dt class="kv-label" style="margin-top: 0;">What is a flow?</dt>
+          <dd class="fs-text-body" style="line-height: 1.5; color: #374151; margin: 0;">
             A pipeline from Signal → Plan → Build → Gate → Deploy → Wisdom.<br/>
             Each flow writes artifacts under
             <code class="mono fs-text-xs">swarm/runs/&lt;run&gt;/</code>
-          </div>
+          </dd>
         </div>
 
         <div style="margin-bottom: 12px;">
-          <div class="kv-label">What is a step?</div>
-          <div class="fs-text-body" style="line-height: 1.5; color: #374151;">
+          <dt class="kv-label">What is a step?</dt>
+          <dd class="fs-text-body" style="line-height: 1.5; color: #374151; margin: 0;">
             A stage in the flow executed by one or more agents.<br/>
             Each step reads inputs and writes artifacts.
-          </div>
+          </dd>
         </div>
 
         <div style="margin-bottom: 12px;">
-          <div class="kv-label">What is an agent?</div>
-          <div class="fs-text-body" style="line-height: 1.5; color: #374151;">
+          <dt class="kv-label">What is an agent?</dt>
+          <dd class="fs-text-body" style="line-height: 1.5; color: #374151; margin: 0;">
             A role with instructions defined in YAML config.<br/>
             Config:
             <code class="mono fs-text-xs">swarm/config/agents/*.yaml</code>
-          </div>
+          </dd>
         </div>
 
-        <div class="author-only" style="margin-top: 16px; padding: 10px; background: #f0f9ff; border-radius: 6px; border-left: 3px solid #3b82f6;">
-          <div class="fs-text-sm" style="font-weight: 600; color: #1e40af; margin-bottom: 6px;">
-            First edit
-          </div>
-          <div class="fs-text-sm" style="color: #374151; line-height: 1.6;">
-            1. Select the <strong>build</strong> flow<br/>
-            2. Click the <strong>load_context</strong> step<br/>
-            3. Follow the <strong>Edit agent</strong> hint
-          </div>
-          <div class="fs-text-xs fs-text-muted" style="margin-top: 6px;">
-            Full guide: <code class="mono" style="font-size: 9px;">docs/FLOW_STUDIO_FIRST_EDIT.md</code>
-          </div>
-        </div>
+      </dl>
 
-        <div class="operator-only" style="margin-top: 16px; padding: 10px; background: #f9fafb; border-radius: 6px;">
-          <div class="fs-text-sm fs-text-muted" style="line-height: 1.6;">
-            Select a step to see artifact status and run details.
-          </div>
+      <div class="author-only" style="margin-top: 16px; padding: 10px; background: #f0f9ff; border-radius: 6px; border-left: 3px solid #3b82f6;" role="status" aria-label="First edit guide">
+        <div class="fs-text-sm" style="font-weight: 600; color: #1e40af; margin-bottom: 6px;">
+          First edit
         </div>
-
-        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid #e5e7eb;">
-          <div class="fs-text-xs fs-text-subtle">
-            <kbd class="fs-kbd">1-6</kbd> flows
-            <kbd class="fs-kbd">/</kbd> search
-            <kbd class="fs-kbd">?</kbd> help
-          </div>
+        <div class="fs-text-sm" style="color: #374151; line-height: 1.6;">
+          1. Select the <strong>build</strong> flow<br/>
+          2. Click the <strong>load_context</strong> step<br/>
+          3. Follow the <strong>Edit agent</strong> hint
         </div>
+        <div class="fs-text-xs fs-text-muted" style="margin-top: 6px;">
+          Full guide: <code class="mono" style="font-size: 9px;">docs/FLOW_STUDIO_FIRST_EDIT.md</code>
+        </div>
+      </div>
 
+      <div class="operator-only" style="margin-top: 16px; padding: 10px; background: #f9fafb; border-radius: 6px;">
+        <div class="fs-text-sm fs-text-muted" style="line-height: 1.6;">
+          Select a step to see artifact status and run details.
+        </div>
+      </div>
+
+        <div role="group" aria-label="Keyboard shortcuts" style="width: 100%; margin-top: 12px; padding-top: 10px; border-top: 1px solid #e5e7eb;">
+        <div class="fs-text-xs fs-text-subtle">
+          <kbd class="fs-kbd">1-6</kbd> flows
+          <kbd class="fs-kbd">/</kbd> search
+          <kbd class="fs-kbd">?</kbd> help
+        </div>
       </div>
     </div>
   `;
@@ -170,7 +170,7 @@ export function renderGettingStartedHint(flowKey) {
     return `
     <div class="welcome-section" style="margin-bottom: 12px;">
       <div class="fs-text-sm fs-text-muted" style="margin-bottom: 8px;">
-        Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
+        Click a node for details. Press <kbd class="fs-kbd">?</kbd> for shortcuts.
       </div>
       <div class="fs-text-sm fs-text-subtle">
         Artifacts: <code class="mono fs-text-xs">swarm/runs/&lt;run&gt;/${escapeHtml(flowKey || "<flow>")}/</code>

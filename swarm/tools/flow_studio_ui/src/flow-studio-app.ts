@@ -14,7 +14,6 @@
 // Core state and utilities
 import { state } from "./state.js";
 import { Api } from "./api.js";
-import { createQuickCommands } from "./utils.js";
 import type {
   FlowKey,
   NodeData,
@@ -716,13 +715,12 @@ function showFlowDetails(detail: FlowDetail | FlowDetailExtended): void {
 
   const hint = document.createElement("div");
   hint.className = "welcome-panel author-only";
-
   const welcomeSection = document.createElement("div");
   welcomeSection.className = "welcome-section";
   welcomeSection.style.marginBottom = "12px";
   welcomeSection.innerHTML = `
     <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">
-      Click a node for details. Press <kbd class="shortcut-key">?</kbd> for shortcuts.
+      Click a node for details. Press <kbd class="fs-kbd">?</kbd> for shortcuts.
     </div>
     <div style="font-size: 11px; color: #9ca3af;">
       Artifacts: <code class="mono" style="font-size: 10px;">swarm/runs/&lt;run&gt;/${flow.key || "&lt;flow&gt;"}/</code>
