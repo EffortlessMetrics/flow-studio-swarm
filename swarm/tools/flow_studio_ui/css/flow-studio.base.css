@@ -1122,6 +1122,21 @@
       font-size: 12px;
     }
 
+    .search-shortcut {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      border: 1px solid var(--fs-color-border-strong);
+      color: var(--fs-color-text-muted);
+    }
+
+    .search-input:focus ~ .search-shortcut,
+    .search-input:not(:placeholder-shown) ~ .search-shortcut {
+      display: none;
+    }
+
     /* Legend box - positioned top-right, collapsed by default */
     #legend {
       position: absolute;
