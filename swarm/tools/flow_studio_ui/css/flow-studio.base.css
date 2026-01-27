@@ -1053,6 +1053,17 @@
     .search-input::placeholder {
       color: #9ca3af;
     }
+    .search-shortcut {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .search-input:focus + .search-shortcut,
+    .search-input:not(:placeholder-shown) + .search-shortcut {
+      display: none;
+    }
     .search-icon {
       position: absolute;
       left: 10px;
