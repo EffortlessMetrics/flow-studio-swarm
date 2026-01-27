@@ -173,7 +173,8 @@ export function initSearchHandlers(): void {
     }
     const target = e.target as HTMLInputElement;
     const query = target.value.trim();
-    state.searchDebounceTimer = setTimeout(() => performSearch(query), 200);
+    // Optimization: Increased debounce from 200ms to 300ms to reduce API calls while typing
+    state.searchDebounceTimer = setTimeout(() => performSearch(query), 300);
   });
 
   searchInput.addEventListener("keydown", (e: KeyboardEvent) => {
