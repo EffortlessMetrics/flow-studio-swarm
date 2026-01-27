@@ -93,7 +93,7 @@
           <span class="run-control-label">Stop</span>
         </button>
       </div>
-      <div id="run-control-status" class="run-control-status" data-uiid="flow_studio.sidebar.run_control.status">
+      <div id="run-control-status" class="run-control-status" role="status" aria-live="polite" data-uiid="flow_studio.sidebar.run_control.status">
         <span id="run-control-status-text" class="muted">No active run</span>
       </div>
     </div>
@@ -4641,7 +4641,7 @@ export async function renderRunTimeline(container) {
             const time = formatTime(event.timestamp);
             const duration = event.duration_ms ? formatDuration(event.duration_ms / 1000) : '';
             html += `
-        <div class="timeline-event ${escapeHtml(event.status || null) || ''}">
+        <div class="timeline-event ${event.status === 'started' || event.status === 'completed' || event.status === 'failed' ? event.status : ''}">
           <span class="timeline-time">${time}</span>
           <span class="timeline-icon" aria-hidden="true">${icon}</span>
           <span class="timeline-flow">${escapeHtml(event.flow)}</span>
@@ -4841,7 +4841,7 @@ function renderTeachingCallout(teachingNote) {
       <span class="teaching-callout-icon" aria-hidden="true">&#x1F4A1;</span>
       <div class="teaching-callout-content">
         <div class="teaching-callout-label">Teaching Note</div>
-        <div class="teaching-callout-text">${teachingNote}</div>
+        <div class="teaching-callout-text">${escapeHtml(teachingNote)}</div>
       </div>
     </div>
   `;
@@ -4869,7 +4869,7 @@ function renderStructuredTeachingNotes(notes) {
         html += `<div class="teaching-notes-section">
       <div class="teaching-notes-label"><span aria-hidden="true">&#x1F4E5;</span> Inputs</div>
       <ul class="teaching-notes-list inputs">
-        ${notes.inputs.map(p => `<li class="mono">${p}</li>`).join('')}
+        ${notes.inputs.map(p => `<li class="mono">${escapeHtml(p)}</li>`).join('')}
       </ul>
     </div>`;
     }
@@ -4877,7 +4877,7 @@ function renderStructuredTeachingNotes(notes) {
         html += `<div class="teaching-notes-section">
       <div class="teaching-notes-label"><span aria-hidden="true">&#x1F4E4;</span> Outputs</div>
       <ul class="teaching-notes-list outputs">
-        ${notes.outputs.map(p => `<li class="mono">${p}</li>`).join('')}
+        ${notes.outputs.map(p => `<li class="mono">${escapeHtml(p)}</li>`).join('')}
       </ul>
     </div>`;
     }
@@ -4885,7 +4885,7 @@ function renderStructuredTeachingNotes(notes) {
         html += `<div class="teaching-notes-section">
       <div class="teaching-notes-label"><span aria-hidden="true">&#x2728;</span> Emphasizes</div>
       <ul class="teaching-notes-list emphasizes">
-        ${notes.emphasizes.map(e => `<li>${e}</li>`).join('')}
+        ${notes.emphasizes.map(e => `<li>${escapeHtml(e)}</li>`).join('')}
       </ul>
     </div>`;
     }
@@ -4893,7 +4893,7 @@ function renderStructuredTeachingNotes(notes) {
         html += `<div class="teaching-notes-section">
       <div class="teaching-notes-label"><span aria-hidden="true">&#x26D4;</span> Constraints</div>
       <ul class="teaching-notes-list constraints">
-        ${notes.constraints.map(c => `<li>${c}</li>`).join('')}
+        ${notes.constraints.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
       </ul>
     </div>`;
     }
@@ -4960,6 +4960,16 @@ async function loadReceiptBadges(container, runId, flowKey, stepId) {
     }
 }
 /**
+ * Sanitize a string to be safe for use as a CSS class name.
+ * Only allows lowercase alphanumeric characters and hyphens.
+ */
+function sanitizeCssClass(value) {
+    return value
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
+}
+/**
  * Render receipt badges HTML
  */
 function renderReceiptBadges(resp) {
@@ -4970,17 +4980,17 @@ function renderReceiptBadges(resp) {
     const badges = [];
     // Engine badge
     if (receipt.engine) {
-        const engineClass = receipt.engine.replace(/\s+/g, '-').toLowerCase();
+        const engineClass = sanitizeCssClass(receipt.engine);
         badges.push(`<span class="run-badge engine ${engineClass}" title="Execution engine">${escapeHtml(receipt.engine)}</span>`);
     }
     // Mode badge
     if (receipt.mode) {
-        const modeClass = receipt.mode.toLowerCase();
+        const modeClass = sanitizeCssClass(receipt.mode);
         badges.push(`<span class="run-badge mode ${modeClass}" title="Execution mode">${escapeHtml(receipt.mode)}</span>`);
     }
     // Provider badge
     if (receipt.provider) {
-        const providerClass = receipt.provider.toLowerCase();
+        const providerClass = sanitizeCssClass(receipt.provider);
         badges.push(`<span class="run-badge provider ${providerClass}" title="LLM provider">${escapeHtml(receipt.provider)}</span>`);
     }
     if (badges.length === 0) {
@@ -5240,7 +5250,7 @@ export async function showStepDetails(data, callbacks = {}) {
                 agentLink.style.cursor = "pointer";
                 agentLink.style.padding = "2px 0";
                 agentLink.style.color = "#3b82f6";
-                agentLink.innerHTML = `<span class="mono">${agentKey}</span>`;
+                agentLink.innerHTML = `<span class="mono">${escapeHtml(agentKey)}</span>`;
                 agentLink.title = `Click to view agent: ${agentKey}`;
                 agentLink.addEventListener("click", async () => {
                     if (selectAgent) {
@@ -5285,7 +5295,7 @@ export async function showStepDetails(data, callbacks = {}) {
             const req = a.required ? "Required" : "Optional";
             artifactRows += `<tr>
         <td>${icon}</td>
-        <td class="mono">${a.path}</td>
+        <td class="mono">${escapeHtml(a.path)}</td>
         <td class="muted">${req}</td>
       </tr>`;
         });
@@ -5301,7 +5311,7 @@ export async function showStepDetails(data, callbacks = {}) {
       ${stepData?.required_present || 0}/${stepData?.required_total || 0} required,
       ${stepData?.optional_present || 0}/${stepData?.optional_total || 0} optional
     </div>
-    ${stepData?.note ? `<div class="muted" style="margin-top: 4px; font-style: italic;">${stepData.note}</div>` : ""}
+    ${stepData?.note ? `<div class="muted" style="margin-top: 4px; font-style: italic;">${escapeHtml(stepData.note)}</div>` : ""}
     <div class="kv-label" style="margin-top: 8px;">Execution</div>
     <div class="run-detail-badges" id="step-receipt-badges"></div>
     ${stepTimingHtml}
@@ -6464,20 +6474,25 @@ window.addEventListener("load", async () => {
             loadTours()
         ]);
         // Phase 2: Critical path - runs and flows are needed for main UI
-        // Load runs first (populates run selector), then flows (renders graph)
-        try {
-            await loadRuns();
+        // Load runs and flows in parallel to speed up initialization
+        const [runsResult, flowsResult] = await Promise.allSettled([
+            loadRuns(),
+            loadFlows({ autoSelect: false })
+        ]);
+        if (runsResult.status === "rejected") {
+            console.error("Failed to load runs", runsResult.reason);
         }
-        catch (err) {
-            console.error("Failed to load runs", err);
-        }
-        try {
-            await loadFlows();
-        }
-        catch (err) {
+        if (flowsResult.status === "rejected") {
             const listEl = document.getElementById("flow-list");
             if (listEl)
-                listEl.textContent = "Failed to load flows: " + err.message;
+                listEl.textContent = "Failed to load flows: " + flowsResult.reason.message;
+        }
+        else {
+            const flows = flowsResult.value;
+            // Select the first flow by default if we have flows and no current flow
+            if (flows.length && !state.currentFlowKey) {
+                await setActiveFlow(flows[0].key);
+            }
         }
         // Initialize tour system (sync handlers only)
         initTourHandlers();
@@ -8417,7 +8432,8 @@ export function updateFlowListStatus() {
 /**
  * Load flows and populate the flow list sidebar.
  */
-export async function loadFlows() {
+export async function loadFlows(options = {}) {
+    const { autoSelect = true } = options;
     const data = await Api.getFlows();
     const flows = data.flows || [];
     const listEl = document.getElementById("flow-list");
@@ -8467,7 +8483,7 @@ export async function loadFlows() {
         _updateFlowListGovernance();
     }
     // Select the first flow by default
-    if (flows.length) {
+    if (autoSelect && flows.length) {
         await setActiveFlow(flows[0].key);
     }
     return flows;
@@ -10635,25 +10651,29 @@ export function createModalFocusManager(modal, contentSelector) {
 // AUTO-GENERATED from swarm/config/flows.yaml
 // Do not edit manually. Run: make gen-flow-constants
 /** Canonical flow ordering in SDLC sequence */
-export const FLOW_KEYS = ["signal", "plan", "build", "gate", "deploy", "wisdom", "stepwise-demo"];
-/** Flow key to numeric index (1-6) */
+export const FLOW_KEYS = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom", "reset", "stepwise-demo"];
+/** Flow key to numeric index (1-9) */
 export const FLOW_INDEX = {
     signal: 1,
     plan: 2,
     build: 3,
-    gate: 4,
-    deploy: 5,
-    wisdom: 6,
-    "stepwise-demo": 7,
+    review: 4,
+    gate: 5,
+    deploy: 6,
+    wisdom: 7,
+    reset: 8,
+    "stepwise-demo": 9,
 };
 /** Flow key to display title */
 export const FLOW_TITLES = {
     signal: "Signal",
     plan: "Plan",
     build: "Build",
+    review: "Review",
     gate: "Gate",
     deploy: "Deploy",
     wisdom: "Wisdom",
+    reset: "Reset",
     "stepwise-demo": "Stepwise",
 };
 /** Flow key to description */
@@ -10661,9 +10681,11 @@ export const FLOW_DESCRIPTIONS = {
     signal: "Raw input to problem statement, requirements, BDD scenarios, early risk assessment",
     plan: "Requirements to ADR, contracts, observability spec, test/work plans, design validation",
     build: "Implement via adversarial microloops, build code and tests, self-verify, produce receipts",
+    review: "Harvest PR feedback, cluster into actionable items, apply fixes, flip Draft to Ready",
     gate: "Pre-merge gate, audit receipts, check contracts/security/policy, recommend merge or bounce",
     deploy: "Move approved artifact to production, execute deployment, verify health, create audit trail",
     wisdom: "Analyze artifacts, detect regressions, extract learnings, close feedback loops",
+    reset: "Branch synchronization, cleanup, and run archiving. Injected when work branch diverges from upstream.",
     "stepwise-demo": "A 10-step demo flow for testing stepwise execution backends",
 };
 // teaching_mode.js
@@ -11081,7 +11103,7 @@ export function toJSON() {
 // - Run detail modal/panel display
 import { Api } from "./api.js";
 import { state, STATUS_ICONS } from "./state.js";
-import { escapeHtml, formatDateTime } from "./utils.js";
+import { copyToClipboard, escapeHtml, formatDateTime } from "./utils.js";
 import { getDefaultRunHistoryFilter } from "./teaching_mode.js";
 let _callbacks = {};
 /**
@@ -11394,16 +11416,26 @@ function renderRunHistoryEmpty() {
     const filterText = _state.currentFilter === "all"
         ? "No runs available"
         : `No ${_state.currentFilter} runs`;
+    const cmd = "make demo-run";
+    const showCmd = _state.currentFilter === "all" || _state.currentFilter === "example" || _state.currentFilter === "active";
+    const commandBlock = `
+    <div class="path-with-copy" style="justify-content: center; margin-top: 8px;">
+      <code class="mono fs-text-xs" style="background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 4px;">${cmd}</code>
+      <button class="copy-cmd-btn copy-btn" data-cmd="${cmd}" aria-label="Copy command" title="Copy to clipboard">
+        Copy
+      </button>
+    </div>
+  `;
     return `
     <div class="fs-empty run-history-empty">
-      <div class="fs-empty-icon">\u{1F4C2}</div>
+      <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">${filterText}</p>
       <p class="fs-empty-description">
         ${_state.currentFilter === "all"
         ? "Generate example data to explore Flow Studio."
-        : `Try changing the filter or run <code class="mono fs-text-xs">make demo-run</code>`}
+        : `Try changing the filter or run:`}
       </p>
-      ${_state.currentFilter === "all" ? '<code class="mono fs-empty-command">make demo-run</code>' : ""}
+      ${showCmd ? commandBlock : ""}
     </div>
   `;
 }
@@ -11467,6 +11499,30 @@ function renderPaginationInfo() {
       ${_state.hasMore ? `<span class="pagination-hint">(use CLI: <code>make runs-list-v</code>)</span>` : ""}
     </div>
   `;
+}
+/**
+ * Attach listeners for empty state interactions (copy button).
+ */
+function attachEmptyStateListeners(container) {
+    const copyBtns = container.querySelectorAll(".copy-cmd-btn");
+    copyBtns.forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const target = e.currentTarget;
+            const cmd = target.dataset.cmd;
+            if (cmd) {
+                void copyToClipboard(cmd);
+                // Visual feedback
+                const originalText = target.textContent;
+                target.textContent = "Copied!";
+                target.classList.add("copied");
+                setTimeout(() => {
+                    target.textContent = originalText;
+                    target.classList.remove("copied");
+                }, 1500);
+            }
+        });
+    });
 }
 // ============================================================================
 // Panel Rendering
@@ -11541,6 +11597,8 @@ function attachEventListeners(container) {
             });
         });
     }
+    // Attach empty state listeners
+    attachEmptyStateListeners(container);
 }
 // ============================================================================
 // Public Accessors
@@ -11607,6 +11665,7 @@ function renderRunListItems() {
     }
     if (_state.filteredRuns.length === 0) {
         listContainer.innerHTML = renderRunHistoryEmpty();
+        attachEmptyStateListeners(listContainer);
         return;
     }
     // Render run items
@@ -11714,6 +11773,7 @@ import { Api } from "./api.js";
 import { escapeHtml, formatDateTime, createModalFocusManager, createCopyButton, createQuickCommands } from "./utils.js";
 import { updateCompactInventory, injectInventoryCSS } from "./inventory_counts.js";
 import { updateBoundaryReviewPanel, injectBoundaryReviewCSS } from "./boundary_review.js";
+import { FLOW_KEYS, FLOW_TITLES } from "./flow_constants.js";
 // ============================================================================
 // Module State
 // ============================================================================
@@ -11994,16 +12054,9 @@ function renderFlowProgress(flows) {
     if (!flows) {
         return '<div class="muted fs-text-sm">No flow data available</div>';
     }
-    const flowOrder = ["signal", "plan", "build", "gate", "deploy", "wisdom", "stepwise-demo"];
-    const flowLabels = {
-        signal: "Signal",
-        plan: "Plan",
-        build: "Build",
-        gate: "Gate",
-        deploy: "Deploy",
-        wisdom: "Wisdom",
-        "stepwise-demo": "Stepwise"
-    };
+    // Use canonical flow ordering and titles from flow_constants
+    const flowOrder = FLOW_KEYS;
+    const flowLabels = FLOW_TITLES;
     const flowItems = flowOrder.map(key => {
         const flowData = flows[key];
         const status = flowData?.status || "not_started";
@@ -12530,6 +12583,7 @@ if (typeof window !== "undefined") {
 // - Verification results
 // - Evolution suggestions (if present)
 import { Api } from "./api.js";
+import { escapeHtml } from "./utils.js";
 // =============================================================================
 // State
 // =============================================================================
@@ -12565,8 +12619,8 @@ function renderAssumptionCard(assumption) {
     return `
     <div class="boundary-card assumption-card ${confidenceClass}" data-assumption-id="${assumption.assumption_id}">
       <div class="card-header">
-        <span class="card-id">${assumption.assumption_id}</span>
-        <span class="card-status ${statusClass}">${assumption.status}</span>
+        <span class="card-id">${escapeHtml(assumption.assumption_id)}</span>
+        <span class="card-status ${statusClass}">${escapeHtml(assumption.status)}</span>
         <span class="card-confidence confidence-${assumption.confidence}">${assumption.confidence}</span>
       </div>
       <div class="card-statement">${escapeHtml(assumption.statement)}</div>
@@ -12603,7 +12657,7 @@ function renderDecisionCard(decision) {
     return `
     <div class="boundary-card decision-card" data-decision-id="${decision.decision_id}">
       <div class="card-header">
-        <span class="card-id">${decision.decision_id}</span>
+        <span class="card-id">${escapeHtml(decision.decision_id)}</span>
         <span class="card-type">${escapeHtml(decision.decision_type)}</span>
       </div>
       <div class="card-subject">${escapeHtml(decision.subject)}</div>
@@ -12643,7 +12697,7 @@ function renderDetourCard(detour) {
     return `
     <div class="boundary-card detour-card" data-detour-id="${detour.detour_id}">
       <div class="card-header">
-        <span class="card-id">${detour.detour_id}</span>
+        <span class="card-id">${escapeHtml(detour.detour_id)}</span>
         <span class="card-type">${escapeHtml(detour.detour_type)}</span>
       </div>
       <div class="card-path">
@@ -12856,11 +12910,6 @@ export async function updateBoundaryReviewPanel(container, runId, options) {
 // =============================================================================
 // Utility
 // =============================================================================
-function escapeHtml(text) {
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
-}
 // =============================================================================
 // CSS (injected on first use)
 // =============================================================================
