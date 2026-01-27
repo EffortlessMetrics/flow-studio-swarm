@@ -4,7 +4,8 @@
       <div class="muted">Interactive node graph of flows, steps, and agents</div>
     <div class="search-container" data-uiid="flow_studio.header.search">
       <span class="search-icon" aria-hidden="true">&#128269;</span>
-      <input type="text" id="search-input" class="search-input" placeholder="Search flows, steps, agents, artifacts... (press /)" autocomplete="off" aria-label="Search flows, steps, agents, and artifacts" data-uiid="flow_studio.header.search.input" />
+      <input type="text" id="search-input" class="search-input" placeholder="Search flows, steps, agents, artifacts..." autocomplete="off" aria-label="Search flows, steps, agents, and artifacts (Press /)" data-uiid="flow_studio.header.search.input" />
+      <kbd class="fs-kbd search-shortcut" aria-hidden="true">/</kbd>
       <div id="search-dropdown" class="search-dropdown" role="listbox" aria-label="Search results" data-uiid="flow_studio.header.search.results"></div>
     </div>
     </div>
@@ -39,7 +40,7 @@
       </button>
       <div class="muted author-only" style="display: flex; align-items: center; gap: 8px;" data-uiid="flow_studio.header.reload">
         <span class="mono">make dev-check</span>
-        <button class="copy-btn" onclick="navigator.clipboard.writeText('make dev-check').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
+        <button id="dev-check-copy-btn" class="copy-btn" title="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
         <button id="reload-btn" class="fs-button-small" data-uiid="flow_studio.header.reload.btn">Reload</button>
       </div>
       <button id="help-btn" class="fs-icon-button" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>

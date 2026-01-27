@@ -1037,9 +1037,17 @@
       position: relative;
       flex: 0 0 280px;
     }
+    .search-shortcut {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      pointer-events: none;
+    }
     .search-input {
       width: 100%;
-      padding: 6px 12px 6px 32px;
+      padding: 6px 32px 6px 32px;
       font-size: 12px;
       border: 1px solid #d1d5db;
       border-radius: 6px;

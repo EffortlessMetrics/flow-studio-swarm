@@ -22,7 +22,8 @@
       <div class="muted">Interactive node graph of flows, steps, and agents</div>
     <div class="search-container" data-uiid="flow_studio.header.search">
       <span class="search-icon" aria-hidden="true">&#128269;</span>
-      <input type="text" id="search-input" class="search-input" placeholder="Search flows, steps, agents, artifacts... (press /)" autocomplete="off" aria-label="Search flows, steps, agents, and artifacts" data-uiid="flow_studio.header.search.input" />
+      <input type="text" id="search-input" class="search-input" placeholder="Search flows, steps, agents, artifacts..." autocomplete="off" aria-label="Search flows, steps, agents, and artifacts (Press /)" data-uiid="flow_studio.header.search.input" />
+      <kbd class="fs-kbd search-shortcut" aria-hidden="true">/</kbd>
       <div id="search-dropdown" class="search-dropdown" role="listbox" aria-label="Search results" data-uiid="flow_studio.header.search.results"></div>
     </div>
     </div>
@@ -57,7 +58,7 @@
       </button>
       <div class="muted author-only" style="display: flex; align-items: center; gap: 8px;" data-uiid="flow_studio.header.reload">
         <span class="mono">make dev-check</span>
-        <button class="copy-btn" onclick="navigator.clipboard.writeText('make dev-check').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
+        <button id="dev-check-copy-btn" class="copy-btn" title="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
         <button id="reload-btn" class="fs-button-small" data-uiid="flow_studio.header.reload.btn">Reload</button>
       </div>
       <button id="help-btn" class="fs-icon-button" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
@@ -1701,9 +1702,17 @@ make validate-swarm</pre>
       position: relative;
       flex: 0 0 280px;
     }
+    .search-shortcut {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      pointer-events: none;
+    }
     .search-input {
       width: 100%;
-      padding: 6px 12px 6px 32px;
+      padding: 6px 32px 6px 32px;
       font-size: 12px;
       border: 1px solid #d1d5db;
       border-radius: 6px;
@@ -5694,6 +5703,7 @@ export function getSDKIfReady() {
 // ============================================================================
 // Core state and utilities
 import { state } from "./state.js";
+import { copyToClipboard } from "./utils.js";
 import { Api } from "./api.js";
 import { qsByUiid, qsAllByUiidPrefix } from "./domain.js";
 // Selection management
@@ -6374,6 +6384,19 @@ window.addEventListener("load", async () => {
         const btn = document.getElementById("reload-btn");
         if (btn) {
             btn.addEventListener("click", reloadConfig);
+        }
+        // Dev check copy button handler
+        const devCheckCopyBtn = document.getElementById("dev-check-copy-btn");
+        if (devCheckCopyBtn) {
+            devCheckCopyBtn.addEventListener("click", () => {
+                void copyToClipboard("make dev-check");
+                devCheckCopyBtn.textContent = "Copied!";
+                devCheckCopyBtn.classList.add("copied");
+                setTimeout(() => {
+                    devCheckCopyBtn.textContent = "Copy";
+                    devCheckCopyBtn.classList.remove("copied");
+                }, 1500);
+            });
         }
         // Help button handler
         const helpBtn = document.getElementById("help-btn");
@@ -14135,8 +14158,10 @@ export async function stopRun() {
         return;
     }
     const runId = _state.activeRunId;
-    _state.isLoading = true;
+    const prevState = _state.runState; // Capture for restoration on error
     // Set intermediate "stopping" state
+    // IMPORTANT: Don't set isLoading=true here - it would mask the "Stopping..." UI
+    // The stopping state already disables buttons via updateUI()
     _state.runState = "stopping";
     updateUI();
     // Fire the stopping callback
@@ -14171,9 +14196,8 @@ export async function stopRun() {
         updateUI();
     }
     catch (err) {
-        _state.isLoading = false;
-        // Revert to previous state on error
-        _state.runState = "running"; // or paused - we lost track, but running is safer
+        // Revert to previous state on error (running or paused)
+        _state.runState = prevState;
         _state.error = err.message || "Failed to stop run";
         console.error("Failed to stop run", err);
         updateUI();
@@ -14276,13 +14300,20 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopping", activeRunId);
             }
             break;
-        case "run_stopped":
+        case "run_stopped": {
+            // Idempotency guard: If we already finalized from the POST fallback,
+            // don't fire callbacks twice. Just capture stop_report_path if missing.
+            if (_state.runState === "stopped") {
+                const p = event.payload?.stop_report_path || null;
+                if (!_state.stopReportPath && p) {
+                    _state.stopReportPath = p;
+                }
+                break;
+            }
             // Run has been stopped cleanly (final state)
             _state.runState = "stopped";
-            _state.stopReportPath = event.payload?.stop_report_path || null;
+            _state.stopReportPath = event.payload?.stop_report_path || _state.stopReportPath;
             _state.error = null; // Stopped is clean, not an error
-            // Keep subscription open for a moment to catch any final events
-            // But mark the run as stopped
             if (_callbacks.onRunStopped) {
                 _callbacks.onRunStopped(activeRunId, _state.stopReportPath || undefined);
             }
@@ -14290,6 +14321,7 @@ function handleSSEEvent(event) {
                 _callbacks.onStateChange("stopped", activeRunId);
             }
             break;
+        }
         case "error":
             _state.runState = "failed";
             _state.error = event.payload?.error || "Run failed";
@@ -14349,8 +14381,8 @@ export async function setActiveRun(runId) {
         _state.currentStep = data.current_step;
         _state.etag = etag;
         _state.error = data.error;
-        // Subscribe to events if run is active
-        if (_state.runState === "running" || _state.runState === "paused") {
+        // Subscribe to events if run is active (including stopping state for reload safety)
+        if (_state.runState === "running" || _state.runState === "paused" || _state.runState === "stopping") {
             subscribeToRunEvents(runId);
         }
         updateUI();

@@ -13,6 +13,7 @@
 
 // Core state and utilities
 import { state } from "./state.js";
+import { copyToClipboard } from "./utils.js";
 import { Api } from "./api.js";
 import type {
   FlowKey,
@@ -897,6 +898,20 @@ window.addEventListener("load", async () => {
     const btn = document.getElementById("reload-btn");
     if (btn) {
       btn.addEventListener("click", reloadConfig);
+    }
+
+    // Dev check copy button handler
+    const devCheckCopyBtn = document.getElementById("dev-check-copy-btn");
+    if (devCheckCopyBtn) {
+      devCheckCopyBtn.addEventListener("click", () => {
+        void copyToClipboard("make dev-check");
+        devCheckCopyBtn.textContent = "Copied!";
+        devCheckCopyBtn.classList.add("copied");
+        setTimeout(() => {
+          devCheckCopyBtn.textContent = "Copy";
+          devCheckCopyBtn.classList.remove("copied");
+        }, 1500);
+      });
     }
 
     // Help button handler
