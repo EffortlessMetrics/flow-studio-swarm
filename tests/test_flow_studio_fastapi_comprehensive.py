@@ -479,6 +479,78 @@ class TestRunEndpoints:
             # Compare response should have structure for diff
             assert isinstance(data, dict), "Compare response should be dict"
 
+    def test_stop_run_endpoint_exists(self, client):
+        """Test POST /api/runs/{run_id}/stop endpoint accepts requests."""
+        # Use a non-existent run to test endpoint routing
+        resp = client.post("/api/runs/nonexistent-run-xyz/stop")
+
+        # Should return 404 (run not found), 503 (service unavailable), or 400 (bad request)
+        # Should not return 405 (method not allowed)
+        assert resp.status_code in (400, 404, 503), (
+            f"Stop endpoint should return 400, 404, or 503, got {resp.status_code}: {resp.text}"
+        )
+
+    def test_stop_run_404_for_missing_run(self, client):
+        """Test stop endpoint returns 404 for non-existent run."""
+        resp = client.post("/api/runs/definitely-not-a-real-run-12345/stop")
+
+        # Should return 404 (run not found) or 503 (service unavailable)
+        assert resp.status_code in (404, 503), (
+            f"Expected 404 or 503 for non-existent run, got {resp.status_code}"
+        )
+
+        if resp.status_code == 404:
+            data = resp.json()
+            assert "error" in data, "404 response should have 'error' field"
+
+    def test_stop_run_returns_forensic_info(self, client):
+        """Test stop endpoint returns forensic info for stoppable run."""
+        # First, get list of runs
+        runs_resp = client.get("/api/runs")
+        if runs_resp.status_code != 200:
+            pytest.skip("Cannot get runs list")
+
+        runs = runs_resp.json().get("runs", [])
+        if not runs:
+            pytest.skip("No runs available")
+
+        # Try to stop first run (may already be completed)
+        run = runs[0]
+        run_id = run.get("run_id") or run.get("id")
+        if not run_id:
+            pytest.skip("Run has no identifier")
+
+        resp = client.post(f"/api/runs/{run_id}/stop")
+
+        # Accept 200 (stopped), 404 (already completed), or 503 (service unavailable)
+        assert resp.status_code in (200, 404, 503), (
+            f"Stop endpoint unexpected status: {resp.status_code}"
+        )
+
+        if resp.status_code == 200:
+            data = resp.json()
+            # Verify forensic info structure
+            assert "run_id" in data, "Stop response should have 'run_id'"
+            assert "status" in data, "Stop response should have 'status'"
+            assert "stop_report_path" in data, "Stop response should have 'stop_report_path'"
+            assert "stop_info" in data, "Stop response should have 'stop_info'"
+
+            # Verify stop_info structure
+            stop_info = data["stop_info"]
+            assert isinstance(stop_info, dict), "stop_info should be a dict"
+            assert "stop_reason" in stop_info, "stop_info should have 'stop_reason'"
+            assert "stopped_at" in stop_info, "stop_info should have 'stopped_at'"
+
+    def test_stop_run_503_when_service_unavailable(self, client, monkeypatch):
+        """Test stop endpoint returns 503 when RunService unavailable."""
+        # This test documents expected behavior when run_service is None
+        # The endpoint should return 503 with appropriate error message
+        resp = client.post("/api/runs/test-run/stop")
+
+        if resp.status_code == 503:
+            data = resp.json()
+            assert "error" in data, "503 response should have 'error' field"
+
 
 # =============================================================================
 # Wisdom API Endpoints

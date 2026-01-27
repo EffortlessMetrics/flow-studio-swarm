@@ -21,6 +21,7 @@ from ..services.run_service import (
     list_runs,
     mark_exemplar,
     start_run,
+    stop_run,
 )
 from ..state import FlowStudioState
 
@@ -215,6 +216,43 @@ async def api_cancel_run(run_id: str, state: FlowStudioState = Depends(get_state
             {"error": "Run not found or already completed", "run_id": run_id},
             status_code=404,
         )
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@router.post("/api/runs/{run_id}/stop")
+async def api_stop_run(run_id: str, state: FlowStudioState = Depends(get_state)):
+    """Stop a run gracefully with forensic savepoint.
+
+    Unlike cancel, stop creates a clean savepoint documenting the state
+    at the time of stopping. Returns stop_report_path and forensic info.
+
+    The run transitions through STOPPING -> STOPPED states.
+    """
+    if state.run_service is None:
+        return JSONResponse({"error": "RunService not available"}, status_code=503)
+
+    try:
+        from datetime import datetime, timezone
+
+        result = stop_run(state.run_service, run_id, reason="user_requested")
+
+        if not result.get("success", False):
+            return JSONResponse(
+                {"error": result.get("message", "Run not found or already completed"), "run_id": run_id},
+                status_code=404,
+            )
+
+        return {
+            "run_id": result["run_id"],
+            "status": result["status"],
+            "message": result["message"],
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "stop_report_path": result["stop_report_path"],
+            "stop_info": result["stop_info"],
+        }
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     except Exception as exc:

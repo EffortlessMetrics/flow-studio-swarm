@@ -95,6 +95,7 @@ class RunTailer:
             Number of newly ingested events (0 if no new events or file missing).
 
         Raises:
+            ValueError: If run_id contains invalid characters or traversal sequences.
             TailerError: If ingestion fails (offset will NOT be advanced).
         """
         validate_path_component(run_id, "run_id")

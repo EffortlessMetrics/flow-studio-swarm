@@ -113,7 +113,7 @@ export async function renderRunTimeline(container: HTMLElement): Promise<void> {
       const duration = event.duration_ms ? formatDuration(event.duration_ms / 1000) : '';
 
       html += `
-        <div class="timeline-event ${escapeHtml(event.status || null) || ''}">
+        <div class="timeline-event ${event.status === 'started' || event.status === 'completed' || event.status === 'failed' ? event.status : ''}">
           <span class="timeline-time">${time}</span>
           <span class="timeline-icon" aria-hidden="true">${icon}</span>
           <span class="timeline-flow">${escapeHtml(event.flow)}</span>
@@ -341,7 +341,7 @@ function renderTeachingCallout(teachingNote: string): string {
       <span class="teaching-callout-icon" aria-hidden="true">&#x1F4A1;</span>
       <div class="teaching-callout-content">
         <div class="teaching-callout-label">Teaching Note</div>
-        <div class="teaching-callout-text">${teachingNote}</div>
+        <div class="teaching-callout-text">${escapeHtml(teachingNote)}</div>
       </div>
     </div>
   `;
@@ -373,7 +373,7 @@ function renderStructuredTeachingNotes(notes: { inputs?: string[]; outputs?: str
     html += `<div class="teaching-notes-section">
       <div class="teaching-notes-label"><span aria-hidden="true">&#x1F4E5;</span> Inputs</div>
       <ul class="teaching-notes-list inputs">
-        ${notes.inputs.map(p => `<li class="mono">${p}</li>`).join('')}
+        ${notes.inputs.map(p => `<li class="mono">${escapeHtml(p)}</li>`).join('')}
       </ul>
     </div>`;
   }
@@ -382,7 +382,7 @@ function renderStructuredTeachingNotes(notes: { inputs?: string[]; outputs?: str
     html += `<div class="teaching-notes-section">
       <div class="teaching-notes-label"><span aria-hidden="true">&#x1F4E4;</span> Outputs</div>
       <ul class="teaching-notes-list outputs">
-        ${notes.outputs.map(p => `<li class="mono">${p}</li>`).join('')}
+        ${notes.outputs.map(p => `<li class="mono">${escapeHtml(p)}</li>`).join('')}
       </ul>
     </div>`;
   }
@@ -391,7 +391,7 @@ function renderStructuredTeachingNotes(notes: { inputs?: string[]; outputs?: str
     html += `<div class="teaching-notes-section">
       <div class="teaching-notes-label"><span aria-hidden="true">&#x2728;</span> Emphasizes</div>
       <ul class="teaching-notes-list emphasizes">
-        ${notes.emphasizes.map(e => `<li>${e}</li>`).join('')}
+        ${notes.emphasizes.map(e => `<li>${escapeHtml(e)}</li>`).join('')}
       </ul>
     </div>`;
   }
@@ -400,7 +400,7 @@ function renderStructuredTeachingNotes(notes: { inputs?: string[]; outputs?: str
     html += `<div class="teaching-notes-section">
       <div class="teaching-notes-label"><span aria-hidden="true">&#x26D4;</span> Constraints</div>
       <ul class="teaching-notes-list constraints">
-        ${notes.constraints.map(c => `<li>${c}</li>`).join('')}
+        ${notes.constraints.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
       </ul>
     </div>`;
   }
@@ -486,6 +486,17 @@ async function loadReceiptBadges(
 }
 
 /**
+ * Sanitize a string to be safe for use as a CSS class name.
+ * Only allows lowercase alphanumeric characters and hyphens.
+ */
+function sanitizeCssClass(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+}
+
+/**
  * Render receipt badges HTML
  */
 function renderReceiptBadges(resp: StepReceiptResponse): string {
@@ -498,19 +509,19 @@ function renderReceiptBadges(resp: StepReceiptResponse): string {
 
   // Engine badge
   if (receipt.engine) {
-    const engineClass = receipt.engine.replace(/\s+/g, '-').toLowerCase();
+    const engineClass = sanitizeCssClass(receipt.engine);
     badges.push(`<span class="run-badge engine ${engineClass}" title="Execution engine">${escapeHtml(receipt.engine)}</span>`);
   }
 
   // Mode badge
   if (receipt.mode) {
-    const modeClass = receipt.mode.toLowerCase();
+    const modeClass = sanitizeCssClass(receipt.mode);
     badges.push(`<span class="run-badge mode ${modeClass}" title="Execution mode">${escapeHtml(receipt.mode)}</span>`);
   }
 
   // Provider badge
   if (receipt.provider) {
-    const providerClass = receipt.provider.toLowerCase();
+    const providerClass = sanitizeCssClass(receipt.provider);
     badges.push(`<span class="run-badge provider ${providerClass}" title="LLM provider">${escapeHtml(receipt.provider)}</span>`);
   }
 
@@ -831,7 +842,7 @@ export async function showStepDetails(
         agentLink.style.cursor = "pointer";
         agentLink.style.padding = "2px 0";
         agentLink.style.color = "#3b82f6";
-        agentLink.innerHTML = `<span class="mono">${agentKey}</span>`;
+        agentLink.innerHTML = `<span class="mono">${escapeHtml(agentKey)}</span>`;
         agentLink.title = `Click to view agent: ${agentKey}`;
         agentLink.addEventListener("click", async () => {
           if (selectAgent) {
@@ -879,7 +890,7 @@ export async function showStepDetails(
       const req = a.required ? "Required" : "Optional";
       artifactRows += `<tr>
         <td>${icon}</td>
-        <td class="mono">${a.path}</td>
+        <td class="mono">${escapeHtml(a.path)}</td>
         <td class="muted">${req}</td>
       </tr>`;
     });
@@ -897,7 +908,7 @@ export async function showStepDetails(
       ${stepData?.required_present || 0}/${stepData?.required_total || 0} required,
       ${stepData?.optional_present || 0}/${stepData?.optional_total || 0} optional
     </div>
-    ${stepData?.note ? `<div class="muted" style="margin-top: 4px; font-style: italic;">${stepData.note}</div>` : ""}
+    ${stepData?.note ? `<div class="muted" style="margin-top: 4px; font-style: italic;">${escapeHtml(stepData.note)}</div>` : ""}
     <div class="kv-label" style="margin-top: 8px;">Execution</div>
     <div class="run-detail-badges" id="step-receipt-badges"></div>
     ${stepTimingHtml}
