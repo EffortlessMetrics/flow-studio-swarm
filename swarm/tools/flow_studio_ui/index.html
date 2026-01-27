@@ -319,54 +319,11 @@
 </div>
 
 <!-- Run Detail Modal -->
-<div id="run-detail-modal" class="run-detail-modal" role="dialog" aria-modal="true" aria-labelledby="run-detail-modal-title" data-uiid="flow_studio.modal.run_detail">
-  <div class="run-detail-content">
-    <button id="run-detail-close" class="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
-    <h3 id="run-detail-modal-title">Run Details</h3>
-    <div id="run-detail-body" data-uiid="flow_studio.modal.run_detail.body">
-      <div class="run-detail-section">
-        <div class="kv-label">RUN ID</div>
-        <div id="run-detail-id" class="mono">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">STATUS</div>
-        <div id="run-detail-status">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">BACKEND</div>
-        <div id="run-detail-backend">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">PROFILE</div>
-        <div id="run-detail-profile">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">FLOWS</div>
-        <div id="run-detail-flows">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">CREATED</div>
-        <div id="run-detail-created">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">COMPLETED</div>
-        <div id="run-detail-completed">-</div>
-      </div>
-      <div class="run-detail-section" id="run-detail-error-section" style="display: none;">
-        <div class="kv-label">ERROR</div>
-        <div id="run-detail-error" class="run-detail-error">-</div>
-      </div>
-      <div class="run-detail-section">
-        <div class="kv-label">TAGS</div>
-        <div id="run-detail-tags">-</div>
-      </div>
-      <div class="run-detail-actions">
-        <button id="run-detail-rerun" class="btn-primary" data-uiid="flow_studio.modal.run_detail.rerun">Re-run</button>
-        <label class="exemplar-toggle">
-          <input type="checkbox" id="run-detail-exemplar" />
-          <span>Exemplar (teaching)</span>
-        </label>
-      </div>
+<div id="run-detail-modal" class="selftest-modal" role="dialog" aria-modal="true" aria-labelledby="run-detail-modal-title" data-uiid="flow_studio.modal.run_detail">
+  <div class="selftest-step-content" data-uiid="flow_studio.modal.run_detail.body">
+    <button class="selftest-modal-close" id="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
+    <div id="run-detail-modal-content">
+      <div class="muted">Loading...</div>
     </div>
   </div>
 </div>
@@ -11754,7 +11711,7 @@ export async function initRunHistory() {
 // - Flow progress and status
 // - Re-run and close actions
 import { Api } from "./api.js";
-import { escapeHtml, formatDateTime, createModalFocusManager } from "./utils.js";
+import { escapeHtml, formatDateTime, createModalFocusManager, createCopyButton, createQuickCommands } from "./utils.js";
 import { updateCompactInventory, injectInventoryCSS } from "./inventory_counts.js";
 import { updateBoundaryReviewPanel, injectBoundaryReviewCSS } from "./boundary_review.js";
 // ============================================================================
@@ -11837,10 +11794,12 @@ function toggleModal(show) {
     }
     if (show) {
         modal.classList.add("open");
+        modal.classList.add("visible");
         _focusManager.open(document.activeElement);
     }
     else {
         modal.classList.remove("open");
+        modal.classList.remove("visible");
         _focusManager.close();
     }
 }
@@ -11908,7 +11867,10 @@ export function renderRunDetailContent(runId, summary) {
     <div class="selftest-step-metadata" style="grid-template-columns: 1fr 1fr 1fr;">
       <div class="selftest-metadata-row">
         <div class="selftest-metadata-label">Run ID</div>
-        <div class="selftest-metadata-value mono" style="font-size: 11px; word-break: break-all;">${escapeHtml(runId)}</div>
+        <div class="selftest-metadata-value" style="display: flex; align-items: center; gap: 4px;">
+          <span class="mono" style="font-size: 11px; word-break: break-all;">${escapeHtml(runId)}</span>
+          <span id="run-detail-id-copy"></span>
+        </div>
       </div>
       <div class="selftest-metadata-row">
         <div class="selftest-metadata-label">Backend</div>
@@ -11934,6 +11896,8 @@ export function renderRunDetailContent(runId, summary) {
         <div class="selftest-metadata-value">${formatDateTime(summary.completed_at || null)}</div>
       </div>
     </div>
+
+    <div id="run-detail-quick-commands" style="margin-top: 16px;"></div>
 
     <div class="kv-section" style="margin-top: 16px;">
       <div class="kv-label">Flow Progress</div>
@@ -12189,6 +12153,25 @@ function attachActionHandlers(modal, runId, summary) {
             console.error("Failed to load inventory counts", err);
             inventoryContainer.innerHTML = '<span class="muted fs-text-xs">Failed to load inventory data.</span>';
         });
+    }
+    // Copy Run ID button
+    const copyContainer = modal.querySelector("#run-detail-id-copy");
+    if (copyContainer) {
+        const copyBtn = createCopyButton(runId, "Copy");
+        // Style adjustments for inline appearance
+        copyBtn.style.marginLeft = "8px";
+        copyBtn.style.padding = "2px 6px";
+        copyBtn.style.fontSize = "10px";
+        copyContainer.appendChild(copyBtn);
+    }
+    // Quick commands
+    const quickCommandsContainer = modal.querySelector("#run-detail-quick-commands");
+    if (quickCommandsContainer) {
+        const commands = [
+            `ls -R swarm/runs/${runId}`,
+            `uv run swarm/tools/wisdom_summarizer.py ${runId}`
+        ];
+        quickCommandsContainer.appendChild(createQuickCommands(commands));
     }
     // Boundary review toggle button (lazy-load on click)
     const boundaryToggle = modal.querySelector("#run-detail-boundary-toggle");

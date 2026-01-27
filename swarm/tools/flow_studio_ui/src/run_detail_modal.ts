@@ -8,7 +8,7 @@
 // - Re-run and close actions
 
 import { Api } from "./api.js";
-import { escapeHtml, formatDateTime, createModalFocusManager, type ModalFocusManager } from "./utils.js";
+import { escapeHtml, formatDateTime, createModalFocusManager, type ModalFocusManager, createCopyButton, createQuickCommands } from "./utils.js";
 import type { RunSummary, FlowKey, FlowStatusData, RunEvent, WisdomSummary } from "./domain.js";
 import { updateCompactInventory, injectInventoryCSS } from "./inventory_counts.js";
 import { updateBoundaryReviewPanel, injectBoundaryReviewCSS } from "./boundary_review.js";
@@ -136,9 +136,11 @@ function toggleModal(show: boolean): void {
 
   if (show) {
     modal.classList.add("open");
+    modal.classList.add("visible");
     _focusManager.open(document.activeElement);
   } else {
     modal.classList.remove("open");
+    modal.classList.remove("visible");
     _focusManager.close();
   }
 }
@@ -215,7 +217,10 @@ export function renderRunDetailContent(runId: string, summary: ExtendedRunSummar
     <div class="selftest-step-metadata" style="grid-template-columns: 1fr 1fr 1fr;">
       <div class="selftest-metadata-row">
         <div class="selftest-metadata-label">Run ID</div>
-        <div class="selftest-metadata-value mono" style="font-size: 11px; word-break: break-all;">${escapeHtml(runId)}</div>
+        <div class="selftest-metadata-value" style="display: flex; align-items: center; gap: 4px;">
+          <span class="mono" style="font-size: 11px; word-break: break-all;">${escapeHtml(runId)}</span>
+          <span id="run-detail-id-copy"></span>
+        </div>
       </div>
       <div class="selftest-metadata-row">
         <div class="selftest-metadata-label">Backend</div>
@@ -241,6 +246,8 @@ export function renderRunDetailContent(runId: string, summary: ExtendedRunSummar
         <div class="selftest-metadata-value">${formatDateTime(summary.completed_at || null)}</div>
       </div>
     </div>
+
+    <div id="run-detail-quick-commands" style="margin-top: 16px;"></div>
 
     <div class="kv-section" style="margin-top: 16px;">
       <div class="kv-label">Flow Progress</div>
@@ -514,6 +521,27 @@ function attachActionHandlers(modal: HTMLElement, runId: string, summary?: Exten
       console.error("Failed to load inventory counts", err);
       inventoryContainer.innerHTML = '<span class="muted fs-text-xs">Failed to load inventory data.</span>';
     });
+  }
+
+  // Copy Run ID button
+  const copyContainer = modal.querySelector("#run-detail-id-copy");
+  if (copyContainer) {
+    const copyBtn = createCopyButton(runId, "Copy");
+    // Style adjustments for inline appearance
+    copyBtn.style.marginLeft = "8px";
+    copyBtn.style.padding = "2px 6px";
+    copyBtn.style.fontSize = "10px";
+    copyContainer.appendChild(copyBtn);
+  }
+
+  // Quick commands
+  const quickCommandsContainer = modal.querySelector("#run-detail-quick-commands");
+  if (quickCommandsContainer) {
+    const commands = [
+      `ls -R swarm/runs/${runId}`,
+      `uv run swarm/tools/wisdom_summarizer.py ${runId}`
+    ];
+    quickCommandsContainer.appendChild(createQuickCommands(commands));
   }
 
   // Boundary review toggle button (lazy-load on click)
