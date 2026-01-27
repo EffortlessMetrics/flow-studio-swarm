@@ -173,7 +173,7 @@ class BoundaryScanner:
         "checkout --force",
     }
 
-    # Patterns that indicate secret exposure
+    # Patterns that indicate secret exposure (filenames)
     SECRET_PATTERNS = {
         ".env",
         "credentials",
@@ -181,6 +181,18 @@ class BoundaryScanner:
         "api_key",
         "password",
         "token",
+    }
+
+    # Patterns for content scanning (high confidence prefixes)
+    SECRET_CONTENT_PATTERNS = {
+        "sk-ant-": "Anthropic API Key",
+        "sk-proj-": "OpenAI Project Key",
+        "sk-live-": "Stripe/OpenAI Live Key",
+        "ghp_": "GitHub Personal Access Token",
+        "gho_": "GitHub OAuth Token",
+        "xoxb-": "Slack Bot Token",
+        "xoxp-": "Slack User Token",
+        "glpat-": "GitLab Personal Access Token",
     }
 
     def __init__(
@@ -365,6 +377,9 @@ class BoundaryScanner:
 
         for file_path in current.changed_files:
             file_lower = file_path.lower()
+
+            # 1. Check filename patterns
+            filename_match = False
             for pattern in self.SECRET_PATTERNS:
                 if pattern in file_lower:
                     violations.append(
@@ -373,12 +388,50 @@ class BoundaryScanner:
                             severity=ViolationSeverity.WARNING,
                             path=file_path,
                             operation="modify",
-                            detail=f"File {file_path} may contain secrets (matched '{pattern}')",
+                            detail=f"File {file_path} name matches secret pattern '{pattern}'",
                             step_id=self._step_id,
                             remediation="Review file for sensitive data before committing.",
                         )
                     )
+                    filename_match = True
                     break  # Only one warning per file
+
+            # 2. Check content for high-confidence secrets
+            # Only check if it's not already flagged (or check anyway? let's check anyway as content is worse)
+            # Actually, let's allow both.
+
+            try:
+                # Use _repo_root because changed_files are relative to it
+                # In shadow mode, this reads from the repo location (which is what we want)
+                abs_path = (self._repo_root / file_path).resolve()
+                if not abs_path.exists() or not abs_path.is_file():
+                    continue
+
+                # Skip if file is too large (> 1MB) to prevent performance issues
+                if abs_path.stat().st_size > 1024 * 1024:
+                    continue
+
+                # Read text (ignore binary files)
+                content = abs_path.read_text(encoding="utf-8")
+
+                for pattern, desc in self.SECRET_CONTENT_PATTERNS.items():
+                    if pattern in content:
+                        violations.append(
+                            Violation(
+                                type=ViolationType.SECRET_EXPOSURE,
+                                severity=ViolationSeverity.CRITICAL,
+                                path=file_path,
+                                operation="content_scan",
+                                detail=f"File {file_path} contains potential {desc} ('{pattern}...')",
+                                step_id=self._step_id,
+                                remediation="REMOVE THIS SECRET IMMEDIATELY. Use environment variables.",
+                            )
+                        )
+                        break  # Stop after first secret found in file
+
+            except (UnicodeDecodeError, OSError):
+                # Skip binary files or unreadable files
+                pass
 
         return violations
 
