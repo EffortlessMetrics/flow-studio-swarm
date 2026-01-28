@@ -300,52 +300,81 @@ class RunService:
 
         # Fast path: Work with IDs first, using set for deduplication
         seen_ids: set[str] = set()
-        all_ids: List[str] = []
 
         # Examples first (sorted by ID descending)
+        example_ids = []
         if include_examples:
             example_ids = storage.discover_example_runs()
             example_ids.sort(reverse=True)
-            for rid in example_ids:
-                if rid not in seen_ids:
-                    seen_ids.add(rid)
-                    all_ids.append(rid)
 
-        if include_legacy:
-            active_ids, legacy_ids = storage.scan_runs()
-        else:
-            active_ids = storage.list_runs()
-            legacy_ids = []
+        # Optimization: Use list_potential_runs to avoid checking every file
+        # This returns all directory names in runs/ without verification
+        other_ids = storage.list_potential_runs()
+        # Sort by ID descending (Assumption: run_id lexicographical order ~= chronological order)
+        other_ids.sort(reverse=True)
 
-        # Combine active and legacy, sort by ID descending
-        # Assumption: run_id lexicographical order ~= chronological order
-        other_ids = sorted(active_ids + legacy_ids, reverse=True)
-
-        for rid in other_ids:
-            if rid not in seen_ids:
-                seen_ids.add(rid)
-                all_ids.append(rid)
-
-        total = len(all_ids)
-        sliced_ids = all_ids[offset : offset + limit]
+        # Total count (Approximation: assumes potentially valid runs)
+        # We overestimate total to avoid checking every file
+        total = len(example_ids) + len(other_ids)
 
         summaries = []
-        # Create sets for fast lookups during summary creation
-        example_set = set(storage.discover_example_runs()) if include_examples else set()
-        legacy_set = set(legacy_ids)
+        skipped = 0
 
-        for rid in sliced_ids:
-            summary = None
+        # 1. Process Examples
+        for rid in example_ids:
+            if rid in seen_ids:
+                continue
+            seen_ids.add(rid)
 
-            if rid in example_set:
-                summary = self._create_legacy_summary(rid, is_example=True)
-            else:
-                summary = storage.read_summary(rid)
-                if not summary and rid in legacy_set:
-                    summary = self._create_legacy_summary(rid, is_example=False)
+            # Examples are assumed valid if discover_example_runs returned them
+            if skipped < offset:
+                skipped += 1
+                continue
 
+            summary = self._create_legacy_summary(rid, is_example=True)
             if summary:
                 summaries.append(summary)
+                if len(summaries) >= limit:
+                    break
+
+        # 2. Process Potential Runs (if we still need more items)
+        if len(summaries) < limit:
+            for rid in other_ids:
+                if rid in seen_ids:
+                    continue
+
+                # Check validity efficiently using stat calls (avoids parsing JSON)
+                is_valid = False
+                if storage.run_exists(rid):
+                    is_valid = True
+                elif include_legacy and storage.is_legacy_run(rid):
+                    is_valid = True
+
+                if not is_valid:
+                    continue
+
+                # It's a valid run (active or legacy)
+                if skipped < offset:
+                    skipped += 1
+                    seen_ids.add(rid)
+                    continue
+
+                # We are in the "take" window
+                summary = None
+
+                # Try to load as active run first
+                if storage.run_exists(rid):
+                    summary = storage.read_summary(rid)
+
+                # If failed and legacy allowed, try to load as legacy run
+                if not summary and include_legacy:
+                    summary = self._create_legacy_summary(rid, is_example=False)
+
+                if summary:
+                    summaries.append(summary)
+                    seen_ids.add(rid)
+                    if len(summaries) >= limit:
+                        break
 
         return summaries, total
 

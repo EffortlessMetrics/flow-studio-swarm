@@ -339,6 +339,31 @@ def run_exists(run_id: RunId, runs_dir: Path = RUNS_DIR) -> bool:
     return (run_path / META_FILE).exists()
 
 
+def is_legacy_run(run_id: RunId, runs_dir: Path = RUNS_DIR) -> bool:
+    """Check if a run is a legacy run (no meta.json, but has flow artifacts).
+
+    Args:
+        run_id: The unique run identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        True if the run is legacy, False otherwise.
+    """
+    run_path = get_run_path(run_id, runs_dir)
+    if not run_path.exists() or not run_path.is_dir():
+        return False
+
+    # Not legacy if it has meta.json
+    if (run_path / META_FILE).exists():
+        return False
+
+    for flow_key in LEGACY_FLOW_KEYS:
+        if (run_path / flow_key).is_dir():
+            return True
+
+    return False
+
+
 def create_run_dir(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Path:
     """Create the run directory structure.
 
@@ -818,6 +843,27 @@ def summarize_navigator_events(
 # -----------------------------------------------------------------------------
 # Run Listing
 # -----------------------------------------------------------------------------
+
+
+def list_potential_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """List all subdirectories in runs_dir without verifying contents.
+
+    Fast version of list_runs() for pagination. Does not check for meta.json.
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of directory names, sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    try:
+        # Just return directory names
+        return sorted([entry.name for entry in os.scandir(runs_dir) if entry.is_dir()])
+    except OSError:
+        return []
 
 
 def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
