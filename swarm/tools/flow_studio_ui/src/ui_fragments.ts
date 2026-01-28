@@ -22,7 +22,10 @@ export function renderNoRuns(): string {
       <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">No runs yet</p>
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
-      <code class="mono fs-empty-command">make demo-run</code>
+      <div class="fs-copy-command">
+        <code class="mono fs-empty-command">make demo-run</code>
+        <button class="fs-icon-button copy-button" title="Copy command" onclick="navigator.clipboard.writeText('make demo-run'); this.textContent='\u2713'; setTimeout(() => this.textContent='\uD83D\uDCCB', 2000)">\uD83D\uDCCB</button>
+      </div>
     </div>
   `;
 }
