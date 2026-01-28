@@ -820,6 +820,34 @@ def summarize_navigator_events(
 # -----------------------------------------------------------------------------
 
 
+def list_potential_runs(runs_dir: Path = RUNS_DIR) -> List[str]:
+    """List all subdirectories in runs_dir without verifying run validity.
+
+    This is significantly faster than list_runs() or scan_runs() because it
+    avoids performing file existence checks (meta.json) for every directory.
+    It should be used for pagination where we only want to load metadata
+    for the requested slice of runs.
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of directory names found in runs_dir, unsorted.
+        Returns empty list if runs_dir doesn't exist.
+    """
+    if not runs_dir.exists():
+        return []
+
+    try:
+        # os.scandir is efficient as it avoids Path object overhead
+        with os.scandir(runs_dir) as it:
+            return [entry.name for entry in it if entry.is_dir()]
+    except OSError:
+        pass
+
+    return []
+
+
 def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     """List all run IDs that have meta.json files.
 
