@@ -611,10 +611,11 @@ function attachActionHandlers(modal: HTMLElement, runId: string, summary?: Exten
   }
 
   // Re-run button
-  const rerunBtn = modal.querySelector("#run-detail-rerun-btn");
+  const rerunBtn = modal.querySelector("#run-detail-rerun-btn") as HTMLButtonElement | null;
   if (rerunBtn) {
+    rerunBtn.dataset.uiid = "flow_studio.modal.run_detail.rerun";
     rerunBtn.addEventListener("click", async () => {
-      const btn = rerunBtn as HTMLButtonElement;
+      const btn = rerunBtn;
       btn.disabled = true;
       btn.textContent = "Starting...";
 
