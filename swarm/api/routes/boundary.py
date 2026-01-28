@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from swarm.config.flow_registry import get_flow_order
+from swarm.runtime.safe_paths import validate_path_component
 from swarm.runtime.storage import find_run_path
 
 logger = logging.getLogger(__name__)
@@ -398,7 +399,21 @@ async def get_boundary_review(
 
     Raises:
         404: Run not found.
+        400: Invalid flow key.
     """
+    if flow_key:
+        try:
+            validate_path_component(flow_key, "flow_key")
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_flow_key",
+                    "message": str(e),
+                    "details": {"flow_key": flow_key},
+                },
+            )
+
     # Find run path (checks both runs/ and examples/)
     run_base = find_run_path(run_id)
     if run_base is None:
