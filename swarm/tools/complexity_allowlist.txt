@@ -5,3 +5,4 @@ swarm/runtime/backends.py | 2026-02-28 | Large backend implementations, needs sp
 tests/test_flow_order_guardrail.py | 2026-02-28 | Test file complexity (AUTO-001)
 tests/test_flow_studio_ui_ids.py | 2026-02-28 | Test file complexity (AUTO-001)
 tests/test_shadow_fork.py | 2026-02-28 | Test file complexity (AUTO-001)
+swarm/tools/lint_routing_fields.py | 2026-02-28 | Lint tool complexity (AUTO-001)
