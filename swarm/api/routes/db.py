@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/db", tags=["database"])
@@ -171,16 +173,26 @@ async def rebuild_database(request: DBRebuildRequest):
                 "errors": [],
             }
             for run_id in request.run_ids:
-                result = db.rebuild_from_events_safe(run_id)
-                total_stats["runs_processed"] += 1
-                if result.get("success"):
-                    total_stats["runs_succeeded"] += 1
-                    total_stats["events_ingested"] += result.get("events_ingested", 0)
-                else:
+                try:
+                    run_id = validate_path_component(run_id)
+                    result = db.rebuild_from_events_safe(run_id)
+                    total_stats["runs_processed"] += 1
+                    if result.get("success"):
+                        total_stats["runs_succeeded"] += 1
+                        total_stats["events_ingested"] += result.get("events_ingested", 0)
+                    else:
+                        total_stats["errors"].append(
+                            {
+                                "run_id": run_id,
+                                "error": result.get("error", "Unknown error"),
+                            }
+                        )
+                except ValueError as e:
+                    total_stats["runs_processed"] += 1
                     total_stats["errors"].append(
                         {
                             "run_id": run_id,
-                            "error": result.get("error", "Unknown error"),
+                            "error": str(e),
                         }
                     )
             stats = total_stats
@@ -283,6 +295,11 @@ async def ingest_run_events(run_id: str):
     Returns:
         Dict with ingestion statistics.
     """
+    try:
+        run_id = validate_path_component(run_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     try:
         from swarm.runtime.resilient_db import get_resilient_db
 
