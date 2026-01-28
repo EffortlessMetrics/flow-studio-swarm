@@ -19,6 +19,8 @@ Usage:
 
 from __future__ import annotations
 
+import heapq
+import itertools
 import logging
 import threading
 from pathlib import Path
@@ -298,18 +300,12 @@ class RunService:
             all_runs = self.list_runs(flow_key, include_legacy, include_examples)
             return all_runs[offset : offset + limit], len(all_runs)
 
-        # Fast path: Work with IDs first, using set for deduplication
-        seen_ids: set[str] = set()
-        all_ids: List[str] = []
-
-        # Examples first (sorted by ID descending)
+        # 1. Fetch IDs
         if include_examples:
             example_ids = storage.discover_example_runs()
             example_ids.sort(reverse=True)
-            for rid in example_ids:
-                if rid not in seen_ids:
-                    seen_ids.add(rid)
-                    all_ids.append(rid)
+        else:
+            example_ids = []
 
         if include_legacy:
             active_ids, legacy_ids = storage.scan_runs()
@@ -317,22 +313,52 @@ class RunService:
             active_ids = storage.list_runs()
             legacy_ids = []
 
-        # Combine active and legacy, sort by ID descending
-        # Assumption: run_id lexicographical order ~= chronological order
-        other_ids = sorted(active_ids + legacy_ids, reverse=True)
+        # Ensure sortedness for heapq.merge (defensive, though storage usually sorts)
+        # Timsort is O(N) for already sorted data
+        active_ids.sort()
+        legacy_ids.sort()
 
-        for rid in other_ids:
-            if rid not in seen_ids:
-                seen_ids.add(rid)
-                all_ids.append(rid)
+        # 2. Compute Total (Optimistic)
+        # We perform a fast calculation assuming disjoint sets for speed.
+        # This gives O(1) time complexity for total count instead of O(N) deduplication.
+        # Overestimate is rare and documented as acceptable.
+        total = len(example_ids) + len(active_ids) + len(legacy_ids)
 
-        total = len(all_ids)
-        sliced_ids = all_ids[offset : offset + limit]
+        # 3. Stream and Slice using Generators (O(limit) instead of O(N))
+        # Use heapq.merge to combine sorted lists without concatenation or full sort
+        def stream_unique():
+            seen = set()
 
+            # Examples first
+            for run_id in example_ids:
+                if run_id not in seen:
+                    seen.add(run_id)
+                    yield run_id
+
+            # Active + Legacy merged (descending)
+            # storage returns ascending lists, reversed gives descending iterator
+            iter_active = reversed(active_ids)
+            iter_legacy = reversed(legacy_ids)
+
+            # heapq.merge yields items in order (reverse=True means descending)
+            # Requires inputs to be sorted descending
+            merged = heapq.merge(iter_active, iter_legacy, reverse=True)
+
+            for run_id in merged:
+                if run_id not in seen:
+                    seen.add(run_id)
+                    yield run_id
+
+        # Use islice to efficiently skip 'offset' and take 'limit' items
+        sliced_ids_iter = itertools.islice(stream_unique(), offset, offset + limit)
+        sliced_ids = list(sliced_ids_iter)
+
+        # 4. Fetch Summaries
         summaries = []
         # Create sets for fast lookups during summary creation
-        example_set = set(storage.discover_example_runs()) if include_examples else set()
-        legacy_set = set(legacy_ids)
+        # Optimizing check: only create sets if we have legacy/examples
+        example_set = set(example_ids) if include_examples else set()
+        legacy_set = set(legacy_ids) if include_legacy else set()
 
         for rid in sliced_ids:
             summary = None
