@@ -427,6 +427,7 @@ class TestRunService:
             storage.write_summary(run_id, summary, runs_dir=tmp_path)
 
         # Mock storage functions to use only our test runs
+        monkeypatch.setattr(storage, "list_potential_runs", lambda runs_dir=None: run_ids)
         monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
         monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
         monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
@@ -481,6 +482,7 @@ class TestRunService:
             storage.write_summary(run_id, summary, runs_dir=tmp_path)
 
         # Mock storage functions to use only our test runs
+        monkeypatch.setattr(storage, "list_potential_runs", lambda runs_dir=None: run_ids)
         monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
         monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
         monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])

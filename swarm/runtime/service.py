@@ -311,15 +311,10 @@ class RunService:
                     seen_ids.add(rid)
                     all_ids.append(rid)
 
-        if include_legacy:
-            active_ids, legacy_ids = storage.scan_runs()
-        else:
-            active_ids = storage.list_runs()
-            legacy_ids = []
-
-        # Combine active and legacy, sort by ID descending
-        # Assumption: run_id lexicographical order ~= chronological order
-        other_ids = sorted(active_ids + legacy_ids, reverse=True)
+        # Get all potential runs without expensive checks
+        # We'll filter out invalid ones when creating summaries
+        all_potential_ids = storage.list_potential_runs()
+        other_ids = sorted(all_potential_ids, reverse=True)
 
         for rid in other_ids:
             if rid not in seen_ids:
@@ -332,7 +327,6 @@ class RunService:
         summaries = []
         # Create sets for fast lookups during summary creation
         example_set = set(storage.discover_example_runs()) if include_examples else set()
-        legacy_set = set(legacy_ids)
 
         for rid in sliced_ids:
             summary = None
@@ -341,7 +335,9 @@ class RunService:
                 summary = self._create_legacy_summary(rid, is_example=True)
             else:
                 summary = storage.read_summary(rid)
-                if not summary and rid in legacy_set:
+                # If read_summary fails (no meta.json), check if it's a legacy run
+                # but only if legacy runs are included
+                if not summary and include_legacy:
                     summary = self._create_legacy_summary(rid, is_example=False)
 
             if summary:
