@@ -428,6 +428,9 @@ class TestRunService:
 
         # Mock storage functions to use only our test runs
         monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "list_potential_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "run_exists", lambda rid, runs_dir=None: rid in run_ids)
+        monkeypatch.setattr(storage, "is_legacy_run", lambda rid, runs_dir=None: False)
         monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
         monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
         monkeypatch.setattr(storage, "scan_runs", lambda runs_dir=None: (run_ids, []))
@@ -482,6 +485,9 @@ class TestRunService:
 
         # Mock storage functions to use only our test runs
         monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "list_potential_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "run_exists", lambda rid, runs_dir=None: rid in run_ids)
+        monkeypatch.setattr(storage, "is_legacy_run", lambda rid, runs_dir=None: False)
         monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
         monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
         monkeypatch.setattr(storage, "scan_runs", lambda runs_dir=None: (run_ids, []))
