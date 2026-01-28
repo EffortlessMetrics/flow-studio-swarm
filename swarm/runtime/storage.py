@@ -820,6 +820,35 @@ def summarize_navigator_events(
 # -----------------------------------------------------------------------------
 
 
+def list_potential_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """List all potential run IDs (all subdirectories in runs_dir).
+
+    This function does NOT check for existence of meta.json or other files,
+    making it extremely fast compared to list_runs() or scan_runs().
+    It is intended for use with pagination where validity checks can be
+    deferred to the few items actually returned.
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of directory names in runs_dir, sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    run_ids: List[RunId] = []
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    run_ids.append(entry.name)
+    except OSError:
+        pass
+
+    return sorted(run_ids)
+
+
 def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     """List all run IDs that have meta.json files.
 
