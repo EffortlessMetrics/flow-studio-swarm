@@ -115,7 +115,10 @@ export async function selectSearchResult(index: number): Promise<void> {
 
   closeSearchDropdown();
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
-  if (searchInput) searchInput.value = "";
+  if (searchInput) {
+    searchInput.value = "";
+    toggleClearButton();
+  }
 
   const cy = getCy();
 
@@ -164,10 +167,21 @@ export async function selectSearchResult(index: number): Promise<void> {
 export function initSearchHandlers(): void {
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
   const dropdown = document.getElementById("search-dropdown");
+  const clearBtn = document.getElementById("search-clear");
 
   if (!searchInput) return;
 
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      closeSearchDropdown();
+      toggleClearButton();
+      searchInput.focus();
+    });
+  }
+
   searchInput.addEventListener("input", (e: Event) => {
+    toggleClearButton();
     if (state.searchDebounceTimer) {
       clearTimeout(state.searchDebounceTimer);
     }
@@ -235,4 +249,15 @@ export function initSearchHandlers(): void {
 export function focusSearch(): void {
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
   if (searchInput) searchInput.focus();
+}
+
+/**
+ * Toggle the clear button visibility.
+ */
+function toggleClearButton(): void {
+  const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
+  const clearBtn = document.getElementById("search-clear");
+  if (searchInput && clearBtn) {
+    clearBtn.style.display = searchInput.value.length > 0 ? "block" : "none";
+  }
 }
