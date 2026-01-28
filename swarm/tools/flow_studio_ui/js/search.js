@@ -100,8 +100,12 @@ export async function selectSearchResult(index) {
         return;
     closeSearchDropdown();
     const searchInput = document.getElementById("search-input");
-    if (searchInput)
+    if (searchInput) {
         searchInput.value = "";
+        const searchClear = document.getElementById("search-clear");
+        if (searchClear)
+            searchClear.style.display = "none";
+    }
     const cy = getCy();
     if (result.type === "flow") {
         if (_setActiveFlow)
@@ -151,10 +155,25 @@ export async function selectSearchResult(index) {
  */
 export function initSearchHandlers() {
     const searchInput = document.getElementById("search-input");
+    const searchClear = document.getElementById("search-clear");
     const dropdown = document.getElementById("search-dropdown");
     if (!searchInput)
         return;
+    const toggleClearButton = () => {
+        if (searchClear) {
+            searchClear.style.display = searchInput.value.length > 0 ? "flex" : "none";
+        }
+    };
+    if (searchClear) {
+        searchClear.addEventListener("click", () => {
+            searchInput.value = "";
+            searchInput.focus();
+            toggleClearButton();
+            closeSearchDropdown();
+        });
+    }
     searchInput.addEventListener("input", (e) => {
+        toggleClearButton();
         if (state.searchDebounceTimer) {
             clearTimeout(state.searchDebounceTimer);
         }
@@ -163,6 +182,8 @@ export function initSearchHandlers() {
         // Optimization: Increased debounce from 200ms to 300ms to reduce API calls while typing
         state.searchDebounceTimer = setTimeout(() => performSearch(query), 300);
     });
+    // Initial state check
+    toggleClearButton();
     searchInput.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
             closeSearchDropdown();

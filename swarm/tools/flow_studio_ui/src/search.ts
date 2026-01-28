@@ -115,7 +115,11 @@ export async function selectSearchResult(index: number): Promise<void> {
 
   closeSearchDropdown();
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
-  if (searchInput) searchInput.value = "";
+  if (searchInput) {
+    searchInput.value = "";
+    const searchClear = document.getElementById("search-clear") as HTMLButtonElement | null;
+    if (searchClear) searchClear.style.display = "none";
+  }
 
   const cy = getCy();
 
@@ -163,11 +167,28 @@ export async function selectSearchResult(index: number): Promise<void> {
  */
 export function initSearchHandlers(): void {
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
+  const searchClear = document.getElementById("search-clear") as HTMLButtonElement | null;
   const dropdown = document.getElementById("search-dropdown");
 
   if (!searchInput) return;
 
+  const toggleClearButton = () => {
+    if (searchClear) {
+      searchClear.style.display = searchInput.value.length > 0 ? "flex" : "none";
+    }
+  };
+
+  if (searchClear) {
+    searchClear.addEventListener("click", () => {
+      searchInput.value = "";
+      searchInput.focus();
+      toggleClearButton();
+      closeSearchDropdown();
+    });
+  }
+
   searchInput.addEventListener("input", (e: Event) => {
+    toggleClearButton();
     if (state.searchDebounceTimer) {
       clearTimeout(state.searchDebounceTimer);
     }
@@ -176,6 +197,9 @@ export function initSearchHandlers(): void {
     // Optimization: Increased debounce from 200ms to 300ms to reduce API calls while typing
     state.searchDebounceTimer = setTimeout(() => performSearch(query), 300);
   });
+
+  // Initial state check
+  toggleClearButton();
 
   searchInput.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key === "Escape") {
