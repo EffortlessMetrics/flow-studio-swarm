@@ -537,6 +537,10 @@ function attachActionHandlers(modal, runId, summary) {
     // Re-run button
     const rerunBtn = modal.querySelector("#run-detail-rerun-btn");
     if (rerunBtn) {
+        // Ensure data-uiid is set (fallback if HTML doesn't have it)
+        if (!rerunBtn.getAttribute("data-uiid")) {
+            rerunBtn.setAttribute("data-uiid", "flow_studio.modal.run_detail.rerun");
+        }
         rerunBtn.addEventListener("click", async () => {
             const btn = rerunBtn;
             btn.disabled = true;
