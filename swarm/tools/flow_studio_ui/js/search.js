@@ -7,6 +7,7 @@
 // - Search result selection and navigation
 import { state } from "./state.js";
 import { Api } from "./api.js";
+import { escapeHtml } from "./utils.js";
 // ============================================================================
 // Module configuration - callbacks set by consumer
 // ============================================================================
@@ -56,14 +57,25 @@ export async function performSearch(query) {
  */
 export function renderSearchResults(results) {
     const dropdown = document.getElementById("search-dropdown");
+    const searchInput = document.getElementById("search-input");
     if (!dropdown)
         return;
+    // Clear existing content safely
+    dropdown.innerHTML = "";
     if (!results.length) {
-        dropdown.innerHTML = '<div class="search-no-results">No results found</div>';
+        const noResults = document.createElement("div");
+        noResults.className = "search-no-results";
+        noResults.textContent = "No results found";
+        dropdown.appendChild(noResults);
         dropdown.classList.add("open");
+        if (searchInput) {
+            searchInput.setAttribute("aria-expanded", "true");
+            searchInput.removeAttribute("aria-activedescendant");
+        }
         return;
     }
-    dropdown.innerHTML = results.map((r, idx) => {
+    const fragment = document.createDocumentFragment();
+    results.forEach((r, idx) => {
         const typeClass = r.type;
         let label = r.label;
         if (r.type === "step") {
@@ -72,12 +84,37 @@ export function renderSearchResults(results) {
         else if (r.type === "artifact") {
             label = r.flow + " / " + (r.file || r.label);
         }
-        return '<div class="search-result' + (idx === state.searchSelectedIndex ? ' selected' : '') + '" data-index="' + idx + '">' +
-            '<span class="search-result-type ' + typeClass + '">' + r.type + '</span>' +
-            '<span class="search-result-label">' + label + '</span>' +
-            '</div>';
-    }).join("");
+        const item = document.createElement("div");
+        item.className = "search-result";
+        if (idx === state.searchSelectedIndex) {
+            item.classList.add("selected");
+            item.setAttribute("aria-selected", "true");
+            // Update aria-activedescendant on input
+            if (searchInput) {
+                searchInput.setAttribute("aria-activedescendant", `search-result-${idx}`);
+            }
+        }
+        else {
+            item.setAttribute("aria-selected", "false");
+        }
+        item.setAttribute("role", "option");
+        item.setAttribute("data-index", String(idx));
+        item.id = `search-result-${idx}`;
+        const typeSpan = document.createElement("span");
+        typeSpan.className = `search-result-type ${escapeHtml(typeClass)}`;
+        typeSpan.textContent = r.type;
+        item.appendChild(typeSpan);
+        const labelSpan = document.createElement("span");
+        labelSpan.className = "search-result-label";
+        labelSpan.textContent = label;
+        item.appendChild(labelSpan);
+        fragment.appendChild(item);
+    });
+    dropdown.appendChild(fragment);
     dropdown.classList.add("open");
+    if (searchInput) {
+        searchInput.setAttribute("aria-expanded", "true");
+    }
     // Click handlers are managed via event delegation in initSearchHandlers
 }
 /**
@@ -87,6 +124,11 @@ export function closeSearchDropdown() {
     const dropdown = document.getElementById("search-dropdown");
     if (dropdown) {
         dropdown.classList.remove("open");
+    }
+    const searchInput = document.getElementById("search-input");
+    if (searchInput) {
+        searchInput.setAttribute("aria-expanded", "false");
+        searchInput.removeAttribute("aria-activedescendant");
     }
     state.searchSelectedIndex = -1;
     state.searchResults = [];
@@ -154,6 +196,12 @@ export function initSearchHandlers() {
     const dropdown = document.getElementById("search-dropdown");
     if (!searchInput)
         return;
+    // Initialize ARIA attributes for Combobox pattern
+    searchInput.setAttribute("role", "combobox");
+    searchInput.setAttribute("aria-autocomplete", "list");
+    searchInput.setAttribute("aria-haspopup", "listbox");
+    searchInput.setAttribute("aria-expanded", "false");
+    searchInput.setAttribute("aria-controls", "search-dropdown");
     searchInput.addEventListener("input", (e) => {
         if (state.searchDebounceTimer) {
             clearTimeout(state.searchDebounceTimer);
