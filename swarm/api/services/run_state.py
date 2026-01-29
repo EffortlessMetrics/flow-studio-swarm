@@ -174,12 +174,24 @@ class RunStateManager:
             if len(runs) >= limit:
                 break
 
-            state_path = run_dir / "run_state.json"
-            if not state_path.exists():
-                continue
+            run_id = run_dir.name
+            state = None
 
-            try:
-                state = json.loads(state_path.read_text(encoding="utf-8"))
+            # Check cache first
+            if run_id in self._cache:
+                state = self._cache[run_id]
+            else:
+                state_path = run_dir / "run_state.json"
+                if not state_path.exists():
+                    continue
+
+                try:
+                    state = json.loads(state_path.read_text(encoding="utf-8"))
+                except Exception as e:
+                    logger.warning("Failed to load run state %s: %s", run_dir, e)
+                    continue
+
+            if state is not None:
                 runs.append(
                     {
                         "run_id": state.get("run_id", run_dir.name),
@@ -190,8 +202,6 @@ class RunStateManager:
                         "timestamp": state.get("created_at"),
                     }
                 )
-            except Exception as e:
-                logger.warning("Failed to load run state %s: %s", run_dir, e)
 
         return runs
 
