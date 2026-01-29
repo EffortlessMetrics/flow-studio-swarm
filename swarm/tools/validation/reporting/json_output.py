@@ -131,9 +131,15 @@ def build_detailed_json_output(
 
     # Lazy import to support running validator in test repos without swarm/config/
     try:
-        from swarm.config.flow_registry import get_flow_keys
+        from swarm.config.flow_registry import get_flow_keys, get_flow_order
 
-        flow_keys = get_flow_keys()
+        # Try to use order first, then keys
+        # We prefer order as it includes core flows even if not configured
+        try:
+            flow_keys = get_flow_order()
+        except Exception:
+            flow_keys = get_flow_keys()
+
     except ImportError:
         # Fallback: use canonical 7-flow keys if registry not available
         flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]

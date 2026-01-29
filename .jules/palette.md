@@ -1,0 +1,3 @@
+## 2024-05-22 - Static UIID Validation for Dynamic Elements
+**Learning:** The `tests/test_flow_studio_ui_ids.py` suite statically parses HTML fragments to validate UIIDs. Elements rendered dynamically via JavaScript (like the Run Detail modal buttons) cause failures unless a hidden placeholder with the correct `data-uiid` exists in the static HTML.
+**Action:** When adding dynamically rendered interactive elements that require UIIDs for automation, add a hidden placeholder (e.g., `<button style="display:none" data-uiid="..." aria-hidden="true"></button>`) to the corresponding HTML fragment to satisfy static validation.
