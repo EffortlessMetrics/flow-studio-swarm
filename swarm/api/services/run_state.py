@@ -145,8 +145,16 @@ class RunStateManager:
 
         self._cache[run_id] = state
 
-    def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
+    async def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
         """List recent runs.
+
+        Async wrapper around _list_runs_sync to avoid blocking the event loop
+        during directory scanning and file I/O.
+        """
+        return await asyncio.to_thread(self._list_runs_sync, limit=limit)
+
+    def _list_runs_sync(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """List recent runs (synchronous implementation).
 
         Uses os.scandir for efficient directory traversal.
         Optimized to sort by mtime BEFORE checking file existence,
