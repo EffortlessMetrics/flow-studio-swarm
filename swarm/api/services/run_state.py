@@ -110,7 +110,8 @@ class RunStateManager:
         """Get run state with ETag."""
         validate_path_component(run_id, "run_id")
         async with self._get_lock(run_id):
-            return self._get_run_unlocked(run_id)
+            # Offload blocking file I/O to a thread. Safe because lock ensures exclusive access to this run_id.
+            return await asyncio.to_thread(self._get_run_unlocked, run_id)
 
     async def update_run(
         self,
@@ -135,14 +136,18 @@ class RunStateManager:
 
     async def _save_state(self, run_id: str, state: Dict[str, Any]) -> None:
         """Save state to disk and cache."""
-        state_path = self._state_path(run_id)
-        state_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write atomically
-        tmp_path = state_path.with_suffix(".tmp")
-        tmp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
-        os.replace(tmp_path, state_path)
+        def _write_to_disk() -> None:
+            state_path = self._state_path(run_id)
+            state_path.parent.mkdir(parents=True, exist_ok=True)
 
+            # Write atomically
+            tmp_path = state_path.with_suffix(".tmp")
+            tmp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            os.replace(tmp_path, state_path)
+
+        # Offload blocking file writes to a thread
+        await asyncio.to_thread(_write_to_disk)
         self._cache[run_id] = state
 
     def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:

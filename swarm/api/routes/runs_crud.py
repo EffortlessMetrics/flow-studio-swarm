@@ -12,6 +12,8 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+import asyncio
+
 from fastapi import APIRouter, Header, HTTPException, Response
 from fastapi.responses import JSONResponse
 
@@ -82,7 +84,8 @@ async def list_runs(limit: int = 20):
         List of run summaries.
     """
     state_manager = get_state_manager()
-    runs = state_manager.list_runs(limit=limit)
+    # Offload blocking I/O (scandir, file reads) to a thread to avoid blocking the event loop
+    runs = await asyncio.to_thread(state_manager.list_runs, limit=limit)
     return RunListResponse(runs=[RunSummary(**r) for r in runs])
 
 
