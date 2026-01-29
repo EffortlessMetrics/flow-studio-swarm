@@ -152,8 +152,16 @@ export async function selectSearchResult(index) {
 export function initSearchHandlers() {
     const searchInput = document.getElementById("search-input");
     const dropdown = document.getElementById("search-dropdown");
+    const clearButton = document.getElementById("search-clear");
     if (!searchInput)
         return;
+    if (clearButton) {
+        clearButton.addEventListener("click", () => {
+            searchInput.value = "";
+            closeSearchDropdown();
+            searchInput.focus();
+        });
+    }
     searchInput.addEventListener("input", (e) => {
         if (state.searchDebounceTimer) {
             clearTimeout(state.searchDebounceTimer);
