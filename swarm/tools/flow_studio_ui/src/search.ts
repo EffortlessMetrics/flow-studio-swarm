@@ -167,6 +167,18 @@ export function initSearchHandlers(): void {
 
   if (!searchInput) return;
 
+  const clearButton = document.getElementById("search-clear");
+  if (clearButton) {
+    clearButton.addEventListener("click", () => {
+      if (state.searchDebounceTimer) {
+        clearTimeout(state.searchDebounceTimer);
+      }
+      searchInput.value = "";
+      searchInput.focus();
+      closeSearchDropdown();
+    });
+  }
+
   searchInput.addEventListener("input", (e: Event) => {
     if (state.searchDebounceTimer) {
       clearTimeout(state.searchDebounceTimer);
