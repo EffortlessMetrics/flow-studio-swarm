@@ -18,6 +18,8 @@ from typing import Any, AsyncGenerator, Dict, Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/runs", tags=["events"])
@@ -366,6 +368,19 @@ async def stream_run_events(run_id: str, request: Request):
         check_db_health()
     except Exception as e:
         logger.warning("DB health check failed on SSE connect: %s", e)
+
+    # Validate run_id to prevent path traversal
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "validation_error",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
 
     # Verify run exists
     run_dir = runs_root / run_id

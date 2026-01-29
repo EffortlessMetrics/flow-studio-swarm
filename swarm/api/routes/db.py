@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/db", tags=["database"])
@@ -171,6 +173,18 @@ async def rebuild_database(request: DBRebuildRequest):
                 "errors": [],
             }
             for run_id in request.run_ids:
+                # Validate run_id to prevent path traversal
+                try:
+                    validate_path_component(run_id, "run_id")
+                except ValueError as e:
+                    total_stats["errors"].append(
+                        {
+                            "run_id": run_id,
+                            "error": str(e),
+                        }
+                    )
+                    continue
+
                 result = db.rebuild_from_events_safe(run_id)
                 total_stats["runs_processed"] += 1
                 if result.get("success"):
@@ -283,6 +297,19 @@ async def ingest_run_events(run_id: str):
     Returns:
         Dict with ingestion statistics.
     """
+    # Validate run_id to prevent path traversal
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "validation_error",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
     try:
         from swarm.runtime.resilient_db import get_resilient_db
 
