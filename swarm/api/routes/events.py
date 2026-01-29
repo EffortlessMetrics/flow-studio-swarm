@@ -355,6 +355,19 @@ async def stream_run_events(run_id: str, request: Request):
         event: run:completed
         data: {"run_id": "abc123", "status": "succeeded"}
     """
+    # Validate run_id to prevent path traversal
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "validation_error",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
     # Get runs root from spec manager
     from ..server import get_spec_manager
 
@@ -368,19 +381,6 @@ async def stream_run_events(run_id: str, request: Request):
         check_db_health()
     except Exception as e:
         logger.warning("DB health check failed on SSE connect: %s", e)
-
-    # Validate run_id to prevent path traversal
-    try:
-        validate_path_component(run_id, "run_id")
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "validation_error",
-                "message": str(e),
-                "details": {"run_id": run_id},
-            },
-        )
 
     # Verify run exists
     run_dir = runs_root / run_id
