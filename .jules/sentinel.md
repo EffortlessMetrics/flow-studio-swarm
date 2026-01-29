@@ -1,0 +1,4 @@
+## 2026-01-29 - Path Traversal in DB and Events Endpoints
+**Vulnerability:** Path traversal in `rebuild_database` (JSON body) and potential risk in `ingest`/`events` (path params).
+**Learning:** `rebuild_database` iterating over a JSON list of IDs was vulnerable to path traversal because JSON body values are not sanitized by routing logic. FastAPI path parameters (e.g., `{run_id}`) mitigates simple traversal by rejecting slashes in single-segment parameters, but defense-in-depth via explicit validation is crucial.
+**Prevention:** Always explicitly validate file system identifiers using `validate_path_component`, especially when they come from JSON bodies or query parameters. Ensure `HTTPException` is re-raised when catching generic exceptions in API handlers to prevent masking 400 errors as 200 OK failures.
