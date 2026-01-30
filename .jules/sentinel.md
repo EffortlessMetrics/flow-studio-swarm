@@ -1,0 +1,4 @@
+## 2026-01-30 - Path Traversal in Run Artifact Endpoints
+**Vulnerability:** Found multiple endpoints (`/api/db/rebuild`, `/api/runs/{id}/events`, `/api/evolution/apply`, `/api/wisdom/...`) that constructed file paths by concatenating a user-provided `run_id` with a base directory without validation. This allowed path traversal (e.g., `../../malicious_run`).
+**Learning:** Developers assumed `run_id` would be a safe identifier, but it comes directly from user input (path params or JSON body). The `TestClient` used in tests automatically normalizes paths, masking the vulnerability in some integration tests.
+**Prevention:** Always validate path components using `swarm.runtime.safe_paths.validate_path_component` before using them in file operations. Ensure API tests bypass client-side normalization where possible (e.g., using JSON bodies) or use raw sockets if needed.
