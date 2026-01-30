@@ -325,6 +325,8 @@
     <button class="selftest-modal-close" id="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
+      <!-- Placeholder for static validation -->
+      <button style="display: none;" data-uiid="flow_studio.modal.run_detail.rerun"></button>
     </div>
   </div>
 </div>
@@ -8790,8 +8792,12 @@ export async function selectSearchResult(index) {
         return;
     closeSearchDropdown();
     const searchInput = document.getElementById("search-input");
-    if (searchInput)
+    const clearBtn = document.getElementById("search-clear");
+    if (searchInput) {
         searchInput.value = "";
+        if (clearBtn)
+            clearBtn.style.display = "none";
+    }
     const cy = getCy();
     if (result.type === "flow") {
         if (_setActiveFlow)
