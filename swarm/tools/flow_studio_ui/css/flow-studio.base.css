@@ -1064,6 +1064,27 @@
     .search-input:not(:placeholder-shown) + .search-shortcut {
       display: none;
     }
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0;
+      line-height: 1;
+      display: none;
+      z-index: 10;
+    }
+    .search-clear:hover {
+      color: var(--fs-color-text);
+    }
+    .search-input:not(:placeholder-shown) ~ .search-clear {
+      display: block;
+    }
     .search-icon {
       position: absolute;
       left: 10px;
