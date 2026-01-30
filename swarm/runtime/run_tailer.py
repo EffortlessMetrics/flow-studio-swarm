@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from .db import StatsDB
 
 from .safe_paths import validate_path_component
-from .storage import RUNS_DIR, list_runs
+from .storage import RUNS_DIR, list_potential_runs
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +199,7 @@ class RunTailer:
         """
         results: Dict[str, int] = {}
 
-        for run_id in list_runs(self._runs_dir):
+        for run_id in list_potential_runs(self._runs_dir):
             try:
                 count = self.tail_run(run_id)
                 if count > 0:

@@ -25,7 +25,7 @@ Usage:
         write_run_state, read_run_state, update_run_state,
         write_envelope, read_envelope, list_envelopes,
         commit_step_completion,
-        list_runs, discover_legacy_runs,
+        list_runs, list_potential_runs, discover_legacy_runs, is_legacy_run,
     )
 """
 
@@ -818,6 +818,58 @@ def summarize_navigator_events(
 # -----------------------------------------------------------------------------
 # Run Listing
 # -----------------------------------------------------------------------------
+
+
+def list_potential_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """List all potential run IDs (subdirectories in runs_dir).
+
+    Does NOT check for meta.json or other artifacts, making it much faster
+    than list_runs() for large directories. Use this when you need a count
+    or are going to validate runs individually (e.g. pagination).
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of directory names, sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    run_ids: List[RunId] = []
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    run_ids.append(entry.name)
+    except OSError:
+        pass
+
+    return sorted(run_ids)
+
+
+def is_legacy_run(run_id: RunId, runs_dir: Path = RUNS_DIR) -> bool:
+    """Check if a run is a legacy run (no meta.json but has flow dirs).
+
+    Args:
+        run_id: The unique run identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        True if the run is legacy, False otherwise.
+    """
+    run_path = get_run_path(run_id, runs_dir)
+
+    # Check if meta.json exists (if so, it's ACTIVE, not legacy)
+    if (run_path / META_FILE).exists():
+        return False
+
+    # Check for legacy flow artifacts
+    for flow_key in LEGACY_FLOW_KEYS:
+        if (run_path / flow_key).is_dir():
+            return True
+
+    return False
 
 
 def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:

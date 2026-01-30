@@ -290,6 +290,44 @@ class TestStorage:
 
         assert storage.run_exists(run_id, runs_dir=tmp_path)
 
+    def test_list_potential_runs(self, tmp_path):
+        """Should list all subdirectories."""
+        runs_dir = tmp_path / "runs"
+        runs_dir.mkdir()
+
+        (runs_dir / "run-1").mkdir()
+        (runs_dir / "run-2").mkdir()
+        (runs_dir / "not-a-run-file").touch()
+
+        potential = storage.list_potential_runs(runs_dir)
+        assert len(potential) == 2
+        assert "run-1" in potential
+        assert "run-2" in potential
+        assert "not-a-run-file" not in potential
+
+    def test_is_legacy_run(self, tmp_path):
+        """Should correctly identify legacy runs."""
+        runs_dir = tmp_path / "runs"
+        runs_dir.mkdir()
+
+        # Case 1: Active run (has meta.json)
+        run_active = runs_dir / "run-active"
+        run_active.mkdir()
+        (run_active / "meta.json").touch()
+
+        # Case 2: Legacy run (no meta.json, has flow dir)
+        run_legacy = runs_dir / "run-legacy"
+        run_legacy.mkdir()
+        (run_legacy / "signal").mkdir()
+
+        # Case 3: Invalid run (no meta.json, no flow dir)
+        run_invalid = runs_dir / "run-invalid"
+        run_invalid.mkdir()
+
+        assert storage.is_legacy_run("run-active", runs_dir) is False
+        assert storage.is_legacy_run("run-legacy", runs_dir) is True
+        assert storage.is_legacy_run("run-invalid", runs_dir) is False
+
 
 class TestRunService:
     """Test RunService orchestration."""
@@ -427,10 +465,9 @@ class TestRunService:
             storage.write_summary(run_id, summary, runs_dir=tmp_path)
 
         # Mock storage functions to use only our test runs
-        monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "list_potential_runs", lambda runs_dir=None: run_ids)
         monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
-        monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
-        monkeypatch.setattr(storage, "scan_runs", lambda runs_dir=None: (run_ids, []))
+        monkeypatch.setattr(storage, "is_legacy_run", lambda rid, runs_dir=None: False)
         # Also patch read_summary to use our tmp_path
         orig_read_summary = storage.read_summary
         monkeypatch.setattr(
@@ -481,10 +518,9 @@ class TestRunService:
             storage.write_summary(run_id, summary, runs_dir=tmp_path)
 
         # Mock storage functions to use only our test runs
-        monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
+        monkeypatch.setattr(storage, "list_potential_runs", lambda runs_dir=None: run_ids)
         monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
-        monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
-        monkeypatch.setattr(storage, "scan_runs", lambda runs_dir=None: (run_ids, []))
+        monkeypatch.setattr(storage, "is_legacy_run", lambda rid, runs_dir=None: False)
         orig_read_summary = storage.read_summary
         monkeypatch.setattr(
             storage,
