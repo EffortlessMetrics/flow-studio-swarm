@@ -72,6 +72,14 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
+    def test_create_fails_if_base_branch_invalid(self, tmp_path):
+        """Test that create fails if base branch name is invalid."""
+        fork = ShadowFork(repo_root=tmp_path)
+
+        # Should fail validation before any git calls
+        with pytest.raises(ValueError, match="cannot start with hyphen"):
+            fork.create(base_branch="-f")
+
     def test_create_fails_if_base_branch_missing(self, tmp_path):
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
@@ -79,8 +87,9 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # Verify base branch exists (resolve calls this first)
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "does not exist"),  # Create and switch to shadow branch (fails)
             ]
 
             with pytest.raises(RuntimeError, match="does not exist"):
@@ -93,8 +102,8 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
                 (True, "", ""),  # Verify base branch exists
+                (True, " M file.txt", ""),  # Uncommitted changes exist
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
