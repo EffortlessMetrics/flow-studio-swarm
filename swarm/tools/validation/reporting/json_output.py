@@ -136,6 +136,7 @@ def build_detailed_json_output(
         flow_keys = get_flow_keys()
     except ImportError:
         # Fallback: use canonical 7-flow keys if registry not available
+        # Note: This list must stay in sync with flow_registry.py
         flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
 
     for flow_id in flow_keys:

@@ -49,6 +49,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple
 
+from .safe_paths import validate_git_ref_format
+
 if sys.platform == "win32":
     import msvcrt
 else:
@@ -84,6 +86,14 @@ class ShadowFork:
     original_branch: Optional[str] = None
     base_branch: str = "main"
     _push_allowed: bool = field(default=False, repr=False)
+
+    def __post_init__(self):
+        """Validate branch names after initialization."""
+        if self.shadow_branch:
+            validate_git_ref_format(self.shadow_branch, "shadow_branch")
+        if self.original_branch:
+            validate_git_ref_format(self.original_branch, "original_branch")
+        validate_git_ref_format(self.base_branch, "base_branch")
 
     def _run_git(
         self,
@@ -263,6 +273,8 @@ class ShadowFork:
         Raises:
             RuntimeError: If shadow fork creation fails.
         """
+        validate_git_ref_format(base_branch, "base_branch")
+
         # Check if already in a shadow fork
         if self._is_shadow_active():
             marker_path = self._get_marker_path()

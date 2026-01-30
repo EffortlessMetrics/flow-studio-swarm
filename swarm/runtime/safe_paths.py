@@ -17,6 +17,10 @@ import re
 # Strictly no slashes or backslashes
 VALID_COMPONENT_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
+# Disallowed characters in git refs: space, control chars, ~, ^, :, ?, *, [, \
+# Also can't begin with - (to avoid option parsing issues)
+GIT_REF_INVALID_CHARS = re.compile(r"[\s\x00-\x1f\x7f~^:?*\[\\]")
+
 
 def validate_path_component(component: str, name: str = "path component") -> str:
     """Validate a string for use as a single path component.
@@ -46,3 +50,37 @@ def validate_path_component(component: str, name: str = "path component") -> str
         raise ValueError(f"{name} contains invalid characters: '{component}'")
 
     return component
+
+
+def validate_git_ref_format(ref: str, name: str = "git ref") -> str:
+    """Validate a string for use as a git reference (branch name, tag).
+
+    Ensures the string is a valid git ref format and not an option flag.
+
+    Args:
+        ref: The string to validate.
+        name: Name of the variable for error messages.
+
+    Returns:
+        The validated ref (same as input).
+
+    Raises:
+        ValueError: If the ref is invalid.
+    """
+    if not ref:
+        raise ValueError(f"{name} cannot be empty")
+
+    if ref.startswith("-"):
+        raise ValueError(f"{name} cannot start with hyphen: '{ref}'")
+
+    if ".." in ref:
+        raise ValueError(f"{name} cannot contain '..': '{ref}'")
+
+    # Check for invalid characters
+    if GIT_REF_INVALID_CHARS.search(ref):
+        raise ValueError(f"{name} contains invalid characters: '{ref}'")
+
+    if "@{" in ref:
+        raise ValueError(f"{name} cannot contain '@{{': '{ref}'")
+
+    return ref
