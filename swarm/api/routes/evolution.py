@@ -420,21 +420,23 @@ async def apply_evolution_patch_endpoint(
         409: Validation failed.
         412: ETag mismatch.
     """
-    evolution = _get_evolution_module()
-    runs_root = _get_runs_root()
-    repo_root = _get_repo_root()
-
     # Parse patch_id (may be "run_id:patch_id" or just "patch_id")
+    run_id = None
+    patch_id = request.patch_id
+
     if ":" in request.patch_id:
         run_id, patch_id = request.patch_id.split(":", 1)
         try:
             validate_path_component(run_id, "run_id")
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-    else:
+
+    evolution = _get_evolution_module()
+    runs_root = _get_runs_root()
+    repo_root = _get_repo_root()
+
+    if run_id is None:
         # Search all recent runs for this patch_id
-        patch_id = request.patch_id
-        run_id = None
         pending = evolution["list_pending_patches"](runs_root, limit=50)
         for rid, patches in pending:
             if any(p.id == patch_id for p in patches):
