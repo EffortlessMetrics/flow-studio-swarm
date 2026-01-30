@@ -8,11 +8,15 @@ repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from swarm.api import create_app
+from swarm.api.server import create_app, set_spec_manager, SpecManager
 
 @pytest.fixture
 def client(tmp_path):
-    # Create app with temporary repo root to avoid affecting real files
+    # Explicitly initialize SpecManager to ensure it's set for the test
+    # This prevents RuntimeError: SpecManager not initialized
+    manager = SpecManager(tmp_path)
+    set_spec_manager(manager)
+
     app = create_app(repo_root=tmp_path)
     return TestClient(app)
 
@@ -26,6 +30,7 @@ def test_events_run_id_validation(client):
         assert response.status_code == 400, f"Expected 400 for {run_id}, got {response.status_code}. Resp: {response.text}"
 
     # Verify a valid ID format (even if run doesn't exist) returns 404 (Not Found) instead of 400
+    # This checks that validation passes and execution proceeds to SpecManager lookup
     response = client.get("/api/runs/valid-id/events")
     assert response.status_code == 404, f"Expected 404 for valid-id, got {response.status_code}"
 
