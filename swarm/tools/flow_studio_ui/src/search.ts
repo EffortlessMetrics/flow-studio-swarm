@@ -115,7 +115,11 @@ export async function selectSearchResult(index: number): Promise<void> {
 
   closeSearchDropdown();
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
-  if (searchInput) searchInput.value = "";
+  const clearBtn = document.getElementById("search-clear");
+  if (searchInput) {
+    searchInput.value = "";
+    if (clearBtn) clearBtn.style.display = "none";
+  }
 
   const cy = getCy();
 
@@ -164,10 +168,28 @@ export async function selectSearchResult(index: number): Promise<void> {
 export function initSearchHandlers(): void {
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
   const dropdown = document.getElementById("search-dropdown");
+  const clearBtn = document.getElementById("search-clear");
 
   if (!searchInput) return;
 
+  // Toggle clear button visibility
+  const updateClearButton = () => {
+    if (clearBtn) {
+      clearBtn.style.display = searchInput.value.length > 0 ? "flex" : "none";
+    }
+  };
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      searchInput.focus();
+      updateClearButton();
+      closeSearchDropdown();
+    });
+  }
+
   searchInput.addEventListener("input", (e: Event) => {
+    updateClearButton();
     if (state.searchDebounceTimer) {
       clearTimeout(state.searchDebounceTimer);
     }

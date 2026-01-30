@@ -72,29 +72,41 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_falls_back_if_base_branch_missing(self, tmp_path):
+        """Test that create falls back to main/HEAD if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            # Order: current_branch -> resolve_base_ref -> status -> checkout
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (False, "", "fatal"),  # Base branch "nonexistent" doesn't exist
+                (False, "", "fatal"),  # "origin/nonexistent" doesn't exist
+                (True, "abcdef", ""),  # "main" exists (fallback)
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "", ""),  # Create and switch to shadow branch
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+            # Create hooks directory for the test
+            (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
-    def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
+            fork.create(base_branch="nonexistent")
+
+            # Should have fallen back to main (based on mock responses)
+            assert fork.base_branch == "main"
+
+    def test_create_warns_on_uncommitted_changes(self, tmp_path):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch("swarm.runtime.shadow_fork.logger") as mock_logger:
+
+            # Order: current_branch -> resolve_base_ref -> status -> checkout
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # Verify base branch exists (main)
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
@@ -103,7 +115,9 @@ class TestShadowForkCreate:
 
             fork.create()
 
-            assert "uncommitted changes" in caplog.text.lower()
+            # Verify warning was logged
+            warning_calls = [str(args[0]) for args, _ in mock_logger.warning.call_args_list]
+            assert any("uncommitted changes" in msg for msg in warning_calls)
 
 
 class TestShadowForkGetDiff:

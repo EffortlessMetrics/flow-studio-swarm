@@ -100,8 +100,12 @@ export async function selectSearchResult(index) {
         return;
     closeSearchDropdown();
     const searchInput = document.getElementById("search-input");
-    if (searchInput)
+    const clearBtn = document.getElementById("search-clear");
+    if (searchInput) {
         searchInput.value = "";
+        if (clearBtn)
+            clearBtn.style.display = "none";
+    }
     const cy = getCy();
     if (result.type === "flow") {
         if (_setActiveFlow)
@@ -152,9 +156,25 @@ export async function selectSearchResult(index) {
 export function initSearchHandlers() {
     const searchInput = document.getElementById("search-input");
     const dropdown = document.getElementById("search-dropdown");
+    const clearBtn = document.getElementById("search-clear");
     if (!searchInput)
         return;
+    // Toggle clear button visibility
+    const updateClearButton = () => {
+        if (clearBtn) {
+            clearBtn.style.display = searchInput.value.length > 0 ? "flex" : "none";
+        }
+    };
+    if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+            searchInput.value = "";
+            searchInput.focus();
+            updateClearButton();
+            closeSearchDropdown();
+        });
+    }
     searchInput.addEventListener("input", (e) => {
+        updateClearButton();
         if (state.searchDebounceTimer) {
             clearTimeout(state.searchDebounceTimer);
         }
