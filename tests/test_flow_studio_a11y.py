@@ -215,6 +215,10 @@ class TestInteractiveElements:
         buttons = button_pattern.findall(html)
 
         for button in buttons:
+            # Skip hidden buttons (aria-hidden="true" or hidden attribute)
+            if 'aria-hidden="true"' in button or "hidden" in button:
+                continue
+
             # Check for text content (including nested spans)
             # Strip all tags and check for remaining text
             text_only = re.sub(r"<[^>]+>", " ", button)
