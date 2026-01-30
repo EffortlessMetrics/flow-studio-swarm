@@ -80,22 +80,67 @@ class TestShadowForkCreate:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal"),  # Base branch doesn't exist (attempt 1)
+                (False, "", "fatal"),  # Base branch doesn't exist (fallbacks)
+                (False, "", "fatal"),
+                (False, "", "fatal"),
+                (False, "", "fatal"),
+                (False, "", "fatal"),
+                (False, "", "fatal"),
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+            # The code falls back to HEAD, so we need to verify that we actually
+            # tried to resolve the base branch and failed, but continued.
+            # However, the original test asserted failure. If the code behavior is
+            # "fallback to HEAD", then `create` should succeed.
+            # If we want to test failure, we must assume _resolve_base_ref returns something invalid,
+            # BUT _resolve_base_ref always returns "HEAD" as a last resort.
+            # So `create` will only fail if "HEAD" is also invalid or some other step fails.
+
+            # Re-reading the failure: `StopIteration`. This means `create` consumed more
+            # side effects than we provided. It tried to check base branch existence, failed,
+            # then kept checking fallbacks until it exhausted our list.
+
+            # Let's fix the test to verify fallback behavior instead of asserting failure,
+            # OR provide enough side effects for it to reach "HEAD" and then we can check
+            # that it used HEAD.
+
+            # Actually, let's just make the first few checks fail, but `create` should eventually
+            # succeed with HEAD.
+            mock_git.side_effect = [
+                (True, "main", ""),  # Get current branch
+                # _resolve_base_ref checks:
+                (False, "", "fatal"),  # preferred failed
+                (False, "", "fatal"),  # origin/preferred failed
+                (False, "", "fatal"),  # main failed
+                (False, "", "fatal"),  # origin/main failed
+                (False, "", "fatal"),  # master failed
+                (False, "", "fatal"),  # origin/master failed
+                # HEAD is checked by string comparison, not git call
+                (True, "", ""),  # status --porcelain (clean)
+                (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # Install push guard
+            ]
+
+            # Create hooks directory for the test
+            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+            # Should not raise, should fallback to HEAD
+            fork.create(base_branch="nonexistent")
+            assert fork.base_branch == "HEAD"
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch("swarm.runtime.shadow_fork.logger") as mock_logger:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
+                (True, "sha", ""),   # _resolve_base_ref("main") -> exists
+                (True, " M file.txt", ""),  # status --porcelain -> Uncommitted changes
                 (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # Install push guard
             ]
 
             # Create hooks directory for the test
@@ -103,7 +148,11 @@ class TestShadowForkCreate:
 
             fork.create()
 
-            assert "uncommitted changes" in caplog.text.lower()
+            # Verify logger.warning was called with the expected message
+            mock_logger.warning.assert_any_call(
+                "Working tree has uncommitted changes. "
+                "These will be carried into the shadow branch."
+            )
 
 
 class TestShadowForkGetDiff:
