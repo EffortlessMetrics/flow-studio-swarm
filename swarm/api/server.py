@@ -41,6 +41,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from swarm.runtime.safe_paths import validate_path_component
+
 # Import SpecManager from services
 from .services.spec_manager import SpecManager, get_spec_manager, set_spec_manager
 
@@ -686,6 +688,19 @@ def create_app(
         Raises:
             HTTPException: If tailer is not available or ingestion fails.
         """
+        # Validate run_id to prevent path traversal
+        try:
+            validate_path_component(run_id)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_run_id",
+                    "message": f"Invalid run ID: {e}",
+                    "details": {"run_id": run_id},
+                },
+            )
+
         tailer = getattr(request.app.state, "tailer", None)
         tailer_state = getattr(request.app.state, "tailer_state", None)
 
