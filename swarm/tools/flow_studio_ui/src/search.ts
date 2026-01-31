@@ -167,6 +167,17 @@ export function initSearchHandlers(): void {
 
   if (!searchInput) return;
 
+  const clearBtn = document.getElementById("search-clear");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      searchInput.focus();
+      closeSearchDropdown();
+      // Dispatch input event to ensure state is cleared (clears debounce timer via handler)
+      searchInput.dispatchEvent(new Event("input"));
+    });
+  }
+
   searchInput.addEventListener("input", (e: Event) => {
     if (state.searchDebounceTimer) {
       clearTimeout(state.searchDebounceTimer);
