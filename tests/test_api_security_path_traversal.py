@@ -1,11 +1,24 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from swarm.api.asgi import app
+from swarm.api.server import create_app
+from swarm.api.services.spec_manager import set_spec_manager, SpecManager
 
-client = TestClient(app)
+@pytest.fixture
+def client():
+    # Create a fresh app instance for testing
+    app = create_app()
 
-def test_path_traversal_events_stream():
+    # Initialize SpecManager explicitly just in case create_app's side effect
+    # isn't persisted or we want to control it
+    # Note: create_app() calls set_spec_manager(SpecManager(repo_root)) internally
+    # but for testing we might want a clean slate or specific config.
+    # Here we just ensure it's set.
+    set_spec_manager(SpecManager())
+
+    return TestClient(app)
+
+def test_path_traversal_events_stream(client):
     """
     Test that invalid run_id for event stream is rejected.
     """
@@ -14,21 +27,17 @@ def test_path_traversal_events_stream():
 
     response = client.get(f"/api/runs/{run_id}/events")
 
-    print(f"\nEvents Stream Response status: {response.status_code}")
-    print(f"Events Stream Response json: {response.json() if response.content else ''}")
-
+    # We expect 400 Bad Request due to validation failure
     assert response.status_code == 400
     assert response.json()['detail']['error'] == 'invalid_run_id'
 
-def test_path_traversal_db_ingest():
+def test_path_traversal_db_ingest(client):
     """
     Test that invalid run_id for db ingest is rejected.
     """
     run_id = "invalid$id"
     response = client.post(f"/api/db/ingest/{run_id}")
 
-    print(f"\nDB Ingest Response status: {response.status_code}")
-    print(f"DB Ingest Response json: {response.json() if response.content else ''}")
-
+    # We expect 400 Bad Request due to validation failure
     assert response.status_code == 400
     assert response.json()['detail']['error'] == 'invalid_run_id'
