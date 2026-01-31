@@ -11,9 +11,6 @@ def client():
 
     # Initialize SpecManager explicitly just in case create_app's side effect
     # isn't persisted or we want to control it
-    # Note: create_app() calls set_spec_manager(SpecManager(repo_root)) internally
-    # but for testing we might want a clean slate or specific config.
-    # Here we just ensure it's set.
     set_spec_manager(SpecManager())
 
     return TestClient(app)
