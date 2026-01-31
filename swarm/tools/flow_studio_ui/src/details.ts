@@ -39,6 +39,7 @@ import {
   renderAgentCategoryHint,
   renderArtifactProducerHint,
   renderTabs,
+  renderLoading,
 } from "./ui_fragments.js";
 import {
   RoutingDecisionCard,
@@ -91,7 +92,7 @@ export async function renderRunTimeline(container: HTMLElement): Promise<void> {
     return;
   }
 
-  container.innerHTML = '<div class="muted">Loading timeline...</div>';
+  container.innerHTML = renderLoading("Loading timeline...");
 
   try {
     const data = await Api.getRunTimeline(state.currentRunId);
@@ -431,7 +432,7 @@ async function loadTranscript(
   flowKey: FlowKey,
   stepId: string
 ): Promise<void> {
-  container.innerHTML = '<div class="muted">Loading transcript...</div>';
+  container.innerHTML = renderLoading("Loading transcript...");
   try {
     const resp = await Api.getStepTranscript(runId, flowKey, stepId);
     container.innerHTML = renderTranscript(resp);
@@ -484,7 +485,7 @@ async function loadReceiptBadges(
   flowKey: FlowKey,
   stepId: string
 ): Promise<void> {
-  container.innerHTML = '<span class="loading">Loading execution info...</span>';
+  container.innerHTML = renderLoading("Loading execution info...");
   try {
     const resp = await Api.getStepReceipt(runId, flowKey, stepId);
     container.innerHTML = renderReceiptBadges(resp);
@@ -634,7 +635,7 @@ async function loadRoutingData(
   flowKey: FlowKey,
   stepId: string
 ): Promise<void> {
-  container.innerHTML = '<div class="muted">Loading routing data...</div>';
+  container.innerHTML = renderLoading("Loading routing data...");
 
   try {
     const resp = await Api.getStepReceipt(runId, flowKey, stepId);
@@ -1113,7 +1114,7 @@ export async function showAgentDetails(
 
   // Fetch agent usage
   const usageSection = document.createElement("div");
-  usageSection.innerHTML = '<div class="kv-label">Used in</div><div class="muted">Loading...</div>';
+  usageSection.innerHTML = `<div class="kv-label">Used in</div>${renderLoading()}`;
 
   const authorOnly = document.createElement("div");
   authorOnly.className = "author-only";

@@ -199,7 +199,12 @@ export function renderOperatorFlowHint() {
  * Render a loading placeholder.
  */
 export function renderLoading(message = "Loading...") {
-    return `<div class="muted" role="status">${escapeHtml(message)}</div>`;
+    return `
+    <div class="fs-loading" role="status">
+      <div class="fs-loading-spinner"></div>
+      <div class="fs-loading-text">${escapeHtml(message)}</div>
+    </div>
+  `;
 }
 // ============================================================================
 // Tour Menu Items

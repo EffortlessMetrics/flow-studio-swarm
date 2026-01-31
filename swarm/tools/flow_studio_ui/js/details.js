@@ -10,7 +10,7 @@ import { state } from "./state.js";
 import { Api } from "./api.js";
 import { getTeachingMode } from "./teaching_mode.js";
 import { formatDuration, formatTime, formatDateTime, createQuickCommands, createPathWithCopy, escapeHtml } from "./utils.js";
-import { renderSelectNodeHint, renderAgentUsageItem, renderAgentLocationInfo, renderAgentCategoryHint, renderArtifactProducerHint, renderTabs, } from "./ui_fragments.js";
+import { renderSelectNodeHint, renderAgentUsageItem, renderAgentLocationInfo, renderAgentCategoryHint, renderArtifactProducerHint, renderTabs, renderLoading, } from "./ui_fragments.js";
 import { RoutingDecisionCard, ForensicVerdictCard, renderInterruptionStackTab, } from "./components/index.js";
 // ============================================================================
 // Empty State
@@ -33,7 +33,7 @@ export async function renderRunTimeline(container) {
         container.innerHTML = '<div class="muted">Select a run to see timeline</div>';
         return;
     }
-    container.innerHTML = '<div class="muted">Loading timeline...</div>';
+    container.innerHTML = renderLoading("Loading timeline...");
     try {
         const data = await Api.getRunTimeline(state.currentRunId);
         const events = data.events || [];
@@ -325,7 +325,7 @@ function renderStructuredTeachingNotes(notes) {
  * Load and render transcript for a step
  */
 async function loadTranscript(container, runId, flowKey, stepId) {
-    container.innerHTML = '<div class="muted">Loading transcript...</div>';
+    container.innerHTML = renderLoading("Loading transcript...");
     try {
         const resp = await Api.getStepTranscript(runId, flowKey, stepId);
         container.innerHTML = renderTranscript(resp);
@@ -367,7 +367,7 @@ function renderTranscript(resp) {
  * Load and render engine/mode/provider badges for a step
  */
 async function loadReceiptBadges(container, runId, flowKey, stepId) {
-    container.innerHTML = '<span class="loading">Loading execution info...</span>';
+    container.innerHTML = renderLoading("Loading execution info...");
     try {
         const resp = await Api.getStepReceipt(runId, flowKey, stepId);
         container.innerHTML = renderReceiptBadges(resp);
@@ -493,7 +493,7 @@ function renderRoutingDecision(routing) {
  * when full routing data is available, falls back to simple display otherwise.
  */
 async function loadRoutingData(container, runId, flowKey, stepId) {
-    container.innerHTML = '<div class="muted">Loading routing data...</div>';
+    container.innerHTML = renderLoading("Loading routing data...");
     try {
         const resp = await Api.getStepReceipt(runId, flowKey, stepId);
         const receipt = resp.receipt;
@@ -878,7 +878,7 @@ export async function showAgentDetails(data, callbacks = {}) {
   `;
     // Fetch agent usage
     const usageSection = document.createElement("div");
-    usageSection.innerHTML = '<div class="kv-label">Used in</div><div class="muted">Loading...</div>';
+    usageSection.innerHTML = `<div class="kv-label">Used in</div>${renderLoading()}`;
     const authorOnly = document.createElement("div");
     authorOnly.className = "author-only";
     authorOnly.innerHTML = renderAgentLocationInfo(agentKey);
