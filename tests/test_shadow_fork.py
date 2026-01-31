@@ -79,31 +79,45 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "", ""),  # _ref_exists("nonexistent") -> True (simulate found to trigger checkout)
+                (True, "", ""),  # status --porcelain
+                (False, "", "fatal: ... does not exist"),  # checkout fails
             ]
 
             with pytest.raises(RuntimeError, match="does not exist"):
                 fork.create(base_branch="nonexistent")
 
-    def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
+    def test_create_warns_on_uncommitted_changes(self, tmp_path):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch("swarm.runtime.shadow_fork.logger") as mock_logger:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # _ref_exists("main") -> True
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # checkout
+                (True, "", ""),  # block_upstream_push (install hook calls git?) No, file ops.
             ]
+            # Note: block_upstream_push doesn't call git, but create() calls it.
+            # create() sequence:
+            # 1. get_current_branch (Mock 1)
+            # 2. resolve_base_ref -> ref_exists (Mock 2)
+            # 3. status (Mock 3)
+            # 4. checkout (Mock 4)
+            # 5. block_upstream_push
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
             fork.create()
 
-            assert "uncommitted changes" in caplog.text.lower()
+            # Verify warning was logged
+            mock_logger.warning.assert_called()
+            # Check args of warning call
+            args, _ = mock_logger.warning.call_args
+            assert "uncommitted changes" in args[0]
 
 
 class TestShadowForkGetDiff:
