@@ -1060,9 +1060,31 @@
       transform: translateY(-50%);
       pointer-events: none;
     }
-    .search-input:focus + .search-shortcut,
-    .search-input:not(:placeholder-shown) + .search-shortcut {
+    .search-input:focus ~ .search-shortcut,
+    .search-input:not(:placeholder-shown) ~ .search-shortcut {
       display: none;
+    }
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: #9ca3af;
+      font-size: 16px;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .search-clear:hover {
+      color: #6b7280;
+    }
+    .search-input:placeholder-shown ~ .search-clear {
+      display: none;
+    }
+    .search-input:not(:placeholder-shown) ~ .search-clear {
+      display: block;
     }
     .search-icon {
       position: absolute;
