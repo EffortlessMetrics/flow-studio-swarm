@@ -96,19 +96,25 @@ class TestShadowForkCreate:
         caplog.set_level(logging.WARNING)
 
         with patch.object(fork, "_resolve_base_ref", return_value="main"):
-            with patch.object(fork, "_run_git") as mock_git:
-                mock_git.side_effect = [
-                    (True, "main", ""),  # Get current branch
-                    (True, " M file.txt", ""),  # Uncommitted changes exist (stdout)
-                    (True, "", ""),  # Create and switch to shadow branch
-                ]
+            # Patch the logger in shadow_fork.py directly to ensure capture
+            with patch("swarm.runtime.shadow_fork.logger") as mock_logger:
+                with patch.object(fork, "_run_git") as mock_git:
+                    mock_git.side_effect = [
+                        (True, "main", ""),  # Get current branch
+                        (True, " M file.txt", ""),  # Uncommitted changes exist (stdout)
+                        (True, "", ""),  # Create and switch to shadow branch
+                    ]
 
-                # Create hooks directory for the test
-                (tmp_path / ".git" / "hooks").mkdir(parents=True)
+                    # Create hooks directory for the test
+                    (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
-                fork.create()
+                    fork.create()
 
-                assert "uncommitted changes" in caplog.text.lower()
+                    # Verify warning was called
+                    mock_logger.warning.assert_any_call(
+                        "Working tree has uncommitted changes. "
+                        "These will be carried into the shadow branch."
+                    )
 
 
 class TestShadowForkGetDiff:
