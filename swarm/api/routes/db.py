@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/db", tags=["database"])
@@ -284,6 +286,8 @@ async def ingest_run_events(run_id: str):
         Dict with ingestion statistics.
     """
     try:
+        validate_path_component(run_id, "run_id")
+
         from swarm.runtime.resilient_db import get_resilient_db
 
         db = get_resilient_db()
@@ -297,6 +301,17 @@ async def ingest_run_events(run_id: str):
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "validation_error",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Failed to ingest events for run %s: %s", run_id, e)
         return {
