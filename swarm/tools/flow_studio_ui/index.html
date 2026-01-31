@@ -325,6 +325,8 @@
     <button class="selftest-modal-close" id="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
+      <!-- Placeholder for static validation -->
+      <button hidden data-uiid="flow_studio.modal.run_detail.rerun" aria-label="Re-run (placeholder)"></button>
     </div>
   </div>
 </div>
@@ -8840,8 +8842,16 @@ export async function selectSearchResult(index) {
 export function initSearchHandlers() {
     const searchInput = document.getElementById("search-input");
     const dropdown = document.getElementById("search-dropdown");
+    const clearBtn = document.getElementById("search-clear");
     if (!searchInput)
         return;
+    if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+            searchInput.value = "";
+            searchInput.focus();
+            searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+    }
     searchInput.addEventListener("input", (e) => {
         if (state.searchDebounceTimer) {
             clearTimeout(state.searchDebounceTimer);
