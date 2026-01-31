@@ -215,7 +215,12 @@ export function renderOperatorFlowHint(): string {
  * Render a loading placeholder.
  */
 export function renderLoading(message = "Loading..."): string {
-  return `<div class="muted" role="status">${escapeHtml(message)}</div>`;
+  return `
+    <div class="fs-loading" role="status">
+      <div class="fs-loading-spinner"></div>
+      <div class="fs-loading-text">${escapeHtml(message)}</div>
+    </div>
+  `;
 }
 
 // ============================================================================
