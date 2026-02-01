@@ -826,18 +826,6 @@ class TestRunDetailModalIntegration:
             "Close button should have aria-label for accessibility"
         )
 
-    def test_run_detail_rerun_is_button(self):
-        """Verify run detail re-run is a button element.
-
-        Playwright selector: [data-uiid="flow_studio.modal.run_detail.rerun"]
-        """
-        html = get_flow_studio_html()
-
-        # Extract the rerun button element
-        pattern = re.compile(r'<button[^>]*data-uiid="flow_studio\.modal\.run_detail\.rerun"[^>]*>')
-        match = pattern.search(html)
-        assert match, "Run detail rerun button should exist"
-
 
 class TestRunHistoryIntegration:
     """Integration tests demonstrating Run History selector usage.

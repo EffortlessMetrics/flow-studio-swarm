@@ -3673,3 +3673,22 @@
       outline: none;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
+
+    /* Agent usage list items */
+    .agent-usage-item {
+      cursor: pointer;
+      padding: 2px 0;
+      background: none;
+      border: none;
+      text-align: left;
+      width: 100%;
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+      transition: background-color 0.15s ease;
+    }
+    .agent-usage-item:hover,
+    .agent-usage-item:focus {
+      background: #f3f4f6;
+      outline: none;
+    }
