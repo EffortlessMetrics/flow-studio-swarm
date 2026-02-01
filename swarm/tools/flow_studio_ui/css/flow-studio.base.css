@@ -1064,6 +1064,33 @@
     .search-input:not(:placeholder-shown) + .search-shortcut {
       display: none;
     }
+    /* Clear button styles */
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      display: none;
+      font-size: 16px;
+      padding: 0;
+      width: 20px;
+      height: 20px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: color 0.15s, background-color 0.15s;
+    }
+    .search-clear:hover {
+      color: #4b5563;
+      background-color: #f3f4f6;
+    }
+    .search-input:not(:placeholder-shown) ~ .search-clear {
+      display: flex;
+    }
     .search-icon {
       position: absolute;
       left: 10px;

@@ -215,6 +215,20 @@ export function initSearchHandlers() {
             }
         });
     }
+    // Clear button handler
+    const clearBtn = document.getElementById("search-clear");
+    if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+            searchInput.value = "";
+            searchInput.focus();
+            closeSearchDropdown();
+            if (state.searchDebounceTimer) {
+                clearTimeout(state.searchDebounceTimer);
+                state.searchDebounceTimer = null;
+            }
+            searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+    }
 }
 /**
  * Focus the search input.
