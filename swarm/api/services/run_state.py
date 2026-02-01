@@ -195,6 +195,14 @@ class RunStateManager:
 
         return runs
 
+    async def list_runs_async(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """List recent runs asynchronously (non-blocking).
+
+        Wraps the synchronous list_runs method in asyncio.to_thread
+        to prevent blocking the event loop during I/O operations.
+        """
+        return await asyncio.to_thread(self.list_runs, limit=limit)
+
 
 # Global state manager (initialized on first use)
 _state_manager: Optional[RunStateManager] = None
