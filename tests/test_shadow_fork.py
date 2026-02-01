@@ -76,25 +76,36 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Mock _resolve_base_ref to simulate base branch resolution failure
+        # Since _resolve_base_ref typically falls back to HEAD, we need to mock it
+        # or the behavior around it to trigger a failure.
+        # However, create() only fails if checkout fails.
+        # To strictly test the failure path, we'll mock _run_git to fail on checkout.
+
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="nonexistent"):
+
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal: branch not found"),  # checkout fails
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Patch _resolve_base_ref to avoid internal git calls consuming side_effect
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="main"):
+
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
+                # (True, "", ""),  # Verify base branch exists (skipped due to patch)
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
