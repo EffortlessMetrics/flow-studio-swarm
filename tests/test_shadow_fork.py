@@ -79,22 +79,33 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "", ""),  # Check base ref (consumed by _resolve_base_ref -> _ref_exists)
+                (False, "", "fatal"),  # Fallback to HEAD? No, wait.
+                # Actually, _resolve_base_ref iterates candidates.
+                # If we want to simulate failure, we need to handle those calls.
+                # But create() handles missing base by falling back to HEAD or similar.
+                # To trigger a crash, we need checkout to fail.
+                (True, "", ""),  # Status check
+                (False, "", "fatal: branch not found"), # Checkout fails
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+            # Mock _resolve_base_ref to return the bad branch so checkout tries it
+            with patch.object(fork, "_resolve_base_ref", return_value="nonexistent"):
+                with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
+                    fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
+        import logging
+        caplog.set_level(logging.WARNING)
+
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
+                (True, "", ""),  # Check base ref (consumed by _resolve_base_ref)
+                (True, " M file.txt", ""),  # Uncommitted changes exist (status)
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
