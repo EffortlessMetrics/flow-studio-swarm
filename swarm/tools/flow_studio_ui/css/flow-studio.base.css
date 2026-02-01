@@ -1053,6 +1053,27 @@
     .search-input::placeholder {
       color: #9ca3af;
     }
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #9ca3af;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 4px;
+      display: none;
+      z-index: 10;
+      line-height: 1;
+    }
+    .search-clear:hover {
+      color: #4b5563;
+    }
+    .search-input:not(:placeholder-shown) ~ .search-clear {
+      display: block;
+    }
     .search-shortcut {
       position: absolute;
       right: 8px;
@@ -1060,8 +1081,8 @@
       transform: translateY(-50%);
       pointer-events: none;
     }
-    .search-input:focus + .search-shortcut,
-    .search-input:not(:placeholder-shown) + .search-shortcut {
+    .search-input:focus ~ .search-shortcut,
+    .search-input:not(:placeholder-shown) ~ .search-shortcut {
       display: none;
     }
     .search-icon {
@@ -3651,4 +3672,23 @@
       top: 0;
       outline: none;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Agent usage list items */
+    .agent-usage-item {
+      cursor: pointer;
+      padding: 2px 0;
+      background: none;
+      border: none;
+      text-align: left;
+      width: 100%;
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+      transition: background-color 0.15s ease;
+    }
+    .agent-usage-item:hover,
+    .agent-usage-item:focus {
+      background: #f3f4f6;
+      outline: none;
     }

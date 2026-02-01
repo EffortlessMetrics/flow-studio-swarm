@@ -203,15 +203,7 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
     list.style.lineHeight = "1.8";
     usage.forEach(u => {
         const item = document.createElement("button");
-        item.style.cursor = "pointer";
-        item.style.padding = "2px 0";
-        item.style.background = "none";
-        item.style.border = "none";
-        item.style.textAlign = "left";
-        item.style.width = "100%";
-        item.style.fontFamily = "inherit";
-        item.style.fontSize = "inherit";
-        item.style.color = "inherit";
+        item.className = "agent-usage-item";
         item.innerHTML = renderAgentUsageItem(u.flow_title, u.step_title);
         item.title = `Click to navigate to ${u.flow}:${u.step}`;
         item.addEventListener("click", async () => {
@@ -233,10 +225,6 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
                 }, 300);
             }
         });
-        item.addEventListener("mouseenter", () => { item.style.background = "#f3f4f6"; });
-        item.addEventListener("mouseleave", () => { item.style.background = "transparent"; });
-        item.addEventListener("focus", () => { item.style.background = "#f3f4f6"; });
-        item.addEventListener("blur", () => { item.style.background = "transparent"; });
         list.appendChild(item);
     });
     container.appendChild(list);
