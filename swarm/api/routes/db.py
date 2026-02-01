@@ -143,6 +143,7 @@ async def rebuild_database(request: DBRebuildRequest):
 
     try:
         from swarm.runtime.resilient_db import check_db_health, get_resilient_db
+        from swarm.runtime.safe_paths import validate_path_component
 
         db = get_resilient_db()
 
@@ -171,6 +172,7 @@ async def rebuild_database(request: DBRebuildRequest):
                 "errors": [],
             }
             for run_id in request.run_ids:
+                validate_path_component(run_id, "run_id")
                 result = db.rebuild_from_events_safe(run_id)
                 total_stats["runs_processed"] += 1
                 if result.get("success"):
@@ -200,6 +202,8 @@ async def rebuild_database(request: DBRebuildRequest):
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
@@ -285,6 +289,9 @@ async def ingest_run_events(run_id: str):
     """
     try:
         from swarm.runtime.resilient_db import get_resilient_db
+        from swarm.runtime.safe_paths import validate_path_component
+
+        validate_path_component(run_id, "run_id")
 
         db = get_resilient_db()
         result = db.rebuild_from_events_safe(run_id)
@@ -297,6 +304,10 @@ async def ingest_run_events(run_id: str):
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Failed to ingest events for run %s: %s", run_id, e)
         return {
