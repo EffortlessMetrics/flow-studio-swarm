@@ -1060,6 +1060,24 @@
       transform: translateY(-50%);
       pointer-events: none;
     }
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: white;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      display: none;
+      padding: 0;
+      font-size: 14px;
+      line-height: 1;
+      z-index: 10;
+    }
+    .search-clear:hover {
+      color: #6b7280;
+    }
     .search-input:focus + .search-shortcut,
     .search-input:not(:placeholder-shown) + .search-shortcut {
       display: none;
