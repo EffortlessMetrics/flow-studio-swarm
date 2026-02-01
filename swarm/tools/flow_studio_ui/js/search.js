@@ -152,9 +152,17 @@ export async function selectSearchResult(index) {
 export function initSearchHandlers() {
     const searchInput = document.getElementById("search-input");
     const dropdown = document.getElementById("search-dropdown");
+    const searchClear = document.getElementById("search-clear");
     if (!searchInput)
         return;
+    // Toggle clear button on input
+    const toggleClearButton = () => {
+        if (searchClear) {
+            searchClear.style.display = searchInput.value.length > 0 ? "block" : "none";
+        }
+    };
     searchInput.addEventListener("input", (e) => {
+        toggleClearButton();
         if (state.searchDebounceTimer) {
             clearTimeout(state.searchDebounceTimer);
         }
@@ -163,6 +171,19 @@ export function initSearchHandlers() {
         // Optimization: Increased debounce from 200ms to 300ms to reduce API calls while typing
         state.searchDebounceTimer = setTimeout(() => performSearch(query), 300);
     });
+    // Handle clear button click
+    if (searchClear) {
+        searchClear.addEventListener("click", () => {
+            searchInput.value = "";
+            searchInput.focus();
+            toggleClearButton();
+            if (state.searchDebounceTimer) {
+                clearTimeout(state.searchDebounceTimer);
+                state.searchDebounceTimer = null;
+            }
+            performSearch("");
+        });
+    }
     searchInput.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
             closeSearchDropdown();
