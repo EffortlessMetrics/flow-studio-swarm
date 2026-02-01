@@ -1,0 +1,4 @@
+## 2025-01-26 - Path Traversal in Database Rebuild API
+**Vulnerability:** The `/api/db/rebuild` and `/api/db/ingest/{run_id}` endpoints accepted arbitrary `run_id` strings, which were used to construct file paths for `events.jsonl` reading. This allowed path traversal (e.g., `../etc/passwd`) if the attacker could guess the directory structure, although the exploitability was limited by the code expecting a specific file structure (reading `events.jsonl` inside the target directory).
+**Learning:** Administrative endpoints are often overlooked for security validation. Batch processing endpoints (like `rebuild`) require careful error handling to report validation failures without failing the entire batch, while single-item endpoints should fail fast with 400.
+**Prevention:** Enforce usage of `swarm.runtime.safe_paths.validate_path_component` for any user-supplied identifier that is used to construct file paths.
