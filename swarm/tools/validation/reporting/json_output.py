@@ -136,6 +136,7 @@ def build_detailed_json_output(
         flow_keys = get_flow_keys()
     except ImportError:
         # Fallback: use canonical 7-flow keys if registry not available
+        # Note: If this list needs to be updated, also update ALLOWED_VIOLATIONS in tests/test_flow_order_guardrail.py
         flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
 
     for flow_id in flow_keys:

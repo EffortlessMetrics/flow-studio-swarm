@@ -2,3 +2,7 @@
 # Example:
 # swarm/runtime/types/state_types.py | 2026-03-31 | Temporary during refactor (SWARM-123)
 swarm/runtime/backends.py | 2026-02-28 | Large backend implementations, needs splitting (REF-001)
+swarm/api/routes/evolution.py | 2026-05-01 | Increased complexity from security hardening (SENTINEL-001)
+tests/test_flow_order_guardrail.py | 2026-05-01 | Increased test coverage for guardrails (SENTINEL-001)
+tests/test_flow_studio_ui_ids.py | 2026-05-01 | Large UI test suite with many assertions (SENTINEL-001)
+tests/test_shadow_fork.py | 2026-05-01 | Comprehensive shadow fork testing (SENTINEL-001)
