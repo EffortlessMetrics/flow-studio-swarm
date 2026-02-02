@@ -227,6 +227,18 @@ export function initSearchHandlers(): void {
       }
     });
   }
+
+  const clearBtn = document.getElementById("search-clear-btn");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      searchInput.focus();
+      if (state.searchDebounceTimer) {
+        clearTimeout(state.searchDebounceTimer);
+      }
+      closeSearchDropdown();
+    });
+  }
 }
 
 /**
