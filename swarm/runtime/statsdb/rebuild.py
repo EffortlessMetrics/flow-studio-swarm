@@ -5,6 +5,8 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,6 +40,17 @@ class StatsDBRebuildMixin:
 
         if runs_dir is None:
             runs_dir = storage_module.RUNS_DIR
+
+        # Validate run_id to prevent path traversal
+        try:
+            validate_path_component(run_id, "run_id")
+        except ValueError as e:
+            return {
+                "run_id": run_id,
+                "events_ingested": 0,
+                "success": False,
+                "error": str(e),
+            }
 
         result = {
             "run_id": run_id,
@@ -242,6 +255,7 @@ def rebuild_stats_db(
 
     for run_id in run_ids:
         try:
+            validate_path_component(run_id, "run_id")
             run_path = runs_dir / run_id
             events_file = run_path / storage_module.EVENTS_FILE
 

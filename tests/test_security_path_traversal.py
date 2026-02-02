@@ -204,3 +204,27 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_stats_db_rebuild_validation(tmp_path):
+    """Test that StatsDBRebuildMixin validates run_id against path traversal."""
+    from swarm.runtime.statsdb.rebuild import StatsDBRebuildMixin
+
+    class MockStatsDB(StatsDBRebuildMixin):
+        def ingest_events(self, events, run_id):
+            return len(events)
+
+    db = MockStatsDB()
+
+    # Test rebuild_from_events
+    result = db.rebuild_from_events("../etc/passwd", runs_dir=tmp_path)
+    assert result["success"] is False
+    assert "run_id contains invalid characters" in result["error"]
+
+    result = db.rebuild_from_events("..", runs_dir=tmp_path)
+    assert result["success"] is False
+    assert "traversal sequence" in result["error"]
+
+    # Test rebuild_all_from_events
+    stats = db.rebuild_all_from_events(runs_dir=tmp_path, run_ids=["../etc/passwd"])
+    assert len(stats["errors"]) == 1
+    assert "run_id contains invalid characters" in stats["errors"][0]["error"]
