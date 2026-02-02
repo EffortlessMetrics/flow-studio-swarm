@@ -76,25 +76,31 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Mock _resolve_base_ref directly to avoid brittle dependency on _run_git call order
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref") as mock_resolve:
+
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "", ""),      # Check for uncommitted changes
             ]
+
+            mock_resolve.side_effect = RuntimeError("Branch 'nonexistent' does not exist")
 
             with pytest.raises(RuntimeError, match="does not exist"):
                 fork.create(base_branch="nonexistent")
 
-    def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
+    def test_create_warns_on_uncommitted_changes(self, tmp_path):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch("swarm.runtime.shadow_fork.logger") as mock_logger:
+
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "main_ref", ""), # Resolve base ref
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
@@ -103,7 +109,14 @@ class TestShadowForkCreate:
 
             fork.create()
 
-            assert "uncommitted changes" in caplog.text.lower()
+            # Verify logger was called with expected message
+            found = False
+            for call in mock_logger.warning.call_args_list:
+                args, _ = call
+                if args and "uncommitted changes" in args[0].lower():
+                    found = True
+                    break
+            assert found, "Warning about uncommitted changes not found in logger calls"
 
 
 class TestShadowForkGetDiff:
