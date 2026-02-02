@@ -1,0 +1,4 @@
+## 2025-02-17 - API Path Traversal Vulnerability
+**Vulnerability:** Found multiple API endpoints (`/db`, `/events`, `/evolution`, `/wisdom`) that accepted unvalidated `run_id` and `artifact_name` parameters, allowing path traversal (e.g., `../secrets`) to access files outside the intended directories. The backend functions (e.g., `ResilientStatsDB.rebuild_from_events`) assumed valid inputs.
+**Learning:** `pathlib.Path` concatenation (e.g., `root / user_input`) does NOT prevent traversal if `user_input` contains `..`. The backend assumes inputs are pre-validated by the API layer. Validation was inconsistent across endpoints.
+**Prevention:** Always use `swarm.runtime.safe_paths.validate_path_component(input, "name")` in API routes before using any user input to construct file paths. Do not rely on lower-level modules to validate paths unless explicitly documented.
