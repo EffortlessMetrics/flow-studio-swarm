@@ -115,7 +115,11 @@ export async function selectSearchResult(index: number): Promise<void> {
 
   closeSearchDropdown();
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
-  if (searchInput) searchInput.value = "";
+  const clearBtn = document.getElementById("search-clear");
+  if (searchInput) {
+    searchInput.value = "";
+    if (clearBtn) clearBtn.hidden = true;
+  }
 
   const cy = getCy();
 
@@ -164,8 +168,23 @@ export async function selectSearchResult(index: number): Promise<void> {
 export function initSearchHandlers(): void {
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
   const dropdown = document.getElementById("search-dropdown");
+  const clearBtn = document.getElementById("search-clear");
 
   if (!searchInput) return;
+
+  // Clear button logic
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      clearBtn.hidden = true;
+      if (state.searchDebounceTimer) {
+        clearTimeout(state.searchDebounceTimer);
+        state.searchDebounceTimer = null;
+      }
+      closeSearchDropdown();
+      searchInput.focus();
+    });
+  }
 
   searchInput.addEventListener("input", (e: Event) => {
     if (state.searchDebounceTimer) {
@@ -173,6 +192,11 @@ export function initSearchHandlers(): void {
     }
     const target = e.target as HTMLInputElement;
     const query = target.value.trim();
+
+    if (clearBtn) {
+      clearBtn.hidden = query.length === 0;
+    }
+
     // Optimization: Increased debounce from 200ms to 300ms to reduce API calls while typing
     state.searchDebounceTimer = setTimeout(() => performSearch(query), 300);
   });
