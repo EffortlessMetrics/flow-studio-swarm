@@ -579,6 +579,13 @@ class TestUIIDIntegrationExample:
             "Search input should have legacy id for backwards compatibility"
         )
 
+    def test_search_clear_button_has_uiid(self):
+        """Verify search clear button has data-uiid."""
+        html = get_flow_studio_html()
+        uiid = "flow_studio.header.search.clear"
+        pattern = f'data-uiid="{uiid}"'
+        assert pattern in html, f"Search clear button with data-uiid={uiid} should exist"
+
     def test_run_selector_css_selector(self):
         """Verify run selector dropdown can be reliably located by data-uiid.
 
