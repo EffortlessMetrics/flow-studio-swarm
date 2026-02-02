@@ -5,6 +5,8 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,6 +47,12 @@ class StatsDBRebuildMixin:
             "success": False,
             "error": None,
         }
+
+        try:
+            validate_path_component(run_id, "run_id")
+        except ValueError as e:
+            result["error"] = str(e)
+            return result
 
         run_path = runs_dir / run_id
         events_file = run_path / storage_module.EVENTS_FILE
