@@ -76,26 +76,32 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        # Mock _resolve_base_ref to return the missing branch directly
+        # so checkout fails (bypassing the fallback-to-HEAD logic)
+        with patch.object(fork, "_resolve_base_ref", return_value="nonexistent"):
+            with patch.object(fork, "_run_git") as mock_git:
+                mock_git.side_effect = [
+                    (True, "main", ""),  # Get current branch
+                    (True, "", ""),  # Check for uncommitted changes
+                    # _resolve_base_ref mocked out
+                    (False, "", "fatal: branch not found"),  # checkout -b fails
+                ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+                with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
+                    fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
+        import logging
+        caplog.set_level(logging.WARNING)
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
+                (True, "main", ""),  # 1. Get current branch
+                (True, "hash123", ""),  # 2. Verify base branch exists (resolve)
+                (True, " M file.txt", ""),  # 3. Check for uncommitted changes
+                (True, "", ""),  # 4. Create and switch to shadow branch
             ]
 
             # Create hooks directory for the test
