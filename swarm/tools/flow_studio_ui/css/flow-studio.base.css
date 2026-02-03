@@ -1060,9 +1060,39 @@
       transform: translateY(-50%);
       pointer-events: none;
     }
-    .search-input:focus + .search-shortcut,
-    .search-input:not(:placeholder-shown) + .search-shortcut {
+    /* Hide shortcut when input is focused or has text */
+    /* Note: search-clear button is physically between input and shortcut in DOM */
+    .search-input:focus ~ .search-shortcut,
+    .search-input:not(:placeholder-shown) ~ .search-shortcut {
       display: none;
+    }
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0;
+      width: 16px;
+      height: 16px;
+      line-height: 1;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: color 0.15s, background-color 0.15s;
+    }
+    .search-clear:hover {
+      color: #4b5563;
+      background-color: #f3f4f6;
+    }
+    /* Show clear button when input has text */
+    .search-input:not(:placeholder-shown) ~ .search-clear {
+      display: flex;
     }
     .search-icon {
       position: absolute;
