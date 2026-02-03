@@ -204,3 +204,19 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_statsdb_rebuild_path_validation(tmp_path):
+    """Test that StatsDBRebuildMixin validates run_id against path traversal."""
+    from swarm.runtime.statsdb.rebuild import StatsDBRebuildMixin
+
+    class MockStatsDB(StatsDBRebuildMixin):
+        def ingest_events(self, events, run_id):
+            return 0
+
+    db = MockStatsDB()
+
+    with pytest.raises(ValueError, match="run_id"):
+        db.rebuild_from_events("../etc/passwd")
+
+    with pytest.raises(ValueError, match="run_id"):
+        db.rebuild_from_events("..")
