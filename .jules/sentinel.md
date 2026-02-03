@@ -1,0 +1,4 @@
+## 2025-01-26 - StatsDB Rebuild Path Traversal
+**Vulnerability:** The `StatsDBRebuildMixin.rebuild_from_events` method in `swarm/runtime/statsdb/rebuild.py` did not validate `run_id`, allowing path traversal via `rebuild_from_events(run_id="../secret")`. This could allow reading arbitrary `events.jsonl` files from the filesystem.
+**Learning:** Mixin classes that handle file I/O often bypass higher-level validation layers. `StatsDBRebuildMixin` was used by `ResilientStatsDB`, which assumed internal methods were safe or that input was validated at the API layer, but `DBRebuildRequest` did not validate `run_ids`.
+**Prevention:** Always validate path components (using `validate_path_component`) immediately before use in file operations, even (and especially) in internal utility methods or mixins. Do not rely on API-layer validation for deep library functions.
