@@ -1,0 +1,4 @@
+## 2025-02-18 - Path Traversal in Database Rebuild
+**Vulnerability:** The `StatsDBRebuildMixin.rebuild_from_events` method blindly concatenated `runs_dir` with `run_id` without validation. Since `run_id` can be controlled by user input (via `ingest_run_events` endpoint), this allowed path traversal (e.g., `../../etc/passwd`) if the input contained separators.
+**Learning:** `pathlib.Path` joining (`/` operator) does NOT sanitize traversal characters (`..`). Even seemingly internal methods (like DB rebuilds) can be exposed to user input via API endpoints, so input validation must happen at the boundary or in the core logic if it handles file paths.
+**Prevention:** Always use `swarm.runtime.safe_paths.validate_path_component` (or similar) before using any user-controlled string in file path construction. Do not assume `pathlib` handles security.
