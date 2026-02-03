@@ -1060,9 +1060,30 @@
       transform: translateY(-50%);
       pointer-events: none;
     }
-    .search-input:focus + .search-shortcut,
-    .search-input:not(:placeholder-shown) + .search-shortcut {
+    .search-input:focus ~ .search-shortcut,
+    .search-input:not(:placeholder-shown) ~ .search-shortcut {
       display: none;
+    }
+    .search-clear-btn {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0;
+      line-height: 1;
+      display: none;
+      z-index: 2;
+    }
+    .search-clear-btn:hover {
+      color: #4b5563;
+    }
+    .search-input:not(:placeholder-shown) ~ .search-clear-btn {
+      display: block;
     }
     .search-icon {
       position: absolute;
