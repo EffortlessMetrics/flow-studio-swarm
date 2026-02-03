@@ -1,0 +1,4 @@
+## 2025-01-20 - [Path Traversal in Evolution API]
+**Vulnerability:** Found unsanitized `run_id` and `patch_id` parameters in `swarm/api/routes/evolution.py` endpoints, specifically `apply_evolution_patch_endpoint`. The `patch_id` parameter could be split into a `run_id` containing traversal sequences (e.g., `../etc`), allowing access to files outside the runs directory.
+**Learning:** While `run_id` is often validated in other parts of the system (like `RunStateManager`), new or less used endpoints might miss these checks, especially when parsing composite IDs manually (like `split(":", 1)`).
+**Prevention:** Always validate path components immediately after extraction, especially when handling user-provided IDs that map to file system paths. Use `validate_path_component` consistently across all API routes dealing with file operations.
