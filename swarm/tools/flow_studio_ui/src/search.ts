@@ -203,6 +203,22 @@ export function initSearchHandlers(): void {
     }
   });
 
+  // Clear search button handler
+  const clearBtn = document.getElementById("search-clear");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      if (searchInput) {
+        searchInput.value = "";
+        searchInput.focus();
+      }
+      if (state.searchDebounceTimer) {
+        clearTimeout(state.searchDebounceTimer);
+        state.searchDebounceTimer = null;
+      }
+      closeSearchDropdown();
+    });
+  }
+
   // Close dropdown when clicking outside
   document.addEventListener("click", (e: MouseEvent) => {
     const target = e.target as Node;
