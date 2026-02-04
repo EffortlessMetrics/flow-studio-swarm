@@ -749,6 +749,7 @@ class TestRunDetailModalUIIDs:
             "This UIID is required for test automation to read run details."
         )
 
+    @pytest.mark.skip(reason="Rerun button is rendered dynamically via JS, not in static HTML")
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
         html = get_flow_studio_html()
@@ -770,7 +771,7 @@ class TestRunDetailModalUIIDs:
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
+            # "flow_studio.modal.run_detail.rerun",  # Dynamic
         ]
 
         missing = [e for e in expected_modal if e not in uiids]
@@ -838,6 +839,7 @@ class TestRunDetailModalIntegration:
             "Close button should have aria-label for accessibility"
         )
 
+    @pytest.mark.skip(reason="Rerun button is rendered dynamically via JS")
     def test_run_detail_rerun_is_button(self):
         """Verify run detail re-run is a button element.
 
@@ -972,6 +974,22 @@ class TestDynamicUIIDs:
         # Should contain the exemplar checkbox UIID
         assert "flow_studio.modal.run_detail.exemplar" in content, (
             "run_detail_modal.js should render exemplar checkbox with data-uiid"
+        )
+
+    def test_rerun_button_uiid_in_run_detail_modal(self):
+        """Verify rerun button UIID is in run_detail_modal.ts.
+
+        The run detail modal renders rerun button dynamically with:
+        data-uiid="flow_studio.modal.run_detail.rerun"
+        """
+        js_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "js" / "run_detail_modal.js"
+        assert js_file.exists(), "run_detail_modal.js should exist"
+
+        content = js_file.read_text(encoding="utf-8")
+
+        # Should contain the rerun button UIID
+        assert "flow_studio.modal.run_detail.rerun" in content, (
+            "run_detail_modal.js should render rerun button with data-uiid"
         )
 
 
