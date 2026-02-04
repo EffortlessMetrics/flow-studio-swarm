@@ -367,6 +367,21 @@ async def stream_run_events(run_id: str, request: Request):
     except Exception as e:
         logger.warning("DB health check failed on SSE connect: %s", e)
 
+    # Validate run_id to prevent path traversal
+    from swarm.runtime.safe_paths import validate_path_component
+
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_run_id",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
     # Verify run exists
     run_dir = runs_root / run_id
     if not run_dir.exists():
