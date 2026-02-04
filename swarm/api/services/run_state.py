@@ -124,7 +124,9 @@ class RunStateManager:
             state, current_etag = self._get_run_unlocked(run_id)
 
             if expected_etag and expected_etag != current_etag:
-                raise ValueError(f"ETag mismatch: expected {expected_etag}, got {current_etag}")
+                raise ValueError(
+                    f"ETag mismatch: expected {expected_etag}, got {current_etag}"
+                )
 
             # Apply updates
             state.update(updates)
@@ -144,6 +146,14 @@ class RunStateManager:
         os.replace(tmp_path, state_path)
 
         self._cache[run_id] = state
+
+    async def list_runs_async(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """List recent runs asynchronously.
+
+        Wraps the synchronous list_runs in a thread pool to avoid blocking
+        the event loop during file I/O operations (scandir, file reads).
+        """
+        return await asyncio.to_thread(self.list_runs, limit=limit)
 
     def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
         """List recent runs.
@@ -183,9 +193,11 @@ class RunStateManager:
                 runs.append(
                     {
                         "run_id": state.get("run_id", run_dir.name),
-                        "flow_key": state.get("flow_id", "").split("-")[-1]
-                        if state.get("flow_id")
-                        else None,
+                        "flow_key": (
+                            state.get("flow_id", "").split("-")[-1]
+                            if state.get("flow_id")
+                            else None
+                        ),
                         "status": state.get("status"),
                         "timestamp": state.get("created_at"),
                     }
