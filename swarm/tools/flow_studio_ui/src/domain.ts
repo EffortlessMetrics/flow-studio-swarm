@@ -1236,6 +1236,8 @@ export type FlowStudioUIID =
   | "flow_studio.header"
   | "flow_studio.header.search"
   | "flow_studio.header.search.input"
+  | "flow_studio.header.search.clear"
+  | "flow_studio.header.search.loading"
   | "flow_studio.header.search.results"
   | "flow_studio.header.controls"
   | "flow_studio.header.tour"

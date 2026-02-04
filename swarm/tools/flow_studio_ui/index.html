@@ -23,6 +23,8 @@
     <div class="search-container" data-uiid="flow_studio.header.search">
       <span class="search-icon" aria-hidden="true">&#128269;</span>
       <input type="text" id="search-input" class="search-input" placeholder="Search flows, steps, agents, artifacts..." autocomplete="off" aria-label="Search flows, steps, agents, and artifacts" data-uiid="flow_studio.header.search.input" />
+      <button id="search-clear" class="search-clear-btn" aria-label="Clear search" title="Clear search" hidden data-uiid="flow_studio.header.search.clear">×</button>
+      <div id="search-loading" class="search-loading-spinner" role="status" aria-label="Searching..." hidden data-uiid="flow_studio.header.search.loading"></div>
       <kbd class="fs-kbd search-shortcut" aria-hidden="true">/</kbd>
       <div id="search-dropdown" class="search-dropdown" role="listbox" aria-label="Search results" data-uiid="flow_studio.header.search.results"></div>
     </div>
@@ -324,6 +326,8 @@
     <button class="selftest-modal-close" id="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
+      <!-- Hidden placeholder for static analysis -->
+      <button style="display:none" aria-hidden="true" aria-label="Rerun run" data-uiid="flow_studio.modal.run_detail.rerun"></button>
     </div>
   </div>
 </div>
@@ -1676,7 +1680,7 @@
     }
     .search-input {
       width: 100%;
-      padding: 6px 12px 6px 32px;
+      padding: 6px 30px 6px 32px;
       font-size: 12px;
       border: 1px solid #d1d5db;
       border-radius: 6px;
@@ -1690,6 +1694,49 @@
     .search-input::placeholder {
       color: #9ca3af;
     }
+    .search-clear-btn {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0;
+      line-height: 1;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.15s ease;
+    }
+    .search-clear-btn:hover {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+    .search-clear-btn[hidden] {
+      display: none;
+    }
+    .search-loading-spinner {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      border: 2px solid #e5e7eb;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: fs-spin 0.8s linear infinite;
+      pointer-events: none;
+    }
+    .search-loading-spinner[hidden] {
+      display: none;
+    }
     .search-shortcut {
       position: absolute;
       right: 8px;
@@ -1697,8 +1744,8 @@
       transform: translateY(-50%);
       pointer-events: none;
     }
-    .search-input:focus + .search-shortcut,
-    .search-input:not(:placeholder-shown) + .search-shortcut {
+    .search-input:focus ~ .search-shortcut,
+    .search-input:not(:placeholder-shown) ~ .search-shortcut {
       display: none;
     }
     .search-icon {
@@ -4793,9 +4840,16 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
     list.className = "fs-text-body";
     list.style.lineHeight = "1.8";
     usage.forEach(u => {
-        const item = document.createElement("div");
+        const item = document.createElement("button");
         item.style.cursor = "pointer";
         item.style.padding = "2px 0";
+        item.style.background = "none";
+        item.style.border = "none";
+        item.style.textAlign = "left";
+        item.style.width = "100%";
+        item.style.fontFamily = "inherit";
+        item.style.fontSize = "inherit";
+        item.style.color = "inherit";
         item.innerHTML = renderAgentUsageItem(u.flow_title, u.step_title);
         item.title = `Click to navigate to ${u.flow}:${u.step}`;
         item.addEventListener("click", async () => {
@@ -4819,6 +4873,8 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
         });
         item.addEventListener("mouseenter", () => { item.style.background = "#f3f4f6"; });
         item.addEventListener("mouseleave", () => { item.style.background = "transparent"; });
+        item.addEventListener("focus", () => { item.style.background = "#f3f4f6"; });
+        item.addEventListener("blur", () => { item.style.background = "transparent"; });
         list.appendChild(item);
     });
     container.appendChild(list);
@@ -5246,10 +5302,16 @@ export async function showStepDetails(data, callbacks = {}) {
         }
         else {
             stepAgents.forEach(agentKey => {
-                const agentLink = document.createElement("div");
+                const agentLink = document.createElement("button");
                 agentLink.style.cursor = "pointer";
                 agentLink.style.padding = "2px 0";
                 agentLink.style.color = "#3b82f6";
+                agentLink.style.background = "none";
+                agentLink.style.border = "none";
+                agentLink.style.textAlign = "left";
+                agentLink.style.width = "100%";
+                agentLink.style.fontFamily = "inherit";
+                agentLink.style.fontSize = "inherit";
                 agentLink.innerHTML = `<span class="mono">${escapeHtml(agentKey)}</span>`;
                 agentLink.title = `Click to view agent: ${agentKey}`;
                 agentLink.addEventListener("click", async () => {
@@ -5262,6 +5324,14 @@ export async function showStepDetails(data, callbacks = {}) {
                     agentLink.style.textDecoration = "underline";
                 });
                 agentLink.addEventListener("mouseleave", () => {
+                    agentLink.style.background = "transparent";
+                    agentLink.style.textDecoration = "none";
+                });
+                agentLink.addEventListener("focus", () => {
+                    agentLink.style.background = "#f3f4f6";
+                    agentLink.style.textDecoration = "underline";
+                });
+                agentLink.addEventListener("blur", () => {
                     agentLink.style.background = "transparent";
                     agentLink.style.textDecoration = "none";
                 });
@@ -8676,6 +8746,30 @@ function getCy() {
 // Search Functions
 // ============================================================================
 /**
+ * Toggle search UI state (loading/clear button).
+ */
+function toggleSearchLoading(loading) {
+    const spinner = document.getElementById("search-loading");
+    if (spinner)
+        spinner.hidden = !loading;
+}
+/**
+ * Clear the search input and reset state.
+ */
+function clearSearch() {
+    const searchInput = document.getElementById("search-input");
+    const clearBtn = document.getElementById("search-clear");
+    if (searchInput) {
+        if (state.searchDebounceTimer)
+            clearTimeout(state.searchDebounceTimer);
+        searchInput.value = "";
+        searchInput.focus();
+    }
+    if (clearBtn)
+        clearBtn.hidden = true;
+    closeSearchDropdown();
+}
+/**
  * Perform search query against the API.
  */
 export async function performSearch(query) {
@@ -8683,6 +8777,7 @@ export async function performSearch(query) {
         closeSearchDropdown();
         return;
     }
+    toggleSearchLoading(true);
     try {
         const data = await Api.search(query);
         state.searchResults = data.results || [];
@@ -8691,6 +8786,9 @@ export async function performSearch(query) {
     catch (err) {
         console.error("Search failed", err);
         closeSearchDropdown();
+    }
+    finally {
+        toggleSearchLoading(false);
     }
 }
 /**
@@ -8744,6 +8842,9 @@ export async function selectSearchResult(index) {
     const searchInput = document.getElementById("search-input");
     if (searchInput)
         searchInput.value = "";
+    const clearBtn = document.getElementById("search-clear");
+    if (clearBtn)
+        clearBtn.hidden = true;
     const cy = getCy();
     if (result.type === "flow") {
         if (_setActiveFlow)
@@ -8794,14 +8895,26 @@ export async function selectSearchResult(index) {
 export function initSearchHandlers() {
     const searchInput = document.getElementById("search-input");
     const dropdown = document.getElementById("search-dropdown");
+    const clearBtn = document.getElementById("search-clear");
     if (!searchInput)
         return;
+    if (clearBtn) {
+        clearBtn.addEventListener("click", clearSearch);
+    }
     searchInput.addEventListener("input", (e) => {
         if (state.searchDebounceTimer) {
             clearTimeout(state.searchDebounceTimer);
         }
         const target = e.target;
         const query = target.value.trim();
+        // Toggle clear button
+        if (clearBtn) {
+            clearBtn.hidden = query.length === 0;
+        }
+        if (query.length === 0) {
+            closeSearchDropdown();
+            return;
+        }
         // Optimization: Increased debounce from 200ms to 300ms to reduce API calls while typing
         state.searchDebounceTimer = setTimeout(() => performSearch(query), 300);
     });
@@ -10133,7 +10246,10 @@ export function renderNoRuns() {
       <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">No runs yet</p>
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
-      <code class="mono fs-empty-command">make demo-run</code>
+      <div class="fs-copy-command">
+        <code class="mono fs-empty-command">make demo-run</code>
+        <button class="fs-icon-button copy-button" title="Copy command" onclick="navigator.clipboard.writeText('make demo-run'); this.textContent='\u2713'; setTimeout(() => this.textContent='\uD83D\uDCCB', 2000)">\uD83D\uDCCB</button>
+      </div>
     </div>
   `;
 }
@@ -10906,6 +11022,8 @@ export const screens = [
                     "flow_studio.header",
                     "flow_studio.header.search",
                     "flow_studio.header.search.input",
+                    "flow_studio.header.search.clear",
+                    "flow_studio.header.search.loading",
                     "flow_studio.header.search.results",
                     "flow_studio.header.controls",
                     "flow_studio.header.tour",

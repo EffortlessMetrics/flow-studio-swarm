@@ -44,6 +44,31 @@ function getCy(): CytoscapeInstance | null {
 // ============================================================================
 
 /**
+ * Toggle search UI state (loading/clear button).
+ */
+function toggleSearchLoading(loading: boolean): void {
+  const spinner = document.getElementById("search-loading");
+  if (spinner) spinner.hidden = !loading;
+}
+
+/**
+ * Clear the search input and reset state.
+ */
+function clearSearch(): void {
+  const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
+  const clearBtn = document.getElementById("search-clear");
+
+  if (searchInput) {
+    if (state.searchDebounceTimer) clearTimeout(state.searchDebounceTimer);
+    searchInput.value = "";
+    searchInput.focus();
+  }
+  if (clearBtn) clearBtn.hidden = true;
+
+  closeSearchDropdown();
+}
+
+/**
  * Perform search query against the API.
  */
 export async function performSearch(query: string): Promise<void> {
@@ -52,6 +77,7 @@ export async function performSearch(query: string): Promise<void> {
     return;
   }
 
+  toggleSearchLoading(true);
   try {
     const data = await Api.search(query);
     state.searchResults = data.results || [];
@@ -59,6 +85,8 @@ export async function performSearch(query: string): Promise<void> {
   } catch (err) {
     console.error("Search failed", err);
     closeSearchDropdown();
+  } finally {
+    toggleSearchLoading(false);
   }
 }
 
@@ -117,6 +145,9 @@ export async function selectSearchResult(index: number): Promise<void> {
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
   if (searchInput) searchInput.value = "";
 
+  const clearBtn = document.getElementById("search-clear");
+  if (clearBtn) clearBtn.hidden = true;
+
   const cy = getCy();
 
   if (result.type === "flow") {
@@ -164,8 +195,13 @@ export async function selectSearchResult(index: number): Promise<void> {
 export function initSearchHandlers(): void {
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
   const dropdown = document.getElementById("search-dropdown");
+  const clearBtn = document.getElementById("search-clear");
 
   if (!searchInput) return;
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", clearSearch);
+  }
 
   searchInput.addEventListener("input", (e: Event) => {
     if (state.searchDebounceTimer) {
@@ -173,6 +209,17 @@ export function initSearchHandlers(): void {
     }
     const target = e.target as HTMLInputElement;
     const query = target.value.trim();
+
+    // Toggle clear button
+    if (clearBtn) {
+      clearBtn.hidden = query.length === 0;
+    }
+
+    if (query.length === 0) {
+      closeSearchDropdown();
+      return;
+    }
+
     // Optimization: Increased debounce from 200ms to 300ms to reduce API calls while typing
     state.searchDebounceTimer = setTimeout(() => performSearch(query), 300);
   });
