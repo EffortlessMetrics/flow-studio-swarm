@@ -5,6 +5,8 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,6 +37,9 @@ class StatsDBRebuildMixin:
             - error: Error message if failed
         """
         from .. import storage as storage_module
+
+        # Security check: Prevent path traversal
+        validate_path_component(run_id, "run_id")
 
         if runs_dir is None:
             runs_dir = storage_module.RUNS_DIR
@@ -242,6 +247,7 @@ def rebuild_stats_db(
 
     for run_id in run_ids:
         try:
+            validate_path_component(run_id, "run_id")
             run_path = runs_dir / run_id
             events_file = run_path / storage_module.EVENTS_FILE
 
