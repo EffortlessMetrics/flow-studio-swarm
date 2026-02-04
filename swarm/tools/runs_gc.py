@@ -86,7 +86,9 @@ def get_dir_size(path: Path) -> int:
     return total
 
 
-def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
+def get_run_info(
+    run_id: str, run_path: Path, run_type: str, compute_size: bool = True
+) -> RunInfo:
     """Collect information about a single run."""
     meta_path = run_path / META_FILE
     has_meta = meta_path.exists()
@@ -110,7 +112,7 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
         mtime = datetime.now(timezone.utc)
 
     # Get size
-    size_bytes = get_dir_size(run_path)
+    size_bytes = get_dir_size(run_path) if compute_size else 0
 
     return RunInfo(
         run_id=run_id,
@@ -124,7 +126,7 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     )
 
 
-def discover_all_runs() -> List[RunInfo]:
+def discover_all_runs(compute_size: bool = True) -> List[RunInfo]:
     """Discover all runs from runs/ and examples/ directories."""
     runs: List[RunInfo] = []
     seen: set[str] = set()
@@ -135,7 +137,11 @@ def discover_all_runs() -> List[RunInfo]:
             if entry.is_dir() and not entry.name.startswith("."):
                 if entry.name not in seen:
                     seen.add(entry.name)
-                    runs.append(get_run_info(entry.name, entry, "example"))
+                    runs.append(
+                        get_run_info(
+                            entry.name, entry, "example", compute_size=compute_size
+                        )
+                    )
 
     # Active runs with meta.json
     if RUNS_DIR.exists():
@@ -147,10 +153,18 @@ def discover_all_runs() -> List[RunInfo]:
 
                 meta_path = entry / META_FILE
                 if meta_path.exists():
-                    runs.append(get_run_info(entry.name, entry, "active"))
+                    runs.append(
+                        get_run_info(
+                            entry.name, entry, "active", compute_size=compute_size
+                        )
+                    )
                 else:
                     # Legacy run (no meta.json)
-                    runs.append(get_run_info(entry.name, entry, "legacy"))
+                    runs.append(
+                        get_run_info(
+                            entry.name, entry, "legacy", compute_size=compute_size
+                        )
+                    )
 
     return runs
 
@@ -281,7 +295,7 @@ def cmd_prune(args: argparse.Namespace) -> int:
         logger.info("Retention policy is disabled. Use --force to override.")
         return 0
 
-    runs = discover_all_runs()
+    runs = discover_all_runs(compute_size=False)
     if not runs:
         logger.info("No runs found.")
         return 0
@@ -311,6 +325,10 @@ def cmd_prune(args: argparse.Namespace) -> int:
             to_delete.append(run)
             continue
 
+    # Calculate size for runs to be deleted
+    for run in to_delete:
+        run.size_bytes = get_dir_size(run.path)
+
     # Report
     logger.info("=" * 60)
     logger.info("PRUNE OPERATION" + (" (DRY RUN)" if dry_run else ""))
@@ -330,7 +348,9 @@ def cmd_prune(args: argparse.Namespace) -> int:
     deleted_count = 0
     for run in to_delete:
         if dry_run:
-            logger.info(f"  [DRY-RUN] Would delete: {run.run_id} ({run.age_days:.1f} days old)")
+            logger.info(
+                f"  [DRY-RUN] Would delete: {run.run_id} ({run.age_days:.1f} days old)"
+            )
         else:
             try:
                 shutil.rmtree(run.path)
@@ -351,7 +371,7 @@ def cmd_quarantine(args: argparse.Namespace) -> int:
     """Move corrupt runs to quarantine directory."""
     dry_run = args.dry_run or is_dry_run_enabled()
 
-    runs = discover_all_runs()
+    runs = discover_all_runs(compute_size=False)
     corrupt_runs = [r for r in runs if r.is_corrupt]
 
     if not corrupt_runs:
@@ -402,17 +422,25 @@ def main() -> int:
 
     # list command
     list_parser = subparsers.add_parser("list", help="List runs with statistics")
-    list_parser.add_argument("-v", "--verbose", action="store_true", help="Show individual runs")
+    list_parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Show individual runs"
+    )
 
     # prune command
     prune_parser = subparsers.add_parser("prune", help="Apply retention policy")
     prune_parser.add_argument("--keep", type=int, help="Keep at most N runs")
     prune_parser.add_argument("--days", type=int, help="Keep runs younger than N days")
-    prune_parser.add_argument("--dry-run", action="store_true", help="Show what would be deleted")
-    prune_parser.add_argument("--force", action="store_true", help="Run even if retention disabled")
+    prune_parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be deleted"
+    )
+    prune_parser.add_argument(
+        "--force", action="store_true", help="Run even if retention disabled"
+    )
 
     # quarantine command
-    quarantine_parser = subparsers.add_parser("quarantine", help="Move corrupt runs to quarantine")
+    quarantine_parser = subparsers.add_parser(
+        "quarantine", help="Move corrupt runs to quarantine"
+    )
     quarantine_parser.add_argument(
         "--dry-run", action="store_true", help="Show what would be moved"
     )

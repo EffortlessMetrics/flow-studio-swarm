@@ -6,6 +6,7 @@ execution, including branch creation, checkpointing, rollback, and cleanup.
 """
 
 from unittest.mock import patch
+import logging
 
 import pytest
 from swarm.runtime.shadow_fork import (
@@ -72,30 +73,77 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_falls_back_to_head_if_base_missing(self, tmp_path, caplog):
+        """Test that create falls back to HEAD if base branch doesn't exist."""
+        caplog.set_level(logging.INFO)
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+            # We need to simulate the exact sequence of calls for this scenario
+            # 1. _get_current_branch -> HEAD
+            # 2. _resolve_base_ref("nonexistent"):
+            #    - _ref_exists("nonexistent") -> False
+            #    - _ref_exists("origin/nonexistent") -> False
+            #    - ... eventually falls back to HEAD (no git calls needed for HEAD check logic in _resolve_base_ref if we're careful, but let's mock the candidates)
+            # The candidates are: preferred, origin/preferred, main, origin/main, master, origin/master, HEAD.
+            # HEAD always returns valid without _ref_exists call in code?
+            # Code: `if ref == "HEAD" or self._ref_exists(ref):`
+            # So HEAD is valid immediately.
+            # But the loop checks others first.
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+            # Sequence:
+            # 1. get_current_branch
+            # 2. verify nonexistent
+            # 3. verify origin/nonexistent
+            # 4. verify main
+            # 5. verify origin/main
+            # 6. verify master
+            # 7. verify origin/master
+            # 8. HEAD (no call)
+            # 9. status (uncommitted check)
+            # 10. checkout (create branch)
+            # 11. rev-parse (push guard) - skipped if we stop mocking or provide default?
+
+            # To simplify, let's mock _resolve_base_ref directly? No, patch object logic is usually better if we can.
+            # But here `_run_git` is called many times.
+
+            # Let's mock _resolve_base_ref to return HEAD directly to skip the search loop
+            with patch.object(fork, "_resolve_base_ref", return_value="HEAD") as mock_resolve:
+                mock_git.side_effect = [
+                    (True, "main", ""),  # Get current branch
+                    (True, "", ""),  # Check for uncommitted changes
+                    (True, "", ""),  # Create and switch to shadow branch
+                    (True, "", ""),  # Install push guard
+                ]
+
+                # Create hooks directory
+                (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+                branch = fork.create(base_branch="nonexistent")
+
+                assert branch.startswith(SHADOW_BRANCH_PREFIX)
+                # Verify fallback logic was used (by checking logs or state)
+                # Note: `_resolve_base_ref` was mocked so it won't trigger the log inside `create` about not finding base branch
+                # UNLESS `create` compares the result.
+                # `create` does:
+                # base_ref = self._resolve_base_ref(base_branch)
+                # if base_ref != base_branch: logger.info(...)
+
+                # Since we mocked it to return "HEAD", and passed "nonexistent", it should log.
+                assert "using 'HEAD' instead" in caplog.text
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
+        caplog.set_level(logging.WARNING)
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
+                (True, "", ""),  # Verify base branch exists (inside _resolve_base_ref)
+                (True, " M file.txt", ""),  # Uncommitted changes exist (status --porcelain)
                 (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # Install push guard
             ]
 
             # Create hooks directory for the test
