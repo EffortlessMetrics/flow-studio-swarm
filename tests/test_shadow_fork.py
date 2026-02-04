@@ -72,38 +72,53 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_falls_back_to_head_if_base_branch_missing(self, tmp_path, caplog):
+        """Test that create falls back to HEAD if base branch doesn't exist."""
+        import logging
+        caplog.set_level(logging.INFO)
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        # Mock _resolve_base_ref to simulate fallback behavior
+        # This avoids brittle mocking of internal git calls in _resolve_base_ref
+        with patch.object(fork, "_resolve_base_ref", return_value="HEAD"):
+            with patch.object(fork, "_run_git") as mock_git:
+                mock_git.side_effect = [
+                    (True, "main", ""),  # Get current branch
+                    (True, "", ""),  # Check for uncommitted changes
+                    (True, "", ""),  # Create and switch to shadow branch
+                ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+                # Create hooks directory for the test
+                (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+                branch = fork.create(base_branch="nonexistent")
+
+                assert fork.base_branch == "HEAD"
+                # Check that fallback message is logged (from the create method)
+                # Note: The log comes from create() comparing return of _resolve_base_ref
+                assert "not found, using 'HEAD'" in caplog.text
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
+        import logging
+        caplog.set_level(logging.INFO)
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+        # Mock _resolve_base_ref to keep it simple
+        with patch.object(fork, "_resolve_base_ref", return_value="main"):
+            with patch.object(fork, "_run_git") as mock_git:
+                mock_git.side_effect = [
+                    (True, "main", ""),  # Get current branch
+                    (True, " M file.txt", ""),  # Uncommitted changes exist
+                    (True, "", ""),  # Create and switch to shadow branch
+                ]
 
-            # Create hooks directory for the test
-            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+                # Create hooks directory for the test
+                (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
-            fork.create()
+                fork.create()
 
-            assert "uncommitted changes" in caplog.text.lower()
+                assert "uncommitted changes" in caplog.text.lower()
 
 
 class TestShadowForkGetDiff:
