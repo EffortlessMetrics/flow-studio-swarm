@@ -204,3 +204,40 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_station_preview_path_validation():
+    """Test that station preview endpoint validates run_id."""
+    import asyncio
+    from unittest.mock import MagicMock, patch
+    from pathlib import Path
+    from fastapi.responses import JSONResponse
+    import json
+
+    from swarm.tools.flow_studio.routes.station_preview import api_station_compile_preview
+    from swarm.flowstudio.schema import CompilePreviewRequest
+
+    async def run_test():
+        # Mock state
+        mock_state = MagicMock()
+        mock_state.repo_root = Path("/tmp/mock_repo")
+
+        # Mock request with traversal payload
+        request = CompilePreviewRequest(
+            flow_id="test-flow",
+            step_id="test-step",
+            station_id="test-station",
+            run_id="../../etc/passwd"
+        )
+
+        # Patch SpecCompiler to ensure we don't actually try to compile if validation fails
+        with patch("swarm.spec.compiler.SpecCompiler") as MockCompiler:
+            # Call the endpoint
+            response = await api_station_compile_preview(request, mock_state)
+
+            # Check response
+            assert isinstance(response, JSONResponse)
+            assert response.status_code == 400
+            body = json.loads(response.body)
+            assert "invalid characters" in body.get("error", "") or "traversal sequence" in body.get("error", "")
+
+    asyncio.run(run_test())

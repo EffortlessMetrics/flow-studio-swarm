@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
+from swarm.runtime.safe_paths import validate_path_component
 from ..deps import get_state
 from ..state import FlowStudioState
 
@@ -29,6 +30,12 @@ async def api_station_compile_preview(
         from swarm.spec.compiler import COMPILER_VERSION, SpecCompiler
     except ImportError:
         return JSONResponse({"error": "SpecCompiler not available"}, status_code=503)
+
+    if request.run_id:
+        try:
+            validate_path_component(request.run_id, "run_id")
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
 
     run_base = state.repo_root / "swarm" / "runs" / (request.run_id or "default")
 
