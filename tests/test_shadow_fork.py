@@ -76,11 +76,13 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Patch _resolve_base_ref so we don't need to mock its git calls
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="main"):
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal: branch 'nonexistent' does not exist"),  # Checkout fails
             ]
 
             with pytest.raises(RuntimeError, match="does not exist"):
@@ -90,7 +92,9 @@ class TestShadowForkCreate:
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Patch _resolve_base_ref so we don't need to mock its git calls
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="main"):
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, " M file.txt", ""),  # Uncommitted changes exist
@@ -100,6 +104,10 @@ class TestShadowForkCreate:
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+            # Need to set log level to capture INFO
+            import logging
+            caplog.set_level(logging.INFO)
 
             fork.create()
 
