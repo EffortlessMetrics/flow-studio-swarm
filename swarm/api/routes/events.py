@@ -18,6 +18,8 @@ from typing import Any, AsyncGenerator, Dict, Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/runs", tags=["events"])
@@ -199,6 +201,8 @@ async def generate_run_events(
     Yields:
         SSE-formatted event strings.
     """
+    validate_path_component(run_id, "run_id")
+
     run_dir = runs_root / run_id
     events_file = run_dir / "events.jsonl"
     state_file = run_dir / "run_state.json"
@@ -353,6 +357,19 @@ async def stream_run_events(run_id: str, request: Request):
         event: run:completed
         data: {"run_id": "abc123", "status": "succeeded"}
     """
+    # Validate run_id to prevent path traversal
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_run_id",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
     # Get runs root from spec manager
     from ..server import get_spec_manager
 
