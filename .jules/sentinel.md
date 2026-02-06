@@ -1,0 +1,4 @@
+## 2026-02-12 - Path Traversal in Events Endpoint
+**Vulnerability:** The `stream_run_events` endpoint in `swarm/api/routes/events.py` lacked validation for the `run_id` parameter, allowing potential path traversal if a user supplied a crafted `run_id` (e.g. `../etc/passwd`). While the file extension (`events.jsonl` or `run_state.json`) was appended, restricting arbitrary file reads, it allowed checking for existence of files in other directories if they matched the naming convention.
+**Learning:** `fastapi` does not automatically validate path parameters against traversal. `pathlib.Path` resolves `..` components transparently. Explicit validation using `validate_path_component` is required for all file system access based on user input.
+**Prevention:** Always validate `run_id` and other path-like parameters using `swarm.runtime.safe_paths.validate_path_component` before using them to construct file paths.
