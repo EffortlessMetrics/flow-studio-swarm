@@ -199,6 +199,19 @@ export function initSearchHandlers() {
             closeSearchDropdown();
         }
     });
+    // Clear button handler
+    const clearButton = document.getElementById("search-clear");
+    if (clearButton && searchInput) {
+        clearButton.addEventListener("click", () => {
+            searchInput.value = "";
+            searchInput.focus();
+            if (state.searchDebounceTimer) {
+                clearTimeout(state.searchDebounceTimer);
+                state.searchDebounceTimer = null;
+            }
+            performSearch("");
+        });
+    }
     // Event delegation for search results
     if (dropdown) {
         dropdown.addEventListener("click", (e) => {
