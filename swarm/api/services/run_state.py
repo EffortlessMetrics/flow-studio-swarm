@@ -81,16 +81,12 @@ class RunStateManager:
             "error": None,
         }
 
-        # Create run directory
-        run_dir = self.runs_root / run_id
-        run_dir.mkdir(parents=True, exist_ok=True)
-
-        # Save state
+        # Save state (also creates directory)
         await self._save_state(run_id, state)
 
         return state
 
-    def _get_run_unlocked(self, run_id: str) -> tuple[Dict[str, Any], str]:
+    async def _get_run_unlocked(self, run_id: str) -> tuple[Dict[str, Any], str]:
         """Get run state without locking (internal use only)."""
         # Check cache first
         if run_id in self._cache:
@@ -98,11 +94,13 @@ class RunStateManager:
             return state, self._compute_etag(state)
 
         # Load from disk
-        state_path = self._state_path(run_id)
-        if not state_path.exists():
-            raise FileNotFoundError(f"Run '{run_id}' not found")
+        def load_state():
+            state_path = self._state_path(run_id)
+            if not state_path.exists():
+                raise FileNotFoundError(f"Run '{run_id}' not found")
+            return json.loads(state_path.read_text(encoding="utf-8"))
 
-        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state = await asyncio.to_thread(load_state)
         self._cache[run_id] = state
         return state, self._compute_etag(state)
 
@@ -110,7 +108,7 @@ class RunStateManager:
         """Get run state with ETag."""
         validate_path_component(run_id, "run_id")
         async with self._get_lock(run_id):
-            return self._get_run_unlocked(run_id)
+            return await self._get_run_unlocked(run_id)
 
     async def update_run(
         self,
@@ -121,10 +119,12 @@ class RunStateManager:
         """Update run state with optional ETag check."""
         validate_path_component(run_id, "run_id")
         async with self._get_lock(run_id):
-            state, current_etag = self._get_run_unlocked(run_id)
+            state, current_etag = await self._get_run_unlocked(run_id)
 
             if expected_etag and expected_etag != current_etag:
-                raise ValueError(f"ETag mismatch: expected {expected_etag}, got {current_etag}")
+                raise ValueError(
+                    f"ETag mismatch: expected {expected_etag}, got {current_etag}"
+                )
 
             # Apply updates
             state.update(updates)
@@ -135,15 +135,22 @@ class RunStateManager:
 
     async def _save_state(self, run_id: str, state: Dict[str, Any]) -> None:
         """Save state to disk and cache."""
-        state_path = self._state_path(run_id)
-        state_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write atomically
-        tmp_path = state_path.with_suffix(".tmp")
-        tmp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
-        os.replace(tmp_path, state_path)
+        def write_state():
+            state_path = self._state_path(run_id)
+            state_path.parent.mkdir(parents=True, exist_ok=True)
 
+            # Write atomically
+            tmp_path = state_path.with_suffix(".tmp")
+            tmp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            os.replace(tmp_path, state_path)
+
+        await asyncio.to_thread(write_state)
         self._cache[run_id] = state
+
+    async def list_runs_async(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """List runs asynchronously to prevent blocking the event loop."""
+        return await asyncio.to_thread(self.list_runs, limit)
 
     def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
         """List recent runs.
@@ -183,9 +190,11 @@ class RunStateManager:
                 runs.append(
                     {
                         "run_id": state.get("run_id", run_dir.name),
-                        "flow_key": state.get("flow_id", "").split("-")[-1]
-                        if state.get("flow_id")
-                        else None,
+                        "flow_key": (
+                            state.get("flow_id", "").split("-")[-1]
+                            if state.get("flow_id")
+                            else None
+                        ),
                         "status": state.get("status"),
                         "timestamp": state.get("created_at"),
                     }
