@@ -212,6 +212,19 @@ export function initSearchHandlers(): void {
   });
 
   // Event delegation for search results
+  const searchClear = document.getElementById("search-clear");
+  if (searchClear) {
+    searchClear.addEventListener("click", () => {
+      if (state.searchDebounceTimer) {
+        clearTimeout(state.searchDebounceTimer);
+        state.searchDebounceTimer = null;
+      }
+      searchInput.value = "";
+      closeSearchDropdown();
+      searchInput.focus();
+    });
+  }
+
   if (dropdown) {
     dropdown.addEventListener("click", (e: MouseEvent) => {
       const target = e.target as HTMLElement;
