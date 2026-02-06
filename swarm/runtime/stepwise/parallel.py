@@ -252,9 +252,8 @@ class ParallelExecutor:
             ForkResult with aggregated results.
         """
         # Use asyncio.run() to execute the async version
-        return asyncio.get_event_loop().run_until_complete(
-            self.execute_fork(run_id, fork_config, contexts, join_config)
-        )
+        # This creates a new event loop if one is not running, ensuring isolation
+        return asyncio.run(self.execute_fork(run_id, fork_config, contexts, join_config))
 
     async def execute_fork(
         self,
