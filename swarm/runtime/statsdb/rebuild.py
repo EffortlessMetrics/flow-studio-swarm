@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -129,9 +130,15 @@ class StatsDBRebuildMixin:
                 logger.warning("Runs directory does not exist: %s", runs_dir)
                 return stats
 
-            run_ids = [
-                d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")
-            ]
+            run_ids = []
+            try:
+                with os.scandir(runs_dir) as it:
+                    for entry in it:
+                        if entry.is_dir() and not entry.name.startswith("."):
+                            run_ids.append(entry.name)
+            except OSError as e:
+                logger.warning("Error scanning runs directory %s: %s", runs_dir, e)
+                return stats
 
         logger.info("Rebuilding projections for %d runs", len(run_ids))
 
@@ -236,7 +243,15 @@ def rebuild_stats_db(
             logger.warning("Runs directory does not exist: %s", runs_dir)
             return stats
 
-        run_ids = [d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
+        run_ids = []
+        try:
+            with os.scandir(runs_dir) as it:
+                for entry in it:
+                    if entry.is_dir() and not entry.name.startswith("."):
+                        run_ids.append(entry.name)
+        except OSError as e:
+            logger.warning("Error scanning runs directory %s: %s", runs_dir, e)
+            return stats
 
     logger.info("Rebuilding stats DB from %d runs", len(run_ids))
 
@@ -278,43 +293,45 @@ def rebuild_stats_db(
             # Set ingestion context to allow record_* calls (projection-only mode)
             _ingestion_context.active = True
             try:
-                for flow_dir in run_path.iterdir():
-                    if not flow_dir.is_dir() or flow_dir.name.startswith("."):
-                        continue
+                with os.scandir(run_path) as it:
+                    for flow_dir_entry in it:
+                        if not flow_dir_entry.is_dir() or flow_dir_entry.name.startswith("."):
+                            continue
 
-                    handoff_dir = flow_dir / "handoff"
-                    if not handoff_dir.exists():
-                        continue
+                        flow_dir = Path(flow_dir_entry.path)
+                        handoff_dir = flow_dir / "handoff"
+                        if not handoff_dir.exists():
+                            continue
 
-                    for envelope_file in handoff_dir.glob("*.json"):
-                        try:
-                            with envelope_file.open("r", encoding="utf-8") as f:
-                                envelope_data = json.load(f)
+                        for envelope_file in handoff_dir.glob("*.json"):
+                            try:
+                                with envelope_file.open("r", encoding="utf-8") as f:
+                                    envelope_data = json.load(f)
 
-                            # Record file changes from envelope if present
-                            file_changes = envelope_data.get("file_changes", {})
-                            if file_changes and "files" in file_changes:
-                                step_id = envelope_data.get("step_id", envelope_file.stem)
-                                for fc in file_changes.get("files", []):
-                                    db.record_file_change(
-                                        run_id=run_id,
-                                        step_id=step_id,
-                                        file_path=fc.get("path", ""),
-                                        change_type=fc.get("status", "modified"),
-                                        lines_added=fc.get("insertions", 0),
-                                        lines_removed=fc.get("deletions", 0),
-                                    )
+                                # Record file changes from envelope if present
+                                file_changes = envelope_data.get("file_changes", {})
+                                if file_changes and "files" in file_changes:
+                                    step_id = envelope_data.get("step_id", envelope_file.stem)
+                                    for fc in file_changes.get("files", []):
+                                        db.record_file_change(
+                                            run_id=run_id,
+                                            step_id=step_id,
+                                            file_path=fc.get("path", ""),
+                                            change_type=fc.get("status", "modified"),
+                                            lines_added=fc.get("insertions", 0),
+                                            lines_removed=fc.get("deletions", 0),
+                                        )
 
-                            stats["envelopes_processed"] += 1
+                                stats["envelopes_processed"] += 1
 
-                        except (json.JSONDecodeError, IOError) as e:
-                            stats["errors"].append(
-                                {
-                                    "run_id": run_id,
-                                    "file": str(envelope_file),
-                                    "error": str(e),
-                                }
-                            )
+                            except (json.JSONDecodeError, IOError) as e:
+                                stats["errors"].append(
+                                    {
+                                        "run_id": run_id,
+                                        "file": str(envelope_file),
+                                        "error": str(e),
+                                    }
+                                )
             finally:
                 _ingestion_context.active = False
 
