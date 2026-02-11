@@ -1,4 +1,8 @@
 import pytest
+import asyncio
+from unittest.mock import MagicMock, patch, AsyncMock
+from fastapi import HTTPException, Request
+
 from swarm.runtime import storage
 from swarm.runtime.safe_paths import validate_path_component
 from swarm.tools.flow_studio.services import run_artifacts
@@ -204,3 +208,46 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+@pytest.mark.anyio
+async def test_stream_run_events_path_validation(tmp_path):
+    """Test that stream_run_events validates run_id against path traversal."""
+    from swarm.api.routes.events import stream_run_events
+    from swarm.api.services.spec_manager import SpecManager
+
+    # Mock SpecManager
+    manager = MagicMock(spec=SpecManager)
+    manager.runs_root = tmp_path / "runs"
+    manager.runs_root.mkdir()
+
+    # Mock request
+    mock_request = MagicMock(spec=Request)
+    mock_request.is_disconnected = AsyncMock(return_value=False)
+
+    # run_id with traversal
+    run_id = "../secret"
+
+    # Patch get_spec_manager used inside stream_run_events
+    with patch("swarm.api.server.get_spec_manager", return_value=manager):
+        # We expect HTTPException with status 400
+        with pytest.raises(HTTPException) as excinfo:
+            await stream_run_events(run_id, mock_request)
+
+        assert excinfo.value.status_code == 400
+        assert excinfo.value.detail["error"] == "invalid_run_id"
+
+@pytest.mark.anyio
+async def test_write_event_path_validation(tmp_path):
+    """Test that write_event validates run_id."""
+    from swarm.api.routes.events import write_event
+
+    with pytest.raises(ValueError, match="run_id"):
+        await write_event("../bad", tmp_path, "event", {})
+
+def test_write_event_sync_path_validation(tmp_path):
+    """Test that write_event_sync validates run_id."""
+    from swarm.api.routes.events import write_event_sync
+
+    with pytest.raises(ValueError, match="run_id"):
+        write_event_sync("../bad", tmp_path, "event", {})
