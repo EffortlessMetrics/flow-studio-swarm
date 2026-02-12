@@ -206,6 +206,13 @@ SKIP_PATTERNS = [
     "**/run_state.json",  # Stepwise state machine uses advance/terminate/error/loop
 ]
 
+# Files to suppress warnings for (still checked for violations)
+# These files document or check for the legacy patterns, so warnings are expected.
+SUPPRESS_WARNINGS_PATTERNS = [
+    "**/docs/RELEASE_CHECKLIST.md",
+    "**/swarm/prompts/agentic_steps/self-reviewer.md",
+]
+
 # File extensions to check
 CHECK_EXTENSIONS = {".md", ".yaml", ".yml", ".json", ".py", ".ts", ".tsx"}
 
@@ -243,6 +250,15 @@ def should_skip_file(file_path: Path) -> bool:
     return False
 
 
+def should_suppress_warnings(file_path: Path) -> bool:
+    """Check if warnings should be suppressed for this file."""
+    path_str = str(file_path)
+    for pattern in SUPPRESS_WARNINGS_PATTERNS:
+        if pattern.replace("**/", "").replace("/**", "") in path_str:
+            return True
+    return False
+
+
 def check_file(
     file_path: Path, check_new: bool = False
 ) -> Tuple[List[Violation], List[RoutingUsage]]:
@@ -261,6 +277,7 @@ def check_file(
     if should_skip_file(file_path):
         return [], []
 
+    suppress_warnings = should_suppress_warnings(file_path)
     violations = []
     usages = []
 
@@ -288,8 +305,9 @@ def check_file(
 
         # Check legacy warning patterns (only if not already matched as violation)
         # Skip warnings if the line already has a violation to avoid duplicates
+        # Also skip if warnings are suppressed for this file
         line_has_violation = any(v.line_num == line_num for v in violations)
-        if not line_has_violation:
+        if not line_has_violation and not suppress_warnings:
             for pattern, desc in LEGACY_WARNING_PATTERNS:
                 if re.search(pattern, line, re.IGNORECASE):
                     violations.append(
