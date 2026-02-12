@@ -180,7 +180,8 @@ import {
   createQuickCommands,
   createPathWithCopy,
   escapeHtml,
-  copyToClipboard
+  copyToClipboard,
+  initGlobalCopyHandler
 } from "./utils.js";
 
 // ============================================================================
@@ -931,19 +932,8 @@ window.addEventListener("load", async () => {
       btn.addEventListener("click", reloadConfig);
     }
 
-    // Header copy button handler
-    const copyDevCheckBtn = document.getElementById("copy-dev-check-btn");
-    if (copyDevCheckBtn) {
-      copyDevCheckBtn.addEventListener("click", () => {
-        void copyToClipboard("make dev-check");
-        copyDevCheckBtn.textContent = "Copied!";
-        copyDevCheckBtn.classList.add("copied");
-        setTimeout(() => {
-          copyDevCheckBtn.textContent = "Copy";
-          copyDevCheckBtn.classList.remove("copied");
-        }, 1500);
-      });
-    }
+    // Initialize global copy handler (delegated)
+    initGlobalCopyHandler();
 
     // Help button handler
     const helpBtn = document.getElementById("help-btn");

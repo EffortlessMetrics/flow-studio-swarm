@@ -74,22 +74,63 @@ export function copyToClipboard(text: string): Promise<void> {
 }
 
 /**
+ * Global copy handler initialization.
+ *
+ * Sets up event delegation for all elements with .copy-btn class and data-copy-text attribute.
+ * This handles both static HTML fragments and dynamically added content.
+ */
+export function initGlobalCopyHandler(): void {
+  document.body.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    // Check if clicked element or its parent is a copy button
+    const copyBtn = target.closest(".copy-btn") as HTMLButtonElement | null;
+
+    if (!copyBtn || !copyBtn.dataset.copyText) return;
+
+    // Prevent default button behavior
+    e.preventDefault();
+    e.stopPropagation();
+
+    const text = copyBtn.dataset.copyText;
+    const originalText = copyBtn.textContent || "Copy";
+    const originalLabel = copyBtn.getAttribute("aria-label");
+
+    void copyToClipboard(text);
+
+    // Visual feedback
+    copyBtn.textContent = "Copied!";
+    copyBtn.classList.add("copied");
+
+    // Accessibility feedback
+    copyBtn.setAttribute("aria-label", "Copied to clipboard");
+
+    // Revert after delay
+    setTimeout(() => {
+      // Only revert if the button is still in the document
+      if (document.body.contains(copyBtn)) {
+        copyBtn.textContent = originalText;
+        copyBtn.classList.remove("copied");
+        if (originalLabel) {
+          copyBtn.setAttribute("aria-label", originalLabel);
+        } else {
+          copyBtn.removeAttribute("aria-label");
+        }
+      }
+    }, 1500);
+  });
+}
+
+/**
  * Create a copy button element
  */
 export function createCopyButton(text: string, label = "Copy"): HTMLButtonElement {
   const btn = document.createElement("button");
   btn.className = "copy-btn";
+  btn.dataset.copyText = text;
   btn.textContent = label;
   btn.title = "Copy to clipboard";
-  btn.addEventListener("click", () => {
-    void copyToClipboard(text);
-    btn.textContent = "Copied!";
-    btn.classList.add("copied");
-    setTimeout(() => {
-      btn.textContent = label;
-      btn.classList.remove("copied");
-    }, 1500);
-  });
+  btn.setAttribute("aria-label", `Copy ${text}`);
+  // No need for click listener - handled by initGlobalCopyHandler
   return btn;
 }
 
