@@ -192,6 +192,19 @@ export function initSearchHandlers() {
             }
         }
     });
+    // Clear search button handler
+    const clearBtn = document.getElementById("search-clear");
+    if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+            searchInput.value = "";
+            searchInput.focus();
+            if (state.searchDebounceTimer) {
+                clearTimeout(state.searchDebounceTimer);
+                state.searchDebounceTimer = null;
+            }
+            performSearch("");
+        });
+    }
     // Close dropdown when clicking outside
     document.addEventListener("click", (e) => {
         const target = e.target;
