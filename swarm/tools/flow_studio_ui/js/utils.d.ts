@@ -19,6 +19,13 @@ export declare function escapeHtml(text: string | null): string;
  */
 export declare function copyToClipboard(text: string): Promise<void>;
 /**
+ * Global copy handler initialization.
+ *
+ * Sets up event delegation for all elements with .copy-btn class and data-copy-text attribute.
+ * This handles both static HTML fragments and dynamically added content.
+ */
+export declare function initGlobalCopyHandler(): void;
+/**
  * Create a copy button element
  */
 export declare function createCopyButton(text: string, label?: string): HTMLButtonElement;
