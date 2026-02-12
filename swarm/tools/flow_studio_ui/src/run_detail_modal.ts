@@ -520,7 +520,7 @@ function attachActionHandlers(modal: HTMLElement, runId: string, summary?: Exten
   // Copy Run ID button
   const copyContainer = modal.querySelector("#run-detail-id-copy");
   if (copyContainer) {
-    const copyBtn = createCopyButton(runId, "Copy");
+    const copyBtn = createCopyButton(runId, "Copy", "Copy run ID to clipboard");
     // Style adjustments for inline appearance
     copyBtn.style.marginLeft = "8px";
     copyBtn.style.padding = "2px 6px";
