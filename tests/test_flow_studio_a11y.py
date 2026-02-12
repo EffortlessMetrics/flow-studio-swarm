@@ -81,33 +81,33 @@ class TestLandmarks:
         """Page should have a banner landmark (header)."""
         html = get_flow_studio_html()
         # Either <header> or role="banner"
-        assert "<header" in html or 'role="banner"' in html, (
-            "Page should have a banner landmark for the header region"
-        )
+        assert (
+            "<header" in html or 'role="banner"' in html
+        ), "Page should have a banner landmark for the header region"
 
     def test_has_main_landmark(self):
         """Page should have a main landmark."""
         html = get_flow_studio_html()
         # Either <main> or role="main"
-        assert "<main" in html or 'role="main"' in html, (
-            "Page should have a main landmark for primary content"
-        )
+        assert (
+            "<main" in html or 'role="main"' in html
+        ), "Page should have a main landmark for primary content"
 
     def test_has_navigation_landmark(self):
         """Page should have a navigation landmark."""
         html = get_flow_studio_html()
         # Either <nav> or role="navigation"
-        assert "<nav" in html or 'role="navigation"' in html, (
-            "Page should have a navigation landmark for the sidebar"
-        )
+        assert (
+            "<nav" in html or 'role="navigation"' in html
+        ), "Page should have a navigation landmark for the sidebar"
 
     def test_has_complementary_landmark(self):
         """Page should have a complementary landmark (aside/inspector)."""
         html = get_flow_studio_html()
         # Either <aside> or role="complementary"
-        assert "<aside" in html or 'role="complementary"' in html, (
-            "Page should have a complementary landmark for the inspector panel"
-        )
+        assert (
+            "<aside" in html or 'role="complementary"' in html
+        ), "Page should have a complementary landmark for the inspector panel"
 
 
 # ============================================================================
@@ -163,9 +163,9 @@ class TestModalAccessibility:
         dialogs = dialog_pattern.findall(html)
 
         for dialog in dialogs:
-            assert "aria-modal=" in dialog, (
-                f"Dialog should have aria-modal attribute: {dialog[:100]}"
-            )
+            assert (
+                "aria-modal=" in dialog
+            ), f"Dialog should have aria-modal attribute: {dialog[:100]}"
 
     def test_modals_have_aria_labelledby(self):
         """Modal dialogs should have aria-labelledby for accessible name."""
@@ -175,27 +175,27 @@ class TestModalAccessibility:
         dialogs = dialog_pattern.findall(html)
 
         for dialog in dialogs:
-            assert "aria-labelledby=" in dialog, (
-                f"Dialog should have aria-labelledby: {dialog[:100]}"
-            )
+            assert (
+                "aria-labelledby=" in dialog
+            ), f"Dialog should have aria-labelledby: {dialog[:100]}"
 
     def test_focus_trap_utilities_exist(self):
         """Focus trap utilities should be available for modals."""
         sources = get_ts_sources()
         utils_ts = sources.get("utils.ts", "")
 
-        assert "createFocusTrap" in utils_ts, (
-            "Focus trap utility should exist for modal accessibility"
-        )
+        assert (
+            "createFocusTrap" in utils_ts
+        ), "Focus trap utility should exist for modal accessibility"
 
     def test_modal_focus_manager_exists(self):
         """Modal focus manager should be available."""
         sources = get_ts_sources()
         utils_ts = sources.get("utils.ts", "")
 
-        assert "createModalFocusManager" in utils_ts, (
-            "Modal focus manager should exist for focus restoration"
-        )
+        assert (
+            "createModalFocusManager" in utils_ts
+        ), "Modal focus manager should exist for focus restoration"
 
 
 # ============================================================================
@@ -224,9 +224,9 @@ class TestInteractiveElements:
             has_aria_labelledby = "aria-labelledby=" in button
             has_title = "title=" in button  # title is acceptable fallback
 
-            assert has_aria_label or has_aria_labelledby or text_content or has_title, (
-                f"Button should have accessible name: {button[:100]}"
-            )
+            assert (
+                has_aria_label or has_aria_labelledby or text_content or has_title
+            ), f"Button should have accessible name: {button[:100]}"
 
     def test_select_elements_have_labels(self):
         """Select elements should have associated labels."""
@@ -250,9 +250,9 @@ class TestInteractiveElements:
                 label_pattern = rf'<label[^>]*for="{select_id}"'
                 has_label = bool(re.search(label_pattern, html))
 
-            assert has_label or has_aria_label, (
-                f"Select '{select_id}' should have an associated label or aria-label"
-            )
+            assert (
+                has_label or has_aria_label
+            ), f"Select '{select_id}' should have an associated label or aria-label"
 
 
 # ============================================================================
@@ -267,7 +267,9 @@ class TestKeyboardNavigation:
         """Keyboard shortcuts should be documented in TypeScript."""
         sources = get_ts_sources()
 
-        assert "shortcuts.ts" in sources, "Shortcuts module should exist for keyboard navigation"
+        assert (
+            "shortcuts.ts" in sources
+        ), "Shortcuts module should exist for keyboard navigation"
 
     def test_shortcuts_include_common_keys(self):
         """Common keyboard shortcuts should be implemented."""
@@ -279,12 +281,12 @@ class TestKeyboardNavigation:
         # Common navigation keys
         assert "Escape" in all_ts, "Escape key should be handled"
         # Enter is handled in search module for form submission
-        assert "Enter" in all_ts or "submit" in all_ts.lower(), (
-            "Enter key or form submission should be handled"
-        )
-        assert "?" in shortcuts_ts or "helpKey" in shortcuts_ts.lower(), (
-            "Help shortcut (?) should be available"
-        )
+        assert (
+            "Enter" in all_ts or "submit" in all_ts.lower()
+        ), "Enter key or form submission should be handled"
+        assert (
+            "?" in shortcuts_ts or "helpKey" in shortcuts_ts.lower()
+        ), "Help shortcut (?) should be available"
 
     def test_search_has_keyboard_shortcut(self):
         """Search should have a keyboard shortcut (/)."""
@@ -292,9 +294,9 @@ class TestKeyboardNavigation:
         shortcuts_ts = sources.get("shortcuts.ts", "")
 
         # Search is typically bound to /
-        assert '"/"' in shortcuts_ts or "search" in shortcuts_ts.lower(), (
-            "Search should have keyboard shortcut"
-        )
+        assert (
+            '"/"' in shortcuts_ts or "search" in shortcuts_ts.lower()
+        ), "Search should have keyboard shortcut"
 
 
 # ============================================================================
@@ -313,7 +315,9 @@ class TestLiveRegions:
         has_status = 'role="status"' in html
         has_live = "aria-live=" in html
 
-        assert has_status or has_live, "Page should have a live region for status announcements"
+        assert (
+            has_status or has_live
+        ), "Page should have a live region for status announcements"
 
     def test_governance_badge_announces_changes(self):
         """Governance badge should be in a live region."""
@@ -328,9 +332,9 @@ class TestLiveRegions:
         # Also check if there's a general status region
         has_status = 'role="status"' in html
 
-        assert governance_pattern.search(html) or has_status, (
-            "Governance status should be announced to assistive technology"
-        )
+        assert (
+            governance_pattern.search(html) or has_status
+        ), "Governance status should be announced to assistive technology"
 
 
 # ============================================================================
@@ -343,14 +347,23 @@ class TestColorAccessibility:
 
     def test_css_defines_high_contrast_colors(self):
         """CSS should define color tokens that support adequate contrast."""
-        css_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "css" / "flow-studio.base.css"
+        css_file = (
+            repo_root
+            / "swarm"
+            / "tools"
+            / "flow_studio_ui"
+            / "css"
+            / "flow-studio.base.css"
+        )
         if not css_file.exists():
             pytest.skip("CSS file not found")
 
         css_content = css_file.read_text(encoding="utf-8")
 
         # Check for color token definitions
-        assert "--fs-color-" in css_content, "CSS should use design tokens for consistent colors"
+        assert (
+            "--fs-color-" in css_content
+        ), "CSS should use design tokens for consistent colors"
 
     def test_status_not_color_only(self):
         """Status indicators should not rely on color alone."""
@@ -365,9 +378,9 @@ class TestColorAccessibility:
         # (This is a heuristic - full check requires visual inspection)
         if matches:
             non_empty = [m for m in matches if m.strip()]
-            assert len(non_empty) > 0 or "aria-label" in html, (
-                "Status indicators should have text labels, not color alone"
-            )
+            assert (
+                len(non_empty) > 0 or "aria-label" in html
+            ), "Status indicators should have text labels, not color alone"
 
 
 # ============================================================================
@@ -394,6 +407,12 @@ class TestUIReadyHandshake:
         # Check any TypeScript file for the states
         all_ts = " ".join(sources.values())
 
-        assert '"loading"' in all_ts or "'loading'" in all_ts, "UI should have 'loading' state"
-        assert '"ready"' in all_ts or "'ready'" in all_ts, "UI should have 'ready' state"
-        assert '"error"' in all_ts or "'error'" in all_ts, "UI should have 'error' state"
+        assert (
+            '"loading"' in all_ts or "'loading'" in all_ts
+        ), "UI should have 'loading' state"
+        assert (
+            '"ready"' in all_ts or "'ready'" in all_ts
+        ), "UI should have 'ready' state"
+        assert (
+            '"error"' in all_ts or "'error'" in all_ts
+        ), "UI should have 'error' state"
