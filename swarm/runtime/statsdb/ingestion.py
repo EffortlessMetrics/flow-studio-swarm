@@ -552,7 +552,17 @@ class StatsDBIngestionMixin:
         # Set ingestion context to allow record_* calls
         _ingestion_context.active = True
         try:
-            return self._ingest_events_internal(events, run_id)
+            # Optimize: use a single transaction for the entire batch
+            # This significantly reduces I/O overhead compared to per-row commits
+            with self._lock:
+                self.connection.execute("BEGIN TRANSACTION")
+                try:
+                    result = self._ingest_events_internal(events, run_id)
+                    self.connection.execute("COMMIT")
+                    return result
+                except Exception:
+                    self.connection.execute("ROLLBACK")
+                    raise
         finally:
             _ingestion_context.active = False
 
