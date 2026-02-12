@@ -76,11 +76,14 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Patch _resolve_base_ref to return our target directly, skipping git checks
+        with patch.object(
+            fork, "_resolve_base_ref", return_value="nonexistent"
+        ), patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "", ""),  # Check status (no uncommitted changes)
+                (False, "", "fatal: does not exist"),  # Checkout fails
             ]
 
             with pytest.raises(RuntimeError, match="does not exist"):
@@ -90,12 +93,15 @@ class TestShadowForkCreate:
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Patch _resolve_base_ref to return main directly
+        with patch.object(fork, "_resolve_base_ref", return_value="main"), patch.object(
+            fork, "_run_git"
+        ) as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # Install push guard hook (via rev-parse)
             ]
 
             # Create hooks directory for the test
