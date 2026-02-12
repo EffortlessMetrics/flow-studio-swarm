@@ -76,11 +76,12 @@ export function copyToClipboard(text: string): Promise<void> {
 /**
  * Create a copy button element
  */
-export function createCopyButton(text: string, label = "Copy"): HTMLButtonElement {
+export function createCopyButton(text: string, label = "Copy", ariaLabel = "Copy to clipboard"): HTMLButtonElement {
   const btn = document.createElement("button");
   btn.className = "copy-btn";
   btn.textContent = label;
   btn.title = "Copy to clipboard";
+  btn.setAttribute("aria-label", ariaLabel);
   btn.addEventListener("click", () => {
     void copyToClipboard(text);
     btn.textContent = "Copied!";
@@ -105,7 +106,7 @@ export function createPathWithCopy(path: string): HTMLDivElement {
   pathSpan.textContent = path;
 
   container.appendChild(pathSpan);
-  container.appendChild(createCopyButton(path, "Copy"));
+  container.appendChild(createCopyButton(path, "Copy", `Copy path: ${path}`));
 
   return container;
 }
@@ -131,7 +132,7 @@ export function createQuickCommands(commands: string[]): HTMLDivElement {
     cmdText.textContent = "$ " + cmd;
 
     line.appendChild(cmdText);
-    line.appendChild(createCopyButton(cmd, "Copy"));
+    line.appendChild(createCopyButton(cmd, "Copy", `Copy command: ${cmd}`));
     container.appendChild(line);
   });
 

@@ -21,7 +21,7 @@ export declare function copyToClipboard(text: string): Promise<void>;
 /**
  * Create a copy button element
  */
-export declare function createCopyButton(text: string, label?: string): HTMLButtonElement;
+export declare function createCopyButton(text: string, label?: string, ariaLabel?: string): HTMLButtonElement;
 /**
  * Create a path display with copy button
  */
