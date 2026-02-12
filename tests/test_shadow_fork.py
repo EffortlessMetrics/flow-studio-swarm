@@ -76,26 +76,39 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Mock _resolve_base_ref to return what we want, so we verify _run_git logic
+        # But actually, create() relies on _resolve_base_ref logic to find the branch.
+        # If we want to test that create() fails when checkout fails (because ref is bad),
+        # we can let _resolve_base_ref return something but make checkout fail.
+        # Or, we can let _resolve_base_ref do its thing but mock _run_git carefully.
+        #
+        # Better approach: Patch _resolve_base_ref to avoid internal git calls
+        # and patch _run_git to fail on checkout.
+        with patch.object(fork, "_resolve_base_ref", return_value="nonexistent"), \
+             patch.object(fork, "_run_git") as mock_git:
+
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal: invalid reference: nonexistent"),  # checkout -b fails
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Patch _resolve_base_ref so it doesn't consume mock_git calls
+        with patch.object(fork, "_resolve_base_ref", return_value="main"), \
+             patch.object(fork, "_run_git") as mock_git:
+
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # Block push (optional, depending on implementation detail)
             ]
 
             # Create hooks directory for the test
