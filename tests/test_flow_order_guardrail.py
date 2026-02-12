@@ -60,7 +60,7 @@ ALLOWED_VIOLATIONS: Dict[str, Dict[int, str]] = {
     },
     # Fallback when registry import fails - acceptable since it tries registry first
     "swarm/tools/validation/reporting/json_output.py": {
-        126: "Fallback constant when flow_registry import fails",
+        139: "Fallback constant when flow_registry import fails",
     },
     # Run plan defaults - defines example configurations
     "swarm/runtime/run_plan_api.py": {
@@ -159,10 +159,16 @@ def _find_violations(
     lines = content.split("\n")
 
     patterns = [
-        (FLOW_LIST_START_PATTERN, "hardcoded flow list starting with signal/plan/build"),
+        (
+            FLOW_LIST_START_PATTERN,
+            "hardcoded flow list starting with signal/plan/build",
+        ),
         (FLOW_LIST_6_PATTERN, "hardcoded 6-flow list (missing review)"),
         (FLOW_LIST_7_PATTERN, "hardcoded 7-flow list"),
-        (FLOW_TUPLE_START_PATTERN, "hardcoded flow tuple starting with signal/plan/build"),
+        (
+            FLOW_TUPLE_START_PATTERN,
+            "hardcoded flow tuple starting with signal/plan/build",
+        ),
     ]
 
     for line_num, line in enumerate(lines, start=1):
@@ -222,7 +228,9 @@ class TestFlowOrderGuardrail:
                 )
                 for line_num, pattern_name, matched_text in violations:
                     relative_path = py_file.relative_to(project_root)
-                    all_violations.append((relative_path, line_num, pattern_name, matched_text))
+                    all_violations.append(
+                        (relative_path, line_num, pattern_name, matched_text)
+                    )
 
         if all_violations:
             msg = (
@@ -257,18 +265,32 @@ class TestFlowOrderGuardrail:
         assert "signal" in order, "signal flow should be in order"
         assert "plan" in order, "plan flow should be in order"
         assert "build" in order, "build flow should be in order"
-        assert "review" in order, "review flow should be in order (it's now a real flow)"
+        assert (
+            "review" in order
+        ), "review flow should be in order (it's now a real flow)"
         assert "gate" in order, "gate flow should be in order"
         assert "deploy" in order, "deploy flow should be in order"
         assert "wisdom" in order, "wisdom flow should be in order"
 
         # Order should be correct (signal before plan, plan before build, etc.)
-        assert order.index("signal") < order.index("plan"), "signal should come before plan"
-        assert order.index("plan") < order.index("build"), "plan should come before build"
-        assert order.index("build") < order.index("review"), "build should come before review"
-        assert order.index("review") < order.index("gate"), "review should come before gate"
-        assert order.index("gate") < order.index("deploy"), "gate should come before deploy"
-        assert order.index("deploy") < order.index("wisdom"), "deploy should come before wisdom"
+        assert order.index("signal") < order.index(
+            "plan"
+        ), "signal should come before plan"
+        assert order.index("plan") < order.index(
+            "build"
+        ), "plan should come before build"
+        assert order.index("build") < order.index(
+            "review"
+        ), "build should come before review"
+        assert order.index("review") < order.index(
+            "gate"
+        ), "review should come before gate"
+        assert order.index("gate") < order.index(
+            "deploy"
+        ), "gate should come before deploy"
+        assert order.index("deploy") < order.index(
+            "wisdom"
+        ), "deploy should come before wisdom"
 
     def test_flow_registry_has_review_flow(self):
         """Ensure the registry includes the review flow (prevents 6-flow regression)."""
@@ -283,9 +305,9 @@ class TestFlowOrderGuardrail:
 
         # Review should be Flow 4 (index 4)
         review_index = get_flow_index("review")
-        assert review_index == 4, (
-            f"review flow should be at index 4, but found at index {review_index}"
-        )
+        assert (
+            review_index == 4
+        ), f"review flow should be at index 4, but found at index {review_index}"
 
     def test_flow_indices_are_sequential(self):
         """Verify flow indices are sequential starting from 1."""
@@ -296,7 +318,9 @@ class TestFlowOrderGuardrail:
 
         # Indices should be sequential 1, 2, 3, ...
         expected = list(range(1, len(order) + 1))
-        assert indices == expected, f"Flow indices should be sequential {expected}, got {indices}"
+        assert (
+            indices == expected
+        ), f"Flow indices should be sequential {expected}, got {indices}"
 
 
 class TestFlowOrderGuardrailPatterns:
@@ -447,7 +471,9 @@ class TestFlowOrderGuardrailAllowlist:
             lines = content.split("\n")
             for line_num, justification in line_numbers.items():
                 if line_num > len(lines):
-                    stale_entries.append((relative_path, line_num, "Line number out of range"))
+                    stale_entries.append(
+                        (relative_path, line_num, "Line number out of range")
+                    )
                     continue
 
                 line = lines[line_num - 1]  # Convert to 0-based index
