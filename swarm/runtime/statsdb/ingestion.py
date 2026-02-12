@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .events import normalize_event_kind, parse_event_ts
 
@@ -48,6 +49,73 @@ class StatsDBIngestionMixin:
         except Exception as e:
             logger.warning(f"Failed to insert event {event.get('event_id')}: {e}")
             return False
+
+    def _insert_raw_events_batch(self, events: List[Dict[str, Any]]) -> Set[str]:
+        """Insert a batch of raw events if not already present. Returns set of inserted event_ids."""
+        if not events or self.connection is None:
+            return set()
+
+        # Prepare data for bulk insert
+        data = []
+        for event in events:
+            data.append(
+                [
+                    event.get("event_id"),
+                    event.get("seq", 0),
+                    event["run_id"],
+                    event["ts"],
+                    event["kind"],
+                    event["flow_key"],
+                    event.get("step_id"),
+                    event.get("agent_key"),
+                    json.dumps(event.get("payload", {})),
+                ]
+            )
+
+        try:
+            with self._transaction() as conn:
+                # Use a unique temp table name to avoid conflicts
+                temp_table = f"temp_events_{uuid.uuid4().hex}"
+
+                conn.execute(
+                    f"""
+                    CREATE TEMPORARY TABLE {temp_table} (
+                        event_id VARCHAR,
+                        seq INTEGER,
+                        run_id VARCHAR,
+                        ts TIMESTAMP,
+                        kind VARCHAR,
+                        flow_key VARCHAR,
+                        step_id VARCHAR,
+                        agent_key VARCHAR,
+                        payload JSON
+                    )
+                """
+                )
+
+                # Bulk insert into temp table
+                conn.executemany(
+                    f"INSERT INTO {temp_table} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", data
+                )
+
+                # Insert from temp to main with conflict handling
+                result = conn.execute(
+                    f"""
+                    INSERT INTO events (event_id, seq, run_id, ts, kind, flow_key, step_id, agent_key, payload)
+                    SELECT event_id, seq, run_id, ts, kind, flow_key, step_id, agent_key, payload
+                    FROM {temp_table}
+                    ON CONFLICT (event_id) DO NOTHING
+                    RETURNING event_id
+                """
+                ).fetchall()
+
+                conn.execute(f"DROP TABLE {temp_table}")
+
+                return set(r[0] for r in result)
+
+        except Exception as e:
+            logger.warning(f"Failed to batch insert events: {e}")
+            return set()
 
     def get_ingestion_offset(self, run_id: str) -> Tuple[int, int]:
         """Get (byte_offset, last_seq) for incremental ingestion."""
@@ -558,17 +626,31 @@ class StatsDBIngestionMixin:
 
     def _ingest_events_internal(self, events: List[Dict[str, Any]], run_id: str) -> int:
         """Internal implementation of ingest_events."""
-        newly_ingested = 0
+        if not events:
+            return 0
 
+        # Ensure run_id is set on all events
+        events_with_run = []
         for event in events:
-            # Ensure run_id is set on the event for raw storage
-            event_with_run = {**event, "run_id": run_id}
+            events_with_run.append({**event, "run_id": run_id})
 
-            # Insert raw event first (idempotent - skips if event_id exists)
-            if not self._insert_raw_event(event_with_run):
-                # Event already exists, skip projection updates
+        # Batch insert raw events
+        inserted_ids = self._insert_raw_events_batch(events_with_run)
+
+        newly_ingested = 0
+        processed_ids: Set[str] = set()
+
+        for event in events_with_run:
+            event_id = event.get("event_id")
+
+            # Skip if not inserted in this batch or already processed in this batch
+            # Note: We rely on inserted_ids to know which events were newly added.
+            # If duplicates exist in input, we only process the first one (if it was the one inserted)
+            # or subsequent ones if they match the ID but we track processed_ids to avoid double processing.
+            if event_id not in inserted_ids or event_id in processed_ids:
                 continue
 
+            processed_ids.add(event_id)
             newly_ingested += 1
 
             # Parse event timestamp - CRITICAL: use event's ts, not "now"
