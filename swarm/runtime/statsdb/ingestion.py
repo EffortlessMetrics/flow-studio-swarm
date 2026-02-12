@@ -551,10 +551,20 @@ class StatsDBIngestionMixin:
 
         # Set ingestion context to allow record_* calls
         _ingestion_context.active = True
-        try:
-            return self._ingest_events_internal(events, run_id)
-        finally:
-            _ingestion_context.active = False
+
+        # Use a transaction for the entire batch to improve performance
+        # DuckDB (and SQLite) are much faster with a single transaction
+        with self._lock:
+            try:
+                self.connection.execute("BEGIN TRANSACTION")
+                result = self._ingest_events_internal(events, run_id)
+                self.connection.execute("COMMIT")
+                return result
+            except Exception:
+                self.connection.execute("ROLLBACK")
+                raise
+            finally:
+                _ingestion_context.active = False
 
     def _ingest_events_internal(self, events: List[Dict[str, Any]], run_id: str) -> int:
         """Internal implementation of ingest_events."""
