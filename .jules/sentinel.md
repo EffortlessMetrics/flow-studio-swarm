@@ -1,0 +1,4 @@
+## 2025-05-23 - Missing Path Traversal Validation in Station Preview
+**Vulnerability:** The `api_station_compile_preview` endpoint in `swarm/tools/flow_studio/routes/station_preview.py` lacked `validate_path_component` checks for `flow_id`, `step_id`, and `run_id`, allowing path traversal (e.g., `../../../ux_manifest`).
+**Learning:** While core API endpoints (e.g., in `swarm/api/routes/preview.py`) used `validate_path_component` correctly, the tool-specific endpoints in `swarm/tools/flow_studio` missed this validation. This inconsistency suggests that tool-related endpoints might be less rigorously reviewed or follow different patterns than the core API.
+**Prevention:** Always verify that ANY endpoint accepting file identifiers (run_id, flow_id, etc.) utilizes `validate_path_component` or equivalent validation before using them in file operations. Regard `swarm/tools` endpoints with equal scrutiny as `swarm/api`.

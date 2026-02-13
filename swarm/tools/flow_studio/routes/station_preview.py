@@ -3,6 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
+from swarm.runtime.safe_paths import validate_path_component
+
 from ..deps import get_state
 from ..state import FlowStudioState
 
@@ -24,6 +26,14 @@ async def api_station_compile_preview(
 ):
     if request is None:
         return JSONResponse({"error": "Request body required"}, status_code=400)
+
+    try:
+        validate_path_component(request.flow_id, "flow_id")
+        validate_path_component(request.step_id, "step_id")
+        if request.run_id:
+            validate_path_component(request.run_id, "run_id")
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
 
     try:
         from swarm.spec.compiler import COMPILER_VERSION, SpecCompiler
