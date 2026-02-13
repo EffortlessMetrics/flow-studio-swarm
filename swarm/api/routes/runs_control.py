@@ -12,6 +12,7 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
+import html
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -713,9 +714,9 @@ async def _write_stop_report(
     lines = [
         "# Stop Report",
         "",
-        f"**Run ID:** {run_id}",
-        f"**Stopped At:** {stop_info.stopped_at}",
-        f"**Reason:** {stop_info.stop_reason}",
+        f"**Run ID:** {html.escape(run_id)}",
+        f"**Stopped At:** {html.escape(stop_info.stopped_at)}",
+        f"**Reason:** {html.escape(stop_info.stop_reason)}",
         "",
         "## Execution State",
         "",
@@ -732,7 +733,7 @@ async def _write_stop_report(
                 "## Last Routing Intent",
                 "",
                 "```",
-                stop_info.last_routing_intent,
+                html.escape(stop_info.last_routing_intent),
                 "```",
                 "",
             ]
