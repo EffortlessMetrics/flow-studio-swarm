@@ -714,9 +714,9 @@ async def _write_stop_report(
     lines = [
         "# Stop Report",
         "",
-        f"**Run ID:** {html.escape(run_id)}",
-        f"**Stopped At:** {html.escape(stop_info.stopped_at)}",
-        f"**Reason:** {html.escape(stop_info.stop_reason)}",
+        f"**Run ID:** {html.escape(str(run_id))}",
+        f"**Stopped At:** {html.escape(str(stop_info.stopped_at))}",
+        f"**Reason:** {html.escape(str(stop_info.stop_reason))}",
         "",
         "## Execution State",
         "",
@@ -733,7 +733,7 @@ async def _write_stop_report(
                 "## Last Routing Intent",
                 "",
                 "```",
-                html.escape(stop_info.last_routing_intent),
+                html.escape(str(stop_info.last_routing_intent)),
                 "```",
                 "",
             ]
