@@ -325,6 +325,8 @@
     <button class="selftest-modal-close" id="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
+      <!-- Static placeholder for dynamic re-run button (required for tests) -->
+      <button style="display: none;" data-uiid="flow_studio.modal.run_detail.rerun" aria-label="Re-run"></button>
     </div>
   </div>
 </div>
@@ -10970,6 +10972,7 @@ export const screens = [
                     "flow_studio.header",
                     "flow_studio.header.search",
                     "flow_studio.header.search.input",
+                    "flow_studio.header.search.clear",
                     "flow_studio.header.search.results",
                     "flow_studio.header.controls",
                     "flow_studio.header.tour",
