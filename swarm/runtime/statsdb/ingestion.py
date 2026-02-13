@@ -4,7 +4,7 @@ import json
 import logging
 import threading
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .events import normalize_event_kind, parse_event_ts
 
@@ -13,6 +13,19 @@ logger = logging.getLogger(__name__)
 # Thread-local flag to indicate we're inside ingest_events()
 # When True, record_* calls are allowed even in projection-only mode
 _ingestion_context = threading.local()
+
+
+# Event kinds that trigger projection updates
+_PROJECTED_EVENT_KINDS = {
+    "step_start",
+    "step_end",
+    "tool_start",
+    "tool_end",
+    "file_changes",
+    "route_decision",
+    "run_started",
+    "run_completed",
+}
 
 
 def _is_in_ingestion_context() -> bool:
@@ -48,6 +61,73 @@ class StatsDBIngestionMixin:
         except Exception as e:
             logger.warning(f"Failed to insert event {event.get('event_id')}: {e}")
             return False
+
+    def _get_existing_event_ids(self, event_ids: List[str]) -> Set[str]:
+        """Query existing event IDs in chunks."""
+        if not event_ids or self.connection is None:
+            return set()
+
+        chunk_size = 999  # Safe limit for SQLite/DuckDB parameters
+        existing_ids = set()
+
+        with self._lock:
+            try:
+                for i in range(0, len(event_ids), chunk_size):
+                    chunk = event_ids[i : i + chunk_size]
+                    placeholders = ",".join("?" * len(chunk))
+                    query = f"SELECT event_id FROM events WHERE event_id IN ({placeholders})"
+                    result = self.connection.execute(query, chunk).fetchall()
+                    existing_ids.update(r[0] for r in result)
+            except Exception as e:
+                logger.warning("Failed to query existing event IDs: %s", e)
+
+        return existing_ids
+
+    def _insert_raw_events_batch(self, events: List[Dict[str, Any]]) -> bool:
+        """Batch insert raw events using executemany.
+
+        Returns:
+            True if batch insertion succeeded (or was empty).
+            False if an error occurred (caller should fallback to one-by-one).
+        """
+        if not events or self.connection is None:
+            return True
+
+        query = """
+            INSERT INTO events (event_id, seq, run_id, ts, kind, flow_key, step_id, agent_key, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (event_id) DO NOTHING
+        """
+
+        params_list = []
+        for event in events:
+            params_list.append(
+                [
+                    event.get("event_id"),
+                    event.get("seq", 0),
+                    event["run_id"],
+                    event["ts"],
+                    event["kind"],
+                    event["flow_key"],
+                    event.get("step_id"),
+                    event.get("agent_key"),
+                    json.dumps(event.get("payload", {})),
+                ]
+            )
+
+        with self._lock:
+            try:
+                self.connection.execute("BEGIN TRANSACTION")
+                self.connection.executemany(query, params_list)
+                self.connection.execute("COMMIT")
+                return True
+            except Exception as e:
+                try:
+                    self.connection.execute("ROLLBACK")
+                except Exception:
+                    pass
+                logger.warning("Batch insert failed (will fallback to one-by-one): %s", e)
+                return False
 
     def get_ingestion_offset(self, run_id: str) -> Tuple[int, int]:
         """Get (byte_offset, last_seq) for incremental ingestion."""
@@ -558,162 +638,189 @@ class StatsDBIngestionMixin:
 
     def _ingest_events_internal(self, events: List[Dict[str, Any]], run_id: str) -> int:
         """Internal implementation of ingest_events."""
-        newly_ingested = 0
+        if not events:
+            return 0
 
-        for event in events:
-            # Ensure run_id is set on the event for raw storage
-            event_with_run = {**event, "run_id": run_id}
+        # Ensure run_id is set on all events
+        events_with_run = [{**e, "run_id": run_id} for e in events]
 
-            # Insert raw event first (idempotent - skips if event_id exists)
-            if not self._insert_raw_event(event_with_run):
-                # Event already exists, skip projection updates
-                continue
+        # 1. Identify existing events to filter them out
+        # This reduces DB roundtrips from N to 2 (one select, one batch insert)
+        all_event_ids = [e.get("event_id") for e in events_with_run if e.get("event_id")]
+        existing_ids = self._get_existing_event_ids(all_event_ids)
 
-            newly_ingested += 1
+        # 2. Filter new events
+        new_events = [e for e in events_with_run if e.get("event_id") not in existing_ids]
 
-            # Parse event timestamp - CRITICAL: use event's ts, not "now"
-            # This ensures replays and rebuilds produce identical projections
-            event_ts = parse_event_ts(event.get("ts"))
+        if not new_events:
+            return 0
 
-            # Normalize event kind to canonical form (handles legacy aliases)
-            raw_kind = event.get("kind", "")
-            kind = normalize_event_kind(raw_kind)
-            payload = event.get("payload", {})
-            step_id = event.get("step_id", "")
-            flow_key = event.get("flow_key", "")
+        # 3. Batch insert new events
+        batch_success = self._insert_raw_events_batch(new_events)
 
-            if kind == "step_start":
-                self.record_step_start(
+        if batch_success:
+            # Batch insert succeeded, proceed to project all new events
+            # Note: If a race condition occurred and some events were inserted by another process
+            # between check and insert, they were handled by ON CONFLICT DO NOTHING.
+            # We still attempt projection, which will fail safely on unique constraints if duplicate.
+            for event in new_events:
+                self._project_event(event, run_id)
+        else:
+            # Batch insert failed (rare), fallback to one-by-one with check
+            # This handles any edge cases or connection weirdness
+            actual_new_events = []
+            for event in new_events:
+                if self._insert_raw_event(event):
+                    self._project_event(event, run_id)
+                    actual_new_events.append(event)
+            # Update new_events to reflect what was actually inserted in fallback mode
+            new_events = actual_new_events
+
+        return len(new_events)
+
+    def _project_event(self, event: Dict[str, Any], run_id: str):
+        """Apply projection updates for a single event."""
+        raw_kind = event.get("kind", "")
+        kind = normalize_event_kind(raw_kind)
+
+        if kind not in _PROJECTED_EVENT_KINDS:
+            return
+
+        event_ts = parse_event_ts(event.get("ts"))
+        payload = event.get("payload", {})
+        step_id = event.get("step_id", "")
+        flow_key = event.get("flow_key", "")
+
+        if kind == "step_start":
+            self.record_step_start(
+                run_id=run_id,
+                flow_key=flow_key,
+                step_id=step_id,
+                step_index=payload.get("step_index", 0),
+                agent_key=payload.get("agent_key"),
+                ts=event_ts,
+            )
+
+        elif kind == "step_end":  # Canonical: step_complete/step_error -> step_end
+            self.record_step_end(
+                run_id=run_id,
+                flow_key=flow_key,
+                step_id=step_id,
+                status=payload.get("status", "succeeded"),
+                duration_ms=payload.get("duration_ms", 0),
+                prompt_tokens=payload.get("prompt_tokens", 0),
+                completion_tokens=payload.get("completion_tokens", 0),
+                handoff_status=payload.get("handoff_status"),
+                routing_decision=payload.get("routing_decision"),
+                routing_next_step=payload.get("routing_next_step"),
+                routing_confidence=payload.get("routing_confidence"),
+                error_message=payload.get("error"),
+                ts=event_ts,
+            )
+
+        elif kind == "tool_start":
+            # We'll update on tool_end
+            pass
+
+        elif kind == "tool_end":
+            self.record_tool_call(
+                run_id=run_id,
+                step_id=step_id,
+                tool_name=payload.get("tool", "unknown"),
+                phase=payload.get("phase", "work"),
+                duration_ms=payload.get("duration_ms", 0),
+                success=payload.get("success", True),
+                target_path=payload.get("target_path"),
+                diff_lines_added=payload.get("diff_lines_added"),
+                diff_lines_removed=payload.get("diff_lines_removed"),
+                exit_code=payload.get("exit_code"),
+                error_message=payload.get("error"),
+                ts=event_ts,
+            )
+
+        elif kind == "file_changes":
+            # File changes from DiffScanner (forensic truth)
+            files = payload.get("files", [])
+            for fc in files:
+                self.record_file_change(
                     run_id=run_id,
-                    flow_key=flow_key,
                     step_id=step_id,
-                    step_index=payload.get("step_index", 0),
-                    agent_key=payload.get("agent_key"),
+                    file_path=fc.get("path", ""),
+                    change_type=fc.get("status", "modified"),
+                    lines_added=fc.get("insertions", 0),
+                    lines_removed=fc.get("deletions", 0),
                     ts=event_ts,
                 )
 
-            elif kind == "step_end":  # Canonical: step_complete/step_error -> step_end
-                self.record_step_end(
-                    run_id=run_id,
-                    flow_key=flow_key,
-                    step_id=step_id,
-                    status=payload.get("status", "succeeded"),
-                    duration_ms=payload.get("duration_ms", 0),
-                    prompt_tokens=payload.get("prompt_tokens", 0),
-                    completion_tokens=payload.get("completion_tokens", 0),
-                    handoff_status=payload.get("handoff_status"),
-                    routing_decision=payload.get("routing_decision"),
-                    routing_next_step=payload.get("routing_next_step"),
-                    routing_confidence=payload.get("routing_confidence"),
-                    error_message=payload.get("error"),
-                    ts=event_ts,
-                )
+        elif kind == "route_decision":
+            # Routing decisions from the router/navigator
+            # Extract explanation if present (may contain nested elimination_log, metrics)
+            explanation = payload.get("explanation")
 
-            elif kind == "tool_start":
-                # We'll update on tool_end
-                pass
+            # Map the method field to routing_mode
+            method = payload.get("method", "")
+            routing_mode = method if method else None
 
-            elif kind == "tool_end":
-                self.record_tool_call(
-                    run_id=run_id,
-                    step_id=step_id,
-                    tool_name=payload.get("tool", "unknown"),
-                    phase=payload.get("phase", "work"),
-                    duration_ms=payload.get("duration_ms", 0),
-                    success=payload.get("success", True),
-                    target_path=payload.get("target_path"),
-                    diff_lines_added=payload.get("diff_lines_added"),
-                    diff_lines_removed=payload.get("diff_lines_removed"),
-                    exit_code=payload.get("exit_code"),
-                    error_message=payload.get("error"),
-                    ts=event_ts,
-                )
+            # Determine routing_source based on method
+            # - "deterministic" -> "fast_path" or "deterministic_fallback"
+            # - "llm_tiebreak" -> "navigator"
+            # - "no_candidates" -> "deterministic_fallback"
+            routing_source = None
+            if method == "deterministic":
+                routing_source = "fast_path"
+            elif method == "llm_tiebreak":
+                routing_source = "navigator"
+            elif method == "no_candidates":
+                routing_source = "deterministic_fallback"
 
-            elif kind == "file_changes":
-                # File changes from DiffScanner (forensic truth)
-                files = payload.get("files", [])
-                for fc in files:
-                    self.record_file_change(
-                        run_id=run_id,
-                        step_id=step_id,
-                        file_path=fc.get("path", ""),
-                        change_type=fc.get("status", "modified"),
-                        lines_added=fc.get("insertions", 0),
-                        lines_removed=fc.get("deletions", 0),
-                        ts=event_ts,
-                    )
+            # Extract candidate count from explanation if available
+            candidate_count = 0
+            if explanation and isinstance(explanation, dict):
+                candidate_count = explanation.get("candidates_evaluated", 0)
 
-            elif kind == "route_decision":
-                # Routing decisions from the router/navigator
-                # Extract explanation if present (may contain nested elimination_log, metrics)
-                explanation = payload.get("explanation")
+            # Derive decision from method and terminate flag
+            terminate = payload.get("terminate", False)
+            decision = "terminate" if terminate else "advance"
+            if method == "llm_tiebreak":
+                decision = "advance"  # LLM chose a path to advance
 
-                # Map the method field to routing_mode
-                method = payload.get("method", "")
-                routing_mode = method if method else None
+            self.record_routing_decision(
+                run_id=run_id,
+                step_seq=event.get("seq", 0),
+                flow_id=flow_key,
+                station_id=step_id,
+                decision=decision,
+                routing_mode=routing_mode,
+                routing_source=routing_source,
+                chosen_candidate_id=payload.get("selected_edge"),
+                candidate_count=candidate_count,
+                target_node=payload.get("target_node"),
+                terminate=terminate,
+                needs_human=payload.get("needs_human", False),
+                explanation=explanation,
+                ts=event_ts,
+            )
 
-                # Determine routing_source based on method
-                # - "deterministic" -> "fast_path" or "deterministic_fallback"
-                # - "llm_tiebreak" -> "navigator"
-                # - "no_candidates" -> "deterministic_fallback"
-                routing_source = None
-                if method == "deterministic":
-                    routing_source = "fast_path"
-                elif method == "llm_tiebreak":
-                    routing_source = "navigator"
-                elif method == "no_candidates":
-                    routing_source = "deterministic_fallback"
+        elif kind == "run_started":  # Canonical: run_start -> run_started
+            # Run initialization
+            flow_keys = payload.get("flow_keys", [])
+            self.record_run_start(
+                run_id=run_id,
+                flow_keys=flow_keys,
+                profile_id=payload.get("profile_id"),
+                engine_id=payload.get("engine"),
+                metadata=payload.get("metadata"),
+                ts=event_ts,
+            )
 
-                # Extract candidate count from explanation if available
-                candidate_count = 0
-                if explanation and isinstance(explanation, dict):
-                    candidate_count = explanation.get("candidates_evaluated", 0)
-
-                # Derive decision from method and terminate flag
-                terminate = payload.get("terminate", False)
-                decision = "terminate" if terminate else "advance"
-                if method == "llm_tiebreak":
-                    decision = "advance"  # LLM chose a path to advance
-
-                self.record_routing_decision(
-                    run_id=run_id,
-                    step_seq=event.get("seq", 0),
-                    flow_id=flow_key,
-                    station_id=step_id,
-                    decision=decision,
-                    routing_mode=routing_mode,
-                    routing_source=routing_source,
-                    chosen_candidate_id=payload.get("selected_edge"),
-                    candidate_count=candidate_count,
-                    target_node=payload.get("target_node"),
-                    terminate=terminate,
-                    needs_human=payload.get("needs_human", False),
-                    explanation=explanation,
-                    ts=event_ts,
-                )
-
-            elif kind == "run_started":  # Canonical: run_start -> run_started
-                # Run initialization
-                flow_keys = payload.get("flow_keys", [])
-                self.record_run_start(
-                    run_id=run_id,
-                    flow_keys=flow_keys,
-                    profile_id=payload.get("profile_id"),
-                    engine_id=payload.get("engine"),
-                    metadata=payload.get("metadata"),
-                    ts=event_ts,
-                )
-
-            elif kind == "run_completed":
-                # Run completion
-                self.record_run_end(
-                    run_id=run_id,
-                    status=payload.get("status", "completed"),
-                    total_steps=payload.get("total_steps", 0),
-                    completed_steps=payload.get("steps_completed", 0),
-                    total_tokens=payload.get("total_tokens", 0),
-                    total_duration_ms=payload.get("duration_ms", 0),
-                    ts=event_ts,
-                )
-
-        return newly_ingested
+        elif kind == "run_completed":
+            # Run completion
+            self.record_run_end(
+                run_id=run_id,
+                status=payload.get("status", "completed"),
+                total_steps=payload.get("total_steps", 0),
+                completed_steps=payload.get("steps_completed", 0),
+                total_tokens=payload.get("total_tokens", 0),
+                total_duration_ms=payload.get("duration_ms", 0),
+                ts=event_ts,
+            )
