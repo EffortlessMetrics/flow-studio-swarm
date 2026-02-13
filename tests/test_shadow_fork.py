@@ -45,10 +45,9 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "hash", ""),  # Verify base branch exists
                 (True, "", ""),  # Check for uncommitted changes
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
-                (True, "", ""),  # Install push guard (rev-parse in block_upstream_push)
             ]
 
             # Create hooks directory for the test
@@ -78,9 +77,10 @@ class TestShadowForkCreate:
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "main", ""),        # 1. current branch
+                (True, "hash", ""),        # 2. resolve base ref (say it exists so we try to use it)
+                (True, "", ""),            # 3. status (clean)
+                (False, "", "fatal: 'nonexistent' does not exist"), # 4. checkout (fail)
             ]
 
             with pytest.raises(RuntimeError, match="does not exist"):
@@ -92,10 +92,10 @@ class TestShadowForkCreate:
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
+                (True, "main", ""),        # 1. current branch
+                (True, "hash", ""),        # 2. resolve base ref (say it exists)
+                (True, " M file.txt", ""), # 3. status (dirty)
+                (True, "", ""),            # 4. checkout (success)
             ]
 
             # Create hooks directory for the test
@@ -423,8 +423,8 @@ class TestShadowForkIntegration:
             # Create shadow
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "hash", ""),  # Verify base branch
                 (True, "", ""),  # Check uncommitted changes
-                (True, "", ""),  # Verify base branch
                 (True, "", ""),  # Create shadow branch
             ]
             branch = fork.create()
@@ -468,8 +468,8 @@ class TestShadowForkIntegration:
             # Create shadow
             mock_git.side_effect = [
                 (True, "feature-x", ""),  # Get current branch
+                (True, "hash", ""),  # Verify base branch
                 (True, "", ""),  # Check uncommitted changes
-                (True, "", ""),  # Verify base branch
                 (True, "", ""),  # Create shadow branch
             ]
             fork.create()
