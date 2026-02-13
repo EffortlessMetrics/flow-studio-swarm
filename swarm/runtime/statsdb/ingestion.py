@@ -552,25 +552,73 @@ class StatsDBIngestionMixin:
         # Set ingestion context to allow record_* calls
         _ingestion_context.active = True
         try:
-            return self._ingest_events_internal(events, run_id)
+            with self._lock:
+                self.connection.execute("BEGIN TRANSACTION")
+                try:
+                    count = self._ingest_events_internal(events, run_id)
+                    self.connection.execute("COMMIT")
+                    return count
+                except Exception:
+                    self.connection.execute("ROLLBACK")
+                    raise
         finally:
             _ingestion_context.active = False
 
     def _ingest_events_internal(self, events: List[Dict[str, Any]], run_id: str) -> int:
         """Internal implementation of ingest_events."""
-        newly_ingested = 0
+        if not events:
+            return 0
 
-        for event in events:
-            # Ensure run_id is set on the event for raw storage
-            event_with_run = {**event, "run_id": run_id}
+        # 1. Identify new events
+        event_ids = [e.get("event_id") for e in events if e.get("event_id")]
+        if not event_ids:
+            return 0
 
-            # Insert raw event first (idempotent - skips if event_id exists)
-            if not self._insert_raw_event(event_with_run):
-                # Event already exists, skip projection updates
-                continue
+        # Check which events already exist (in chunks to avoid large IN clauses)
+        existing_ids = set()
+        chunk_size = 1000
+        for i in range(0, len(event_ids), chunk_size):
+            chunk = event_ids[i : i + chunk_size]
+            placeholders = ",".join(["?"] * len(chunk))
+            rows = self.connection.execute(
+                f"SELECT event_id FROM events WHERE event_id IN ({placeholders})",
+                chunk,
+            ).fetchall()
+            existing_ids.update(r[0] for r in rows)
 
-            newly_ingested += 1
+        new_events = [e for e in events if e.get("event_id") not in existing_ids]
+        if not new_events:
+            return 0
 
+        # 2. Batch insert new raw events
+        raw_values = []
+        for event in new_events:
+            raw_values.append(
+                [
+                    event.get("event_id"),
+                    event.get("seq", 0),
+                    run_id,
+                    event.get("ts"),
+                    event.get("kind"),
+                    event.get("flow_key"),
+                    event.get("step_id"),
+                    event.get("agent_key"),
+                    json.dumps(event.get("payload", {})),
+                ]
+            )
+
+        self.connection.executemany(
+            """
+            INSERT INTO events (event_id, seq, run_id, ts, kind, flow_key, step_id, agent_key, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            raw_values,
+        )
+
+        newly_ingested = len(new_events)
+
+        # 3. Update projections for new events
+        for event in new_events:
             # Parse event timestamp - CRITICAL: use event's ts, not "now"
             # This ensures replays and rebuilds produce identical projections
             event_ts = parse_event_ts(event.get("ts"))
