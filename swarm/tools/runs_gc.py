@@ -86,7 +86,9 @@ def get_dir_size(path: Path) -> int:
     return total
 
 
-def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
+def get_run_info(
+    run_id: str, run_path: Path, run_type: str, compute_size: bool = True
+) -> RunInfo:
     """Collect information about a single run."""
     meta_path = run_path / META_FILE
     has_meta = meta_path.exists()
@@ -110,7 +112,7 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
         mtime = datetime.now(timezone.utc)
 
     # Get size
-    size_bytes = get_dir_size(run_path)
+    size_bytes = get_dir_size(run_path) if compute_size else 0
 
     return RunInfo(
         run_id=run_id,
@@ -124,8 +126,13 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     )
 
 
-def discover_all_runs() -> List[RunInfo]:
-    """Discover all runs from runs/ and examples/ directories."""
+def discover_all_runs(compute_size: bool = True) -> List[RunInfo]:
+    """Discover all runs from runs/ and examples/ directories.
+
+    Args:
+        compute_size: If True, calculate size of each run directory.
+                     If False, size will be reported as 0.
+    """
     runs: List[RunInfo] = []
     seen: set[str] = set()
 
@@ -135,7 +142,9 @@ def discover_all_runs() -> List[RunInfo]:
             if entry.is_dir() and not entry.name.startswith("."):
                 if entry.name not in seen:
                     seen.add(entry.name)
-                    runs.append(get_run_info(entry.name, entry, "example"))
+                    runs.append(
+                        get_run_info(entry.name, entry, "example", compute_size)
+                    )
 
     # Active runs with meta.json
     if RUNS_DIR.exists():
@@ -147,10 +156,14 @@ def discover_all_runs() -> List[RunInfo]:
 
                 meta_path = entry / META_FILE
                 if meta_path.exists():
-                    runs.append(get_run_info(entry.name, entry, "active"))
+                    runs.append(
+                        get_run_info(entry.name, entry, "active", compute_size)
+                    )
                 else:
                     # Legacy run (no meta.json)
-                    runs.append(get_run_info(entry.name, entry, "legacy"))
+                    runs.append(
+                        get_run_info(entry.name, entry, "legacy", compute_size)
+                    )
 
     return runs
 
@@ -281,7 +294,8 @@ def cmd_prune(args: argparse.Namespace) -> int:
         logger.info("Retention policy is disabled. Use --force to override.")
         return 0
 
-    runs = discover_all_runs()
+    # Optimize: Don't compute size during discovery, only for runs we'll delete
+    runs = discover_all_runs(compute_size=False)
     if not runs:
         logger.info("No runs found.")
         return 0
@@ -310,6 +324,10 @@ def cmd_prune(args: argparse.Namespace) -> int:
         if non_preserved_index >= keep_count:
             to_delete.append(run)
             continue
+
+    # Compute size for runs to delete (needed for reporting)
+    for run in to_delete:
+        run.size_bytes = get_dir_size(run.path)
 
     # Report
     logger.info("=" * 60)
