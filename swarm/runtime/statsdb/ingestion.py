@@ -612,9 +612,12 @@ class StatsDBIngestionMixin:
                     newly_ingested = len(new_ids)
 
                     # 5. Process projections for new events
+                    processed_ids = set()
                     for event in events:
-                        if event.get("event_id") in new_ids:
+                        event_id = event.get("event_id")
+                        if event_id in new_ids and event_id not in processed_ids:
                             self._process_event_projections(event, run_id)
+                            processed_ids.add(event_id)
 
                     # 6. Cleanup
                     self.connection.execute("DROP TABLE batch_events_staging")
