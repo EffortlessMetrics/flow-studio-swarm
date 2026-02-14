@@ -100,8 +100,12 @@ export async function selectSearchResult(index) {
         return;
     closeSearchDropdown();
     const searchInput = document.getElementById("search-input");
-    if (searchInput)
+    if (searchInput) {
         searchInput.value = "";
+        const searchClear = document.getElementById("search-clear");
+        if (searchClear)
+            searchClear.hidden = true;
+    }
     const cy = getCy();
     if (result.type === "flow") {
         if (_setActiveFlow)
@@ -151,10 +155,25 @@ export async function selectSearchResult(index) {
  */
 export function initSearchHandlers() {
     const searchInput = document.getElementById("search-input");
+    const searchClear = document.getElementById("search-clear");
     const dropdown = document.getElementById("search-dropdown");
     if (!searchInput)
         return;
+    const updateClearButton = () => {
+        if (searchClear) {
+            searchClear.hidden = searchInput.value.length === 0;
+        }
+    };
+    if (searchClear) {
+        searchClear.addEventListener("click", () => {
+            searchInput.value = "";
+            updateClearButton();
+            performSearch(""); // Close dropdown
+            searchInput.focus();
+        });
+    }
     searchInput.addEventListener("input", (e) => {
+        updateClearButton();
         if (state.searchDebounceTimer) {
             clearTimeout(state.searchDebounceTimer);
         }

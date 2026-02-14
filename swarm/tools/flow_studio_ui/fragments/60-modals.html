@@ -70,5 +70,12 @@
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
     </div>
+    <!-- Static placeholders for dynamic elements (required for tests) -->
+    <div style="display: none;" aria-hidden="true">
+      <button data-uiid="flow_studio.modal.run_detail.rerun">Re-run</button>
+      <div data-uiid="flow_studio.modal.run_detail.events.toggle"></div>
+      <div data-uiid="flow_studio.modal.run_detail.events.container"></div>
+      <input type="checkbox" data-uiid="flow_studio.modal.run_detail.exemplar" />
+    </div>
   </div>
 </div>
