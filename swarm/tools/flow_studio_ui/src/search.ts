@@ -164,8 +164,22 @@ export async function selectSearchResult(index: number): Promise<void> {
 export function initSearchHandlers(): void {
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
   const dropdown = document.getElementById("search-dropdown");
+  const clearBtn = document.getElementById("search-clear-btn");
 
   if (!searchInput) return;
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      searchInput.focus();
+      // Clear any pending search
+      if (state.searchDebounceTimer) {
+        clearTimeout(state.searchDebounceTimer);
+      }
+      performSearch(""); // Clear results
+      clearBtn.hidden = true;
+    });
+  }
 
   searchInput.addEventListener("input", (e: Event) => {
     if (state.searchDebounceTimer) {
@@ -173,6 +187,11 @@ export function initSearchHandlers(): void {
     }
     const target = e.target as HTMLInputElement;
     const query = target.value.trim();
+
+    if (clearBtn) {
+      clearBtn.hidden = query.length === 0;
+    }
+
     // Optimization: Increased debounce from 200ms to 300ms to reduce API calls while typing
     state.searchDebounceTimer = setTimeout(() => performSearch(query), 300);
   });

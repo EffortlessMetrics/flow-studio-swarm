@@ -5,6 +5,7 @@ These tests verify the Shadow Fork isolation layer for safe speculative
 execution, including branch creation, checkpointing, rollback, and cleanup.
 """
 
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -42,13 +43,12 @@ class TestShadowForkCreate:
         """Test successful shadow fork creation."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="main"):
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
-                (True, "", ""),  # Install push guard (rev-parse in block_upstream_push)
             ]
 
             # Create hooks directory for the test
@@ -72,29 +72,38 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_falls_back_if_base_branch_missing(self, tmp_path, caplog):
+        """Test that create falls back to HEAD if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
+        caplog.set_level(logging.INFO)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Patch _resolve_base_ref to return HEAD (simulating fallback)
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="HEAD"):
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "", ""),  # Create and switch to shadow branch
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+            # Create hooks directory for the test
+            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+            branch = fork.create(base_branch="nonexistent")
+
+            assert branch.startswith(SHADOW_BRANCH_PREFIX)
+            assert "Base branch 'nonexistent' not found, using 'HEAD' instead" in caplog.text
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
+        caplog.set_level(logging.INFO)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="main"):
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
@@ -419,41 +428,39 @@ class TestShadowForkIntegration:
 
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="main"):
             # Create shadow
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check uncommitted changes
-                (True, "", ""),  # Verify base branch
                 (True, "", ""),  # Create shadow branch
-            ]
-            branch = fork.create()
-            assert branch.startswith(SHADOW_BRANCH_PREFIX)
-
-            # Checkpoint
-            mock_git.side_effect = [
+                # Checkpoint
                 (True, "", ""),  # git add
                 (False, "", ""),  # git diff (has changes)
                 (True, "", ""),  # git commit
                 (True, "abc123", ""),  # git rev-parse
-            ]
-            sha = fork.commit_checkpoint("WIP")
-            assert sha == "abc123"
-
-            # Bridge to main
-            fork._push_allowed = True
-            mock_git.side_effect = [
+                # Bridge
                 (True, "", ""),  # Checkout main
                 (True, "", ""),  # Merge
-            ]
-            result = fork.bridge_to_main()
-            assert result is True
-
-            # Cleanup
-            mock_git.side_effect = [
+                # Cleanup
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Delete shadow branch
             ]
+
+            # Use explicit side_effect management because one large list is brittle if internal calls change
+            # But here we are just updating the existing test to use _resolve_base_ref patch
+
+            branch = fork.create()
+            assert branch.startswith(SHADOW_BRANCH_PREFIX)
+
+            sha = fork.commit_checkpoint("WIP")
+            assert sha == "abc123"
+
+            fork._push_allowed = True
+            result = fork.bridge_to_main()
+            assert result is True
+
             fork.cleanup(success=True)
             assert fork.shadow_branch is None
 
@@ -464,38 +471,33 @@ class TestShadowForkIntegration:
 
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="feature-x"):
             # Create shadow
             mock_git.side_effect = [
                 (True, "feature-x", ""),  # Get current branch
                 (True, "", ""),  # Check uncommitted changes
-                (True, "", ""),  # Verify base branch
                 (True, "", ""),  # Create shadow branch
-            ]
-            fork.create()
-
-            # Checkpoint
-            mock_git.side_effect = [
+                # Checkpoint
                 (True, "", ""),  # git add
                 (False, "", ""),  # git diff (has changes)
                 (True, "", ""),  # git commit
                 (True, "abc123", ""),  # git rev-parse
-            ]
-            sha = fork.commit_checkpoint("WIP")
-
-            # Rollback
-            mock_git.side_effect = [
+                # Rollback
                 (True, "", ""),  # Verify commit
                 (True, "", ""),  # Hard reset
-            ]
-            result = fork.rollback_to(sha)
-            assert result is True
-
-            # Cleanup (failure case)
-            mock_git.side_effect = [
+                # Cleanup
                 (True, fork.shadow_branch, ""),  # Get current branch
                 (True, "", ""),  # Checkout original
                 (True, "", ""),  # Delete shadow
             ]
+
+            fork.create()
+
+            sha = fork.commit_checkpoint("WIP")
+
+            result = fork.rollback_to(sha)
+            assert result is True
+
             fork.cleanup(success=False)
             assert fork.shadow_branch is None
