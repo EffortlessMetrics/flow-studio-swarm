@@ -560,160 +560,223 @@ class StatsDBIngestionMixin:
         """Internal implementation of ingest_events."""
         newly_ingested = 0
 
-        for event in events:
-            # Ensure run_id is set on the event for raw storage
-            event_with_run = {**event, "run_id": run_id}
+        # Process in chunks to avoid excessive query size
+        BATCH_SIZE = 1000
+        for i in range(0, len(events), BATCH_SIZE):
+            chunk = events[i : i + BATCH_SIZE]
 
-            # Insert raw event first (idempotent - skips if event_id exists)
-            if not self._insert_raw_event(event_with_run):
-                # Event already exists, skip projection updates
+            # Prepare data for batch insert
+            batch_params = []
+            chunk_with_run = []
+
+            for event in chunk:
+                # Ensure run_id is set on the event for raw storage
+                event_with_run = {**event, "run_id": run_id}
+
+                try:
+                    # Validate required fields to prevent batch failure
+                    evt_id = event_with_run.get("event_id")
+                    if not evt_id:
+                        raise KeyError("event_id")
+
+                    # Construct params, accessing required fields to catch missing keys early
+                    params = [
+                        evt_id,
+                        event_with_run.get("seq", 0),
+                        event_with_run["run_id"],
+                        event_with_run["ts"],
+                        event_with_run["kind"],
+                        event_with_run["flow_key"],
+                        event_with_run.get("step_id"),
+                        event_with_run.get("agent_key"),
+                        json.dumps(event_with_run.get("payload", {})),
+                    ]
+                    batch_params.extend(params)
+                    chunk_with_run.append(event_with_run)
+                except KeyError as e:
+                    logger.warning(f"Skipping malformed event in run {run_id}: missing key {e}")
+                    continue
+
+            if not batch_params:
                 continue
 
-            newly_ingested += 1
+            # Batch insert raw events
+            new_event_ids = set()
+            try:
+                placeholders = "(?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                values_clause = ", ".join([placeholders] * len(chunk_with_run))
 
-            # Parse event timestamp - CRITICAL: use event's ts, not "now"
-            # This ensures replays and rebuilds produce identical projections
-            event_ts = parse_event_ts(event.get("ts"))
+                with self._transaction() as conn:
+                    result = conn.execute(
+                        f"""
+                        INSERT INTO events (event_id, seq, run_id, ts, kind, flow_key, step_id, agent_key, payload)
+                        VALUES {values_clause}
+                        ON CONFLICT (event_id) DO NOTHING
+                        RETURNING event_id
+                        """,
+                        batch_params
+                    ).fetchall()
+                    new_event_ids = {row[0] for row in result}
+            except Exception as e:
+                logger.warning(f"Batch insert failed for run {run_id}: {e}")
+                # If batch insert fails (e.g. constraints), we could fallback to individual inserts
+                # or just log. For now, we skip projection updates for this chunk.
+                continue
 
-            # Normalize event kind to canonical form (handles legacy aliases)
-            raw_kind = event.get("kind", "")
-            kind = normalize_event_kind(raw_kind)
-            payload = event.get("payload", {})
-            step_id = event.get("step_id", "")
-            flow_key = event.get("flow_key", "")
+            # Run projections for newly inserted events
+            for event in chunk_with_run:
+                event_id = event.get("event_id")
+                if event_id not in new_event_ids:
+                    # Event already existed or wasn't inserted
+                    continue
 
-            if kind == "step_start":
-                self.record_step_start(
-                    run_id=run_id,
-                    flow_key=flow_key,
-                    step_id=step_id,
-                    step_index=payload.get("step_index", 0),
-                    agent_key=payload.get("agent_key"),
-                    ts=event_ts,
-                )
+                # Consumed this ID (handle duplicates in batch)
+                new_event_ids.remove(event_id)
+                newly_ingested += 1
 
-            elif kind == "step_end":  # Canonical: step_complete/step_error -> step_end
-                self.record_step_end(
-                    run_id=run_id,
-                    flow_key=flow_key,
-                    step_id=step_id,
-                    status=payload.get("status", "succeeded"),
-                    duration_ms=payload.get("duration_ms", 0),
-                    prompt_tokens=payload.get("prompt_tokens", 0),
-                    completion_tokens=payload.get("completion_tokens", 0),
-                    handoff_status=payload.get("handoff_status"),
-                    routing_decision=payload.get("routing_decision"),
-                    routing_next_step=payload.get("routing_next_step"),
-                    routing_confidence=payload.get("routing_confidence"),
-                    error_message=payload.get("error"),
-                    ts=event_ts,
-                )
+                # Parse event timestamp - CRITICAL: use event's ts, not "now"
+                # This ensures replays and rebuilds produce identical projections
+                event_ts = parse_event_ts(event.get("ts"))
 
-            elif kind == "tool_start":
-                # We'll update on tool_end
-                pass
+                # Normalize event kind to canonical form (handles legacy aliases)
+                raw_kind = event.get("kind", "")
+                kind = normalize_event_kind(raw_kind)
+                payload = event.get("payload", {})
+                step_id = event.get("step_id", "")
+                flow_key = event.get("flow_key", "")
 
-            elif kind == "tool_end":
-                self.record_tool_call(
-                    run_id=run_id,
-                    step_id=step_id,
-                    tool_name=payload.get("tool", "unknown"),
-                    phase=payload.get("phase", "work"),
-                    duration_ms=payload.get("duration_ms", 0),
-                    success=payload.get("success", True),
-                    target_path=payload.get("target_path"),
-                    diff_lines_added=payload.get("diff_lines_added"),
-                    diff_lines_removed=payload.get("diff_lines_removed"),
-                    exit_code=payload.get("exit_code"),
-                    error_message=payload.get("error"),
-                    ts=event_ts,
-                )
-
-            elif kind == "file_changes":
-                # File changes from DiffScanner (forensic truth)
-                files = payload.get("files", [])
-                for fc in files:
-                    self.record_file_change(
+                if kind == "step_start":
+                    self.record_step_start(
                         run_id=run_id,
+                        flow_key=flow_key,
                         step_id=step_id,
-                        file_path=fc.get("path", ""),
-                        change_type=fc.get("status", "modified"),
-                        lines_added=fc.get("insertions", 0),
-                        lines_removed=fc.get("deletions", 0),
+                        step_index=payload.get("step_index", 0),
+                        agent_key=payload.get("agent_key"),
                         ts=event_ts,
                     )
 
-            elif kind == "route_decision":
-                # Routing decisions from the router/navigator
-                # Extract explanation if present (may contain nested elimination_log, metrics)
-                explanation = payload.get("explanation")
+                elif kind == "step_end":  # Canonical: step_complete/step_error -> step_end
+                    self.record_step_end(
+                        run_id=run_id,
+                        flow_key=flow_key,
+                        step_id=step_id,
+                        status=payload.get("status", "succeeded"),
+                        duration_ms=payload.get("duration_ms", 0),
+                        prompt_tokens=payload.get("prompt_tokens", 0),
+                        completion_tokens=payload.get("completion_tokens", 0),
+                        handoff_status=payload.get("handoff_status"),
+                        routing_decision=payload.get("routing_decision"),
+                        routing_next_step=payload.get("routing_next_step"),
+                        routing_confidence=payload.get("routing_confidence"),
+                        error_message=payload.get("error"),
+                        ts=event_ts,
+                    )
 
-                # Map the method field to routing_mode
-                method = payload.get("method", "")
-                routing_mode = method if method else None
+                elif kind == "tool_start":
+                    # We'll update on tool_end
+                    pass
 
-                # Determine routing_source based on method
-                # - "deterministic" -> "fast_path" or "deterministic_fallback"
-                # - "llm_tiebreak" -> "navigator"
-                # - "no_candidates" -> "deterministic_fallback"
-                routing_source = None
-                if method == "deterministic":
-                    routing_source = "fast_path"
-                elif method == "llm_tiebreak":
-                    routing_source = "navigator"
-                elif method == "no_candidates":
-                    routing_source = "deterministic_fallback"
+                elif kind == "tool_end":
+                    self.record_tool_call(
+                        run_id=run_id,
+                        step_id=step_id,
+                        tool_name=payload.get("tool", "unknown"),
+                        phase=payload.get("phase", "work"),
+                        duration_ms=payload.get("duration_ms", 0),
+                        success=payload.get("success", True),
+                        target_path=payload.get("target_path"),
+                        diff_lines_added=payload.get("diff_lines_added"),
+                        diff_lines_removed=payload.get("diff_lines_removed"),
+                        exit_code=payload.get("exit_code"),
+                        error_message=payload.get("error"),
+                        ts=event_ts,
+                    )
 
-                # Extract candidate count from explanation if available
-                candidate_count = 0
-                if explanation and isinstance(explanation, dict):
-                    candidate_count = explanation.get("candidates_evaluated", 0)
+                elif kind == "file_changes":
+                    # File changes from DiffScanner (forensic truth)
+                    files = payload.get("files", [])
+                    for fc in files:
+                        self.record_file_change(
+                            run_id=run_id,
+                            step_id=step_id,
+                            file_path=fc.get("path", ""),
+                            change_type=fc.get("status", "modified"),
+                            lines_added=fc.get("insertions", 0),
+                            lines_removed=fc.get("deletions", 0),
+                            ts=event_ts,
+                        )
 
-                # Derive decision from method and terminate flag
-                terminate = payload.get("terminate", False)
-                decision = "terminate" if terminate else "advance"
-                if method == "llm_tiebreak":
-                    decision = "advance"  # LLM chose a path to advance
+                elif kind == "route_decision":
+                    # Routing decisions from the router/navigator
+                    # Extract explanation if present (may contain nested elimination_log, metrics)
+                    explanation = payload.get("explanation")
 
-                self.record_routing_decision(
-                    run_id=run_id,
-                    step_seq=event.get("seq", 0),
-                    flow_id=flow_key,
-                    station_id=step_id,
-                    decision=decision,
-                    routing_mode=routing_mode,
-                    routing_source=routing_source,
-                    chosen_candidate_id=payload.get("selected_edge"),
-                    candidate_count=candidate_count,
-                    target_node=payload.get("target_node"),
-                    terminate=terminate,
-                    needs_human=payload.get("needs_human", False),
-                    explanation=explanation,
-                    ts=event_ts,
-                )
+                    # Map the method field to routing_mode
+                    method = payload.get("method", "")
+                    routing_mode = method if method else None
 
-            elif kind == "run_started":  # Canonical: run_start -> run_started
-                # Run initialization
-                flow_keys = payload.get("flow_keys", [])
-                self.record_run_start(
-                    run_id=run_id,
-                    flow_keys=flow_keys,
-                    profile_id=payload.get("profile_id"),
-                    engine_id=payload.get("engine"),
-                    metadata=payload.get("metadata"),
-                    ts=event_ts,
-                )
+                    # Determine routing_source based on method
+                    # - "deterministic" -> "fast_path" or "deterministic_fallback"
+                    # - "llm_tiebreak" -> "navigator"
+                    # - "no_candidates" -> "deterministic_fallback"
+                    routing_source = None
+                    if method == "deterministic":
+                        routing_source = "fast_path"
+                    elif method == "llm_tiebreak":
+                        routing_source = "navigator"
+                    elif method == "no_candidates":
+                        routing_source = "deterministic_fallback"
 
-            elif kind == "run_completed":
-                # Run completion
-                self.record_run_end(
-                    run_id=run_id,
-                    status=payload.get("status", "completed"),
-                    total_steps=payload.get("total_steps", 0),
-                    completed_steps=payload.get("steps_completed", 0),
-                    total_tokens=payload.get("total_tokens", 0),
-                    total_duration_ms=payload.get("duration_ms", 0),
-                    ts=event_ts,
-                )
+                    # Extract candidate count from explanation if available
+                    candidate_count = 0
+                    if explanation and isinstance(explanation, dict):
+                        candidate_count = explanation.get("candidates_evaluated", 0)
+
+                    # Derive decision from method and terminate flag
+                    terminate = payload.get("terminate", False)
+                    decision = "terminate" if terminate else "advance"
+                    if method == "llm_tiebreak":
+                        decision = "advance"  # LLM chose a path to advance
+
+                    self.record_routing_decision(
+                        run_id=run_id,
+                        step_seq=event.get("seq", 0),
+                        flow_id=flow_key,
+                        station_id=step_id,
+                        decision=decision,
+                        routing_mode=routing_mode,
+                        routing_source=routing_source,
+                        chosen_candidate_id=payload.get("selected_edge"),
+                        candidate_count=candidate_count,
+                        target_node=payload.get("target_node"),
+                        terminate=terminate,
+                        needs_human=payload.get("needs_human", False),
+                        explanation=explanation,
+                        ts=event_ts,
+                    )
+
+                elif kind == "run_started":  # Canonical: run_start -> run_started
+                    # Run initialization
+                    flow_keys = payload.get("flow_keys", [])
+                    self.record_run_start(
+                        run_id=run_id,
+                        flow_keys=flow_keys,
+                        profile_id=payload.get("profile_id"),
+                        engine_id=payload.get("engine"),
+                        metadata=payload.get("metadata"),
+                        ts=event_ts,
+                    )
+
+                elif kind == "run_completed":
+                    # Run completion
+                    self.record_run_end(
+                        run_id=run_id,
+                        status=payload.get("status", "completed"),
+                        total_steps=payload.get("total_steps", 0),
+                        completed_steps=payload.get("steps_completed", 0),
+                        total_tokens=payload.get("total_tokens", 0),
+                        total_duration_ms=payload.get("duration_ms", 0),
+                        ts=event_ts,
+                    )
 
         return newly_ingested
