@@ -204,3 +204,50 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+def test_generate_run_events_path_traversal(tmp_path):
+    """Test that generate_run_events yields error for traversal sequences."""
+    import asyncio
+    import json
+    from swarm.api.routes.events import generate_run_events
+
+    async def run_test():
+        # Setup directories
+        runs_root = tmp_path / "runs"
+        runs_root.mkdir()
+
+        # Create a secret directory outside runs_root
+        secret_dir = tmp_path / "secret"
+        secret_dir.mkdir()
+
+        # Create a fake run in the secret directory
+        # We need both events.jsonl and run_state.json for generate_run_events to work
+        (secret_dir / "run_state.json").write_text(
+            json.dumps({"status": "running"}), encoding="utf-8"
+        )
+
+        secret_event = {"event": "secret_leaked", "data": "super_secret"}
+        (secret_dir / "events.jsonl").write_text(
+            json.dumps(secret_event) + "\n", encoding="utf-8"
+        )
+
+        # Attempt to access the secret run using path traversal
+        traversal_run_id = "../secret"
+
+        events = []
+        # generate_run_events is an async generator
+        async for event_str in generate_run_events(traversal_run_id, runs_root):
+            events.append(event_str)
+            if "secret_leaked" in event_str:
+                break
+
+        # We should NOT see the secret leaked
+        leaked = any("secret_leaked" in e for e in events)
+        assert not leaked, "Path traversal succeeded! Secret was leaked."
+
+        # We SHOULD see an error about invalid_run_id
+        error_found = any("invalid_run_id" in e for e in events)
+        assert error_found, "Expected error event for invalid run_id not found."
+
+    asyncio.run(run_test())
