@@ -2,3 +2,7 @@
 # Example:
 # swarm/runtime/types/state_types.py | 2026-03-31 | Temporary during refactor (SWARM-123)
 swarm/runtime/backends.py | 2026-02-28 | Large backend implementations, needs splitting (REF-001)
+swarm/runtime/statsdb/ingestion.py | 2026-04-30 | Increased size due to batch ingestion optimization (SWARM-255)
+swarm/tools/lint_routing_fields.py | 2026-04-30 | Grown due to documentation logic (SWARM-256)
+tests/test_flow_order_guardrail.py | 2026-04-30 | Comprehensive guardrail testing (SWARM-257)
+tests/test_shadow_fork.py | 2026-04-30 | Extensive shadow fork testing (SWARM-258)
