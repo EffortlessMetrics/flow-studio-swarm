@@ -1,6 +1,6 @@
 import pytest
 from swarm.runtime import storage
-from swarm.runtime.safe_paths import validate_path_component
+from swarm.runtime.safe_paths import validate_path_component, validate_relative_path
 from swarm.tools.flow_studio.services import run_artifacts
 from swarm.tools.run_inspector import RunInspector
 
@@ -204,3 +204,73 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_validate_relative_path_valid():
+    """Test that valid relative paths pass validation."""
+    assert validate_relative_path("foo/bar") == "foo/bar"
+    assert validate_relative_path("foo") == "foo"
+    assert validate_relative_path("foo/bar/baz.txt") == "foo/bar/baz.txt"
+
+def test_validate_relative_path_absolute():
+    """Test that absolute paths are rejected."""
+    with pytest.raises(ValueError, match="cannot be absolute"):
+        validate_relative_path("/foo/bar")
+
+def test_validate_relative_path_traversal():
+    """Test that traversal sequences are rejected."""
+    with pytest.raises(ValueError, match="traversal sequence"):
+        validate_relative_path("../foo")
+
+    with pytest.raises(ValueError, match="traversal sequence"):
+        validate_relative_path("foo/../bar")
+
+    with pytest.raises(ValueError, match="traversal sequence"):
+        validate_relative_path(".")
+
+def test_validate_relative_path_empty_component():
+    """Test that empty components are rejected."""
+    # "foo//bar" -> ["foo", "", "bar"] -> "" raises "cannot be empty" in validate_path_component
+    with pytest.raises(ValueError, match="cannot be empty"):
+        validate_relative_path("foo//bar")
+
+def test_validate_relative_path_empty():
+    """Test that empty paths are rejected."""
+    with pytest.raises(ValueError, match="cannot be empty"):
+        validate_relative_path("")
+
+def test_compile_preview_path_validation():
+    """Test that compile preview endpoints validate paths against traversal."""
+    from swarm.api.routes.compile import _compile_from_station
+
+    # Test run_base traversal
+    with pytest.raises(ValueError, match="run_base"):
+        _compile_from_station(
+            station_id="clarifier",
+            step_id="step_1",
+            objective="test",
+            flow_key="build",
+            run_base="../../etc/passwd",
+            context_pack=None
+        )
+
+    # Test flow_key traversal
+    with pytest.raises(ValueError, match="flow_key"):
+        _compile_from_station(
+            station_id="clarifier",
+            step_id="step_1",
+            objective="test",
+            flow_key="../bad_flow",
+            run_base="swarm/runs/preview",
+            context_pack=None
+        )
+
+    # Test step_id traversal
+    with pytest.raises(ValueError, match="step_id"):
+        _compile_from_station(
+            station_id="clarifier",
+            step_id="../bad_step",
+            objective="test",
+            flow_key="build",
+            run_base="swarm/runs/preview",
+            context_pack=None
+        )
