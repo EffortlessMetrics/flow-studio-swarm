@@ -581,9 +581,9 @@ class StatsDBIngestionMixin:
                             event.get("event_id"),
                             event.get("seq", 0),
                             run_id,
-                            event["ts"],
-                            event["kind"],
-                            event["flow_key"],
+                            event.get("ts"),
+                            event.get("kind"),
+                            event.get("flow_key"),
                             event.get("step_id"),
                             event.get("agent_key"),
                             json.dumps(event.get("payload", {}))
