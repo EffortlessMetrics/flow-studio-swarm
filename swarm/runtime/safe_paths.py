@@ -46,3 +46,33 @@ def validate_path_component(component: str, name: str = "path component") -> str
         raise ValueError(f"{name} contains invalid characters: '{component}'")
 
     return component
+
+
+def validate_relative_path(path: str, name: str = "path") -> str:
+    """Validate a relative path string.
+
+    Ensures the path does not start with '/', does not contain traversal sequences,
+    and each component is valid according to validate_path_component.
+
+    Args:
+        path: The path string to validate.
+        name: Name of the variable for error messages (default: "path").
+
+    Returns:
+        The validated path (same as input).
+
+    Raises:
+        ValueError: If path is absolute, contains invalid components, or is empty.
+    """
+    if not path:
+        raise ValueError(f"{name} cannot be empty")
+
+    if path.startswith("/"):
+        raise ValueError(f"{name} cannot be absolute: '{path}'")
+
+    parts = path.split("/")
+    for part in parts:
+        # validate_path_component handles empty strings, '.', '..', and invalid chars
+        validate_path_component(part, f"{name} component")
+
+    return path

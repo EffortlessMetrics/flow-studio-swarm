@@ -163,10 +163,16 @@ def _compile_from_station(
         load_station_library,
         to_compiler_spec,
     )
+    from swarm.runtime.safe_paths import validate_path_component, validate_relative_path
     from swarm.spec.compiler import (
         build_system_append,
         render_template,
     )
+
+    # Validate paths and IDs to prevent traversal/injection
+    validate_relative_path(run_base, "run_base")
+    validate_path_component(step_id, "step_id")
+    validate_path_component(flow_key, "flow_key")
 
     repo_root = _get_repo_root()
 
