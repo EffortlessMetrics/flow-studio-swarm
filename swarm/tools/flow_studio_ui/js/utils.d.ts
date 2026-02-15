@@ -68,3 +68,15 @@ export interface ModalFocusManager {
     isOpen(): boolean;
 }
 export declare function createModalFocusManager(modal: HTMLElement, contentSelector: string): ModalFocusManager;
+/**
+ * Setup a toggle button that loads content asynchronously.
+ * Manages aria-expanded, disabled state during loading, and error handling.
+ */
+export declare function setupAsyncToggle(button: HTMLButtonElement, container: HTMLElement, loadFn: () => Promise<void>, options: {
+    collapsedLabel: string;
+    expandedLabel: string;
+    loadingLabel?: string;
+    onExpand?: () => void;
+    onCollapse?: () => void;
+    onError?: (err: unknown) => void;
+}): void;

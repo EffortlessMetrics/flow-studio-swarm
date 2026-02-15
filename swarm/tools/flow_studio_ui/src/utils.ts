@@ -294,3 +294,81 @@ export function createModalFocusManager(
     isOpen: () => isModalOpen
   };
 }
+
+// ============================================================================
+// Async Toggle Utilities
+// ============================================================================
+
+/**
+ * Setup a toggle button that loads content asynchronously.
+ * Manages aria-expanded, disabled state during loading, and error handling.
+ */
+export function setupAsyncToggle(
+  button: HTMLButtonElement,
+  container: HTMLElement,
+  loadFn: () => Promise<void>,
+  options: {
+    collapsedLabel: string;
+    expandedLabel: string;
+    loadingLabel?: string;
+    onExpand?: () => void;
+    onCollapse?: () => void;
+    onError?: (err: unknown) => void;
+  }
+): void {
+  const {
+    collapsedLabel,
+    expandedLabel,
+    loadingLabel = "Loading...",
+    onExpand,
+    onCollapse,
+    onError
+  } = options;
+
+  // Initial state validation
+  if (!button.getAttribute("aria-expanded")) {
+      button.setAttribute("aria-expanded", "false");
+  }
+  if (!button.getAttribute("aria-controls")) {
+      button.setAttribute("aria-controls", container.id);
+  }
+
+  if (!container.id) {
+    console.warn("Toggle container missing ID");
+  }
+
+  button.addEventListener("click", async () => {
+    const isExpanded = button.getAttribute("aria-expanded") === "true";
+
+    if (isExpanded) {
+       // Collapse
+       container.style.display = "none";
+       button.textContent = collapsedLabel;
+       button.setAttribute("aria-expanded", "false");
+       if (onCollapse) onCollapse();
+       return;
+    }
+
+    // Expand
+    container.style.display = "block";
+    button.textContent = loadingLabel;
+    button.disabled = true;
+
+    try {
+        await loadFn();
+        button.textContent = expandedLabel;
+        button.setAttribute("aria-expanded", "true");
+        if (onExpand) onExpand();
+    } catch (err) {
+        console.error("Toggle load failed", err);
+        button.textContent = "Retry";
+        button.setAttribute("aria-expanded", "true");
+
+        if (onError) {
+            onError(err);
+        }
+    } finally {
+        button.disabled = false;
+    }
+  });
+}

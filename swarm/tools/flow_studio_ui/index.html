@@ -4793,9 +4793,16 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
     list.className = "fs-text-body";
     list.style.lineHeight = "1.8";
     usage.forEach(u => {
-        const item = document.createElement("div");
+        const item = document.createElement("button");
         item.style.cursor = "pointer";
         item.style.padding = "2px 0";
+        item.style.background = "none";
+        item.style.border = "none";
+        item.style.textAlign = "left";
+        item.style.width = "100%";
+        item.style.fontFamily = "inherit";
+        item.style.fontSize = "inherit";
+        item.style.color = "inherit";
         item.innerHTML = renderAgentUsageItem(u.flow_title, u.step_title);
         item.title = `Click to navigate to ${u.flow}:${u.step}`;
         item.addEventListener("click", async () => {
@@ -4819,6 +4826,8 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
         });
         item.addEventListener("mouseenter", () => { item.style.background = "#f3f4f6"; });
         item.addEventListener("mouseleave", () => { item.style.background = "transparent"; });
+        item.addEventListener("focus", () => { item.style.background = "#f3f4f6"; });
+        item.addEventListener("blur", () => { item.style.background = "transparent"; });
         list.appendChild(item);
     });
     container.appendChild(list);
@@ -5246,10 +5255,16 @@ export async function showStepDetails(data, callbacks = {}) {
         }
         else {
             stepAgents.forEach(agentKey => {
-                const agentLink = document.createElement("div");
+                const agentLink = document.createElement("button");
                 agentLink.style.cursor = "pointer";
                 agentLink.style.padding = "2px 0";
                 agentLink.style.color = "#3b82f6";
+                agentLink.style.background = "none";
+                agentLink.style.border = "none";
+                agentLink.style.textAlign = "left";
+                agentLink.style.width = "100%";
+                agentLink.style.fontFamily = "inherit";
+                agentLink.style.fontSize = "inherit";
                 agentLink.innerHTML = `<span class="mono">${escapeHtml(agentKey)}</span>`;
                 agentLink.title = `Click to view agent: ${agentKey}`;
                 agentLink.addEventListener("click", async () => {
@@ -5262,6 +5277,14 @@ export async function showStepDetails(data, callbacks = {}) {
                     agentLink.style.textDecoration = "underline";
                 });
                 agentLink.addEventListener("mouseleave", () => {
+                    agentLink.style.background = "transparent";
+                    agentLink.style.textDecoration = "none";
+                });
+                agentLink.addEventListener("focus", () => {
+                    agentLink.style.background = "#f3f4f6";
+                    agentLink.style.textDecoration = "underline";
+                });
+                agentLink.addEventListener("blur", () => {
                     agentLink.style.background = "transparent";
                     agentLink.style.textDecoration = "none";
                 });
@@ -10133,7 +10156,10 @@ export function renderNoRuns() {
       <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">No runs yet</p>
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
-      <code class="mono fs-empty-command">make demo-run</code>
+      <div class="fs-copy-command">
+        <code class="mono fs-empty-command">make demo-run</code>
+        <button class="fs-icon-button copy-button" title="Copy command" onclick="navigator.clipboard.writeText('make demo-run'); this.textContent='\u2713'; setTimeout(() => this.textContent='\uD83D\uDCCB', 2000)">\uD83D\uDCCB</button>
+      </div>
     </div>
   `;
 }
@@ -10647,6 +10673,60 @@ export function createModalFocusManager(modal, contentSelector) {
         close,
         isOpen: () => isModalOpen
     };
+}
+// ============================================================================
+// Async Toggle Utilities
+// ============================================================================
+/**
+ * Setup a toggle button that loads content asynchronously.
+ * Manages aria-expanded, disabled state during loading, and error handling.
+ */
+export function setupAsyncToggle(button, container, loadFn, options) {
+    const { collapsedLabel, expandedLabel, loadingLabel = "Loading...", onExpand, onCollapse, onError } = options;
+    // Initial state validation
+    if (!button.getAttribute("aria-expanded")) {
+        button.setAttribute("aria-expanded", "false");
+    }
+    if (!button.getAttribute("aria-controls")) {
+        button.setAttribute("aria-controls", container.id);
+    }
+    if (!container.id) {
+        console.warn("Toggle container missing ID");
+    }
+    button.addEventListener("click", async () => {
+        const isExpanded = button.getAttribute("aria-expanded") === "true";
+        if (isExpanded) {
+            // Collapse
+            container.style.display = "none";
+            button.textContent = collapsedLabel;
+            button.setAttribute("aria-expanded", "false");
+            if (onCollapse)
+                onCollapse();
+            return;
+        }
+        // Expand
+        container.style.display = "block";
+        button.textContent = loadingLabel;
+        button.disabled = true;
+        try {
+            await loadFn();
+            button.textContent = expandedLabel;
+            button.setAttribute("aria-expanded", "true");
+            if (onExpand)
+                onExpand();
+        }
+        catch (err) {
+            console.error("Toggle load failed", err);
+            button.textContent = "Retry";
+            button.setAttribute("aria-expanded", "true");
+            if (onError) {
+                onError(err);
+            }
+        }
+        finally {
+            button.disabled = false;
+        }
+    });
 }
 // flow_constants.js
 // AUTO-GENERATED from swarm/config/flows.yaml
@@ -11771,7 +11851,7 @@ export async function initRunHistory() {
 // - Flow progress and status
 // - Re-run and close actions
 import { Api } from "./api.js";
-import { escapeHtml, formatDateTime, createModalFocusManager, createCopyButton, createQuickCommands } from "./utils.js";
+import { escapeHtml, formatDateTime, createModalFocusManager, createCopyButton, createQuickCommands, setupAsyncToggle } from "./utils.js";
 import { updateCompactInventory, injectInventoryCSS } from "./inventory_counts.js";
 import { updateBoundaryReviewPanel, injectBoundaryReviewCSS } from "./boundary_review.js";
 import { FLOW_KEYS, FLOW_TITLES } from "./flow_constants.js";
@@ -11975,7 +12055,7 @@ export function renderRunDetailContent(runId, summary) {
     <div class="kv-section" style="margin-top: 16px;" data-uiid="flow_studio.modal.run_detail.boundary">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Boundary Summary</span>
-        <button id="run-detail-boundary-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.boundary.toggle" style="padding: 2px 8px; font-size: 10px;">Load Review</button>
+        <button id="run-detail-boundary-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.boundary.toggle" style="padding: 2px 8px; font-size: 10px;" aria-expanded="false" aria-controls="run-detail-boundary-container">Load Review</button>
       </div>
       <div id="run-detail-boundary-container" data-uiid="flow_studio.modal.run_detail.boundary.container" style="display: none; margin-top: 8px;">
         <div class="muted fs-text-xs">Click "Load Review" to view boundary data...</div>
@@ -11985,7 +12065,7 @@ export function renderRunDetailContent(runId, summary) {
     <div class="kv-section" style="margin-top: 16px;">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Events Timeline</span>
-        <button id="run-detail-events-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.events.toggle" style="padding: 2px 8px; font-size: 10px;">Load Events</button>
+        <button id="run-detail-events-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.events.toggle" style="padding: 2px 8px; font-size: 10px;" aria-expanded="false" aria-controls="run-detail-events-container">Load Events</button>
       </div>
       <div id="run-detail-events-container" data-uiid="flow_studio.modal.run_detail.events.container" style="display: none; margin-top: 8px; max-height: 200px; overflow-y: auto; background: #f9fafb; border-radius: 4px; padding: 8px;">
         <div class="muted fs-text-xs">Click "Load Events" to view execution events...</div>
@@ -11995,7 +12075,7 @@ export function renderRunDetailContent(runId, summary) {
     <div class="kv-section" style="margin-top: 16px;" data-uiid="flow_studio.modal.run_detail.wisdom">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Wisdom Summary</span>
-        <button id="run-detail-wisdom-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.wisdom.toggle" style="padding: 2px 8px; font-size: 10px;">Load Wisdom</button>
+        <button id="run-detail-wisdom-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.wisdom.toggle" style="padding: 2px 8px; font-size: 10px;" aria-expanded="false" aria-controls="run-detail-wisdom-container">Load Wisdom</button>
       </div>
       <div id="run-detail-wisdom-container" data-uiid="flow_studio.modal.run_detail.wisdom.container" style="display: none; margin-top: 8px; background: #f0fdf4; border-radius: 4px; padding: 12px;">
         <div class="muted fs-text-xs">Click "Load Wisdom" to view wisdom metrics...</div>
@@ -12231,30 +12311,14 @@ function attachActionHandlers(modal, runId, summary) {
     const boundaryToggle = modal.querySelector("#run-detail-boundary-toggle");
     const boundaryContainer = modal.querySelector("#run-detail-boundary-container");
     if (boundaryToggle && boundaryContainer) {
-        boundaryToggle.addEventListener("click", async () => {
-            const btn = boundaryToggle;
-            const container = boundaryContainer;
-            // Toggle visibility
-            if (container.style.display === "none") {
-                container.style.display = "block";
-                btn.textContent = "Loading...";
-                btn.disabled = true;
-                try {
-                    await updateBoundaryReviewPanel(container, runId, { scope: "run" });
-                    btn.textContent = "Hide Review";
-                }
-                catch (err) {
-                    console.error("Failed to load boundary review", err);
-                    container.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load boundary review: ${escapeHtml(err.message || "Unknown error")}</div>`;
-                    btn.textContent = "Retry";
-                }
-                finally {
-                    btn.disabled = false;
-                }
-            }
-            else {
-                container.style.display = "none";
-                btn.textContent = "Load Review";
+        setupAsyncToggle(boundaryToggle, boundaryContainer, async () => {
+            await updateBoundaryReviewPanel(boundaryContainer, runId, { scope: "run" });
+        }, {
+            collapsedLabel: "Load Review",
+            expandedLabel: "Hide Review",
+            loadingLabel: "Loading...",
+            onError: (err) => {
+                boundaryContainer.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load boundary review: ${escapeHtml(err.message || "Unknown error")}</div>`;
             }
         });
     }
@@ -12347,31 +12411,15 @@ function attachActionHandlers(modal, runId, summary) {
     const eventsToggle = modal.querySelector("#run-detail-events-toggle");
     const eventsContainer = modal.querySelector("#run-detail-events-container");
     if (eventsToggle && eventsContainer) {
-        eventsToggle.addEventListener("click", async () => {
-            const btn = eventsToggle;
-            const container = eventsContainer;
-            // Toggle visibility
-            if (container.style.display === "none") {
-                container.style.display = "block";
-                btn.textContent = "Loading...";
-                btn.disabled = true;
-                try {
-                    const response = await Api.getRunEvents(runId);
-                    container.innerHTML = renderEventsTimeline(response.events);
-                    btn.textContent = "Hide Events";
-                }
-                catch (err) {
-                    console.error("Failed to load events", err);
-                    container.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load events: ${escapeHtml(err.message || "Unknown error")}</div>`;
-                    btn.textContent = "Retry";
-                }
-                finally {
-                    btn.disabled = false;
-                }
-            }
-            else {
-                container.style.display = "none";
-                btn.textContent = "Load Events";
+        setupAsyncToggle(eventsToggle, eventsContainer, async () => {
+            const response = await Api.getRunEvents(runId);
+            eventsContainer.innerHTML = renderEventsTimeline(response.events);
+        }, {
+            collapsedLabel: "Load Events",
+            expandedLabel: "Hide Events",
+            loadingLabel: "Loading...",
+            onError: (err) => {
+                eventsContainer.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load events: ${escapeHtml(err.message || "Unknown error")}</div>`;
             }
         });
     }
@@ -12379,38 +12427,21 @@ function attachActionHandlers(modal, runId, summary) {
     const wisdomToggle = modal.querySelector("#run-detail-wisdom-toggle");
     const wisdomContainer = modal.querySelector("#run-detail-wisdom-container");
     if (wisdomToggle && wisdomContainer) {
-        wisdomToggle.addEventListener("click", async () => {
-            const btn = wisdomToggle;
-            const container = wisdomContainer;
-            // Toggle visibility
-            if (container.style.display === "none") {
-                container.style.display = "block";
-                btn.textContent = "Loading...";
-                btn.disabled = true;
-                try {
-                    const wisdom = await Api.getRunWisdom(runId);
-                    container.innerHTML = renderWisdomSummary(wisdom);
-                    btn.textContent = "Hide Wisdom";
+        setupAsyncToggle(wisdomToggle, wisdomContainer, async () => {
+            const wisdom = await Api.getRunWisdom(runId);
+            wisdomContainer.innerHTML = renderWisdomSummary(wisdom);
+        }, {
+            collapsedLabel: "Load Wisdom",
+            expandedLabel: "Hide Wisdom",
+            loadingLabel: "Loading...",
+            onError: (err) => {
+                const errorMsg = err.message || "Unknown error";
+                if (errorMsg.includes("404")) {
+                    wisdomContainer.innerHTML = renderWisdomEmpty(runId);
                 }
-                catch (err) {
-                    console.error("Failed to load wisdom", err);
-                    // 404 means no wisdom available - show helpful message
-                    const errorMsg = err.message || "Unknown error";
-                    if (errorMsg.includes("404")) {
-                        container.innerHTML = renderWisdomEmpty(runId);
-                    }
-                    else {
-                        container.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load wisdom: ${escapeHtml(errorMsg)}</div>`;
-                    }
-                    btn.textContent = "Retry";
+                else {
+                    wisdomContainer.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load wisdom: ${escapeHtml(errorMsg)}</div>`;
                 }
-                finally {
-                    btn.disabled = false;
-                }
-            }
-            else {
-                container.style.display = "none";
-                btn.textContent = "Load Wisdom";
             }
         });
     }
