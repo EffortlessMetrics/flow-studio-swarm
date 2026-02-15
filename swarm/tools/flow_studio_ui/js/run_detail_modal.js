@@ -7,7 +7,7 @@
 // - Flow progress and status
 // - Re-run and close actions
 import { Api } from "./api.js";
-import { escapeHtml, formatDateTime, createModalFocusManager, createCopyButton, createQuickCommands } from "./utils.js";
+import { escapeHtml, formatDateTime, createModalFocusManager, createCopyButton, createQuickCommands, setupAsyncToggle } from "./utils.js";
 import { updateCompactInventory, injectInventoryCSS } from "./inventory_counts.js";
 import { updateBoundaryReviewPanel, injectBoundaryReviewCSS } from "./boundary_review.js";
 import { FLOW_KEYS, FLOW_TITLES } from "./flow_constants.js";
@@ -211,7 +211,7 @@ export function renderRunDetailContent(runId, summary) {
     <div class="kv-section" style="margin-top: 16px;" data-uiid="flow_studio.modal.run_detail.boundary">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Boundary Summary</span>
-        <button id="run-detail-boundary-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.boundary.toggle" style="padding: 2px 8px; font-size: 10px;">Load Review</button>
+        <button id="run-detail-boundary-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.boundary.toggle" style="padding: 2px 8px; font-size: 10px;" aria-expanded="false" aria-controls="run-detail-boundary-container">Load Review</button>
       </div>
       <div id="run-detail-boundary-container" data-uiid="flow_studio.modal.run_detail.boundary.container" style="display: none; margin-top: 8px;">
         <div class="muted fs-text-xs">Click "Load Review" to view boundary data...</div>
@@ -221,7 +221,7 @@ export function renderRunDetailContent(runId, summary) {
     <div class="kv-section" style="margin-top: 16px;">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Events Timeline</span>
-        <button id="run-detail-events-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.events.toggle" style="padding: 2px 8px; font-size: 10px;">Load Events</button>
+        <button id="run-detail-events-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.events.toggle" style="padding: 2px 8px; font-size: 10px;" aria-expanded="false" aria-controls="run-detail-events-container">Load Events</button>
       </div>
       <div id="run-detail-events-container" data-uiid="flow_studio.modal.run_detail.events.container" style="display: none; margin-top: 8px; max-height: 200px; overflow-y: auto; background: #f9fafb; border-radius: 4px; padding: 8px;">
         <div class="muted fs-text-xs">Click "Load Events" to view execution events...</div>
@@ -231,7 +231,7 @@ export function renderRunDetailContent(runId, summary) {
     <div class="kv-section" style="margin-top: 16px;" data-uiid="flow_studio.modal.run_detail.wisdom">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Wisdom Summary</span>
-        <button id="run-detail-wisdom-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.wisdom.toggle" style="padding: 2px 8px; font-size: 10px;">Load Wisdom</button>
+        <button id="run-detail-wisdom-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.wisdom.toggle" style="padding: 2px 8px; font-size: 10px;" aria-expanded="false" aria-controls="run-detail-wisdom-container">Load Wisdom</button>
       </div>
       <div id="run-detail-wisdom-container" data-uiid="flow_studio.modal.run_detail.wisdom.container" style="display: none; margin-top: 8px; background: #f0fdf4; border-radius: 4px; padding: 12px;">
         <div class="muted fs-text-xs">Click "Load Wisdom" to view wisdom metrics...</div>
@@ -467,30 +467,14 @@ function attachActionHandlers(modal, runId, summary) {
     const boundaryToggle = modal.querySelector("#run-detail-boundary-toggle");
     const boundaryContainer = modal.querySelector("#run-detail-boundary-container");
     if (boundaryToggle && boundaryContainer) {
-        boundaryToggle.addEventListener("click", async () => {
-            const btn = boundaryToggle;
-            const container = boundaryContainer;
-            // Toggle visibility
-            if (container.style.display === "none") {
-                container.style.display = "block";
-                btn.textContent = "Loading...";
-                btn.disabled = true;
-                try {
-                    await updateBoundaryReviewPanel(container, runId, { scope: "run" });
-                    btn.textContent = "Hide Review";
-                }
-                catch (err) {
-                    console.error("Failed to load boundary review", err);
-                    container.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load boundary review: ${escapeHtml(err.message || "Unknown error")}</div>`;
-                    btn.textContent = "Retry";
-                }
-                finally {
-                    btn.disabled = false;
-                }
-            }
-            else {
-                container.style.display = "none";
-                btn.textContent = "Load Review";
+        setupAsyncToggle(boundaryToggle, boundaryContainer, async () => {
+            await updateBoundaryReviewPanel(boundaryContainer, runId, { scope: "run" });
+        }, {
+            collapsedLabel: "Load Review",
+            expandedLabel: "Hide Review",
+            loadingLabel: "Loading...",
+            onError: (err) => {
+                boundaryContainer.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load boundary review: ${escapeHtml(err.message || "Unknown error")}</div>`;
             }
         });
     }
@@ -583,31 +567,15 @@ function attachActionHandlers(modal, runId, summary) {
     const eventsToggle = modal.querySelector("#run-detail-events-toggle");
     const eventsContainer = modal.querySelector("#run-detail-events-container");
     if (eventsToggle && eventsContainer) {
-        eventsToggle.addEventListener("click", async () => {
-            const btn = eventsToggle;
-            const container = eventsContainer;
-            // Toggle visibility
-            if (container.style.display === "none") {
-                container.style.display = "block";
-                btn.textContent = "Loading...";
-                btn.disabled = true;
-                try {
-                    const response = await Api.getRunEvents(runId);
-                    container.innerHTML = renderEventsTimeline(response.events);
-                    btn.textContent = "Hide Events";
-                }
-                catch (err) {
-                    console.error("Failed to load events", err);
-                    container.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load events: ${escapeHtml(err.message || "Unknown error")}</div>`;
-                    btn.textContent = "Retry";
-                }
-                finally {
-                    btn.disabled = false;
-                }
-            }
-            else {
-                container.style.display = "none";
-                btn.textContent = "Load Events";
+        setupAsyncToggle(eventsToggle, eventsContainer, async () => {
+            const response = await Api.getRunEvents(runId);
+            eventsContainer.innerHTML = renderEventsTimeline(response.events);
+        }, {
+            collapsedLabel: "Load Events",
+            expandedLabel: "Hide Events",
+            loadingLabel: "Loading...",
+            onError: (err) => {
+                eventsContainer.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load events: ${escapeHtml(err.message || "Unknown error")}</div>`;
             }
         });
     }
@@ -615,38 +583,21 @@ function attachActionHandlers(modal, runId, summary) {
     const wisdomToggle = modal.querySelector("#run-detail-wisdom-toggle");
     const wisdomContainer = modal.querySelector("#run-detail-wisdom-container");
     if (wisdomToggle && wisdomContainer) {
-        wisdomToggle.addEventListener("click", async () => {
-            const btn = wisdomToggle;
-            const container = wisdomContainer;
-            // Toggle visibility
-            if (container.style.display === "none") {
-                container.style.display = "block";
-                btn.textContent = "Loading...";
-                btn.disabled = true;
-                try {
-                    const wisdom = await Api.getRunWisdom(runId);
-                    container.innerHTML = renderWisdomSummary(wisdom);
-                    btn.textContent = "Hide Wisdom";
+        setupAsyncToggle(wisdomToggle, wisdomContainer, async () => {
+            const wisdom = await Api.getRunWisdom(runId);
+            wisdomContainer.innerHTML = renderWisdomSummary(wisdom);
+        }, {
+            collapsedLabel: "Load Wisdom",
+            expandedLabel: "Hide Wisdom",
+            loadingLabel: "Loading...",
+            onError: (err) => {
+                const errorMsg = err.message || "Unknown error";
+                if (errorMsg.includes("404")) {
+                    wisdomContainer.innerHTML = renderWisdomEmpty(runId);
                 }
-                catch (err) {
-                    console.error("Failed to load wisdom", err);
-                    // 404 means no wisdom available - show helpful message
-                    const errorMsg = err.message || "Unknown error";
-                    if (errorMsg.includes("404")) {
-                        container.innerHTML = renderWisdomEmpty(runId);
-                    }
-                    else {
-                        container.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load wisdom: ${escapeHtml(errorMsg)}</div>`;
-                    }
-                    btn.textContent = "Retry";
+                else {
+                    wisdomContainer.innerHTML = `<div class="fs-text-xs" style="color: #dc2626;">Failed to load wisdom: ${escapeHtml(errorMsg)}</div>`;
                 }
-                finally {
-                    btn.disabled = false;
-                }
-            }
-            else {
-                container.style.display = "none";
-                btn.textContent = "Load Wisdom";
             }
         });
     }
