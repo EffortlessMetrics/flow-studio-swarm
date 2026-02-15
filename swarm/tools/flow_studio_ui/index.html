@@ -58,7 +58,7 @@
       </button>
       <div class="muted author-only" style="display: flex; align-items: center; gap: 8px;" data-uiid="flow_studio.header.reload">
         <span class="mono">make dev-check</span>
-        <button id="copy-dev-check-btn" class="copy-btn" title="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
+        <button id="copy-dev-check-btn" class="copy-btn" title="Copy command to clipboard" aria-label="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
         <button id="reload-btn" class="fs-button-small" data-uiid="flow_studio.header.reload.btn">Reload</button>
       </div>
       <button id="help-btn" class="fs-icon-button" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
@@ -214,11 +214,11 @@
         </div>
         <div class="command-line">
            <span class="command-text">uv run swarm/tools/gen_flows.py</span>
-           <button class="copy-btn" onclick="navigator.clipboard.writeText('uv run swarm/tools/gen_flows.py').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard">Copy</button>
+           <button class="copy-btn" onclick="navigator.clipboard.writeText('uv run swarm/tools/gen_flows.py').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard" aria-label="Copy command to clipboard">Copy</button>
         </div>
         <div class="command-line">
            <span class="command-text">make validate-swarm</span>
-           <button class="copy-btn" onclick="navigator.clipboard.writeText('make validate-swarm').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard">Copy</button>
+           <button class="copy-btn" onclick="navigator.clipboard.writeText('make validate-swarm').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard" aria-label="Copy command to clipboard">Copy</button>
         </div>
       </div>
       <p style="margin-top: 12px; font-size: 12px; color: #6b7280;">
@@ -4793,9 +4793,16 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
     list.className = "fs-text-body";
     list.style.lineHeight = "1.8";
     usage.forEach(u => {
-        const item = document.createElement("div");
+        const item = document.createElement("button");
         item.style.cursor = "pointer";
         item.style.padding = "2px 0";
+        item.style.background = "none";
+        item.style.border = "none";
+        item.style.textAlign = "left";
+        item.style.width = "100%";
+        item.style.fontFamily = "inherit";
+        item.style.fontSize = "inherit";
+        item.style.color = "inherit";
         item.innerHTML = renderAgentUsageItem(u.flow_title, u.step_title);
         item.title = `Click to navigate to ${u.flow}:${u.step}`;
         item.addEventListener("click", async () => {
@@ -4819,6 +4826,8 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
         });
         item.addEventListener("mouseenter", () => { item.style.background = "#f3f4f6"; });
         item.addEventListener("mouseleave", () => { item.style.background = "transparent"; });
+        item.addEventListener("focus", () => { item.style.background = "#f3f4f6"; });
+        item.addEventListener("blur", () => { item.style.background = "transparent"; });
         list.appendChild(item);
     });
     container.appendChild(list);
@@ -5246,10 +5255,16 @@ export async function showStepDetails(data, callbacks = {}) {
         }
         else {
             stepAgents.forEach(agentKey => {
-                const agentLink = document.createElement("div");
+                const agentLink = document.createElement("button");
                 agentLink.style.cursor = "pointer";
                 agentLink.style.padding = "2px 0";
                 agentLink.style.color = "#3b82f6";
+                agentLink.style.background = "none";
+                agentLink.style.border = "none";
+                agentLink.style.textAlign = "left";
+                agentLink.style.width = "100%";
+                agentLink.style.fontFamily = "inherit";
+                agentLink.style.fontSize = "inherit";
                 agentLink.innerHTML = `<span class="mono">${escapeHtml(agentKey)}</span>`;
                 agentLink.title = `Click to view agent: ${agentKey}`;
                 agentLink.addEventListener("click", async () => {
@@ -5262,6 +5277,14 @@ export async function showStepDetails(data, callbacks = {}) {
                     agentLink.style.textDecoration = "underline";
                 });
                 agentLink.addEventListener("mouseleave", () => {
+                    agentLink.style.background = "transparent";
+                    agentLink.style.textDecoration = "none";
+                });
+                agentLink.addEventListener("focus", () => {
+                    agentLink.style.background = "#f3f4f6";
+                    agentLink.style.textDecoration = "underline";
+                });
+                agentLink.addEventListener("blur", () => {
                     agentLink.style.background = "transparent";
                     agentLink.style.textDecoration = "none";
                 });
@@ -5727,7 +5750,7 @@ import { BoundaryReview, createBoundaryReview, extractBoundaryReviewData, } from
 // Inventory Counts - marker statistics
 import { InventoryCounts } from "./components/InventoryCounts.js";
 // Import utilities
-import { formatDuration, formatTime, formatDateTime, createQuickCommands, createPathWithCopy, escapeHtml, copyToClipboard } from "./utils.js";
+import { formatDuration, formatTime, formatDateTime, createQuickCommands, createPathWithCopy, escapeHtml, copyToClipboard, setupCopyButton } from "./utils.js";
 // ============================================================================
 // Details Wrappers
 // ============================================================================
@@ -6392,15 +6415,7 @@ window.addEventListener("load", async () => {
         // Header copy button handler
         const copyDevCheckBtn = document.getElementById("copy-dev-check-btn");
         if (copyDevCheckBtn) {
-            copyDevCheckBtn.addEventListener("click", () => {
-                void copyToClipboard("make dev-check");
-                copyDevCheckBtn.textContent = "Copied!";
-                copyDevCheckBtn.classList.add("copied");
-                setTimeout(() => {
-                    copyDevCheckBtn.textContent = "Copy";
-                    copyDevCheckBtn.classList.remove("copied");
-                }, 1500);
-            });
+            setupCopyButton(copyDevCheckBtn, "make dev-check", "Copy");
         }
         // Help button handler
         const helpBtn = document.getElementById("help-btn");
@@ -10133,7 +10148,10 @@ export function renderNoRuns() {
       <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">No runs yet</p>
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
-      <code class="mono fs-empty-command">make demo-run</code>
+      <div class="fs-copy-command">
+        <code class="mono fs-empty-command">make demo-run</code>
+        <button class="fs-icon-button copy-button" title="Copy command" onclick="navigator.clipboard.writeText('make demo-run'); this.textContent='\u2713'; setTimeout(() => this.textContent='\uD83D\uDCCB', 2000)">\uD83D\uDCCB</button>
+      </div>
     </div>
   `;
 }
@@ -10481,22 +10499,50 @@ export function copyToClipboard(text) {
     });
 }
 /**
- * Create a copy button element
+ * Setup a copy button with accessible feedback loop
  */
-export function createCopyButton(text, label = "Copy") {
-    const btn = document.createElement("button");
-    btn.className = "copy-btn";
-    btn.textContent = label;
-    btn.title = "Copy to clipboard";
+export function setupCopyButton(btn, text, label = "Copy") {
+    // Capture existing aria-label or generate one
+    let originalAriaLabel = btn.getAttribute("aria-label");
+    if (!originalAriaLabel) {
+        originalAriaLabel = label === "Copy" ? "Copy to clipboard" : `Copy ${label} to clipboard`;
+        btn.setAttribute("aria-label", originalAriaLabel);
+    }
+    if (!btn.title) {
+        btn.title = "Copy to clipboard";
+    }
     btn.addEventListener("click", () => {
+        // If already copied, ignore to prevent race conditions or sticky "Copied!" state
+        if (btn.classList.contains("copied")) {
+            return;
+        }
         void copyToClipboard(text);
         btn.textContent = "Copied!";
         btn.classList.add("copied");
+        // Update aria-label for screen reader announcement
+        btn.setAttribute("aria-label", "Copied to clipboard");
         setTimeout(() => {
             btn.textContent = label;
             btn.classList.remove("copied");
+            // Restore original accessible name
+            if (originalAriaLabel) {
+                btn.setAttribute("aria-label", originalAriaLabel);
+            }
         }, 1500);
     });
+}
+/**
+ * Create a copy button element
+ */
+export function createCopyButton(text, label = "Copy", accessibleLabel) {
+    const btn = document.createElement("button");
+    btn.className = "copy-btn";
+    btn.textContent = label;
+    btn.type = "button";
+    if (accessibleLabel) {
+        btn.setAttribute("aria-label", accessibleLabel);
+    }
+    setupCopyButton(btn, text, label);
     return btn;
 }
 /**
@@ -10529,7 +10575,7 @@ export function createQuickCommands(commands) {
         cmdText.className = "command-text";
         cmdText.textContent = "$ " + cmd;
         line.appendChild(cmdText);
-        line.appendChild(createCopyButton(cmd, "Copy"));
+        line.appendChild(createCopyButton(cmd, "Copy", "Copy command to clipboard"));
         container.appendChild(line);
     });
     return container;

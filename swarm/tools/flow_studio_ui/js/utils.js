@@ -69,22 +69,50 @@ export function copyToClipboard(text) {
     });
 }
 /**
- * Create a copy button element
+ * Setup a copy button with accessible feedback loop
  */
-export function createCopyButton(text, label = "Copy") {
-    const btn = document.createElement("button");
-    btn.className = "copy-btn";
-    btn.textContent = label;
-    btn.title = "Copy to clipboard";
+export function setupCopyButton(btn, text, label = "Copy") {
+    // Capture existing aria-label or generate one
+    let originalAriaLabel = btn.getAttribute("aria-label");
+    if (!originalAriaLabel) {
+        originalAriaLabel = label === "Copy" ? "Copy to clipboard" : `Copy ${label} to clipboard`;
+        btn.setAttribute("aria-label", originalAriaLabel);
+    }
+    if (!btn.title) {
+        btn.title = "Copy to clipboard";
+    }
     btn.addEventListener("click", () => {
+        // If already copied, ignore to prevent race conditions or sticky "Copied!" state
+        if (btn.classList.contains("copied")) {
+            return;
+        }
         void copyToClipboard(text);
         btn.textContent = "Copied!";
         btn.classList.add("copied");
+        // Update aria-label for screen reader announcement
+        btn.setAttribute("aria-label", "Copied to clipboard");
         setTimeout(() => {
             btn.textContent = label;
             btn.classList.remove("copied");
+            // Restore original accessible name
+            if (originalAriaLabel) {
+                btn.setAttribute("aria-label", originalAriaLabel);
+            }
         }, 1500);
     });
+}
+/**
+ * Create a copy button element
+ */
+export function createCopyButton(text, label = "Copy", accessibleLabel) {
+    const btn = document.createElement("button");
+    btn.className = "copy-btn";
+    btn.textContent = label;
+    btn.type = "button";
+    if (accessibleLabel) {
+        btn.setAttribute("aria-label", accessibleLabel);
+    }
+    setupCopyButton(btn, text, label);
     return btn;
 }
 /**
@@ -117,7 +145,7 @@ export function createQuickCommands(commands) {
         cmdText.className = "command-text";
         cmdText.textContent = "$ " + cmd;
         line.appendChild(cmdText);
-        line.appendChild(createCopyButton(cmd, "Copy"));
+        line.appendChild(createCopyButton(cmd, "Copy", "Copy command to clipboard"));
         container.appendChild(line);
     });
     return container;
