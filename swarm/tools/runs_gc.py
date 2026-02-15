@@ -58,7 +58,7 @@ class RunInfo:
     run_id: str
     path: Path
     run_type: str  # "active", "example", "legacy"
-    size_bytes: int
+    size_bytes: int  # -1 if size calculation was skipped
     mtime: datetime
     has_meta: bool
     is_corrupt: bool
@@ -86,7 +86,9 @@ def get_dir_size(path: Path) -> int:
     return total
 
 
-def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
+def get_run_info(
+    run_id: str, run_path: Path, run_type: str, compute_size: bool = True
+) -> RunInfo:
     """Collect information about a single run."""
     meta_path = run_path / META_FILE
     has_meta = meta_path.exists()
@@ -110,7 +112,7 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
         mtime = datetime.now(timezone.utc)
 
     # Get size
-    size_bytes = get_dir_size(run_path)
+    size_bytes = get_dir_size(run_path) if compute_size else -1
 
     return RunInfo(
         run_id=run_id,
@@ -124,7 +126,7 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     )
 
 
-def discover_all_runs() -> List[RunInfo]:
+def discover_all_runs(compute_size: bool = True) -> List[RunInfo]:
     """Discover all runs from runs/ and examples/ directories."""
     runs: List[RunInfo] = []
     seen: set[str] = set()
@@ -135,7 +137,11 @@ def discover_all_runs() -> List[RunInfo]:
             if entry.is_dir() and not entry.name.startswith("."):
                 if entry.name not in seen:
                     seen.add(entry.name)
-                    runs.append(get_run_info(entry.name, entry, "example"))
+                    runs.append(
+                        get_run_info(
+                            entry.name, entry, "example", compute_size=compute_size
+                        )
+                    )
 
     # Active runs with meta.json
     if RUNS_DIR.exists():
@@ -147,10 +153,18 @@ def discover_all_runs() -> List[RunInfo]:
 
                 meta_path = entry / META_FILE
                 if meta_path.exists():
-                    runs.append(get_run_info(entry.name, entry, "active"))
+                    runs.append(
+                        get_run_info(
+                            entry.name, entry, "active", compute_size=compute_size
+                        )
+                    )
                 else:
                     # Legacy run (no meta.json)
-                    runs.append(get_run_info(entry.name, entry, "legacy"))
+                    runs.append(
+                        get_run_info(
+                            entry.name, entry, "legacy", compute_size=compute_size
+                        )
+                    )
 
     return runs
 
@@ -281,7 +295,9 @@ def cmd_prune(args: argparse.Namespace) -> int:
         logger.info("Retention policy is disabled. Use --force to override.")
         return 0
 
-    runs = discover_all_runs()
+    # Pruning relies on age/count, so size is not strictly required for decision.
+    # We defer size calculation to report phase if needed.
+    runs = discover_all_runs(compute_size=False)
     if not runs:
         logger.info("No runs found.")
         return 0
@@ -311,6 +327,13 @@ def cmd_prune(args: argparse.Namespace) -> int:
             to_delete.append(run)
             continue
 
+    # Calculate size for items to delete (for reporting)
+    total_size_freed = 0
+    for run in to_delete:
+        if run.size_bytes == -1:
+            run.size_bytes = get_dir_size(run.path)
+        total_size_freed += run.size_bytes
+
     # Report
     logger.info("=" * 60)
     logger.info("PRUNE OPERATION" + (" (DRY RUN)" if dry_run else ""))
@@ -319,7 +342,7 @@ def cmd_prune(args: argparse.Namespace) -> int:
     logger.info(f"Total runs:      {len(runs)}")
     logger.info(f"To delete:       {len(to_delete)}")
     logger.info(f"Preserved:       {len(preserved)}")
-    logger.info(f"Space to free:   {format_size(sum(r.size_bytes for r in to_delete))}")
+    logger.info(f"Space to free:   {format_size(total_size_freed)}")
     logger.info("")
 
     if not to_delete:
@@ -351,7 +374,7 @@ def cmd_quarantine(args: argparse.Namespace) -> int:
     """Move corrupt runs to quarantine directory."""
     dry_run = args.dry_run or is_dry_run_enabled()
 
-    runs = discover_all_runs()
+    runs = discover_all_runs(compute_size=False)
     corrupt_runs = [r for r in runs if r.is_corrupt]
 
     if not corrupt_runs:
