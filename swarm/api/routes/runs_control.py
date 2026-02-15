@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+import html
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -715,7 +716,7 @@ async def _write_stop_report(
         "",
         f"**Run ID:** {run_id}",
         f"**Stopped At:** {stop_info.stopped_at}",
-        f"**Reason:** {stop_info.stop_reason}",
+        f"**Reason:** {html.escape(stop_info.stop_reason)}",
         "",
         "## Execution State",
         "",
@@ -727,12 +728,14 @@ async def _write_stop_report(
 
     # Add routing intent if available
     if stop_info.last_routing_intent:
+        # Sanitize backticks to prevent breaking out of code block
+        safe_intent = stop_info.last_routing_intent.replace("`", "'")
         lines.extend(
             [
                 "## Last Routing Intent",
                 "",
                 "```",
-                stop_info.last_routing_intent,
+                safe_intent,
                 "```",
                 "",
             ]
@@ -747,7 +750,9 @@ async def _write_stop_report(
             ]
         )
         for call in stop_info.last_tool_calls:
-            lines.append(f"- `{call}`")
+            # Escape HTML to prevent injection
+            safe_call = html.escape(call)
+            lines.append(f"- `{safe_call}`")
         lines.append("")
 
     # Add open assumptions
@@ -759,7 +764,9 @@ async def _write_stop_report(
             ]
         )
         for assumption in stop_info.open_assumptions:
-            lines.append(f"- {assumption}")
+            # Escape HTML to prevent injection
+            safe_assumption = html.escape(assumption)
+            lines.append(f"- {safe_assumption}")
         lines.append("")
 
     # Add completed steps if available
