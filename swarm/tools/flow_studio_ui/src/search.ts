@@ -115,7 +115,11 @@ export async function selectSearchResult(index: number): Promise<void> {
 
   closeSearchDropdown();
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
-  if (searchInput) searchInput.value = "";
+  if (searchInput) {
+    searchInput.value = "";
+    const clearBtn = document.getElementById("search-clear");
+    if (clearBtn) clearBtn.setAttribute("hidden", "");
+  }
 
   const cy = getCy();
 
@@ -164,10 +168,40 @@ export async function selectSearchResult(index: number): Promise<void> {
 export function initSearchHandlers(): void {
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
   const dropdown = document.getElementById("search-dropdown");
+  const clearBtn = document.getElementById("search-clear");
 
   if (!searchInput) return;
 
+  const updateClearButton = () => {
+    if (clearBtn) {
+      if (searchInput.value.length > 0) {
+        clearBtn.removeAttribute("hidden");
+      } else {
+        clearBtn.setAttribute("hidden", "");
+      }
+    }
+  };
+
+  // Initialize button state
+  updateClearButton();
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      searchInput.focus();
+      updateClearButton();
+
+      if (state.searchDebounceTimer) {
+        clearTimeout(state.searchDebounceTimer);
+        state.searchDebounceTimer = null;
+      }
+      performSearch("");
+    });
+  }
+
   searchInput.addEventListener("input", (e: Event) => {
+    updateClearButton();
+
     if (state.searchDebounceTimer) {
       clearTimeout(state.searchDebounceTimer);
     }
