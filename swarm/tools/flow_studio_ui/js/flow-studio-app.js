@@ -50,7 +50,7 @@ import { BoundaryReview, createBoundaryReview, extractBoundaryReviewData, } from
 // Inventory Counts - marker statistics
 import { InventoryCounts } from "./components/InventoryCounts.js";
 // Import utilities
-import { formatDuration, formatTime, formatDateTime, createQuickCommands, createPathWithCopy, escapeHtml, copyToClipboard } from "./utils.js";
+import { formatDuration, formatTime, formatDateTime, createQuickCommands, createPathWithCopy, escapeHtml, copyToClipboard, setupCopyButton } from "./utils.js";
 // ============================================================================
 // Details Wrappers
 // ============================================================================
@@ -715,15 +715,7 @@ window.addEventListener("load", async () => {
         // Header copy button handler
         const copyDevCheckBtn = document.getElementById("copy-dev-check-btn");
         if (copyDevCheckBtn) {
-            copyDevCheckBtn.addEventListener("click", () => {
-                void copyToClipboard("make dev-check");
-                copyDevCheckBtn.textContent = "Copied!";
-                copyDevCheckBtn.classList.add("copied");
-                setTimeout(() => {
-                    copyDevCheckBtn.textContent = "Copy";
-                    copyDevCheckBtn.classList.remove("copied");
-                }, 1500);
-            });
+            setupCopyButton(copyDevCheckBtn, "make dev-check", "Copy");
         }
         // Help button handler
         const helpBtn = document.getElementById("help-btn");

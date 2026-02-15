@@ -19,9 +19,13 @@ export declare function escapeHtml(text: string | null): string;
  */
 export declare function copyToClipboard(text: string): Promise<void>;
 /**
+ * Setup a copy button with accessible feedback loop
+ */
+export declare function setupCopyButton(btn: HTMLElement, text: string, label?: string): void;
+/**
  * Create a copy button element
  */
-export declare function createCopyButton(text: string, label?: string): HTMLButtonElement;
+export declare function createCopyButton(text: string, label?: string, accessibleLabel?: string): HTMLButtonElement;
 /**
  * Create a path display with copy button
  */
