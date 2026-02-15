@@ -185,12 +185,13 @@ export function initGraph(options = {}) {
  */
 export function renderGraphCore(graph, options = {}) {
     const cy = initGraph(options);
-    const elements = [];
-    (graph.nodes || []).forEach(n => elements.push(n));
-    (graph.edges || []).forEach(e => elements.push(e));
-    cy.elements().forEach(() => {
-        // Remove is handled by remove method
-    });
+    // Combine nodes and edges into a single array for batch addition
+    const elements = [
+        ...(graph.nodes || []),
+        ...(graph.edges || [])
+    ];
+    // Optimization: Removed useless cy.elements().forEach() loop here
+    // which was iterating over all elements for no reason before removal.
     cy.remove(cy.elements());
     cy.add(elements);
     cy.layout(DEFAULT_LAYOUT).run();

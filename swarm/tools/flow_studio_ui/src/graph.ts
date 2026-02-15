@@ -214,13 +214,15 @@ export function initGraph(options: RenderGraphOptions = {}): CytoscapeInstance {
 export function renderGraphCore(graph: FlowGraph, options: RenderGraphOptions = {}): CytoscapeInstance {
   const cy = initGraph(options);
 
-  const elements: object[] = [];
-  (graph.nodes || []).forEach(n => elements.push(n));
-  (graph.edges || []).forEach(e => elements.push(e));
+  // Combine nodes and edges into a single array for batch addition
+  const elements = [
+    ...(graph.nodes || []),
+    ...(graph.edges || [])
+  ];
 
-  cy.elements().forEach(() => {
-    // Remove is handled by remove method
-  });
+  // Optimization: Removed useless cy.elements().forEach() loop here
+  // which was iterating over all elements for no reason before removal.
+
   cy.remove(cy.elements());
   cy.add(elements);
   cy.layout(DEFAULT_LAYOUT).run();
