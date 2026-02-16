@@ -552,7 +552,18 @@ class StatsDBIngestionMixin:
         # Set ingestion context to allow record_* calls
         _ingestion_context.active = True
         try:
-            return self._ingest_events_internal(events, run_id)
+            with self._lock:
+                self.connection.execute("BEGIN TRANSACTION")
+                try:
+                    result = self._ingest_events_internal(events, run_id)
+                    self.connection.execute("COMMIT")
+                    return result
+                except Exception:
+                    try:
+                        self.connection.execute("ROLLBACK")
+                    except Exception:
+                        pass
+                    raise
         finally:
             _ingestion_context.active = False
 
