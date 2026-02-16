@@ -552,7 +552,17 @@ class StatsDBIngestionMixin:
         # Set ingestion context to allow record_* calls
         _ingestion_context.active = True
         try:
-            return self._ingest_events_internal(events, run_id)
+            # Wrap batch ingestion in a transaction for performance
+            # DuckDB is much faster with a single transaction for bulk inserts
+            with self._transaction() as conn:
+                try:
+                    conn.execute("BEGIN TRANSACTION")
+                    count = self._ingest_events_internal(events, run_id)
+                    conn.execute("COMMIT")
+                    return count
+                except Exception:
+                    conn.execute("ROLLBACK")
+                    raise
         finally:
             _ingestion_context.active = False
 
