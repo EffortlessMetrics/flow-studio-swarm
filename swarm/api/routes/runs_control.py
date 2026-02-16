@@ -12,6 +12,7 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
+import html
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -715,7 +716,7 @@ async def _write_stop_report(
         "",
         f"**Run ID:** {run_id}",
         f"**Stopped At:** {stop_info.stopped_at}",
-        f"**Reason:** {stop_info.stop_reason}",
+        f"**Reason:** {html.escape(stop_info.stop_reason)}",
         "",
         "## Execution State",
         "",
@@ -727,12 +728,15 @@ async def _write_stop_report(
 
     # Add routing intent if available
     if stop_info.last_routing_intent:
+        # Sanitize routing intent: remove triple backticks to prevent breaking out of code block
+        # Do not use html.escape inside code blocks as it makes code unreadable
+        intent = stop_info.last_routing_intent.replace("```", "'''")
         lines.extend(
             [
                 "## Last Routing Intent",
                 "",
                 "```",
-                stop_info.last_routing_intent,
+                intent,
                 "```",
                 "",
             ]
@@ -747,7 +751,9 @@ async def _write_stop_report(
             ]
         )
         for call in stop_info.last_tool_calls:
-            lines.append(f"- `{call}`")
+            # Escape backticks in code span, do not html.escape
+            sanitized_call = call.replace("`", "'")
+            lines.append(f"- `{sanitized_call}`")
         lines.append("")
 
     # Add open assumptions
@@ -759,7 +765,7 @@ async def _write_stop_report(
             ]
         )
         for assumption in stop_info.open_assumptions:
-            lines.append(f"- {assumption}")
+            lines.append(f"- {html.escape(assumption)}")
         lines.append("")
 
     # Add completed steps if available
