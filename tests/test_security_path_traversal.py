@@ -1,6 +1,8 @@
+from pathlib import Path
+
 import pytest
 from swarm.runtime import storage
-from swarm.runtime.safe_paths import validate_path_component
+from swarm.runtime.safe_paths import validate_path_component, validate_relative_path
 from swarm.tools.flow_studio.services import run_artifacts
 from swarm.tools.run_inspector import RunInspector
 
@@ -204,3 +206,28 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+def test_validate_relative_path_valid():
+    """Test that valid relative paths pass validation."""
+    assert validate_relative_path("foo/bar") == Path("foo/bar")
+    assert validate_relative_path("foo") == Path("foo")
+    assert validate_relative_path("foo/bar/baz.txt") == Path("foo/bar/baz.txt")
+
+
+def test_validate_relative_path_invalid():
+    """Test that invalid relative paths are rejected."""
+    with pytest.raises(ValueError, match="cannot be empty"):
+        validate_relative_path("")
+
+    with pytest.raises(ValueError, match="must be a relative path"):
+        validate_relative_path("/etc/passwd")
+
+    with pytest.raises(ValueError, match="traversal"):
+        validate_relative_path("../etc/passwd")
+
+    with pytest.raises(ValueError, match="traversal"):
+        validate_relative_path("foo/../../bar")
+
+    with pytest.raises(ValueError, match="traversal"):
+        validate_relative_path("..")

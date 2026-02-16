@@ -5,13 +5,15 @@ This module provides functions to validate and sanitize user inputs that will
 be used in file path construction, preventing path traversal attacks.
 
 Usage:
-    from swarm.runtime.safe_paths import validate_path_component
+    from swarm.runtime.safe_paths import validate_path_component, validate_relative_path
 
     run_id = validate_path_component(user_input_run_id)
     flow_key = validate_path_component(user_input_flow_key)
+    path = validate_relative_path(user_input_path)
 """
 
 import re
+from pathlib import Path
 
 # Allowlist: alphanumeric, underscore, hyphen, dot
 # Strictly no slashes or backslashes
@@ -46,3 +48,32 @@ def validate_path_component(component: str, name: str = "path component") -> str
         raise ValueError(f"{name} contains invalid characters: '{component}'")
 
     return component
+
+
+def validate_relative_path(path_str: str, name: str = "path") -> Path:
+    """Validate that a path is relative and does not traverse upwards.
+
+    Args:
+        path_str: The path string to validate.
+        name: Name of the variable for error messages.
+
+    Returns:
+        The validated Path object.
+
+    Raises:
+        ValueError: If path is absolute or traverses upwards.
+    """
+    if not path_str:
+        raise ValueError(f"{name} cannot be empty")
+
+    path = Path(path_str)
+
+    if path.is_absolute():
+        raise ValueError(f"{name} must be a relative path")
+
+    # Check for traversal
+    # Check if any part of the path is '..'
+    if ".." in path.parts:
+        raise ValueError(f"{name} cannot contain traversal '..'")
+
+    return path
