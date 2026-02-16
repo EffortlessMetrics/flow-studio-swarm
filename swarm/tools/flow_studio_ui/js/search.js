@@ -152,8 +152,20 @@ export async function selectSearchResult(index) {
 export function initSearchHandlers() {
     const searchInput = document.getElementById("search-input");
     const dropdown = document.getElementById("search-dropdown");
+    const searchClear = document.getElementById("search-clear");
     if (!searchInput)
         return;
+    if (searchClear) {
+        searchClear.addEventListener("click", () => {
+            searchInput.value = "";
+            if (state.searchDebounceTimer) {
+                clearTimeout(state.searchDebounceTimer);
+            }
+            performSearch("");
+            closeSearchDropdown(); // explicit close for safety
+            searchInput.focus();
+        });
+    }
     searchInput.addEventListener("input", (e) => {
         if (state.searchDebounceTimer) {
             clearTimeout(state.searchDebounceTimer);
