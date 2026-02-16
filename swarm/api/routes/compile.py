@@ -159,6 +159,7 @@ def _compile_from_station(
     Raises:
         ValueError: If station not found or compilation fails.
     """
+    from swarm.runtime.safe_paths import validate_relative_path
     from swarm.runtime.station_library import (
         load_station_library,
         to_compiler_spec,
@@ -184,7 +185,7 @@ def _compile_from_station(
     station = to_compiler_spec(station_runtime)
 
     # Build template variables
-    run_base_path = Path(run_base)
+    run_base_path = validate_relative_path(run_base, "run_base")
     variables = {
         "run": {"base": str(run_base_path)},
         "step": {"id": step_id, "objective": objective, "scope": ""},
