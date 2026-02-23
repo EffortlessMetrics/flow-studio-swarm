@@ -9,6 +9,7 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -875,14 +876,15 @@ async def apply_wisdom_patches(
 
     # Emit events for each result (non-dry-run only)
     if not request.dry_run:
-        from .events import EventType, write_event_sync
+        from .events import EventType, write_event
 
         runs_root = _get_runs_root()
 
         for result in results:
             status = result.get("status")
             if status == "applied":
-                write_event_sync(
+                await asyncio.to_thread(
+                    write_event,
                     run_id=run_id,
                     runs_root=runs_root,
                     event_type=EventType.WISDOM_PATCH_APPLIED,
@@ -894,7 +896,8 @@ async def apply_wisdom_patches(
                     },
                 )
             elif status == "rejected":
-                write_event_sync(
+                await asyncio.to_thread(
+                    write_event,
                     run_id=run_id,
                     runs_root=runs_root,
                     event_type=EventType.WISDOM_PATCH_REJECTED,
