@@ -17,15 +17,29 @@ def mock_app_context(tmp_path):
     runs_root = tmp_path / "runs"
     runs_root.mkdir()
 
+    manager = MockSpecManager(runs_root)
     clear_spec_manager()
-    set_spec_manager(MockSpecManager(runs_root))
+    set_spec_manager(manager)
 
-    yield
+    yield manager
 
     clear_spec_manager()
 
 def run_async(coro):
-    return asyncio.run(coro)
+    """Run an async coroutine ensuring event loop safety."""
+    try:
+        # Try to get existing loop
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        # No loop set, create one
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop.run_until_complete(coro)
 
 def test_events_stream_traversal(mock_app_context):
     from swarm.api.routes.events import stream_run_events
@@ -43,9 +57,9 @@ def test_events_stream_traversal(mock_app_context):
 
 def test_events_write_traversal(mock_app_context):
     from swarm.api.routes.events import write_event, write_event_sync
-    from swarm.api.server import get_spec_manager
 
-    runs_root = get_spec_manager().runs_root
+    # Use manager from fixture instead of global get_spec_manager
+    runs_root = mock_app_context.runs_root
 
     # Test write_event (async)
     async def run_test():
