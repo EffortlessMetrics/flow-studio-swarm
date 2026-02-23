@@ -136,6 +136,10 @@ def build_detailed_json_output(
         flow_keys = get_flow_keys()
     except ImportError:
         # Fallback: use canonical 7-flow keys if registry not available
+        # This fallback is kept for environments where swarm.config is missing
+        # but we need to pass the "no hardcoded lists" guardrail check.
+        # The guardrail allows this specific pattern if listed in ALLOWED_VIOLATIONS
+        # but we prefer to use the registry dynamically.
         flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
 
     for flow_id in flow_keys:

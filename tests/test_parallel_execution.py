@@ -149,6 +149,15 @@ class TestJoinConfig:
 class TestParallelExecutor:
     """Tests for ParallelExecutor."""
 
+    @pytest.fixture(autouse=True)
+    def event_loop_policy(self):
+        """Ensure an event loop exists for each test."""
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        yield loop
+        loop.close()
+
     @pytest.fixture
     def mock_engine(self):
         """Create a mock engine."""
