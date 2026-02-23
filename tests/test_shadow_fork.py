@@ -5,6 +5,7 @@ These tests verify the Shadow Fork isolation layer for safe speculative
 execution, including branch creation, checkpointing, rollback, and cleanup.
 """
 
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -72,34 +73,46 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_falls_back_to_head_if_base_branch_missing(self, tmp_path, caplog):
+        """Test that create falls back to HEAD if base branch doesn't exist."""
+        caplog.set_level(logging.INFO, logger="swarm.runtime.shadow_fork")
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Create hooks directory for the test
+        (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="HEAD") as mock_resolve:
+
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                # _resolve_base_ref is mocked
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
-
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
-
-    def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
-        """Test that create warns about uncommitted changes."""
-        fork = ShadowFork(repo_root=tmp_path)
-
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
-            # Create hooks directory for the test
-            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+            fork.create(base_branch="nonexistent")
+
+            mock_resolve.assert_called_with("nonexistent")
+            assert "not found, using 'head' instead" in caplog.text.lower()
+
+    def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
+        """Test that create warns about uncommitted changes."""
+        caplog.set_level(logging.WARNING, logger="swarm.runtime.shadow_fork")
+        fork = ShadowFork(repo_root=tmp_path)
+
+        # Create hooks directory for the test
+        (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="main"):
+
+            mock_git.side_effect = [
+                (True, "main", ""),  # Get current branch
+                # _resolve_base_ref is mocked
+                (True, " M file.txt", ""),  # Uncommitted changes exist (status)
+                (True, "", ""),  # Create and switch to shadow branch
+            ]
 
             fork.create()
 
