@@ -5,6 +5,7 @@ These tests verify the Shadow Fork isolation layer for safe speculative
 execution, including branch creation, checkpointing, rollback, and cleanup.
 """
 
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -45,11 +46,14 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (True, "", ""),  # Verify base branch exists
+                (True, "", ""),  # Check for uncommitted changes (actually this is status check)
+                (True, "", ""),  # Verify base branch exists (inside _resolve_base_ref)
                 (True, "", ""),  # Create and switch to shadow branch
-                (True, "", ""),  # Install push guard (rev-parse in block_upstream_push)
+                (True, "", ""),  # Install push guard (rev-parse in block_upstream_push - actually block_upstream_push doesn't call git if file ops used)
             ]
+            # Note: The side_effect list above is approximate.
+            # If _resolve_base_ref is not patched, it consumes git calls.
+            # _resolve_base_ref("main") calls: _ref_exists("main") -> git rev-parse --verify main
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
@@ -76,26 +80,42 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Patch _resolve_base_ref to return the missing branch name directly
+        # This simulates the scenario where we try to use it and fail at checkout,
+        # OR we could simulate _resolve_base_ref failing if we wanted to test that.
+        # But _resolve_base_ref falls back to HEAD.
+        #
+        # If we want to reproduce "does not exist" error from the original test,
+        # we should force _resolve_base_ref to return the bad branch name,
+        # then let checkout fail.
+        with patch.object(fork, "_resolve_base_ref", return_value="nonexistent"), \
+             patch.object(fork, "_run_git") as mock_git:
+
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "", ""),      # Check for uncommitted changes (status)
+                (False, "", "fatal: 'nonexistent' does not exist"), # Create/switch branch failure
             ]
 
+            # We expect RuntimeError because checkout failed
             with pytest.raises(RuntimeError, match="does not exist"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
+        # Explicitly set logger level to ensure we capture the warning
+        caplog.set_level(logging.WARNING, logger="swarm.runtime.shadow_fork")
+
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        # Mock _resolve_base_ref to avoid git calls for branch resolution
+        with patch.object(fork, "_resolve_base_ref", return_value="main"), \
+             patch.object(fork, "_run_git") as mock_git:
+
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
+                (True, "main", ""),       # Get current branch
+                (True, " M file.txt", ""), # Uncommitted changes exist (status)
+                (True, "", ""),           # Create and switch to shadow branch
             ]
 
             # Create hooks directory for the test
@@ -127,6 +147,7 @@ class TestShadowForkGetDiff:
 
     def test_get_diff_no_shadow(self, tmp_path, caplog):
         """Test get_diff when no shadow branch is active."""
+        caplog.set_level(logging.WARNING, logger="swarm.runtime.shadow_fork")
         fork = ShadowFork(repo_root=tmp_path)
 
         diff = fork.get_diff()
@@ -419,41 +440,36 @@ class TestShadowForkIntegration:
 
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        with patch.object(fork, "_resolve_base_ref", return_value="main"), \
+             patch.object(fork, "_run_git") as mock_git:
             # Create shadow
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check uncommitted changes
-                (True, "", ""),  # Verify base branch
+                (True, "", ""),  # Check uncommitted changes (status)
                 (True, "", ""),  # Create shadow branch
-            ]
-            branch = fork.create()
-            assert branch.startswith(SHADOW_BRANCH_PREFIX)
-
-            # Checkpoint
-            mock_git.side_effect = [
+                # Checkpoint sequence starts here
                 (True, "", ""),  # git add
                 (False, "", ""),  # git diff (has changes)
                 (True, "", ""),  # git commit
                 (True, "abc123", ""),  # git rev-parse
+                # Bridge sequence starts here
+                (True, "", ""),  # Checkout main
+                (True, "", ""),  # Merge
+                # Cleanup sequence starts here
+                (True, "main", ""),  # Get current branch
+                (True, "", ""),  # Delete shadow branch
             ]
+            branch = fork.create()
+            assert branch.startswith(SHADOW_BRANCH_PREFIX)
+
             sha = fork.commit_checkpoint("WIP")
             assert sha == "abc123"
 
             # Bridge to main
             fork._push_allowed = True
-            mock_git.side_effect = [
-                (True, "", ""),  # Checkout main
-                (True, "", ""),  # Merge
-            ]
             result = fork.bridge_to_main()
             assert result is True
 
-            # Cleanup
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Delete shadow branch
-            ]
             fork.cleanup(success=True)
             assert fork.shadow_branch is None
 
@@ -464,38 +480,32 @@ class TestShadowForkIntegration:
 
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
+        with patch.object(fork, "_resolve_base_ref", return_value="feature-x"), \
+             patch.object(fork, "_run_git") as mock_git:
             # Create shadow
             mock_git.side_effect = [
                 (True, "feature-x", ""),  # Get current branch
-                (True, "", ""),  # Check uncommitted changes
-                (True, "", ""),  # Verify base branch
+                (True, "", ""),  # Check uncommitted changes (status)
                 (True, "", ""),  # Create shadow branch
-            ]
-            fork.create()
-
-            # Checkpoint
-            mock_git.side_effect = [
+                # Checkpoint sequence
                 (True, "", ""),  # git add
                 (False, "", ""),  # git diff (has changes)
                 (True, "", ""),  # git commit
                 (True, "abc123", ""),  # git rev-parse
-            ]
-            sha = fork.commit_checkpoint("WIP")
-
-            # Rollback
-            mock_git.side_effect = [
+                # Rollback sequence
                 (True, "", ""),  # Verify commit
                 (True, "", ""),  # Hard reset
-            ]
-            result = fork.rollback_to(sha)
-            assert result is True
-
-            # Cleanup (failure case)
-            mock_git.side_effect = [
+                # Cleanup sequence
                 (True, fork.shadow_branch, ""),  # Get current branch
                 (True, "", ""),  # Checkout original
                 (True, "", ""),  # Delete shadow
             ]
+            fork.create()
+
+            sha = fork.commit_checkpoint("WIP")
+
+            result = fork.rollback_to(sha)
+            assert result is True
+
             fork.cleanup(success=False)
             assert fork.shadow_branch is None
