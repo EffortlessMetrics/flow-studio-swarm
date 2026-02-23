@@ -22,9 +22,9 @@
       <div class="muted">Interactive node graph of flows, steps, and agents</div>
     <div class="search-container" data-uiid="flow_studio.header.search">
       <span class="search-icon" aria-hidden="true">&#128269;</span>
-      <input type="text" id="search-input" class="search-input" placeholder="Search flows, steps, agents, artifacts..." autocomplete="off" aria-label="Search flows, steps, agents, and artifacts" data-uiid="flow_studio.header.search.input" style="padding-right: 30px;" />
+      <input type="text" id="search-input" class="search-input" placeholder="Search flows, steps, agents, artifacts..." autocomplete="off" aria-label="Search flows, steps, agents, and artifacts" data-uiid="flow_studio.header.search.input" />
       <kbd class="fs-kbd search-shortcut" aria-hidden="true">/</kbd>
-      <button id="search-clear" class="search-clear" aria-label="Clear search" data-uiid="flow_studio.header.search.clear" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; background: transparent; border: none; color: #9ca3af; cursor: pointer; display: none; padding: 0; font-size: 14px; line-height: 1;">&#x2715;</button>
+      <button id="search-clear" class="search-clear" aria-label="Clear search" data-uiid="flow_studio.header.search.clear">&#x2715;</button>
       <div id="search-dropdown" class="search-dropdown" role="listbox" aria-label="Search results" data-uiid="flow_studio.header.search.results"></div>
     </div>
     </div>
@@ -1679,7 +1679,7 @@
     }
     .search-input {
       width: 100%;
-      padding: 6px 12px 6px 32px;
+      padding: 6px 30px 6px 32px;
       font-size: 12px;
       border: 1px solid #d1d5db;
       border-radius: 6px;
@@ -1703,6 +1703,25 @@
     .search-input:focus + .search-shortcut,
     .search-input:not(:placeholder-shown) + .search-shortcut {
       display: none;
+    }
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      display: none;
+      padding: 0;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .search-clear:hover {
+      color: #6b7280;
     }
     .search-icon {
       position: absolute;
