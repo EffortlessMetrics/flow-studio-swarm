@@ -215,6 +215,15 @@ export function initSearchHandlers() {
             }
         });
     }
+    // Clear button handler
+    const searchClear = document.getElementById("search-clear");
+    if (searchClear) {
+        searchClear.addEventListener("click", () => {
+            searchInput.value = "";
+            searchInput.focus();
+            closeSearchDropdown();
+        });
+    }
 }
 /**
  * Focus the search input.
