@@ -139,7 +139,7 @@ def format_sse_event(
 # =============================================================================
 
 
-async def read_events_file(
+def read_events_file(
     events_file: Path,
     last_position: int = 0,
 ) -> tuple[list[Dict[str, Any]], int]:
@@ -174,6 +174,24 @@ async def read_events_file(
         new_position = last_position
 
     return events, new_position
+
+
+def read_run_state_sync(state_file: Path) -> Optional[Dict[str, Any]]:
+    """Read run state from file synchronously.
+
+    Args:
+        state_file: Path to run_state.json.
+
+    Returns:
+        State dictionary or None if file doesn't exist.
+    """
+    if not state_file.exists():
+        return None
+    try:
+        return json.loads(state_file.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.error("Error reading state file %s: %s", state_file, e)
+        return None
 
 
 async def generate_run_events(
@@ -218,20 +236,22 @@ async def generate_run_events(
 
     while True:
         try:
-            # Check if run exists
-            if not state_file.exists():
+            # Read current state (offload to thread)
+            state = await asyncio.to_thread(read_run_state_sync, state_file)
+
+            if state is None:
                 yield format_sse_event(
                     EventType.ERROR,
                     {"error": "run_not_found", "message": f"Run '{run_id}' not found"},
                 )
                 break
 
-            # Read current state
-            state = json.loads(state_file.read_text(encoding="utf-8"))
             status = state.get("status", "pending")
 
-            # Read new events from file
-            events, last_position = await read_events_file(events_file, last_position)
+            # Read new events from file (offload to thread)
+            events, last_position = await asyncio.to_thread(
+                read_events_file, events_file, last_position
+            )
 
             for event in events:
                 event_counter += 1
@@ -402,40 +422,13 @@ async def stream_run_events(run_id: str, request: Request):
 # =============================================================================
 
 
-async def write_event(
+def write_event(
     run_id: str,
     runs_root: Path,
     event_type: str,
     data: Dict[str, Any],
 ) -> None:
-    """Write an event to a run's events file.
-
-    Args:
-        run_id: Run identifier.
-        runs_root: Root directory for runs.
-        event_type: Event type name.
-        data: Event data.
-    """
-    events_file = runs_root / run_id / "events.jsonl"
-    events_file.parent.mkdir(parents=True, exist_ok=True)
-
-    event = {
-        "event": event_type,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        **data,
-    }
-
-    with open(events_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event) + "\n")
-
-
-def write_event_sync(
-    run_id: str,
-    runs_root: Path,
-    event_type: str,
-    data: Dict[str, Any],
-) -> None:
-    """Synchronous version of write_event.
+    """Write an event to a run's events file synchronously.
 
     Args:
         run_id: Run identifier.

@@ -12,6 +12,7 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -597,9 +598,10 @@ async def stop_run(
         )
 
         # Emit stopping event for SSE subscribers
-        from .events import EventType, write_event_sync
+        from .events import EventType, write_event
 
-        write_event_sync(
+        await asyncio.to_thread(
+            write_event,
             run_id=run_id,
             runs_root=state_manager.runs_root,
             event_type=EventType.RUN_STOPPING,
@@ -645,7 +647,8 @@ async def stop_run(
         )
 
         # Emit stopped event
-        write_event_sync(
+        await asyncio.to_thread(
+            write_event,
             run_id=run_id,
             runs_root=state_manager.runs_root,
             event_type=EventType.RUN_STOPPED,
