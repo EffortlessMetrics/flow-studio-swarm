@@ -1,4 +1,3 @@
-# Path | expires (YYYY-MM-DD) | reason
-# Example:
-# swarm/runtime/types/state_types.py | 2026-03-31 | Temporary during refactor (SWARM-123)
-swarm/runtime/backends.py | 2026-02-28 | Large backend implementations, needs splitting (REF-001)
+swarm/api/routes/runs_control.py | 2026-03-23 | Increased line count due to security fixes (Sentienl)
+tests/test_flow_order_guardrail.py | 2026-03-23 | Increased function count due to updated guardrails (Sentinel)
+tests/test_shadow_fork.py | 2026-03-23 | Increased line/function/class count due to improved tests (Sentinel)
