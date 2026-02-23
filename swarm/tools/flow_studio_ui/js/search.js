@@ -100,8 +100,13 @@ export async function selectSearchResult(index) {
         return;
     closeSearchDropdown();
     const searchInput = document.getElementById("search-input");
-    if (searchInput)
+    if (searchInput) {
         searchInput.value = "";
+        // Hide clear button
+        const clearBtn = document.getElementById("search-clear");
+        if (clearBtn)
+            clearBtn.style.display = "none";
+    }
     const cy = getCy();
     if (result.type === "flow") {
         if (_setActiveFlow)
@@ -160,9 +165,27 @@ export function initSearchHandlers() {
         }
         const target = e.target;
         const query = target.value.trim();
+        // Toggle clear button visibility
+        const clearBtn = document.getElementById("search-clear");
+        if (clearBtn) {
+            clearBtn.style.display = query.length > 0 ? "block" : "none";
+        }
         // Optimization: Increased debounce from 200ms to 300ms to reduce API calls while typing
         state.searchDebounceTimer = setTimeout(() => performSearch(query), 300);
     });
+    // Handle clear button click
+    const clearBtn = document.getElementById("search-clear");
+    if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+            if (state.searchDebounceTimer) {
+                clearTimeout(state.searchDebounceTimer);
+            }
+            searchInput.value = "";
+            searchInput.focus();
+            clearBtn.style.display = "none";
+            performSearch(""); // Clear results
+        });
+    }
     searchInput.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
             closeSearchDropdown();
