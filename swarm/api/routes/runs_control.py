@@ -12,6 +12,7 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
+import html
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -710,16 +711,20 @@ async def _write_stop_report(
     report_path = run_dir / "stop_report.md"
 
     # Build report content
+    # Sanitize inputs to prevent markdown injection
+    safe_reason = html.escape(stop_info.stop_reason)
+    safe_last_step = html.escape(stop_info.last_step_id or "None")
+
     lines = [
         "# Stop Report",
         "",
         f"**Run ID:** {run_id}",
         f"**Stopped At:** {stop_info.stopped_at}",
-        f"**Reason:** {stop_info.stop_reason}",
+        f"**Reason:** {safe_reason}",
         "",
         "## Execution State",
         "",
-        f"- **Last Step ID:** {stop_info.last_step_id or 'None'}",
+        f"- **Last Step ID:** {safe_last_step}",
         f"- **Flow ID:** {state.get('flow_id', 'Unknown')}",
         f"- **Previous Status:** {state.get('status', 'Unknown')}",
         "",
@@ -727,12 +732,14 @@ async def _write_stop_report(
 
     # Add routing intent if available
     if stop_info.last_routing_intent:
+        # Prevent markdown code block breakout
+        safe_intent = stop_info.last_routing_intent.replace("`", "'")
         lines.extend(
             [
                 "## Last Routing Intent",
                 "",
                 "```",
-                stop_info.last_routing_intent,
+                safe_intent,
                 "```",
                 "",
             ]
@@ -747,7 +754,9 @@ async def _write_stop_report(
             ]
         )
         for call in stop_info.last_tool_calls:
-            lines.append(f"- `{call}`")
+            # Escape call path to prevent markdown injection
+            safe_call = html.escape(call).replace("`", "'")
+            lines.append(f"- `{safe_call}`")
         lines.append("")
 
     # Add open assumptions
@@ -759,7 +768,8 @@ async def _write_stop_report(
             ]
         )
         for assumption in stop_info.open_assumptions:
-            lines.append(f"- {assumption}")
+            safe_assumption = html.escape(assumption)
+            lines.append(f"- {safe_assumption}")
         lines.append("")
 
     # Add completed steps if available
