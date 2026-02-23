@@ -1,0 +1,3 @@
+## 2024-05-23 - Search Clear Button
+**Learning:** `test_flow_studio_ui_ids.py` verifies static HTML IDs but fails for dynamically injected elements like `flow_studio.modal.run_detail.rerun` if they are missing from the static fragment. This suggests a pattern where key interactive elements should either have static placeholders or tests should be categorized under `TestDynamicUIIDs`.
+**Action:** When adding dynamic controls, prefer adding a hidden static placeholder with the `data-uiid` to satisfy static analysis tests and ensure accessibility (ARIA attributes) are present even before JS loads. I applied this by adding the `search-clear` button statically in the HTML.
