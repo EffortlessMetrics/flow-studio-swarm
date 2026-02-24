@@ -46,3 +46,43 @@ def validate_path_component(component: str, name: str = "path component") -> str
         raise ValueError(f"{name} contains invalid characters: '{component}'")
 
     return component
+
+
+def validate_relative_path(path: str, name: str = "path") -> str:
+    """Validate that a path is relative and safe from traversal.
+
+    Ensures the path does not start with / (or \\ on Windows) and does not
+    contain '..' segments.
+
+    Args:
+        path: The path string to validate.
+        name: Name of the variable for error messages (default: "path").
+
+    Returns:
+        The validated path (same as input).
+
+    Raises:
+        ValueError: If the path is absolute or contains traversal sequences.
+    """
+    if not path:
+        raise ValueError(f"{name} cannot be empty")
+
+    # Check for absolute path
+    # On Windows, absolute paths can start with drive letter (C:) or \
+    # On Linux/Mac, start with /
+    # We check for generic absolute indicators
+    if path.startswith("/") or path.startswith("\\"):
+        raise ValueError(f"{name} must be a relative path")
+
+    # Check for drive letter (e.g., C:)
+    if len(path) > 1 and path[1] == ":":
+        raise ValueError(f"{name} cannot contain drive letter")
+
+    # Check for traversal sequences
+    # We split by both forward and backward slashes
+    parts = re.split(r"[/\\]", path)
+    for part in parts:
+        if part == "..":
+            raise ValueError(f"{name} cannot contain path traversal '..'")
+
+    return path
