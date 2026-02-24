@@ -1,6 +1,6 @@
 import pytest
 from swarm.runtime import storage
-from swarm.runtime.safe_paths import validate_path_component
+from swarm.runtime.safe_paths import validate_path_component, validate_relative_path
 from swarm.tools.flow_studio.services import run_artifacts
 from swarm.tools.run_inspector import RunInspector
 
@@ -204,3 +204,39 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+def test_validate_relative_path_valid():
+    """Test that valid relative paths pass validation."""
+    assert validate_relative_path("swarm/runs/preview") == "swarm/runs/preview"
+    assert validate_relative_path("foo/bar/baz.txt") == "foo/bar/baz.txt"
+    assert validate_relative_path("data") == "data"
+    assert validate_relative_path("./local/path") == "./local/path"  # . is allowed
+
+
+def test_validate_relative_path_invalid():
+    """Test that invalid paths (absolute, traversal) are rejected."""
+    # Empty
+    with pytest.raises(ValueError, match="cannot be empty"):
+        validate_relative_path("")
+
+    # Absolute (Posix)
+    with pytest.raises(ValueError, match="must be a relative path"):
+        validate_relative_path("/etc/passwd")
+
+    # Absolute (Windows)
+    with pytest.raises(ValueError, match="must be a relative path"):
+        validate_relative_path("C:\\Windows")
+
+    # Traversal
+    with pytest.raises(ValueError, match="traversal sequence"):
+        validate_relative_path("..")
+
+    with pytest.raises(ValueError, match="traversal sequence"):
+        validate_relative_path("../etc")
+
+    with pytest.raises(ValueError, match="traversal sequence"):
+        validate_relative_path("foo/../bar")
+
+    with pytest.raises(ValueError, match="traversal sequence"):
+        validate_relative_path("foo/bar/..")
