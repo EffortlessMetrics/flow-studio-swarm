@@ -1046,6 +1046,9 @@
       background: white;
       outline: none;
     }
+    .search-input:not(:placeholder-shown) {
+      padding-right: 28px;
+    }
     .search-input:focus {
       border-color: #3b82f6;
       box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
@@ -1063,6 +1066,31 @@
     .search-input:focus + .search-shortcut,
     .search-input:not(:placeholder-shown) + .search-shortcut {
       display: none;
+    }
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      padding: 0;
+      font-size: 14px;
+      display: none;
+      width: 16px;
+      height: 16px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+    }
+    .search-clear:hover {
+      background: #e5e7eb;
+      color: #4b5563;
+    }
+    .search-input:not(:placeholder-shown) ~ .search-clear {
+      display: flex;
     }
     .search-icon {
       position: absolute;
