@@ -204,8 +204,6 @@ SKIP_PATTERNS = [
     "**/lint_routing_fields.py",  # Don't lint ourselves
     "**/swarm/runs/**",  # Run artifacts use different state machine vocabulary
     "**/run_state.json",  # Stepwise state machine uses advance/terminate/error/loop
-    "**/docs/RELEASE_CHECKLIST.md",  # Documents the fields to check for
-    "**/swarm/prompts/agentic_steps/self-reviewer.md",  # Explains migration to agents
 ]
 
 # File extensions to check
