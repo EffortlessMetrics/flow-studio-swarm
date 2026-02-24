@@ -44,11 +44,10 @@ class TestShadowForkCreate:
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-                (True, "", ""),  # Install push guard (rev-parse in block_upstream_push)
+                (True, "main", ""),  # _get_current_branch
+                (True, "hash", ""),  # _resolve_base_ref (rev-parse --verify main)
+                (True, "", ""),  # status --porcelain
+                (True, "", ""),  # checkout -b
             ]
 
             # Create hooks directory for the test
@@ -72,19 +71,42 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_falls_back_if_base_branch_missing(self, tmp_path):
+        """Test that create falls back to HEAD if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            # We need to simulate _resolve_base_ref checking multiple candidates
+            # Candidates: nonexistent, origin/nonexistent, main, origin/main, master, origin/master, HEAD
+            # We'll make them all fail except HEAD (which doesn't call git if hardcoded check passes,
+            # but _resolve_base_ref implementation says: "if ref == 'HEAD' or self._ref_exists(ref)".
+            # So for HEAD it stops.
+            # But it will check others first.
+
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "main", ""),  # _get_current_branch
+                # _resolve_base_ref calls:
+                (False, "", "fatal"),  # rev-parse nonexistent
+                (False, "", "fatal"),  # rev-parse origin/nonexistent
+                (False, "", "fatal"),  # rev-parse main
+                (False, "", "fatal"),  # rev-parse origin/main
+                (False, "", "fatal"),  # rev-parse master
+                (False, "", "fatal"),  # rev-parse origin/master
+                # HEAD is checked next, and it might call git or short-circuit.
+                # In _resolve_base_ref: `if ref == "HEAD" or self._ref_exists(ref):`
+                # So for HEAD it short-circuits and returns "HEAD".
+
+                (True, "", ""),  # status --porcelain
+                (True, "", ""),  # checkout -b
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+            # Create hooks directory
+            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+            branch = fork.create(base_branch="nonexistent")
+
+            assert fork.base_branch == "HEAD"
+            assert branch.startswith(SHADOW_BRANCH_PREFIX)
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
@@ -92,13 +114,13 @@ class TestShadowForkCreate:
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
+                (True, "main", ""),  # _get_current_branch
+                (True, "hash", ""),  # _resolve_base_ref (rev-parse main)
+                (True, " M file.txt", ""),  # status --porcelain (HAS CHANGES)
+                (True, "", ""),  # checkout -b
             ]
 
-            # Create hooks directory for the test
+            # Create hooks directory
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
             fork.create()
@@ -423,8 +445,8 @@ class TestShadowForkIntegration:
             # Create shadow
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "hash", ""),  # _resolve_base_ref
                 (True, "", ""),  # Check uncommitted changes
-                (True, "", ""),  # Verify base branch
                 (True, "", ""),  # Create shadow branch
             ]
             branch = fork.create()
@@ -468,8 +490,8 @@ class TestShadowForkIntegration:
             # Create shadow
             mock_git.side_effect = [
                 (True, "feature-x", ""),  # Get current branch
+                (True, "hash", ""),  # _resolve_base_ref
                 (True, "", ""),  # Check uncommitted changes
-                (True, "", ""),  # Verify base branch
                 (True, "", ""),  # Create shadow branch
             ]
             fork.create()
