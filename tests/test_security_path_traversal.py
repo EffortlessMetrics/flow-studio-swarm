@@ -204,3 +204,35 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+def test_validate_relative_path():
+    """Test that relative paths are validated and absolute/traversal paths rejected."""
+    from swarm.runtime.safe_paths import validate_relative_path
+
+    # Valid relative paths
+    assert validate_relative_path("foo/bar") == "foo/bar"
+    assert validate_relative_path("foo.txt") == "foo.txt"
+    assert validate_relative_path("./foo") == "./foo"
+    # Backslash handling on Windows vs Linux is tricky, but normalized to / in function for check
+    # We test with forward slashes which work everywhere in python
+    assert validate_relative_path("foo/bar/baz") == "foo/bar/baz"
+
+    # Invalid absolute paths
+    with pytest.raises(ValueError, match="must be relative"):
+        # We need an absolute path. On linux /etc/passwd is absolute.
+        # On windows C:\Windows is absolute.
+        # We can construct one using pathlib to be safe.
+        import pathlib
+        abs_path = str(pathlib.Path.cwd() / "foo")
+        validate_relative_path(abs_path)
+
+    # Invalid traversal paths
+    with pytest.raises(ValueError, match="cannot traverse outside root"):
+        validate_relative_path("../etc/passwd")
+
+    with pytest.raises(ValueError, match="cannot traverse outside root"):
+        validate_relative_path("foo/../../bar")
+
+    with pytest.raises(ValueError, match="cannot traverse outside root"):
+        validate_relative_path("..")

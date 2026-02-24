@@ -11,7 +11,9 @@ Usage:
     flow_key = validate_path_component(user_input_flow_key)
 """
 
+import os
 import re
+from pathlib import Path
 
 # Allowlist: alphanumeric, underscore, hyphen, dot
 # Strictly no slashes or backslashes
@@ -46,3 +48,32 @@ def validate_path_component(component: str, name: str = "path component") -> str
         raise ValueError(f"{name} contains invalid characters: '{component}'")
 
     return component
+
+
+def validate_relative_path(path: str, name: str = "path") -> str:
+    """Validate that a path is relative and safe (no traversal).
+
+    Args:
+        path: The path string to validate.
+        name: Name of the variable for error messages.
+
+    Returns:
+        The validated path.
+
+    Raises:
+        ValueError: If path is absolute or attempts traversal.
+    """
+    if not path:
+        raise ValueError(f"{name} cannot be empty")
+
+    p = Path(path)
+    if p.is_absolute():
+        raise ValueError(f"{name} must be relative, not absolute")
+
+    # Check for traversal using os.path.normpath logic
+    # We want to ensure the normalized path doesn't start with ..
+    normalized = os.path.normpath(path)
+    if normalized.startswith("..") or "/../" in normalized.replace("\\", "/"):
+        raise ValueError(f"{name} cannot traverse outside root")
+
+    return path
