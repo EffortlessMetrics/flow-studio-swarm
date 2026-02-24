@@ -263,63 +263,22 @@ def _parse_status_line(line: str) -> Optional[Tuple[str, str, Optional[str]]]:
     return status, rest, None
 
 
-def scan_file_changes_sync(
-    repo_root: Path,
+def _process_scan_results(
+    numstat_stdout: str,
+    status_stdout: str,
     include_untracked: bool = True,
     include_staged: bool = True,
 ) -> FileChanges:
-    """Synchronously scan for file changes in a git repository.
-
-    This function captures all file mutations since the last commit,
-    including unstaged changes, staged changes, and untracked files.
-
-    Args:
-        repo_root: Path to the repository root.
-        include_untracked: Whether to include untracked files.
-        include_staged: Whether to include staged files separately.
-
-    Returns:
-        FileChanges with complete mutation information.
-    """
+    """Process git diff --numstat and status --porcelain output into FileChanges."""
     result = FileChanges()
 
-    # Verify we're in a git repo
-    success, _, stderr = _run_git_command(["rev-parse", "--git-dir"], repo_root)
-    if not success:
-        result.scan_error = f"Not a git repository: {stderr.strip()}"
-        return result
-
-    # Get file changes with numstat (insertions/deletions)
-    # This shows both staged and unstaged changes
-    success, stdout, stderr = _run_git_command(
-        ["diff", "HEAD", "--numstat", "--find-renames"],
-        repo_root,
-    )
-
-    if not success:
-        # HEAD might not exist (empty repo), try without HEAD
-        success, stdout, stderr = _run_git_command(
-            ["diff", "--numstat", "--find-renames"],
-            repo_root,
-        )
-
     numstat_map: Dict[str, Tuple[int, int]] = {}
-    if success and stdout.strip():
-        for line in stdout.strip().split("\n"):
+    if numstat_stdout.strip():
+        for line in numstat_stdout.strip().split("\n"):
             parsed = _parse_numstat_line(line)
             if parsed:
                 ins, dels, path = parsed
                 numstat_map[path] = (ins, dels)
-
-    # Get porcelain status for comprehensive file list
-    success, stdout, stderr = _run_git_command(
-        ["status", "--porcelain", "-uall"],  # -uall shows all untracked
-        repo_root,
-    )
-
-    if not success:
-        result.scan_error = f"Failed to get git status: {stderr.strip()}"
-        return result
 
     tracked_files: List[FileDiff] = []
     untracked_files: List[str] = []
@@ -327,8 +286,8 @@ def scan_file_changes_sync(
     total_ins = 0
     total_dels = 0
 
-    if stdout.strip():
-        for line in stdout.strip().split("\n"):
+    if status_stdout.strip():
+        for line in status_stdout.strip().split("\n"):
             parsed = _parse_status_line(line)
             if not parsed:
                 continue
@@ -380,15 +339,15 @@ def scan_file_changes_sync(
     return result
 
 
-async def scan_file_changes(
+def scan_file_changes_sync(
     repo_root: Path,
     include_untracked: bool = True,
     include_staged: bool = True,
 ) -> FileChanges:
-    """Asynchronously scan for file changes in a git repository.
+    """Synchronously scan for file changes in a git repository.
 
-    This is an async wrapper around scan_file_changes_sync that runs
-    the git commands in a thread pool to avoid blocking the event loop.
+    This function captures all file mutations since the last commit,
+    including unstaged changes, staged changes, and untracked files.
 
     Args:
         repo_root: Path to the repository root.
@@ -398,10 +357,146 @@ async def scan_file_changes(
     Returns:
         FileChanges with complete mutation information.
     """
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
-        None,  # Use default executor
-        lambda: scan_file_changes_sync(repo_root, include_untracked, include_staged),
+    # Verify we're in a git repo
+    success, _, stderr = _run_git_command(["rev-parse", "--git-dir"], repo_root)
+    if not success:
+        result = FileChanges()
+        result.scan_error = f"Not a git repository: {stderr.strip()}"
+        return result
+
+    # Get file changes with numstat (insertions/deletions)
+    # This shows both staged and unstaged changes
+    success, numstat_stdout, stderr = _run_git_command(
+        ["diff", "HEAD", "--numstat", "--find-renames"],
+        repo_root,
+    )
+
+    if not success:
+        # HEAD might not exist (empty repo), try without HEAD
+        success, numstat_stdout, stderr = _run_git_command(
+            ["diff", "--numstat", "--find-renames"],
+            repo_root,
+        )
+
+    # Get porcelain status for comprehensive file list
+    success, status_stdout, stderr = _run_git_command(
+        ["status", "--porcelain", "-uall"],  # -uall shows all untracked
+        repo_root,
+    )
+
+    if not success:
+        result = FileChanges()
+        result.scan_error = f"Failed to get git status: {stderr.strip()}"
+        return result
+
+    return _process_scan_results(
+        numstat_stdout,
+        status_stdout,
+        include_untracked,
+        include_staged,
+    )
+
+
+async def _run_git_command_async(
+    args: List[str],
+    cwd: Path,
+    timeout: float = 30.0,
+) -> Tuple[bool, str, str]:
+    """Run a git command asynchronously and return (success, stdout, stderr).
+
+    Args:
+        args: Git command arguments (without 'git' prefix).
+        cwd: Working directory for the command.
+        timeout: Command timeout in seconds.
+
+    Returns:
+        Tuple of (success, stdout, stderr).
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "git",
+            *args,
+            cwd=str(cwd),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        return proc.returncode == 0, stdout.decode(), stderr.decode()
+    except asyncio.TimeoutError:
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+        return False, "", f"Git command timed out after {timeout}s"
+    except FileNotFoundError:
+        return False, "", "Git not found in PATH"
+    except Exception as e:
+        return False, "", f"Git command failed: {e}"
+
+
+async def scan_file_changes(
+    repo_root: Path,
+    include_untracked: bool = True,
+    include_staged: bool = True,
+) -> FileChanges:
+    """Asynchronously scan for file changes in a git repository.
+
+    This runs git commands asynchronously, running diff and status in parallel
+    for improved performance.
+
+    Args:
+        repo_root: Path to the repository root.
+        include_untracked: Whether to include untracked files.
+        include_staged: Whether to include staged files separately.
+
+    Returns:
+        FileChanges with complete mutation information.
+    """
+    # 1. Verify we're in a git repo
+    success, _, stderr = await _run_git_command_async(["rev-parse", "--git-dir"], repo_root)
+    if not success:
+        result = FileChanges()
+        result.scan_error = f"Not a git repository: {stderr.strip()}"
+        return result
+
+    # 2. Run diff and status concurrently
+    async def get_numstat() -> Tuple[bool, str, str]:
+        success, stdout, stderr = await _run_git_command_async(
+            ["diff", "HEAD", "--numstat", "--find-renames"],
+            repo_root,
+        )
+        if not success:
+            # HEAD might not exist (empty repo), try without HEAD
+            success, stdout, stderr = await _run_git_command_async(
+                ["diff", "--numstat", "--find-renames"],
+                repo_root,
+            )
+        return success, stdout, stderr
+
+    numstat_task = asyncio.create_task(get_numstat())
+    status_task = asyncio.create_task(
+        _run_git_command_async(
+            ["status", "--porcelain", "-uall"],
+            repo_root,
+        )
+    )
+
+    (numstat_success, numstat_stdout, _), (
+        status_success,
+        status_stdout,
+        status_stderr,
+    ) = await asyncio.gather(numstat_task, status_task)
+
+    if not status_success:
+        result = FileChanges()
+        result.scan_error = f"Failed to get git status: {status_stderr.strip()}"
+        return result
+
+    return _process_scan_results(
+        numstat_stdout if numstat_success else "",
+        status_stdout,
+        include_untracked,
+        include_staged,
     )
 
 

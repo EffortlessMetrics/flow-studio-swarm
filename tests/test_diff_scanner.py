@@ -18,8 +18,10 @@ from swarm.runtime.diff_scanner import (
     file_changes_to_dict,
     file_diff_from_dict,
     file_diff_to_dict,
+    scan_file_changes,
     scan_file_changes_sync,
 )
+import pytest
 
 
 class TestFileDiff:
@@ -342,3 +344,72 @@ class TestCreateFileChangesEvent:
         assert "ts" in event
         assert "payload" in event
         assert event["payload"]["total_insertions"] == 5
+
+
+@pytest.mark.anyio
+async def test_scan_file_changes_async_clean(tmp_path):
+    """Test async scanning a clean git repo."""
+    with patch("swarm.runtime.diff_scanner._run_git_command_async") as mock_git:
+        async def git_responses(args, cwd, **kwargs):
+            if args == ["rev-parse", "--git-dir"]:
+                return True, ".git", ""
+            elif args[0] == "diff":
+                return True, "", ""
+            elif args[0] == "status":
+                return True, "", ""
+            return True, "", ""
+
+        mock_git.side_effect = git_responses
+
+        changes = await scan_file_changes(tmp_path)
+        assert changes.scan_error is None
+        assert not changes.has_changes
+
+
+@pytest.mark.anyio
+async def test_scan_file_changes_async_modifications(tmp_path):
+    """Test async scanning repo with modifications."""
+    with patch("swarm.runtime.diff_scanner._run_git_command_async") as mock_git:
+        async def git_responses(args, cwd, **kwargs):
+            if args == ["rev-parse", "--git-dir"]:
+                return True, ".git", ""
+            elif args[0:2] == ["diff", "HEAD"]:
+                return True, "10\t5\tsrc/main.py\n", ""
+            elif args[0] == "status":
+                return True, " M src/main.py\n?? new_file.py\n", ""
+            return True, "", ""
+
+        mock_git.side_effect = git_responses
+
+        changes = await scan_file_changes(tmp_path)
+        assert changes.scan_error is None
+        assert changes.has_changes
+        assert len(changes.files) == 1
+        assert changes.files[0].path == "src/main.py"
+        assert changes.files[0].insertions == 10
+        assert changes.files[0].deletions == 5
+        assert "new_file.py" in changes.untracked
+
+
+@pytest.mark.anyio
+async def test_scan_file_changes_async_diff_fallback(tmp_path):
+    """Test async scanning with diff HEAD failure (fallback)."""
+    with patch("swarm.runtime.diff_scanner._run_git_command_async") as mock_git:
+        async def git_responses(args, cwd, **kwargs):
+            if args == ["rev-parse", "--git-dir"]:
+                return True, ".git", ""
+            elif args[0:2] == ["diff", "HEAD"]:
+                return False, "", "fatal: bad revision"
+            elif args == ["diff", "--numstat", "--find-renames"]:
+                return True, "10\t5\tsrc/main.py\n", ""
+            elif args[0] == "status":
+                return True, " M src/main.py\n", ""
+            return True, "", ""
+
+        mock_git.side_effect = git_responses
+
+        changes = await scan_file_changes(tmp_path)
+        assert changes.scan_error is None
+        assert changes.has_changes
+        assert len(changes.files) == 1
+        assert changes.files[0].insertions == 10
