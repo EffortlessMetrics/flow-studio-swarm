@@ -77,13 +77,53 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            # We expect multiple calls to check candidates (main, origin/main, etc)
+            # The exact number depends on the candidate list in _resolve_base_ref
+            # We'll make them all fail to simulate total failure
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                # Fail all candidate checks
+                (False, "", "fatal"),  # Candidate 1
+                (False, "", "fatal"),  # Candidate 2
+                (False, "", "fatal"),  # Candidate 3
+                (False, "", "fatal"),  # Candidate 4
+                (False, "", "fatal"),  # Candidate 5
+                (False, "", "fatal"),  # Candidate 6
+                # Finally fallback to HEAD which always succeeds (in logic) or fails if even HEAD missing
+                # But here create() calls _resolve_base_ref which calls _ref_exists
+                # If _resolve_base_ref returns HEAD, create() continues.
+                # But the test expects a RuntimeError?
+                # Actually, looking at ShadowFork.create:
+                # base_ref = self._resolve_base_ref(base_branch)
+                # ...
+                # success, _, stderr = self._run_git(["checkout", "-b", self.shadow_branch, base_ref])
+                # So if base_ref resolves to HEAD, the checkout might still fail if HEAD is bad or other reason?
+                # No, if base_ref is HEAD, checkout succeeds.
+                # Wait, the original test expected RuntimeError.
+                # This implies previous logic raised if base missing.
+                # Current logic falls back to HEAD.
+                # So we should probably expect SUCCESS if HEAD is valid (default),
+                # OR if we want to test failure, we must ensure checkout fails.
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            # Since _resolve_base_ref falls back to HEAD, we need checkout to fail
+            # to trigger the RuntimeError in create()
+            def side_effect(args, **kwargs):
+                cmd = args[0]
+                if cmd == "rev-parse" and "--abbrev-ref" in args:
+                    return (True, "main", "")  # current branch
+                if cmd == "status":
+                    return (True, "", "")  # uncommitted changes
+                if cmd == "rev-parse" and "--verify" in args:
+                    return (False, "", "fatal")  # ref exists check fails for all
+                if cmd == "checkout":
+                    return (False, "", "fatal: not a valid object name: 'HEAD'") # checkout fails
+                return (True, "", "")
+
+            mock_git.side_effect = side_effect
+
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -91,12 +131,20 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+            # We need to account for _resolve_base_ref calls too
+            def side_effect(args, **kwargs):
+                cmd = args[0]
+                if cmd == "rev-parse" and "--abbrev-ref" in args:
+                    return (True, "main", "")  # current branch
+                if cmd == "status":
+                    return (True, " M file.txt", "")  # uncommitted changes
+                if cmd == "rev-parse" and "--verify" in args:
+                    return (True, "", "")  # base ref exists
+                if cmd == "checkout":
+                    return (True, "", "") # checkout succeeds
+                return (True, "", "")
+
+            mock_git.side_effect = side_effect
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
