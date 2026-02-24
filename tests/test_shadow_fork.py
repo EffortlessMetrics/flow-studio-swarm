@@ -73,18 +73,31 @@ class TestShadowForkCreate:
             fork.create()
 
     def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+        """Test that create falls back to HEAD if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (False, "", "fatal"),  # Verify base branch (nonexistent)
+                (False, "", "fatal"),  # Verify base branch (origin/nonexistent)
+                (False, "", "fatal"),  # Verify base branch (main)
+                (False, "", "fatal"),  # Verify base branch (origin/main)
+                (False, "", "fatal"),  # Verify base branch (master)
+                (False, "", "fatal"),  # Verify base branch (origin/master)
+                # HEAD is always valid so loop ends
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "", ""),  # Create and switch to shadow branch (from HEAD)
+                (True, "", ""),  # Install push guard
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+            # Create hooks directory for the test
+            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+            # Should NOT raise exception, but use HEAD
+            fork.create(base_branch="nonexistent")
+
+            assert fork.base_branch == "HEAD"
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
@@ -93,9 +106,10 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
+                (True, "", ""),  # Verify base branch exists (_resolve_base_ref)
+                (True, " M file.txt", ""),  # Uncommitted changes exist (status)
                 (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # Install push guard
             ]
 
             # Create hooks directory for the test
