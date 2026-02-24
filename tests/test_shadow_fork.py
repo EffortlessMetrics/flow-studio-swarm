@@ -72,32 +72,50 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_falls_back_if_base_branch_missing(self, tmp_path, caplog):
+        """Test that create falls back to HEAD if base branch doesn't exist."""
+        import logging
+        caplog.set_level(logging.INFO)
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        def side_effect(args, **kwargs):
+            if args[0] == "rev-parse" and args[1] == "--abbrev-ref":
+                return (True, "main", "")
+            if args[0] == "status":
+                return (True, "", "")
+            if args[0] == "rev-parse" and args[1] == "--verify":
+                # All verifications fail, forcing fallback to HEAD
+                return (False, "", "fatal")
+            if args[0] == "checkout":
+                return (True, "", "")
+            return (True, "", "")
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+        with patch.object(fork, "_run_git", side_effect=side_effect):
+            # Create hooks directory for the test
+            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+            fork.create(base_branch="nonexistent")
+
+            assert "not found, using 'HEAD' instead" in caplog.text
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
+        import logging
+        caplog.set_level(logging.WARNING)
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+        def side_effect(args, **kwargs):
+            if args[0] == "rev-parse" and args[1] == "--abbrev-ref":
+                return (True, "main", "")
+            if args[0] == "status":
+                return (True, " M file.txt", "")
+            if args[0] == "rev-parse" and args[1] == "--verify":
+                return (True, "sha", "")
+            if args[0] == "checkout":
+                return (True, "", "")
+            return (True, "", "")
 
+        with patch.object(fork, "_run_git", side_effect=side_effect):
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
