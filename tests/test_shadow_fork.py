@@ -76,28 +76,48 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        # Mock side effect that handles fallback logic
+        # 1. Get current branch (HEAD)
+        # 2. Check uncommitted changes
+        # 3. Verify base branch (fails for nonexistent)
+        # 4. Verify fallback to HEAD (succeeds)
+        # 5. Create shadow branch
+        # 6. Install push guard
+        def mock_git_side_effect(*args, **kwargs):
+            cmd = args[0]
+            if cmd[0] == "rev-parse" and cmd[1] == "--abbrev-ref":
+                return (True, "main", "")  # Get current branch
+            if cmd[0] == "status":
+                return (True, "", "")  # No uncommitted changes
+            if cmd[0] == "rev-parse" and cmd[1] == "--verify":
+                if "nonexistent" in cmd[2]:
+                    return (False, "", "fatal: needed verification")  # Fail base check
+                return (True, "abc1234", "")  # Succeed HEAD check
+            return (True, "", "")  # Default success for checkout, etc.
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+        with patch.object(fork, "_run_git", side_effect=mock_git_side_effect):
+            # Should NOT raise RuntimeError, but fall back to HEAD
+            fork.create(base_branch="nonexistent")
+            # In the mocked environment, base_branch remains "nonexistent" until resolved internally
+            # but the shadow fork logic sets self.base_branch to the resolved ref
+            # Note: The resolved base ref might be "main" if that's what the mock returns for HEAD
+            # In our mock above, rev-parse HEAD returns "main", so resolve_base_ref returns "main"
+            # because "HEAD" resolution checks if HEAD exists, which calls rev-parse HEAD
+            assert fork.base_branch == "main"
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+        def mock_git_side_effect(*args, **kwargs):
+            cmd = args[0]
+            if cmd[0] == "rev-parse" and cmd[1] == "--abbrev-ref":
+                return (True, "main", "")
+            if cmd[0] == "status":
+                return (True, " M file.txt", "")  # Uncommitted changes
+            return (True, "", "")
 
+        with patch.object(fork, "_run_git", side_effect=mock_git_side_effect):
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
