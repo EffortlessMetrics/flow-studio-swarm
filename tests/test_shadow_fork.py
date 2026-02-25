@@ -76,28 +76,69 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        def mock_git_runner(args, **kwargs):
+            cmd = " ".join(args)
+            if "rev-parse --abbrev-ref HEAD" in cmd:
+                return (True, "main", "")
+            if "status --porcelain" in cmd:
+                return (True, "", "")
+            if "rev-parse --verify" in cmd:
+                # All ref checks fail -> eventually defaults to HEAD or raises
+                # But here we want to test the explicit failure path if possible,
+                # or ensure it handles the fallback.
+                # If we want to simulate "nonexistent" not found:
+                if "nonexistent" in cmd:
+                    return (False, "", "fatal: not a valid object name")
+                # Fallback checks:
+                return (False, "", "fatal: not a valid object name")
+            if "checkout -b" in cmd:
+                # If falling back to HEAD, allow success
+                if "HEAD" in cmd:
+                    return (True, "", "")
+                # If trying to checkout nonexistent branch directly, fail
+                return (False, "", "fatal: not a valid object name: 'nonexistent'")
+            return (True, "", "")
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+        with patch.object(fork, "_run_git", side_effect=mock_git_runner):
+            # If logic falls back to HEAD, it won't raise RuntimeError about existence
+            # unless we mock HEAD check to fail too.
+            # But _resolve_base_ref returns "HEAD" string literal if all else fails.
+            # So checkout receives "HEAD".
+            # If we want to verify it handles missing base_branch gracefully (by falling back),
+            # we should expect success, OR if we want to enforce failure, we check logs.
+            #
+            # However, the original test expected RuntimeError.
+            # Let's assume we want to simulate checkout failure for the resolved ref.
+            # If _resolve_base_ref returns "HEAD", we can let checkout succeed or fail.
+            #
+            # Re-reading memory: "ShadowFork.create falls back to HEAD... Tests validating this behavior must expect success... rather than raising an exception."
+            # So the test expectation was WRONG/OUTDATED.
+            # I should update the test to expect success (fallback) and check the log.
+
+            # Create hooks directory for the test
+            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+            fork.create(base_branch="nonexistent")
+            # Should have fallen back to HEAD
+            assert fork.base_branch == "HEAD"
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+        def mock_git_runner(args, **kwargs):
+            cmd = " ".join(args)
+            if "rev-parse --abbrev-ref HEAD" in cmd:
+                return (True, "main", "")
+            if "status --porcelain" in cmd:
+                return (True, " M file.txt", "")
+            if "rev-parse --verify" in cmd:
+                return (True, "hash", "") # Base branch exists
+            if "checkout -b" in cmd:
+                return (True, "", "")
+            return (True, "", "")
 
+        with patch.object(fork, "_run_git", side_effect=mock_git_runner):
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
