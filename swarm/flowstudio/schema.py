@@ -19,7 +19,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from swarm.runtime.safe_paths import validate_path_component
 
 # =============================================================================
 # Health & System Status
@@ -696,6 +698,18 @@ class CompilePreviewRequest(BaseModel):
     step_id: str = Field(description="Step identifier within the flow (e.g., '3.3')")
     station_id: str = Field(description="Station identifier (e.g., 'code-implementer')")
     run_id: Optional[str] = Field(None, description="Optional run ID for context resolution")
+
+    @field_validator("flow_id", "step_id", "station_id")
+    @classmethod
+    def validate_ids(cls, v: str) -> str:
+        return validate_path_component(v, "id")
+
+    @field_validator("run_id")
+    @classmethod
+    def validate_run_id(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            return validate_path_component(v, "run_id")
+        return v
 
 
 class SdkOptionsModel(BaseModel):
