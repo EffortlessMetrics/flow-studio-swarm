@@ -12,6 +12,7 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
+import html
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -709,30 +710,38 @@ async def _write_stop_report(
     run_dir = runs_root / run_id
     report_path = run_dir / "stop_report.md"
 
+    # Sanitize inputs to prevent Markdown injection / XSS
+    reason = html.escape(str(stop_info.stop_reason or ""))
+    flow_id = html.escape(str(state.get("flow_id", "Unknown")))
+    status = html.escape(str(state.get("status", "Unknown")))
+    last_step = html.escape(str(stop_info.last_step_id or "None"))
+
     # Build report content
     lines = [
         "# Stop Report",
         "",
         f"**Run ID:** {run_id}",
         f"**Stopped At:** {stop_info.stopped_at}",
-        f"**Reason:** {stop_info.stop_reason}",
+        f"**Reason:** {reason}",
         "",
         "## Execution State",
         "",
-        f"- **Last Step ID:** {stop_info.last_step_id or 'None'}",
-        f"- **Flow ID:** {state.get('flow_id', 'Unknown')}",
-        f"- **Previous Status:** {state.get('status', 'Unknown')}",
+        f"- **Last Step ID:** {last_step}",
+        f"- **Flow ID:** {flow_id}",
+        f"- **Previous Status:** {status}",
         "",
     ]
 
     # Add routing intent if available
     if stop_info.last_routing_intent:
+        # Escape backticks to prevent code block breakout
+        intent = stop_info.last_routing_intent.replace("`", "'")
         lines.extend(
             [
                 "## Last Routing Intent",
                 "",
                 "```",
-                stop_info.last_routing_intent,
+                intent,
                 "```",
                 "",
             ]
@@ -747,7 +756,7 @@ async def _write_stop_report(
             ]
         )
         for call in stop_info.last_tool_calls:
-            lines.append(f"- `{call}`")
+            lines.append(f"- `{html.escape(str(call))}`")
         lines.append("")
 
     # Add open assumptions
@@ -759,7 +768,7 @@ async def _write_stop_report(
             ]
         )
         for assumption in stop_info.open_assumptions:
-            lines.append(f"- {assumption}")
+            lines.append(f"- {html.escape(str(assumption))}")
         lines.append("")
 
     # Add completed steps if available
@@ -772,7 +781,7 @@ async def _write_stop_report(
             ]
         )
         for step in completed_steps:
-            lines.append(f"- {step}")
+            lines.append(f"- {html.escape(str(step))}")
         lines.append("")
 
     # Add pending steps if available
@@ -785,7 +794,7 @@ async def _write_stop_report(
             ]
         )
         for step in pending_steps:
-            lines.append(f"- {step}")
+            lines.append(f"- {html.escape(str(step))}")
         lines.append("")
 
     # Write the report
