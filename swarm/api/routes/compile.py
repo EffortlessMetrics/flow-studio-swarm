@@ -18,7 +18,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from swarm.runtime.safe_paths import validate_relative_path
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,11 @@ class CompilePreviewRequest(BaseModel):
         default=None,
         description="Optional context pack with upstream artifacts and envelopes",
     )
+
+    @field_validator("run_base")
+    @classmethod
+    def validate_run_base(cls, v: str) -> str:
+        return validate_relative_path(v, "run_base")
 
 
 class SdkOptionsResponse(BaseModel):
