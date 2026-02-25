@@ -9,6 +9,7 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -82,7 +83,9 @@ async def list_runs(limit: int = 20):
         List of run summaries.
     """
     state_manager = get_state_manager()
-    runs = state_manager.list_runs(limit=limit)
+    # list_runs is synchronous and performs blocking directory scanning (os.scandir)
+    # Offload to a thread to keep the event loop responsive
+    runs = await asyncio.to_thread(state_manager.list_runs, limit=limit)
     return RunListResponse(runs=[RunSummary(**r) for r in runs])
 
 
