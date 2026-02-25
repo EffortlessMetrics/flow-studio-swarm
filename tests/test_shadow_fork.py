@@ -76,13 +76,16 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        def git_side_effect(*args, **kwargs):
+            cmd = args[0]
+            if "rev-parse" in cmd and "--abbrev-ref" in cmd:
+                return (True, "main", "")  # current branch
+            if "status" in cmd:
+                return (True, "", "")  # no uncommitted changes
+            # Verify base branch check
+            return (False, "", "fatal: branch 'nonexistent' does not exist")
 
+        with patch.object(fork, "_run_git", side_effect=git_side_effect):
             with pytest.raises(RuntimeError, match="does not exist"):
                 fork.create(base_branch="nonexistent")
 
@@ -90,14 +93,15 @@ class TestShadowForkCreate:
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+        def git_side_effect(*args, **kwargs):
+            cmd = args[0]
+            if "rev-parse" in cmd and "--abbrev-ref" in cmd:
+                return (True, "main", "")  # current branch
+            if "status" in cmd:
+                return (True, " M file.txt", "")  # Uncommitted changes exist
+            return (True, "", "")  # All other commands succeed
 
+        with patch.object(fork, "_run_git", side_effect=git_side_effect):
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
