@@ -164,8 +164,20 @@ export async function selectSearchResult(index: number): Promise<void> {
 export function initSearchHandlers(): void {
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
   const dropdown = document.getElementById("search-dropdown");
+  const clearBtn = document.getElementById("search-clear");
 
   if (!searchInput) return;
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      if (state.searchDebounceTimer) {
+        clearTimeout(state.searchDebounceTimer);
+      }
+      searchInput.value = "";
+      closeSearchDropdown();
+      searchInput.focus();
+    });
+  }
 
   searchInput.addEventListener("input", (e: Event) => {
     if (state.searchDebounceTimer) {
