@@ -711,13 +711,9 @@ async def _write_stop_report(
     report_path = run_dir / "stop_report.md"
 
     # Build report content
-    stop_reason = html.escape(stop_info.stop_reason)
-    flow_id = state.get("flow_id", "Unknown")
-    if isinstance(flow_id, str):
-        flow_id = html.escape(flow_id)
-    status = state.get("status", "Unknown")
-    if isinstance(status, str):
-        status = html.escape(status)
+    stop_reason = html.escape(str(stop_info.stop_reason or ""))
+    flow_id = html.escape(str(state.get("flow_id", "Unknown")))
+    status = html.escape(str(state.get("status", "Unknown")))
 
     lines = [
         "# Stop Report",
@@ -758,7 +754,7 @@ async def _write_stop_report(
             ]
         )
         for call in stop_info.last_tool_calls:
-            lines.append(f"- `{html.escape(call)}`")
+            lines.append(f"- `{html.escape(str(call))}`")
         lines.append("")
 
     # Add open assumptions
@@ -770,7 +766,7 @@ async def _write_stop_report(
             ]
         )
         for assumption in stop_info.open_assumptions:
-            lines.append(f"- {html.escape(assumption)}")
+            lines.append(f"- {html.escape(str(assumption))}")
         lines.append("")
 
     # Add completed steps if available
