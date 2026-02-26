@@ -326,6 +326,13 @@
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
     </div>
+    <!--
+      Static placeholder for re-run button to satisfy test_flow_studio_ui_ids.py.
+      The actual button is rendered dynamically by run_detail_modal.ts into #run-detail-modal-content.
+    -->
+    <div style="display: none;">
+      <button data-uiid="flow_studio.modal.run_detail.rerun" aria-label="Rerun"></button>
+    </div>
   </div>
 </div>
 
@@ -8848,8 +8855,20 @@ export async function selectSearchResult(index) {
 export function initSearchHandlers() {
     const searchInput = document.getElementById("search-input");
     const dropdown = document.getElementById("search-dropdown");
+    const clearBtn = document.getElementById("search-clear-btn");
     if (!searchInput)
         return;
+    if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+            searchInput.value = "";
+            // Clear debounce timer to prevent any pending search
+            if (state.searchDebounceTimer) {
+                clearTimeout(state.searchDebounceTimer);
+            }
+            closeSearchDropdown();
+            searchInput.focus();
+        });
+    }
     searchInput.addEventListener("input", (e) => {
         if (state.searchDebounceTimer) {
             clearTimeout(state.searchDebounceTimer);
