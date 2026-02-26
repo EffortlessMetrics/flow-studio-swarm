@@ -1039,7 +1039,7 @@
     }
     .search-input {
       width: 100%;
-      padding: 6px 12px 6px 32px;
+      padding: 6px 36px 6px 32px;
       font-size: 12px;
       border: 1px solid #d1d5db;
       border-radius: 6px;
@@ -1060,8 +1060,37 @@
       transform: translateY(-50%);
       pointer-events: none;
     }
-    .search-input:focus + .search-shortcut,
-    .search-input:not(:placeholder-shown) + .search-shortcut {
+    .search-input:focus ~ .search-shortcut,
+    .search-input:not(:placeholder-shown) ~ .search-shortcut {
+      display: none;
+    }
+    .search-clear-btn {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      border: none;
+      background: #e5e7eb;
+      color: #6b7280;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      z-index: 1003;
+      transition: background 0.15s ease;
+    }
+    .search-clear-btn:hover {
+      background: #d1d5db;
+      color: #374151;
+    }
+    /* Hide clear button when input is empty (placeholder shown) */
+    .search-input:placeholder-shown + .search-clear-btn {
       display: none;
     }
     .search-icon {
