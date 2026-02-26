@@ -204,6 +204,8 @@ SKIP_PATTERNS = [
     "**/lint_routing_fields.py",  # Don't lint ourselves
     "**/swarm/runs/**",  # Run artifacts use different state machine vocabulary
     "**/run_state.json",  # Stepwise state machine uses advance/terminate/error/loop
+    "**/swarm/prompts/agentic_steps/self-reviewer.md",  # Mentions deprecated fields in context
+    "**/docs/RELEASE_CHECKLIST.md",  # Mentions deprecated fields in migration guide
 ]
 
 # File extensions to check

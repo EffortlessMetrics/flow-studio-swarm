@@ -23,6 +23,10 @@ export declare function copyToClipboard(text: string): Promise<void>;
  */
 export declare function createCopyButton(text: string, label?: string): HTMLButtonElement;
 /**
+ * Initialize global copy handlers (delegation)
+ */
+export declare function initCopyHandlers(): void;
+/**
  * Create a path display with copy button
  */
 export declare function createPathWithCopy(path: string): HTMLDivElement;

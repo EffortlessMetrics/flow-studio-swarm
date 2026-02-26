@@ -81,16 +81,36 @@ export function createCopyButton(text: string, label = "Copy"): HTMLButtonElemen
   btn.className = "copy-btn";
   btn.textContent = label;
   btn.title = "Copy to clipboard";
-  btn.addEventListener("click", () => {
-    void copyToClipboard(text);
-    btn.textContent = "Copied!";
-    btn.classList.add("copied");
-    setTimeout(() => {
-      btn.textContent = label;
-      btn.classList.remove("copied");
-    }, 1500);
-  });
+  btn.dataset.copyText = text;
   return btn;
+}
+
+/**
+ * Initialize global copy handlers (delegation)
+ */
+export function initCopyHandlers(): void {
+  document.body.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    const btn = target.closest(".copy-btn") as HTMLButtonElement | null;
+
+    if (btn && btn.dataset.copyText && !btn.classList.contains("copied")) {
+      e.preventDefault();
+      void copyToClipboard(btn.dataset.copyText);
+
+      // Store original text in dataset if not present to ensure stability
+      if (!btn.dataset.originalLabel) {
+        btn.dataset.originalLabel = btn.textContent || "Copy";
+      }
+
+      btn.textContent = "Copied!";
+      btn.classList.add("copied");
+
+      setTimeout(() => {
+        btn.textContent = btn.dataset.originalLabel || "Copy";
+        btn.classList.remove("copied");
+      }, 1500);
+    }
+  });
 }
 
 /**
