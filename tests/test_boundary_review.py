@@ -1492,6 +1492,31 @@ class TestBoundaryReviewEndpoint:
         assert data["assumptions_count"] == 1
         assert data["assumptions"][0]["assumption_id"] == "ASM-VALID"
 
+    def test_boundary_review_endpoint_flow_key_path_traversal(
+        self,
+        fastapi_client,
+        isolated_runs_env,
+    ):
+        """Rejects flow_key with path traversal sequences."""
+        runs_dir = isolated_runs_env["runs_dir"]
+        run_path = runs_dir / "secure-run"
+        run_path.mkdir()
+
+        # Path traversal payload
+        resp = fastapi_client.get(
+            "/api/runs/secure-run/boundary-review",
+            params={"scope": "flow", "flow_key": "../secret"},
+        )
+
+        assert resp.status_code == 400
+        data = resp.json()
+        assert data["detail"]["error"] == "invalid_flow_key"
+        # The specific error message depends on validation logic, checking for invalid characters or traversal
+        assert (
+            "traversal sequence" in data["detail"]["message"]
+            or "invalid characters" in data["detail"]["message"]
+        )
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
