@@ -1,0 +1,3 @@
+## 2026-02-26 - Search Input Clear Button
+**Learning:** Adding a "Clear" button to search inputs is a critical usability pattern, but it requires careful coordination between HTML structure, CSS positioning, and visibility logic. Specifically, using the `:placeholder-shown` pseudo-class provides a clean, CSS-only way to toggle visibility based on input content without complex JS state management.
+**Action:** Always include a clear button for text-heavy inputs, and use the `.input:placeholder-shown + .clear-btn` (or `~`) pattern to manage its visibility efficiently. Ensure tab order and focus management (returning focus to input after clear) are handled for accessibility.
