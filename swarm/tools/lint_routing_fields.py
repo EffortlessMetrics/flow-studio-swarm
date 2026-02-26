@@ -195,6 +195,19 @@ NEW_ROUTING_VALID_PATTERNS = [
 VIOLATION_PATTERNS = LEGACY_VIOLATION_PATTERNS
 WARNING_PATTERNS = LEGACY_WARNING_PATTERNS
 
+# Allowed mentions of legacy fields (for documentation/deprecation notices)
+# Format: "path/to/file": ["substring to match", ...]
+# These lines will be ignored even if they match legacy patterns
+ALLOWED_LEGACY_MENTIONS = {
+    "swarm/prompts/agentic_steps/self-reviewer.md": [
+        "instead of legacy `route_to_flow`/`route_to_agent`",
+    ],
+    "docs/RELEASE_CHECKLIST.md": [
+        r'grep -r "route_to_flow\|route_to_agent" swarm/',
+        "No active uses of `route_to_flow` or `route_to_agent`",
+    ],
+}
+
 # Files/directories to skip
 SKIP_PATTERNS = [
     "**/node_modules/**",
@@ -244,12 +257,13 @@ def should_skip_file(file_path: Path) -> bool:
 
 
 def check_file(
-    file_path: Path, check_new: bool = False
+    file_path: Path, root: Path, check_new: bool = False
 ) -> Tuple[List[Violation], List[RoutingUsage]]:
     """Check a single file for routing field violations and new pattern usage.
 
     Args:
         file_path: Path to the file to check
+        root: Repo root path (for relative path matching)
         check_new: If True, also validate V3 routing patterns are well-formed
 
     Returns:
@@ -260,6 +274,14 @@ def check_file(
 
     if should_skip_file(file_path):
         return [], []
+
+    try:
+        rel_path = str(file_path.relative_to(root))
+    except ValueError:
+        # Fallback if path is not relative to root
+        rel_path = str(file_path)
+
+    allowed_substrings = ALLOWED_LEGACY_MENTIONS.get(rel_path, [])
 
     violations = []
     usages = []
@@ -272,6 +294,10 @@ def check_file(
     lines = content.split("\n")
 
     for line_num, line in enumerate(lines, start=1):
+        # Check if line contains allowed substrings
+        if any(s in line for s in allowed_substrings):
+            continue
+
         # Check legacy violation patterns
         for pattern, desc in LEGACY_VIOLATION_PATTERNS:
             if re.search(pattern, line, re.IGNORECASE):
@@ -398,7 +424,7 @@ See docs/ROUTING_PROTOCOL.md for the full routing contract.
         if dir_path.exists():
             files = find_files(dir_path)
             for file in files:
-                violations, usages = check_file(file, check_new=args.check_new)
+                violations, usages = check_file(file, root=root, check_new=args.check_new)
                 all_violations.extend(violations)
                 all_usages.extend(usages)
 

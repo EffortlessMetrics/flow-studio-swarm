@@ -12,6 +12,7 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
+import html
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +20,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 
+from swarm.utils.markdown import escape_markdown_code_block, escape_markdown_inline
 from ..services.run_state import get_state_manager
 from .runs_models import (
     InjectRequest,
@@ -713,15 +715,15 @@ async def _write_stop_report(
     lines = [
         "# Stop Report",
         "",
-        f"**Run ID:** {run_id}",
-        f"**Stopped At:** {stop_info.stopped_at}",
-        f"**Reason:** {stop_info.stop_reason}",
+        f"**Run ID:** {html.escape(str(run_id))}",
+        f"**Stopped At:** {html.escape(str(stop_info.stopped_at))}",
+        f"**Reason:** {html.escape(str(stop_info.stop_reason))}",
         "",
         "## Execution State",
         "",
-        f"- **Last Step ID:** {stop_info.last_step_id or 'None'}",
-        f"- **Flow ID:** {state.get('flow_id', 'Unknown')}",
-        f"- **Previous Status:** {state.get('status', 'Unknown')}",
+        f"- **Last Step ID:** {html.escape(str(stop_info.last_step_id or 'None'))}",
+        f"- **Flow ID:** {html.escape(str(state.get('flow_id', 'Unknown')))}",
+        f"- **Previous Status:** {html.escape(str(state.get('status', 'Unknown')))}",
         "",
     ]
 
@@ -731,9 +733,7 @@ async def _write_stop_report(
             [
                 "## Last Routing Intent",
                 "",
-                "```",
-                stop_info.last_routing_intent,
-                "```",
+                escape_markdown_code_block(str(stop_info.last_routing_intent)),
                 "",
             ]
         )
@@ -747,7 +747,8 @@ async def _write_stop_report(
             ]
         )
         for call in stop_info.last_tool_calls:
-            lines.append(f"- `{call}`")
+            escaped_call = escape_markdown_inline(str(call))
+            lines.append(f"- {escaped_call}")
         lines.append("")
 
     # Add open assumptions
@@ -759,7 +760,7 @@ async def _write_stop_report(
             ]
         )
         for assumption in stop_info.open_assumptions:
-            lines.append(f"- {assumption}")
+            lines.append(f"- {html.escape(str(assumption))}")
         lines.append("")
 
     # Add completed steps if available
