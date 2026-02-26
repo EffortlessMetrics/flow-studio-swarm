@@ -72,31 +72,61 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_falls_back_if_base_branch_missing(self, tmp_path):
+        """Test that create falls back to main/HEAD if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+            # Mock sequence to simulate missing branch -> fallback to main -> success
+            # The exact number of calls depends on _resolve_base_ref logic
+            # We use a callable side effect to be robust
+            def git_side_effect(args, **kwargs):
+                cmd = " ".join(args)
+                if "rev-parse --abbrev-ref HEAD" in cmd:
+                    return (True, "main", "")
+                if "status --porcelain" in cmd:
+                    return (True, "", "")
+                if "rev-parse --verify nonexistent" in cmd:
+                    return (False, "", "fatal: not found")
+                if "rev-parse --verify origin/nonexistent" in cmd:
+                    return (False, "", "fatal: not found")
+                if "rev-parse --verify main" in cmd:
+                    return (True, "main", "")
+                if "checkout -b shadow/" in cmd:
+                    return (True, "", "")
+                # Default success for other calls (hooks, locks etc)
+                return (True, "", "")
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+            mock_git.side_effect = git_side_effect
+
+            # Create hooks directory for the test
+            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+            branch = fork.create(base_branch="nonexistent")
+
+            assert branch.startswith(SHADOW_BRANCH_PREFIX)
+            assert fork.base_branch == "main"
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
+        import logging
+        caplog.set_level(logging.WARNING)
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+            def git_side_effect(args, **kwargs):
+                cmd = " ".join(args)
+                if "rev-parse --abbrev-ref HEAD" in cmd:
+                    return (True, "main", "")
+                if "status --porcelain" in cmd:
+                    return (True, " M file.txt", "")
+                if "rev-parse --verify" in cmd:
+                    return (True, "main", "")
+                if "checkout -b shadow/" in cmd:
+                    return (True, "", "")
+                return (True, "", "")
+
+            mock_git.side_effect = git_side_effect
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)

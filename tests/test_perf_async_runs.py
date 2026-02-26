@@ -23,7 +23,8 @@ async def test_list_runs_blocking_behavior():
 
     # Mock get_state_manager to return our mock
     mock_manager = MagicMock(spec=RunStateManager)
-    mock_manager.list_runs = slow_list_runs
+    # Use side_effect to ensure the function is called
+    mock_manager.list_runs.side_effect = slow_list_runs
 
     with patch("swarm.api.routes.runs_crud.get_state_manager", return_value=mock_manager):
 
@@ -54,6 +55,9 @@ async def test_list_runs_blocking_behavior():
 
         # If blocking: counter should be very small (e.g. 0 or 1) because time.sleep blocks everything
         # If non-blocking: counter should be around slow_duration / 0.05 (e.g. 10)
+
+        # We verify that list_runs was actually called
+        assert mock_manager.list_runs.called, "list_runs should have been called"
 
         # We expect the test to FAIL if the implementation is blocking.
         # So we assert that it is NOT blocking.
