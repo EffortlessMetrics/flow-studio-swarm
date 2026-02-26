@@ -139,11 +139,11 @@ def format_sse_event(
 # =============================================================================
 
 
-async def read_events_file(
+def read_events_file_sync(
     events_file: Path,
     last_position: int = 0,
 ) -> tuple[list[Dict[str, Any]], int]:
-    """Read new events from the events file.
+    """Read new events from the events file synchronously.
 
     Args:
         events_file: Path to events.jsonl file.
@@ -174,6 +174,22 @@ async def read_events_file(
         new_position = last_position
 
     return events, new_position
+
+
+async def read_events_file(
+    events_file: Path,
+    last_position: int = 0,
+) -> tuple[list[Dict[str, Any]], int]:
+    """Read new events from the events file (non-blocking).
+
+    Args:
+        events_file: Path to events.jsonl file.
+        last_position: Last read position in file.
+
+    Returns:
+        Tuple of (events list, new position).
+    """
+    return await asyncio.to_thread(read_events_file_sync, events_file, last_position)
 
 
 async def generate_run_events(
@@ -227,7 +243,8 @@ async def generate_run_events(
                 break
 
             # Read current state
-            state = json.loads(state_file.read_text(encoding="utf-8"))
+            state_content = await asyncio.to_thread(state_file.read_text, encoding="utf-8")
+            state = json.loads(state_content)
             status = state.get("status", "pending")
 
             # Read new events from file
@@ -408,7 +425,7 @@ async def write_event(
     event_type: str,
     data: Dict[str, Any],
 ) -> None:
-    """Write an event to a run's events file.
+    """Write an event to a run's events file (non-blocking).
 
     Args:
         run_id: Run identifier.
@@ -416,17 +433,7 @@ async def write_event(
         event_type: Event type name.
         data: Event data.
     """
-    events_file = runs_root / run_id / "events.jsonl"
-    events_file.parent.mkdir(parents=True, exist_ok=True)
-
-    event = {
-        "event": event_type,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        **data,
-    }
-
-    with open(events_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event) + "\n")
+    await asyncio.to_thread(write_event_sync, run_id, runs_root, event_type, data)
 
 
 def write_event_sync(
