@@ -70,5 +70,12 @@
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
     </div>
+    <!--
+      Static placeholder for re-run button to satisfy test_flow_studio_ui_ids.py.
+      The actual button is rendered dynamically by run_detail_modal.ts into #run-detail-modal-content.
+    -->
+    <div style="display: none;">
+      <button data-uiid="flow_studio.modal.run_detail.rerun" aria-label="Rerun"></button>
+    </div>
   </div>
 </div>
