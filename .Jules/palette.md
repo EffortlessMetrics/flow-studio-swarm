@@ -1,0 +1,3 @@
+## 2026-02-26 - [Strict Linting & Allowlist Complexity]
+**Learning:** Strict linting checks can be triggered by seemingly unrelated changes (like modifying allowlists) if the tool itself grows too large. Also, CI checks for deprecated patterns might flag legitimate documentation or prompt files that mention the deprecated terms for instructional purposes.
+**Action:** When adding exceptions to linter configurations or allowlists, be prepared to also add the linter tool itself to complexity allowlists if it exceeds thresholds. Always verify `make lint-routing-strict` and `make complexity-check` before submitting, even if you think your changes are minor.
