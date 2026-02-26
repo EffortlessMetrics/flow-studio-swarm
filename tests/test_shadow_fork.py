@@ -45,10 +45,9 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-                (True, "", ""),  # Install push guard (rev-parse in block_upstream_push)
+                (True, "", ""),  # Verify base branch exists (resolve base ref)
+                (True, "", ""),  # Check for uncommitted changes (status)
+                (True, "", ""),  # Create and switch to shadow branch (checkout)
             ]
 
             # Create hooks directory for the test
