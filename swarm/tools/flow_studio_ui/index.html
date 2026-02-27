@@ -311,6 +311,18 @@
       <span class="shortcut-desc">Show this help</span>
       <kbd class="fs-kbd">?</kbd>
     </div>
+    <div class="shortcut-row" style="margin-top: 12px; border-top: 1px solid #f3f4f6; padding-top: 8px;">
+      <span class="shortcut-desc">Start / Resume Run</span>
+      <div><kbd class="fs-kbd">Shift</kbd> + <kbd class="fs-kbd">Enter</kbd></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Pause Run</span>
+      <div><kbd class="fs-kbd">Shift</kbd> + <kbd class="fs-kbd">Space</kbd></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Stop Run</span>
+      <div><kbd class="fs-kbd">Shift</kbd> + <kbd class="fs-kbd">Esc</kbd></div>
+    </div>
     <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
       <div>Full documentation: <code style="background: #f3f4f6; padding: 2px 4px; border-radius: 3px;">docs/FLOW_STUDIO.md</code></div>
       <div style="margin-top: 6px;">Color/governance rules: <code style="background: #f3f4f6; padding: 2px 4px; border-radius: 3px;">docs/VALIDATION_RULES.md</code></div>
@@ -4793,9 +4805,16 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
     list.className = "fs-text-body";
     list.style.lineHeight = "1.8";
     usage.forEach(u => {
-        const item = document.createElement("div");
+        const item = document.createElement("button");
         item.style.cursor = "pointer";
         item.style.padding = "2px 0";
+        item.style.background = "none";
+        item.style.border = "none";
+        item.style.textAlign = "left";
+        item.style.width = "100%";
+        item.style.fontFamily = "inherit";
+        item.style.fontSize = "inherit";
+        item.style.color = "inherit";
         item.innerHTML = renderAgentUsageItem(u.flow_title, u.step_title);
         item.title = `Click to navigate to ${u.flow}:${u.step}`;
         item.addEventListener("click", async () => {
@@ -4819,6 +4838,8 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
         });
         item.addEventListener("mouseenter", () => { item.style.background = "#f3f4f6"; });
         item.addEventListener("mouseleave", () => { item.style.background = "transparent"; });
+        item.addEventListener("focus", () => { item.style.background = "#f3f4f6"; });
+        item.addEventListener("blur", () => { item.style.background = "transparent"; });
         list.appendChild(item);
     });
     container.appendChild(list);
@@ -5246,10 +5267,16 @@ export async function showStepDetails(data, callbacks = {}) {
         }
         else {
             stepAgents.forEach(agentKey => {
-                const agentLink = document.createElement("div");
+                const agentLink = document.createElement("button");
                 agentLink.style.cursor = "pointer";
                 agentLink.style.padding = "2px 0";
                 agentLink.style.color = "#3b82f6";
+                agentLink.style.background = "none";
+                agentLink.style.border = "none";
+                agentLink.style.textAlign = "left";
+                agentLink.style.width = "100%";
+                agentLink.style.fontFamily = "inherit";
+                agentLink.style.fontSize = "inherit";
                 agentLink.innerHTML = `<span class="mono">${escapeHtml(agentKey)}</span>`;
                 agentLink.title = `Click to view agent: ${agentKey}`;
                 agentLink.addEventListener("click", async () => {
@@ -5262,6 +5289,14 @@ export async function showStepDetails(data, callbacks = {}) {
                     agentLink.style.textDecoration = "underline";
                 });
                 agentLink.addEventListener("mouseleave", () => {
+                    agentLink.style.background = "transparent";
+                    agentLink.style.textDecoration = "none";
+                });
+                agentLink.addEventListener("focus", () => {
+                    agentLink.style.background = "#f3f4f6";
+                    agentLink.style.textDecoration = "underline";
+                });
+                agentLink.addEventListener("blur", () => {
                     agentLink.style.background = "transparent";
                     agentLink.style.textDecoration = "none";
                 });
@@ -5717,7 +5752,7 @@ import { configure as configureRunHistory, initRunHistory, setSelectedRunId as s
 // Run detail modal
 import { configure as configureRunDetailModal, showRunDetailModal } from "./run_detail_modal.js";
 // Run control panel
-import { configure as configureRunControl, initRunControl, setActiveRun as setRunControlActiveRun, clearActiveRun as clearRunControlActiveRun } from "./run_control.js";
+import { configure as configureRunControl, initRunControl, setActiveRun as setRunControlActiveRun, clearActiveRun as clearRunControlActiveRun, getRunControlState, startRun, pauseRun, resumeRun, stopRun } from "./run_control.js";
 // Graph semantic companion
 import { renderFlowOutline, getCurrentGraphState } from "./graph_outline.js";
 // Layout spec for SDK
@@ -6340,7 +6375,30 @@ window.addEventListener("load", async () => {
         configureShortcuts({
             setActiveFlow: setActiveFlow,
             showStepDetails: showStepDetails,
-            toggleSelftestModal: toggleSelftestModal
+            toggleSelftestModal: toggleSelftestModal,
+            onRunAction: (action) => {
+                const runState = getRunControlState();
+                switch (action) {
+                    case "play":
+                        if (runState.runState === "paused") {
+                            void resumeRun();
+                        }
+                        else if (runState.runState !== "running" && runState.runState !== "stopping") {
+                            void startRun();
+                        }
+                        break;
+                    case "pause":
+                        if (runState.runState === "running") {
+                            void pauseRun();
+                        }
+                        break;
+                    case "stop":
+                        if (runState.runState === "running" || runState.runState === "paused") {
+                            void stopRun();
+                        }
+                        break;
+                }
+            }
         });
         // Configure tours module
         configureTours({
@@ -9510,6 +9568,7 @@ import { createModalFocusManager } from "./utils.js";
 let _setActiveFlow = null;
 let _showStepDetails = null;
 let _toggleSelftestModal = null;
+let _onRunAction = null;
 /**
  * Configure callbacks for the shortcuts module.
  */
@@ -9520,6 +9579,8 @@ export function configure(callbacks = {}) {
         _showStepDetails = callbacks.showStepDetails;
     if (callbacks.toggleSelftestModal)
         _toggleSelftestModal = callbacks.toggleSelftestModal;
+    if (callbacks.onRunAction)
+        _onRunAction = callbacks.onRunAction;
 }
 // ============================================================================
 // Shortcuts Modal
@@ -9598,12 +9659,33 @@ export function initKeyboardShortcuts() {
             e.preventDefault();
             toggleShortcutsModal(true);
         }
-        // Escape - Close modals/dropdowns
+        // Shift+Enter - Play
+        if (e.shiftKey && e.key === "Enter") {
+            e.preventDefault();
+            if (_onRunAction)
+                _onRunAction("play");
+        }
+        // Shift+Space - Pause
+        else if (e.shiftKey && e.key === " ") {
+            e.preventDefault();
+            if (_onRunAction)
+                _onRunAction("pause");
+        }
+        // Escape - Close modals/dropdowns or Stop (Shift+Esc)
         else if (e.key === "Escape") {
-            closeSearchDropdown();
-            toggleShortcutsModal(false);
-            if (_toggleSelftestModal)
-                _toggleSelftestModal(false);
+            if (e.shiftKey) {
+                // Shift+Esc - Stop run
+                e.preventDefault();
+                if (_onRunAction)
+                    _onRunAction("stop");
+            }
+            else {
+                // Normal Esc - Close UI elements
+                closeSearchDropdown();
+                toggleShortcutsModal(false);
+                if (_toggleSelftestModal)
+                    _toggleSelftestModal(false);
+            }
         }
         // 1-6 - Jump to flows
         else if (e.key >= "1" && e.key <= "6") {
@@ -10133,7 +10215,10 @@ export function renderNoRuns() {
       <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">No runs yet</p>
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
-      <code class="mono fs-empty-command">make demo-run</code>
+      <div class="fs-copy-command">
+        <code class="mono fs-empty-command">make demo-run</code>
+        <button class="fs-icon-button copy-button" title="Copy command" onclick="navigator.clipboard.writeText('make demo-run'); this.textContent='\u2713'; setTimeout(() => this.textContent='\uD83D\uDCCB', 2000)">\uD83D\uDCCB</button>
+      </div>
     </div>
   `;
 }

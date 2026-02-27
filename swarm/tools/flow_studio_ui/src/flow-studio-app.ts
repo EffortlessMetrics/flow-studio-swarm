@@ -139,6 +139,11 @@ import {
   initRunControl,
   setActiveRun as setRunControlActiveRun,
   clearActiveRun as clearRunControlActiveRun,
+  getRunControlState,
+  startRun,
+  pauseRun,
+  resumeRun,
+  stopRun,
   type SSEEvent
 } from "./run_control.js";
 
@@ -875,7 +880,29 @@ window.addEventListener("load", async () => {
     configureShortcuts({
       setActiveFlow: setActiveFlow,
       showStepDetails: showStepDetails,
-      toggleSelftestModal: toggleSelftestModal
+      toggleSelftestModal: toggleSelftestModal,
+      onRunAction: (action) => {
+        const runState = getRunControlState();
+        switch (action) {
+          case "play":
+            if (runState.runState === "paused") {
+              void resumeRun();
+            } else if (runState.runState !== "running" && runState.runState !== "stopping") {
+              void startRun();
+            }
+            break;
+          case "pause":
+            if (runState.runState === "running") {
+              void pauseRun();
+            }
+            break;
+          case "stop":
+            if (runState.runState === "running" || runState.runState === "paused") {
+              void stopRun();
+            }
+            break;
+        }
+      }
     });
 
     // Configure tours module
