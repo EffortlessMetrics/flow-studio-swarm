@@ -1,0 +1,4 @@
+## 2025-01-28 - Path Traversal in Wisdom/Evolution Artifacts
+**Vulnerability:** Path traversal vulnerability in `wisdom.py` and `evolution.py` endpoints. User input for `run_id`, `artifact_name`, and `patch_id` was directly used to construct file paths without validation, allowing access to files outside the intended directories (e.g. `../../../secret.txt`).
+**Learning:** Even when `_get_run_wisdom_dir` seems to scope access, subsequent path joining with user input (`wisdom_dir / artifact_name`) bypasses this protection if the input contains traversal sequences (`../`).
+**Prevention:** Always validate path components using `swarm.runtime.safe_paths.validate_path_component` before using them in file operations. This function enforces an allowlist of characters and rejects traversal sequences.
