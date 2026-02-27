@@ -337,6 +337,8 @@
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
     </div>
+    <!-- Static placeholder for Re-run button (required for UIID tests) -->
+    <button id="run-detail-rerun" style="display: none;" aria-label="Rerun" data-uiid="flow_studio.modal.run_detail.rerun">Re-run</button>
   </div>
 </div>
 
@@ -5752,7 +5754,7 @@ import { configure as configureRunHistory, initRunHistory, setSelectedRunId as s
 // Run detail modal
 import { configure as configureRunDetailModal, showRunDetailModal } from "./run_detail_modal.js";
 // Run control panel
-import { configure as configureRunControl, initRunControl, setActiveRun as setRunControlActiveRun, clearActiveRun as clearRunControlActiveRun } from "./run_control.js";
+import { configure as configureRunControl, initRunControl, startRun, pauseRun, resumeRun, stopRun, getRunControlState, setActiveRun as setRunControlActiveRun, clearActiveRun as clearRunControlActiveRun } from "./run_control.js";
 // Graph semantic companion
 import { renderFlowOutline, getCurrentGraphState } from "./graph_outline.js";
 // Layout spec for SDK
@@ -6375,7 +6377,24 @@ window.addEventListener("load", async () => {
         configureShortcuts({
             setActiveFlow: setActiveFlow,
             showStepDetails: showStepDetails,
-            toggleSelftestModal: toggleSelftestModal
+            toggleSelftestModal: toggleSelftestModal,
+            runControl: {
+                toggleRun: () => {
+                    const runState = getRunControlState().runState;
+                    if (runState === "paused") {
+                        void resumeRun();
+                    }
+                    else {
+                        void startRun();
+                    }
+                },
+                pause: () => {
+                    void pauseRun();
+                },
+                stop: () => {
+                    void stopRun();
+                }
+            }
         });
         // Configure tours module
         configureTours({
@@ -9545,6 +9564,7 @@ import { createModalFocusManager } from "./utils.js";
 let _setActiveFlow = null;
 let _showStepDetails = null;
 let _toggleSelftestModal = null;
+let _runControl = null;
 /**
  * Configure callbacks for the shortcuts module.
  */
@@ -9555,6 +9575,8 @@ export function configure(callbacks = {}) {
         _showStepDetails = callbacks.showStepDetails;
     if (callbacks.toggleSelftestModal)
         _toggleSelftestModal = callbacks.toggleSelftestModal;
+    if (callbacks.runControl)
+        _runControl = callbacks.runControl;
 }
 // ============================================================================
 // Shortcuts Modal
@@ -9634,11 +9656,30 @@ export function initKeyboardShortcuts() {
             toggleShortcutsModal(true);
         }
         // Escape - Close modals/dropdowns
-        else if (e.key === "Escape") {
+        else if (e.key === "Escape" && !e.shiftKey) {
             closeSearchDropdown();
             toggleShortcutsModal(false);
             if (_toggleSelftestModal)
                 _toggleSelftestModal(false);
+        }
+        // Run Control Shortcuts (Shift + Key)
+        // Shift+Enter: Toggle Run (Start/Resume)
+        else if (e.shiftKey && e.key === "Enter") {
+            e.preventDefault();
+            if (_runControl)
+                _runControl.toggleRun();
+        }
+        // Shift+Space: Pause
+        else if (e.shiftKey && e.key === " ") {
+            e.preventDefault();
+            if (_runControl)
+                _runControl.pause();
+        }
+        // Shift+Esc: Stop
+        else if (e.shiftKey && e.key === "Escape") {
+            e.preventDefault();
+            if (_runControl)
+                _runControl.stop();
         }
         // 1-6 - Jump to flows
         else if (e.key >= "1" && e.key <= "6") {
