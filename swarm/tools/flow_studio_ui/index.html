@@ -76,19 +76,19 @@
     <div class="run-control-panel" data-uiid="flow_studio.sidebar.run_control">
       <label class="muted" style="font-size: 10px; display: block; margin-bottom: 6px;">RUN CONTROL</label>
       <div class="run-control-buttons" data-uiid="flow_studio.sidebar.run_control.buttons">
-        <button id="run-control-play" class="run-control-btn run-control-btn--play" title="Start run" aria-label="Start run" data-uiid="flow_studio.sidebar.run_control.play">
+        <button id="run-control-play" class="run-control-btn run-control-btn--play" title="Start run (Shift+Enter)" aria-label="Start run (Shift+Enter)" data-uiid="flow_studio.sidebar.run_control.play">
           <span class="run-control-icon" aria-hidden="true">&#9654;</span>
           <span class="run-control-label">Start</span>
         </button>
-        <button id="run-control-pause" class="run-control-btn run-control-btn--pause" title="Pause run" aria-label="Pause run" data-uiid="flow_studio.sidebar.run_control.pause" disabled>
+        <button id="run-control-pause" class="run-control-btn run-control-btn--pause" title="Pause run (Shift+Space)" aria-label="Pause run (Shift+Space)" data-uiid="flow_studio.sidebar.run_control.pause" disabled>
           <span class="run-control-icon" aria-hidden="true">&#10074;&#10074;</span>
           <span class="run-control-label">Pause</span>
         </button>
-        <button id="run-control-resume" class="run-control-btn run-control-btn--resume" title="Resume run" aria-label="Resume run" data-uiid="flow_studio.sidebar.run_control.resume" disabled style="display: none;">
+        <button id="run-control-resume" class="run-control-btn run-control-btn--resume" title="Resume run (Shift+Enter)" aria-label="Resume run (Shift+Enter)" data-uiid="flow_studio.sidebar.run_control.resume" disabled style="display: none;">
           <span class="run-control-icon" aria-hidden="true">&#9654;</span>
           <span class="run-control-label">Resume</span>
         </button>
-        <button id="run-control-cancel" class="run-control-btn run-control-btn--stop" title="Stop run" aria-label="Stop run" data-uiid="flow_studio.sidebar.run_control.stop" disabled>
+        <button id="run-control-cancel" class="run-control-btn run-control-btn--stop" title="Stop run (Shift+Esc)" aria-label="Stop run (Shift+Esc)" data-uiid="flow_studio.sidebar.run_control.stop" disabled>
           <span class="run-control-icon" aria-hidden="true">&#9632;</span>
           <span class="run-control-label">Stop</span>
         </button>
@@ -272,6 +272,18 @@
       <kbd class="fs-kbd">/</kbd>
     </div>
     <div class="shortcut-row">
+      <span class="shortcut-desc">Run / Resume</span>
+      <kbd class="fs-kbd">Shift+Enter</kbd>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Pause</span>
+      <kbd class="fs-kbd">Shift+Space</kbd>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Stop</span>
+      <kbd class="fs-kbd">Shift+Esc</kbd>
+    </div>
+    <div class="shortcut-row">
       <span class="shortcut-desc">Close dropdown / modal</span>
       <kbd class="fs-kbd">Esc</kbd>
     </div>
@@ -325,6 +337,8 @@
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
     </div>
+    <!-- Static placeholder for Re-run button (required for UIID tests) -->
+    <button id="run-detail-rerun" style="display: none;" aria-label="Rerun" data-uiid="flow_studio.modal.run_detail.rerun">Re-run</button>
   </div>
 </div>
 
@@ -4793,9 +4807,16 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
     list.className = "fs-text-body";
     list.style.lineHeight = "1.8";
     usage.forEach(u => {
-        const item = document.createElement("div");
+        const item = document.createElement("button");
         item.style.cursor = "pointer";
         item.style.padding = "2px 0";
+        item.style.background = "none";
+        item.style.border = "none";
+        item.style.textAlign = "left";
+        item.style.width = "100%";
+        item.style.fontFamily = "inherit";
+        item.style.fontSize = "inherit";
+        item.style.color = "inherit";
         item.innerHTML = renderAgentUsageItem(u.flow_title, u.step_title);
         item.title = `Click to navigate to ${u.flow}:${u.step}`;
         item.addEventListener("click", async () => {
@@ -4819,6 +4840,8 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
         });
         item.addEventListener("mouseenter", () => { item.style.background = "#f3f4f6"; });
         item.addEventListener("mouseleave", () => { item.style.background = "transparent"; });
+        item.addEventListener("focus", () => { item.style.background = "#f3f4f6"; });
+        item.addEventListener("blur", () => { item.style.background = "transparent"; });
         list.appendChild(item);
     });
     container.appendChild(list);
@@ -5246,10 +5269,16 @@ export async function showStepDetails(data, callbacks = {}) {
         }
         else {
             stepAgents.forEach(agentKey => {
-                const agentLink = document.createElement("div");
+                const agentLink = document.createElement("button");
                 agentLink.style.cursor = "pointer";
                 agentLink.style.padding = "2px 0";
                 agentLink.style.color = "#3b82f6";
+                agentLink.style.background = "none";
+                agentLink.style.border = "none";
+                agentLink.style.textAlign = "left";
+                agentLink.style.width = "100%";
+                agentLink.style.fontFamily = "inherit";
+                agentLink.style.fontSize = "inherit";
                 agentLink.innerHTML = `<span class="mono">${escapeHtml(agentKey)}</span>`;
                 agentLink.title = `Click to view agent: ${agentKey}`;
                 agentLink.addEventListener("click", async () => {
@@ -5262,6 +5291,14 @@ export async function showStepDetails(data, callbacks = {}) {
                     agentLink.style.textDecoration = "underline";
                 });
                 agentLink.addEventListener("mouseleave", () => {
+                    agentLink.style.background = "transparent";
+                    agentLink.style.textDecoration = "none";
+                });
+                agentLink.addEventListener("focus", () => {
+                    agentLink.style.background = "#f3f4f6";
+                    agentLink.style.textDecoration = "underline";
+                });
+                agentLink.addEventListener("blur", () => {
                     agentLink.style.background = "transparent";
                     agentLink.style.textDecoration = "none";
                 });
@@ -5717,7 +5754,7 @@ import { configure as configureRunHistory, initRunHistory, setSelectedRunId as s
 // Run detail modal
 import { configure as configureRunDetailModal, showRunDetailModal } from "./run_detail_modal.js";
 // Run control panel
-import { configure as configureRunControl, initRunControl, setActiveRun as setRunControlActiveRun, clearActiveRun as clearRunControlActiveRun } from "./run_control.js";
+import { configure as configureRunControl, initRunControl, startRun, pauseRun, resumeRun, stopRun, getRunControlState, setActiveRun as setRunControlActiveRun, clearActiveRun as clearRunControlActiveRun } from "./run_control.js";
 // Graph semantic companion
 import { renderFlowOutline, getCurrentGraphState } from "./graph_outline.js";
 // Layout spec for SDK
@@ -6340,7 +6377,24 @@ window.addEventListener("load", async () => {
         configureShortcuts({
             setActiveFlow: setActiveFlow,
             showStepDetails: showStepDetails,
-            toggleSelftestModal: toggleSelftestModal
+            toggleSelftestModal: toggleSelftestModal,
+            runControl: {
+                toggleRun: () => {
+                    const runState = getRunControlState().runState;
+                    if (runState === "paused") {
+                        void resumeRun();
+                    }
+                    else {
+                        void startRun();
+                    }
+                },
+                pause: () => {
+                    void pauseRun();
+                },
+                stop: () => {
+                    void stopRun();
+                }
+            }
         });
         // Configure tours module
         configureTours({
@@ -9510,6 +9564,7 @@ import { createModalFocusManager } from "./utils.js";
 let _setActiveFlow = null;
 let _showStepDetails = null;
 let _toggleSelftestModal = null;
+let _runControl = null;
 /**
  * Configure callbacks for the shortcuts module.
  */
@@ -9520,6 +9575,8 @@ export function configure(callbacks = {}) {
         _showStepDetails = callbacks.showStepDetails;
     if (callbacks.toggleSelftestModal)
         _toggleSelftestModal = callbacks.toggleSelftestModal;
+    if (callbacks.runControl)
+        _runControl = callbacks.runControl;
 }
 // ============================================================================
 // Shortcuts Modal
@@ -9599,11 +9656,30 @@ export function initKeyboardShortcuts() {
             toggleShortcutsModal(true);
         }
         // Escape - Close modals/dropdowns
-        else if (e.key === "Escape") {
+        else if (e.key === "Escape" && !e.shiftKey) {
             closeSearchDropdown();
             toggleShortcutsModal(false);
             if (_toggleSelftestModal)
                 _toggleSelftestModal(false);
+        }
+        // Run Control Shortcuts (Shift + Key)
+        // Shift+Enter: Toggle Run (Start/Resume)
+        else if (e.shiftKey && e.key === "Enter") {
+            e.preventDefault();
+            if (_runControl)
+                _runControl.toggleRun();
+        }
+        // Shift+Space: Pause
+        else if (e.shiftKey && e.key === " ") {
+            e.preventDefault();
+            if (_runControl)
+                _runControl.pause();
+        }
+        // Shift+Esc: Stop
+        else if (e.shiftKey && e.key === "Escape") {
+            e.preventDefault();
+            if (_runControl)
+                _runControl.stop();
         }
         // 1-6 - Jump to flows
         else if (e.key >= "1" && e.key <= "6") {
@@ -10133,7 +10209,10 @@ export function renderNoRuns() {
       <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">No runs yet</p>
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
-      <code class="mono fs-empty-command">make demo-run</code>
+      <div class="fs-copy-command">
+        <code class="mono fs-empty-command">make demo-run</code>
+        <button class="fs-icon-button copy-button" title="Copy command" onclick="navigator.clipboard.writeText('make demo-run'); this.textContent='\u2713'; setTimeout(() => this.textContent='\uD83D\uDCCB', 2000)">\uD83D\uDCCB</button>
+      </div>
     </div>
   `;
 }

@@ -14,6 +14,7 @@ import { createModalFocusManager } from "./utils.js";
 let _setActiveFlow = null;
 let _showStepDetails = null;
 let _toggleSelftestModal = null;
+let _runControl = null;
 /**
  * Configure callbacks for the shortcuts module.
  */
@@ -24,6 +25,8 @@ export function configure(callbacks = {}) {
         _showStepDetails = callbacks.showStepDetails;
     if (callbacks.toggleSelftestModal)
         _toggleSelftestModal = callbacks.toggleSelftestModal;
+    if (callbacks.runControl)
+        _runControl = callbacks.runControl;
 }
 // ============================================================================
 // Shortcuts Modal
@@ -103,11 +106,30 @@ export function initKeyboardShortcuts() {
             toggleShortcutsModal(true);
         }
         // Escape - Close modals/dropdowns
-        else if (e.key === "Escape") {
+        else if (e.key === "Escape" && !e.shiftKey) {
             closeSearchDropdown();
             toggleShortcutsModal(false);
             if (_toggleSelftestModal)
                 _toggleSelftestModal(false);
+        }
+        // Run Control Shortcuts (Shift + Key)
+        // Shift+Enter: Toggle Run (Start/Resume)
+        else if (e.shiftKey && e.key === "Enter") {
+            e.preventDefault();
+            if (_runControl)
+                _runControl.toggleRun();
+        }
+        // Shift+Space: Pause
+        else if (e.shiftKey && e.key === " ") {
+            e.preventDefault();
+            if (_runControl)
+                _runControl.pause();
+        }
+        // Shift+Esc: Stop
+        else if (e.shiftKey && e.key === "Escape") {
+            e.preventDefault();
+            if (_runControl)
+                _runControl.stop();
         }
         // 1-6 - Jump to flows
         else if (e.key >= "1" && e.key <= "6") {

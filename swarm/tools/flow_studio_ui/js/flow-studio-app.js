@@ -40,7 +40,7 @@ import { configure as configureRunHistory, initRunHistory, setSelectedRunId as s
 // Run detail modal
 import { configure as configureRunDetailModal, showRunDetailModal } from "./run_detail_modal.js";
 // Run control panel
-import { configure as configureRunControl, initRunControl, setActiveRun as setRunControlActiveRun, clearActiveRun as clearRunControlActiveRun } from "./run_control.js";
+import { configure as configureRunControl, initRunControl, startRun, pauseRun, resumeRun, stopRun, getRunControlState, setActiveRun as setRunControlActiveRun, clearActiveRun as clearRunControlActiveRun } from "./run_control.js";
 // Graph semantic companion
 import { renderFlowOutline, getCurrentGraphState } from "./graph_outline.js";
 // Layout spec for SDK
@@ -663,7 +663,24 @@ window.addEventListener("load", async () => {
         configureShortcuts({
             setActiveFlow: setActiveFlow,
             showStepDetails: showStepDetails,
-            toggleSelftestModal: toggleSelftestModal
+            toggleSelftestModal: toggleSelftestModal,
+            runControl: {
+                toggleRun: () => {
+                    const runState = getRunControlState().runState;
+                    if (runState === "paused") {
+                        void resumeRun();
+                    }
+                    else {
+                        void startRun();
+                    }
+                },
+                pause: () => {
+                    void pauseRun();
+                },
+                stop: () => {
+                    void stopRun();
+                }
+            }
         });
         // Configure tours module
         configureTours({
