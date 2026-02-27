@@ -58,9 +58,14 @@ export function renderSearchResults(results) {
     const dropdown = document.getElementById("search-dropdown");
     if (!dropdown)
         return;
+    const searchInput = document.getElementById("search-input");
     if (!results.length) {
         dropdown.innerHTML = '<div class="search-no-results">No results found</div>';
         dropdown.classList.add("open");
+        if (searchInput) {
+            searchInput.setAttribute("aria-expanded", "true");
+            searchInput.removeAttribute("aria-activedescendant");
+        }
         return;
     }
     dropdown.innerHTML = results.map((r, idx) => {
@@ -72,12 +77,22 @@ export function renderSearchResults(results) {
         else if (r.type === "artifact") {
             label = r.flow + " / " + (r.file || r.label);
         }
-        return '<div class="search-result' + (idx === state.searchSelectedIndex ? ' selected' : '') + '" data-index="' + idx + '">' +
+        const isSelected = idx === state.searchSelectedIndex;
+        return '<div id="search-result-' + idx + '" class="search-result' + (isSelected ? ' selected' : '') + '" role="option" aria-selected="' + isSelected + '" data-index="' + idx + '">' +
             '<span class="search-result-type ' + typeClass + '">' + r.type + '</span>' +
             '<span class="search-result-label">' + label + '</span>' +
             '</div>';
     }).join("");
     dropdown.classList.add("open");
+    if (searchInput) {
+        searchInput.setAttribute("aria-expanded", "true");
+        if (state.searchSelectedIndex >= 0) {
+            searchInput.setAttribute("aria-activedescendant", "search-result-" + state.searchSelectedIndex);
+        }
+        else {
+            searchInput.removeAttribute("aria-activedescendant");
+        }
+    }
     // Click handlers are managed via event delegation in initSearchHandlers
 }
 /**
@@ -87,6 +102,11 @@ export function closeSearchDropdown() {
     const dropdown = document.getElementById("search-dropdown");
     if (dropdown) {
         dropdown.classList.remove("open");
+    }
+    const searchInput = document.getElementById("search-input");
+    if (searchInput) {
+        searchInput.setAttribute("aria-expanded", "false");
+        searchInput.removeAttribute("aria-activedescendant");
     }
     state.searchSelectedIndex = -1;
     state.searchResults = [];
