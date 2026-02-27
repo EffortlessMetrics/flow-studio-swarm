@@ -17,12 +17,10 @@ import { escapeHtml } from "./utils.js";
  * Render an empty state for "no runs" in the sidebar.
  */
 export function renderNoRuns(): string {
-  // Use createCopyButton logic inline or via semantic HTML
-  // Note: The original code used inline JS which is brittle.
-  // We'll use the existing .copy-btn class which is handled by utils.ts initCopyHandlers if wired up,
-  // OR we keep the inline onclick for simplicity in this fragment-based architecture if utils.ts isn't re-bound.
-  // Given this is a string fragment, inline onclick is the standard pattern here (see previous file content).
-
+  // Use semantic HTML and existing utility classes
+  // .fs-status-button provides the container styling
+  // .fs-button-small provides the button styling
+  // .mono provides monospace font for the command
   return `
     <div class="fs-empty" style="padding: 16px 12px;">
       <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
