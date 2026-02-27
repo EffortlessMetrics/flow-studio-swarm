@@ -131,7 +131,7 @@ def build_detailed_json_output(
 
     # Lazy import to support running validator in test repos without swarm/config/
     try:
-        from swarm.config.flow_registry import get_flow_keys
+        from swarm.config.flow_registry import get_flow_keys, get_flow_order
 
         flow_keys = get_flow_keys()
     except ImportError:
