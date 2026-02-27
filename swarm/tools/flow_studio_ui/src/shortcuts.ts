@@ -18,6 +18,7 @@ import type { FlowKey, NodeData, ShortcutsCallbacks } from "./domain.js";
 let _setActiveFlow: ((flowKey: FlowKey) => Promise<void>) | null = null;
 let _showStepDetails: ((nodeData: NodeData) => void) | null = null;
 let _toggleSelftestModal: ((show: boolean) => void) | null = null;
+let _runControl: ShortcutsCallbacks['runControl'] | null = null;
 
 /**
  * Configure callbacks for the shortcuts module.
@@ -26,6 +27,7 @@ export function configure(callbacks: ShortcutsCallbacks = {}): void {
   if (callbacks.setActiveFlow) _setActiveFlow = callbacks.setActiveFlow;
   if (callbacks.showStepDetails) _showStepDetails = callbacks.showStepDetails;
   if (callbacks.toggleSelftestModal) _toggleSelftestModal = callbacks.toggleSelftestModal;
+  if (callbacks.runControl) _runControl = callbacks.runControl;
 }
 
 // ============================================================================
@@ -116,10 +118,27 @@ export function initKeyboardShortcuts(): void {
     }
 
     // Escape - Close modals/dropdowns
-    else if (e.key === "Escape") {
+    else if (e.key === "Escape" && !e.shiftKey) {
       closeSearchDropdown();
       toggleShortcutsModal(false);
       if (_toggleSelftestModal) _toggleSelftestModal(false);
+    }
+
+    // Run Control Shortcuts (Shift + Key)
+    // Shift+Enter: Toggle Run (Start/Resume)
+    else if (e.shiftKey && e.key === "Enter") {
+      e.preventDefault();
+      if (_runControl) _runControl.toggleRun();
+    }
+    // Shift+Space: Pause
+    else if (e.shiftKey && e.key === " ") {
+      e.preventDefault();
+      if (_runControl) _runControl.pause();
+    }
+    // Shift+Esc: Stop
+    else if (e.shiftKey && e.key === "Escape") {
+      e.preventDefault();
+      if (_runControl) _runControl.stop();
     }
 
     // 1-6 - Jump to flows

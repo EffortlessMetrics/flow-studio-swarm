@@ -797,6 +797,11 @@ export interface ShortcutsCallbacks {
     setActiveFlow?: (flowKey: FlowKey) => Promise<void>;
     showStepDetails?: (nodeData: NodeData) => void;
     toggleSelftestModal?: (show: boolean) => void;
+    runControl?: {
+        toggleRun: () => void;
+        pause: () => void;
+        stop: () => void;
+    };
 }
 /** Callbacks for tours module configuration */
 export interface ToursCallbacks {
