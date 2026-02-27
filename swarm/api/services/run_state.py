@@ -174,6 +174,22 @@ class RunStateManager:
             if len(runs) >= limit:
                 break
 
+            run_id = run_dir.name
+            # Optimization: check cache first to avoid I/O
+            if run_id in self._cache:
+                state = self._cache[run_id]
+                runs.append(
+                    {
+                        "run_id": state.get("run_id", run_id),
+                        "flow_key": state.get("flow_id", "").split("-")[-1]
+                        if state.get("flow_id")
+                        else None,
+                        "status": state.get("status"),
+                        "timestamp": state.get("created_at"),
+                    }
+                )
+                continue
+
             state_path = run_dir / "run_state.json"
             if not state_path.exists():
                 continue
