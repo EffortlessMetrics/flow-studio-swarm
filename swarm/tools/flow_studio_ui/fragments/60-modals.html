@@ -66,7 +66,10 @@
 <!-- Run Detail Modal -->
 <div id="run-detail-modal" class="selftest-modal" role="dialog" aria-modal="true" aria-labelledby="run-detail-modal-title" data-uiid="flow_studio.modal.run_detail">
   <div class="selftest-step-content" data-uiid="flow_studio.modal.run_detail.body">
-    <button class="selftest-modal-close" id="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 8px; gap: 8px;">
+      <button class="fs-btn fs-btn-secondary" id="run-detail-rerun" aria-label="Rerun" data-uiid="flow_studio.modal.run_detail.rerun">Rerun</button>
+      <button class="selftest-modal-close" id="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
+    </div>
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
     </div>
