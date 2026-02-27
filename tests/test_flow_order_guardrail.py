@@ -59,9 +59,12 @@ ALLOWED_VIOLATIONS: Dict[str, Dict[int, str]] = {
         17: "Fallback constant when flow_registry import fails in _get_default_flow_sequence()",
     },
     # Fallback when registry import fails - acceptable since it tries registry first
-    "swarm/tools/validation/reporting/json_output.py": {
-        126: "Fallback constant when flow_registry import fails",
-    },
+    # Note: formatting may split the list across multiple lines, which the regex
+    # in this test (FLOW_LIST_7_PATTERN) currently doesn't match if multiline.
+    # If the list is multiline, it's not detected as a violation, so no exemption needed.
+    # "swarm/tools/validation/reporting/json_output.py": {
+    #     143: "Fallback constant when flow_registry import fails",
+    # },
     # Run plan defaults - defines example configurations
     "swarm/runtime/run_plan_api.py": {
         27: "Example default configuration for gated mode",
