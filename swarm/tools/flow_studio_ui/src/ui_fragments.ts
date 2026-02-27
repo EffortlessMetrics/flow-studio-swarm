@@ -17,14 +17,20 @@ import { escapeHtml } from "./utils.js";
  * Render an empty state for "no runs" in the sidebar.
  */
 export function renderNoRuns(): string {
+  // Use createCopyButton logic inline or via semantic HTML
+  // Note: The original code used inline JS which is brittle.
+  // We'll use the existing .copy-btn class which is handled by utils.ts initCopyHandlers if wired up,
+  // OR we keep the inline onclick for simplicity in this fragment-based architecture if utils.ts isn't re-bound.
+  // Given this is a string fragment, inline onclick is the standard pattern here (see previous file content).
+
   return `
     <div class="fs-empty" style="padding: 16px 12px;">
       <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">No runs yet</p>
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
-      <div class="fs-copy-command">
-        <code class="mono fs-empty-command">make demo-run</code>
-        <button class="fs-icon-button copy-button" title="Copy command" onclick="navigator.clipboard.writeText('make demo-run'); this.textContent='\u2713'; setTimeout(() => this.textContent='\uD83D\uDCCB', 2000)">\uD83D\uDCCB</button>
+      <div class="fs-copy-command fs-status-button" style="justify-content: space-between; width: 100%;">
+        <code class="mono fs-empty-command" style="flex: 1; font-size: 11px; background: transparent; padding: 0;">make demo-run</code>
+        <button class="fs-button-small" title="Copy command" aria-label="Copy demo command" onclick="navigator.clipboard.writeText('make demo-run').then(() => { this.textContent='\u2713'; setTimeout(() => this.textContent='Copy', 2000); })">Copy</button>
       </div>
     </div>
   `;
