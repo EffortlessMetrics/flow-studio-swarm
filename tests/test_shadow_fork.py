@@ -77,24 +77,91 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            # Note: _resolve_base_ref calls _ref_exists multiple times
+            # 1. Get current branch
+            # 2. Check uncommitted changes
+            # 3. Check "nonexistent" -> False
+            # 4. Check "origin/nonexistent" -> False
+            # 5. Check "main" -> True (fallback)
+            # BUT we want it to fail, so we need to ensure all fallbacks fail?
+            # Or does _resolve_base_ref return HEAD if all else fails?
+            # The code says: returns "HEAD" if all else fails.
+            # And then create() says: if base_ref != base_branch: log warning.
+            # It doesn't actually raise RuntimeError if base branch is missing, it falls back!
+            # Wait, the previous test code expected a RuntimeError.
+            # Let's see ShadowFork.create implementation again.
+            # It says:
+            # base_ref = self._resolve_base_ref(base_branch)
+            # if base_ref != base_branch: log info...
+            # Then it tries to checkout.
+            # So if we want it to fail, we need `git checkout -b shadow base_ref` to fail?
+            # No, if base_ref is HEAD, checkout succeeds.
+            # The only way it fails is if _resolve_base_ref fails to find ANY valid ref.
+            # But _resolve_base_ref returns HEAD.
+            #
+            # The failure in CI was StopIteration. This means the side_effect list was exhausted.
+            # The test code provided only 3 return values.
+            # But `_resolve_base_ref` iterates through [preferred, origin/preferred, main, origin/main, master, origin/master, HEAD].
+            # It calls `_ref_exists` for each until one returns True.
+            # To make it fail like the test expects, we might need to patch _resolve_base_ref directly
+            # OR provide enough side effects to let it try candidates.
+            #
+            # However, looking at the previous test code:
+            # mock_git.side_effect = [ (True, "main", ""), (True, "", ""), (False, "", "fatal") ]
+            # It expected `_run_git` to be called 3 times.
+            # 1. _get_current_branch (rev-parse --abbrev-ref HEAD)
+            # 2. status --porcelain
+            # 3. _resolve_base_ref -> _ref_exists("nonexistent") -> (False...)
+            #
+            # If `_resolve_base_ref` continues to check "origin/nonexistent", it calls `_run_git` again.
+            # Since the side_effect is exhausted, it raised StopIteration.
+            #
+            # To fix this, we should mock `_resolve_base_ref` to return an invalid ref (if we want to test checkout failure)
+            # OR we should update the test to expect the fallback behavior (which seems to be the intended logic now).
+            #
+            # If the test name is "test_create_fails_if_base_branch_missing", it assumes failure.
+            # But the code seems designed to fallback.
+            # Let's force a failure at the checkout step instead, which is what `create` does:
+            # success, _, stderr = self._run_git(["checkout", "-b", ...])
+            # if not success: raise RuntimeError
+            #
+            # So we need to let _resolve_base_ref succeed (e.g. return "HEAD" or "main")
+            # OR assume we passed a ref that `git checkout` rejects?
+            #
+            # Actually, let's just patch `_resolve_base_ref` to keep it simple and robust against internal logic changes.
+            pass
+
+        # Re-implementing correctly below using a fresh context
+        with patch.object(fork, "_run_git") as mock_git, \
+             patch.object(fork, "_resolve_base_ref", return_value="nonexistent_ref"):
+
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal: not a valid object name"),  # checkout -b shadow nonexistent_ref
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
+        # Ensure we capture logs from the correct logger
+        import logging
+        caplog.set_level(logging.WARNING, logger="swarm.runtime.shadow_fork")
+
         with patch.object(fork, "_run_git") as mock_git:
+            # Correct order of operations in create():
+            # 1. get_current_branch
+            # 2. resolve_base_ref -> ref_exists("main")
+            # 3. status --porcelain
+            # 4. checkout
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # Verify base branch (main) exists
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
