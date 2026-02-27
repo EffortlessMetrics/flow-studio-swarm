@@ -20,10 +20,10 @@ import json
 import logging
 import shutil
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -51,26 +51,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class RunInfo:
-    """Information about a run for GC decisions."""
-
-    run_id: str
-    path: Path
-    run_type: str  # "active", "example", "legacy"
-    size_bytes: int
-    mtime: datetime
-    has_meta: bool
-    is_corrupt: bool
-    tags: List[str]
-
-    @property
-    def age_days(self) -> float:
-        """Age in days since last modification."""
-        now = datetime.now(timezone.utc)
-        return (now - self.mtime).total_seconds() / 86400
-
-
 def get_dir_size(path: Path) -> int:
     """Get total size of a directory in bytes."""
     total = 0
@@ -86,21 +66,68 @@ def get_dir_size(path: Path) -> int:
     return total
 
 
+@dataclass
+class RunInfo:
+    """Information about a run for GC decisions."""
+
+    run_id: str
+    path: Path
+    run_type: str  # "active", "example", "legacy"
+    mtime: datetime
+    has_meta: bool
+
+    # Private fields for lazy loading
+    _size_bytes: Optional[int] = field(default=None, repr=False)
+    _tags: Optional[List[str]] = field(default=None, repr=False)
+    _is_corrupt: Optional[bool] = field(default=None, repr=False)
+
+    @property
+    def age_days(self) -> float:
+        """Age in days since last modification."""
+        now = datetime.now(timezone.utc)
+        return (now - self.mtime).total_seconds() / 86400
+
+    @property
+    def size_bytes(self) -> int:
+        """Get total size of run directory in bytes (lazy)."""
+        if self._size_bytes is None:
+            self._size_bytes = get_dir_size(self.path)
+        return self._size_bytes
+
+    def _load_meta(self) -> None:
+        """Load metadata if not already loaded."""
+        if self._tags is not None and self._is_corrupt is not None:
+            return
+
+        self._tags = []
+        self._is_corrupt = False
+
+        if self.has_meta:
+            meta_path = self.path / META_FILE
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self._tags = data.get("tags", [])
+            except (json.JSONDecodeError, OSError):
+                self._is_corrupt = True
+
+    @property
+    def tags(self) -> List[str]:
+        """Get run tags from metadata (lazy)."""
+        self._load_meta()
+        return self._tags if self._tags is not None else []
+
+    @property
+    def is_corrupt(self) -> bool:
+        """Check if run metadata is corrupt (lazy)."""
+        self._load_meta()
+        return self._is_corrupt if self._is_corrupt is not None else False
+
+
 def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     """Collect information about a single run."""
     meta_path = run_path / META_FILE
     has_meta = meta_path.exists()
-    is_corrupt = False
-    tags: List[str] = []
-
-    # Check if metadata is corrupt
-    if has_meta:
-        try:
-            with open(meta_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            tags = data.get("tags", [])
-        except (json.JSONDecodeError, OSError):
-            is_corrupt = True
 
     # Get modification time
     try:
@@ -109,18 +136,14 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     except OSError:
         mtime = datetime.now(timezone.utc)
 
-    # Get size
-    size_bytes = get_dir_size(run_path)
+    # Note: size_bytes, tags, and is_corrupt are now lazy loaded
 
     return RunInfo(
         run_id=run_id,
         path=run_path,
         run_type=run_type,
-        size_bytes=size_bytes,
         mtime=mtime,
         has_meta=has_meta,
-        is_corrupt=is_corrupt,
-        tags=tags,
     )
 
 
@@ -178,6 +201,7 @@ def should_preserve_run(run: RunInfo) -> tuple[bool, str]:
 
     # Tag-based preservation
     preserved_tags = get_preserved_tags()
+    # Accessing run.tags will trigger lazy load of metadata
     for tag in run.tags:
         if tag in preserved_tags:
             return True, f"has preserved tag '{tag}'"
@@ -209,10 +233,13 @@ def cmd_list(args: argparse.Namespace) -> int:
     runs.sort(key=lambda r: r.mtime, reverse=True)
 
     # Calculate statistics
+    # This will trigger size calculation for all runs
     total_size = sum(r.size_bytes for r in runs)
+
     examples = [r for r in runs if r.run_type == "example"]
     active = [r for r in runs if r.run_type == "active"]
     legacy = [r for r in runs if r.run_type == "legacy"]
+    # Accessing is_corrupt will trigger metadata loading for active runs
     corrupt = [r for r in runs if r.is_corrupt]
 
     logger.info("=" * 60)
@@ -319,6 +346,7 @@ def cmd_prune(args: argparse.Namespace) -> int:
     logger.info(f"Total runs:      {len(runs)}")
     logger.info(f"To delete:       {len(to_delete)}")
     logger.info(f"Preserved:       {len(preserved)}")
+    # Trigger size calculation only for runs to be deleted
     logger.info(f"Space to free:   {format_size(sum(r.size_bytes for r in to_delete))}")
     logger.info("")
 
@@ -352,6 +380,7 @@ def cmd_quarantine(args: argparse.Namespace) -> int:
     dry_run = args.dry_run or is_dry_run_enabled()
 
     runs = discover_all_runs()
+    # Trigger metadata loading to check for corruption
     corrupt_runs = [r for r in runs if r.is_corrupt]
 
     if not corrupt_runs:
