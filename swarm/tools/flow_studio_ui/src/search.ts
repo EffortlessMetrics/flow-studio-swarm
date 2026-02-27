@@ -115,7 +115,9 @@ export async function selectSearchResult(index: number): Promise<void> {
 
   closeSearchDropdown();
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
+  const clearBtn = document.getElementById("search-clear-btn");
   if (searchInput) searchInput.value = "";
+  if (clearBtn) clearBtn.style.display = "none";
 
   const cy = getCy();
 
@@ -164,6 +166,16 @@ export async function selectSearchResult(index: number): Promise<void> {
 export function initSearchHandlers(): void {
   const searchInput = document.getElementById("search-input") as HTMLInputElement | null;
   const dropdown = document.getElementById("search-dropdown");
+  const clearBtn = document.getElementById("search-clear-btn");
+
+  if (clearBtn && searchInput) {
+    clearBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      closeSearchDropdown();
+      searchInput.focus();
+      clearBtn.style.display = "none";
+    });
+  }
 
   if (!searchInput) return;
 
@@ -173,6 +185,11 @@ export function initSearchHandlers(): void {
     }
     const target = e.target as HTMLInputElement;
     const query = target.value.trim();
+
+    if (clearBtn) {
+      clearBtn.style.display = target.value.length > 0 ? "flex" : "none";
+    }
+
     // Optimization: Increased debounce from 200ms to 300ms to reduce API calls while typing
     state.searchDebounceTimer = setTimeout(() => performSearch(query), 300);
   });
