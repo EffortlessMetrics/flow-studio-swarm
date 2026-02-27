@@ -18,6 +18,39 @@ import re
 VALID_COMPONENT_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
 
+def validate_relative_path(path_str: str, name: str = "path") -> str:
+    """Validate a string for use as a relative path.
+
+    Ensures the string is not an absolute path and does not contain traversal sequences.
+
+    Args:
+        path_str: The string to validate.
+        name: Name of the variable for error messages (default: "path").
+
+    Returns:
+        The validated path string (same as input).
+
+    Raises:
+        ValueError: If the path is absolute or contains a traversal sequence like '..'.
+    """
+    if not path_str:
+        raise ValueError(f"{name} cannot be empty")
+
+    import os
+    if os.path.isabs(path_str):
+        raise ValueError(f"{name} cannot be an absolute path: '{path_str}'")
+
+    # Reject any component that is exactly '..'
+    # Handling different path separators
+    normalized_path = path_str.replace("\\", "/")
+    parts = normalized_path.split("/")
+
+    if ".." in parts:
+        raise ValueError(f"{name} cannot contain traversal sequence '..'")
+
+    return path_str
+
+
 def validate_path_component(component: str, name: str = "path component") -> str:
     """Validate a string for use as a single path component.
 

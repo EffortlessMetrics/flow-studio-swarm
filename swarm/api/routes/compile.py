@@ -18,7 +18,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from swarm.runtime.safe_paths import validate_path_component, validate_relative_path
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,18 @@ class CompilePreviewRequest(BaseModel):
         default=None,
         description="Optional context pack with upstream artifacts and envelopes",
     )
+
+    @field_validator("station_id", "step_id", "flow_key")
+    @classmethod
+    def validate_components(cls, v: str, info) -> str:
+        """Validate path components against traversal attacks."""
+        return validate_path_component(v, name=info.field_name)
+
+    @field_validator("run_base")
+    @classmethod
+    def validate_run_base(cls, v: str, info) -> str:
+        """Validate run_base is a safe relative path."""
+        return validate_relative_path(v, name=info.field_name)
 
 
 class SdkOptionsResponse(BaseModel):
