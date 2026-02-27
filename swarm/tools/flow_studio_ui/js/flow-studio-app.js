@@ -40,7 +40,7 @@ import { configure as configureRunHistory, initRunHistory, setSelectedRunId as s
 // Run detail modal
 import { configure as configureRunDetailModal, showRunDetailModal } from "./run_detail_modal.js";
 // Run control panel
-import { configure as configureRunControl, initRunControl, setActiveRun as setRunControlActiveRun, clearActiveRun as clearRunControlActiveRun } from "./run_control.js";
+import { configure as configureRunControl, initRunControl, setActiveRun as setRunControlActiveRun, clearActiveRun as clearRunControlActiveRun, getRunControlState, startRun, pauseRun, resumeRun, stopRun } from "./run_control.js";
 // Graph semantic companion
 import { renderFlowOutline, getCurrentGraphState } from "./graph_outline.js";
 // Layout spec for SDK
@@ -663,7 +663,30 @@ window.addEventListener("load", async () => {
         configureShortcuts({
             setActiveFlow: setActiveFlow,
             showStepDetails: showStepDetails,
-            toggleSelftestModal: toggleSelftestModal
+            toggleSelftestModal: toggleSelftestModal,
+            onRunAction: (action) => {
+                const runState = getRunControlState();
+                switch (action) {
+                    case "play":
+                        if (runState.runState === "paused") {
+                            void resumeRun();
+                        }
+                        else if (runState.runState !== "running" && runState.runState !== "stopping") {
+                            void startRun();
+                        }
+                        break;
+                    case "pause":
+                        if (runState.runState === "running") {
+                            void pauseRun();
+                        }
+                        break;
+                    case "stop":
+                        if (runState.runState === "running" || runState.runState === "paused") {
+                            void stopRun();
+                        }
+                        break;
+                }
+            }
         });
         // Configure tours module
         configureTours({

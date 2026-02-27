@@ -14,6 +14,7 @@ import { createModalFocusManager } from "./utils.js";
 let _setActiveFlow = null;
 let _showStepDetails = null;
 let _toggleSelftestModal = null;
+let _onRunAction = null;
 /**
  * Configure callbacks for the shortcuts module.
  */
@@ -24,6 +25,8 @@ export function configure(callbacks = {}) {
         _showStepDetails = callbacks.showStepDetails;
     if (callbacks.toggleSelftestModal)
         _toggleSelftestModal = callbacks.toggleSelftestModal;
+    if (callbacks.onRunAction)
+        _onRunAction = callbacks.onRunAction;
 }
 // ============================================================================
 // Shortcuts Modal
@@ -102,12 +105,33 @@ export function initKeyboardShortcuts() {
             e.preventDefault();
             toggleShortcutsModal(true);
         }
-        // Escape - Close modals/dropdowns
+        // Shift+Enter - Play
+        if (e.shiftKey && e.key === "Enter") {
+            e.preventDefault();
+            if (_onRunAction)
+                _onRunAction("play");
+        }
+        // Shift+Space - Pause
+        else if (e.shiftKey && e.key === " ") {
+            e.preventDefault();
+            if (_onRunAction)
+                _onRunAction("pause");
+        }
+        // Escape - Close modals/dropdowns or Stop (Shift+Esc)
         else if (e.key === "Escape") {
-            closeSearchDropdown();
-            toggleShortcutsModal(false);
-            if (_toggleSelftestModal)
-                _toggleSelftestModal(false);
+            if (e.shiftKey) {
+                // Shift+Esc - Stop run
+                e.preventDefault();
+                if (_onRunAction)
+                    _onRunAction("stop");
+            }
+            else {
+                // Normal Esc - Close UI elements
+                closeSearchDropdown();
+                toggleShortcutsModal(false);
+                if (_toggleSelftestModal)
+                    _toggleSelftestModal(false);
+            }
         }
         // 1-6 - Jump to flows
         else if (e.key >= "1" && e.key <= "6") {
