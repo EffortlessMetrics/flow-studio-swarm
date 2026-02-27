@@ -76,12 +76,23 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
+        # We want to simulate the case where checkout fails because the ref is invalid
+        # _resolve_base_ref usually falls back to HEAD, so we need to mock it
+        # to return the bad ref, OR mock _run_git to fail on checkout
+
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+            def git_side_effect(args, **kwargs):
+                cmd = " ".join(args)
+                if "rev-parse --abbrev-ref HEAD" in cmd:
+                    return (True, "main", "")
+                if "status --porcelain" in cmd:
+                    return (True, "", "")
+                if "checkout -b" in cmd:
+                    # Simulate git checkout failure
+                    return (False, "", "fatal: 'nonexistent' does not exist")
+                return (True, "", "")
+
+            mock_git.side_effect = git_side_effect
 
             with pytest.raises(RuntimeError, match="does not exist"):
                 fork.create(base_branch="nonexistent")
@@ -89,14 +100,34 @@ class TestShadowForkCreate:
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
+        import logging
+        caplog.set_level(logging.WARNING)  # Ensure warnings are captured
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+            # We need to provide enough side effects for the entire create process
+            # Sequence:
+            # 1. _get_current_branch -> rev-parse HEAD
+            # 2. check uncommitted -> status --porcelain
+            # 3. _resolve_base_ref -> _ref_exists("main") -> rev-parse --verify main
+            # 4. checkout -b ...
+            # 5. block_upstream_push (no git calls, file ops only)
+
+            # Using a side_effect function is safer than a list for complex flows
+            def git_side_effect(args, **kwargs):
+                cmd = " ".join(args)
+                if "rev-parse --abbrev-ref HEAD" in cmd:
+                    return (True, "main", "")
+                if "status --porcelain" in cmd:
+                    return (True, " M file.txt", "")  # Has changes
+                if "rev-parse --verify main" in cmd:
+                    return (True, "", "")  # Base exists
+                if "rev-parse --verify HEAD" in cmd:
+                    return (True, "", "")  # Fallback exists
+                if "checkout -b" in cmd:
+                    return (True, "", "")
+                return (True, "", "") # Default success
+
+            mock_git.side_effect = git_side_effect
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
