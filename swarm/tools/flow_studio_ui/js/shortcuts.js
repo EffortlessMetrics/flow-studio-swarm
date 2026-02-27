@@ -8,6 +8,7 @@
 import { state, FLOW_KEYS } from "./state.js";
 import { closeSearchDropdown, focusSearch } from "./search.js";
 import { createModalFocusManager } from "./utils.js";
+import { start as startRun, pause as pauseRun, resume as resumeRun, stop as stopRun, hasActiveRun, getRunControlState } from "./run_control.js";
 // ============================================================================
 // Module configuration - callbacks set by consumer
 // ============================================================================
@@ -104,10 +105,37 @@ export function initKeyboardShortcuts() {
         }
         // Escape - Close modals/dropdowns
         else if (e.key === "Escape") {
+            if (e.shiftKey && hasActiveRun()) {
+                const rc = getRunControlState();
+                if (rc.runState === "running" || rc.runState === "paused") {
+                    e.preventDefault();
+                    void stopRun();
+                    return;
+                }
+            }
             closeSearchDropdown();
             toggleShortcutsModal(false);
             if (_toggleSelftestModal)
                 _toggleSelftestModal(false);
+        }
+        // Shift + Enter: Start or Resume run
+        else if (e.key === "Enter" && e.shiftKey) {
+            e.preventDefault();
+            const rc = getRunControlState();
+            if (rc.runState === "paused") {
+                void resumeRun();
+            }
+            else if (!hasActiveRun() || rc.runState === "completed" || rc.runState === "failed" || rc.runState === "stopped") {
+                void startRun();
+            }
+        }
+        // Shift + Space: Pause run
+        else if (e.key === " " && e.shiftKey) {
+            e.preventDefault();
+            const rc = getRunControlState();
+            if (rc.runState === "running") {
+                void pauseRun();
+            }
         }
         // 1-6 - Jump to flows
         else if (e.key >= "1" && e.key <= "6") {
