@@ -30,7 +30,7 @@ class RunStateManager:
 
     def __init__(self, runs_root: Path):
         self.runs_root = runs_root
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: Dict[str, tuple[float, Dict[str, Any]]] = {}
         self._locks: Dict[str, asyncio.Lock] = {}
 
     def _get_lock(self, run_id: str) -> asyncio.Lock:
@@ -92,18 +92,21 @@ class RunStateManager:
 
     def _get_run_unlocked(self, run_id: str) -> tuple[Dict[str, Any], str]:
         """Get run state without locking (internal use only)."""
-        # Check cache first
-        if run_id in self._cache:
-            state = self._cache[run_id]
-            return state, self._compute_etag(state)
-
         # Load from disk
         state_path = self._state_path(run_id)
         if not state_path.exists():
             raise FileNotFoundError(f"Run '{run_id}' not found")
 
+        mtime = state_path.stat().st_mtime
+
+        # Check cache first
+        if run_id in self._cache:
+            cached_mtime, state = self._cache[run_id]
+            if mtime == cached_mtime:
+                return state, self._compute_etag(state)
+
         state = json.loads(state_path.read_text(encoding="utf-8"))
-        self._cache[run_id] = state
+        self._cache[run_id] = (mtime, state)
         return state, self._compute_etag(state)
 
     async def get_run(self, run_id: str) -> tuple[Dict[str, Any], str]:
@@ -143,7 +146,7 @@ class RunStateManager:
         tmp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
         os.replace(tmp_path, state_path)
 
-        self._cache[run_id] = state
+        self._cache[run_id] = (state_path.stat().st_mtime, state)
 
     def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
         """List recent runs.
@@ -162,27 +165,52 @@ class RunStateManager:
         with os.scandir(self.runs_root) as it:
             for entry in it:
                 if entry.is_dir():
-                    # capture mtime and path
+                    # capture mtime, path, and name
                     # entry.stat() is cached from scandir
-                    candidates.append((entry.stat().st_mtime, Path(entry.path)))
+                    candidates.append((entry.stat().st_mtime, entry.path, entry.name))
 
         # Sort by mtime descending (newest first)
         candidates.sort(key=lambda x: x[0], reverse=True)
 
         # Check for valid runs (run_state.json exists) in sorted order
-        for _, run_dir in candidates:
+        for mtime, run_path, run_id in candidates:
             if len(runs) >= limit:
                 break
 
-            state_path = run_dir / "run_state.json"
-            if not state_path.exists():
-                continue
-
             try:
-                state = json.loads(state_path.read_text(encoding="utf-8"))
+                # ⚡ Bolt: Cache-first strategy avoids expensive JSON parsing
+                # and disk I/O for runs already loaded in memory and unmodified
+                state_path = Path(run_path) / "run_state.json"
+
+                # Use cached state if available and directory mtime hasn't changed.
+                # In RunStateManager, modifying the state changes the directory mtime
+                # (or at least closely tracks it since we write to the directory).
+                # To be completely safe without a separate stat on run_state.json,
+                # we do a full stat on state_path if we get a cache miss or mtime mismatch,
+                # but the common case will hit.
+                state = None
+                if run_id in self._cache:
+                    cached_mtime, cached_state = self._cache[run_id]
+                    # Check if the cached file mtime is newer or equal to dir mtime
+                    # (in case dir mtime was updated by something else, we fallback)
+                    # For safety, if we aren't sure, we will just stat the file.
+                    try:
+                        file_mtime = state_path.stat().st_mtime
+                        if file_mtime == cached_mtime:
+                            state = cached_state
+                    except FileNotFoundError:
+                        continue
+
+                if state is None:
+                    if not state_path.exists():
+                        continue
+                    file_mtime = state_path.stat().st_mtime
+                    state = json.loads(state_path.read_text(encoding="utf-8"))
+                    self._cache[run_id] = (file_mtime, state)
+
                 runs.append(
                     {
-                        "run_id": state.get("run_id", run_dir.name),
+                        "run_id": state.get("run_id", run_id),
                         "flow_key": state.get("flow_id", "").split("-")[-1]
                         if state.get("flow_id")
                         else None,
@@ -191,7 +219,7 @@ class RunStateManager:
                     }
                 )
             except Exception as e:
-                logger.warning("Failed to load run state %s: %s", run_dir, e)
+                logger.warning("Failed to load run state %s: %s", run_path, e)
 
         return runs
 
