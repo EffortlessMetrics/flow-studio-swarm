@@ -96,10 +96,10 @@ Legacy patterns should be rejected.
 
 ```bash
 # This should find only the linter tool and educational references
-grep -r "route_to_flow\|route_to_agent" swarm/
+grep -E -r "(route|route)_to_(flow|agent)" swarm/
 ```
 
-- [ ] No active uses of `route_to_flow` or `route_to_agent`
+- [ ] No active uses of legacy routing instructions
 - [ ] Linter rule exists to prevent reintroduction
 - [ ] V3 routing vocabulary is used everywhere (CONTINUE, DETOUR, INJECT_FLOW, INJECT_NODES, EXTEND_GRAPH)
 
