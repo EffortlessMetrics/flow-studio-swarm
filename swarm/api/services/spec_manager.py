@@ -498,32 +498,47 @@ class SpecManager:
         Returns:
             List of run summaries, most recent first.
         """
+        import os
         runs = []
 
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # Use os.scandir for faster directory iteration without Path instantiation overhead
+        candidates = []
+        try:
+            with os.scandir(self.runs_root) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        candidates.append(entry.name)
+        except OSError:
+            pass
 
-            state_file = run_dir / "run_state.json"
-            if state_file.exists():
+        # Sort by name descending to maintain chronological ordering
+        candidates.sort(reverse=True)
+
+        # Pre-compute string path for root to avoid Path operations in loop
+        runs_root_str = str(self.runs_root)
+
+        for run_name in candidates:
+            if len(runs) >= limit:
+                break
+
+            state_file_path = os.path.join(runs_root_str, run_name, "run_state.json")
+            if os.path.exists(state_file_path):
                 try:
-                    state = json.loads(state_file.read_text(encoding="utf-8"))
+                    with open(state_file_path, "r", encoding="utf-8") as f:
+                        state = json.load(f)
                     runs.append(
                         {
-                            "run_id": state.get("run_id", run_dir.name),
+                            "run_id": state.get("run_id", run_name),
                             "flow_key": state.get("flow_key"),
                             "status": state.get("status"),
                             "timestamp": state.get("timestamp"),
                         }
                     )
                 except Exception as e:
-                    logger.warning("Failed to load run state %s: %s", run_dir, e)
-
-            if len(runs) >= limit:
-                break
+                    logger.warning("Failed to load run state %s: %s", run_name, e)
 
         return runs
 
