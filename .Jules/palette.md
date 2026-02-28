@@ -1,0 +1,4 @@
+
+## 2024-05-15 - Convert clickable divs to buttons for accessibility
+**Learning:** Found several places in lists (e.g., flow list, tour menu items, template palette) where `div` elements with `click` event listeners were used instead of semantic `<button>` elements. These elements didn't natively receive focus or keyboard interaction correctly and didn't convey their interactive nature to screen readers.
+**Action:** Replaced `document.createElement("div")` with `document.createElement("button")` in list items and updated the corresponding CSS classes (`.flow-item`, `.tour-menu-item`, `.template-palette__card`) with button reset styles (`background: none; border: none; text-align: left; width: 100%; font-family: inherit; font-size: inherit; color: inherit;`) so that visual designs are perfectly preserved while gaining built-in a11y benefits.

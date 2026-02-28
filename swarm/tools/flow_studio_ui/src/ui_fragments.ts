@@ -227,10 +227,10 @@ export function renderLoading(message = "Loading..."): string {
  */
 export function renderNoTourMenuItem(): string {
   return `
-    <div class="tour-menu-item" data-tour="">
+    <button class="tour-menu-item" data-tour="">
       <div class="tour-menu-title">No tour</div>
       <div class="tour-menu-desc">Exit current tour</div>
-    </div>
+    </button>
   `;
 }
 

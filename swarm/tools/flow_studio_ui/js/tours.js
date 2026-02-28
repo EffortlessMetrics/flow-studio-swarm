@@ -55,7 +55,7 @@ export function renderTourMenu() {
     </div>
   `;
     availableTours.forEach(tour => {
-        const item = document.createElement("div");
+        const item = document.createElement("button");
         item.className = "tour-menu-item";
         item.dataset.tour = tour.id;
         item.innerHTML = `
