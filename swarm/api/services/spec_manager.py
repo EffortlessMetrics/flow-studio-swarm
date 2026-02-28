@@ -22,6 +22,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+import os
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from swarm.runtime.safe_paths import validate_path_component
@@ -503,27 +504,43 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # Use os.scandir to avoid building Path objects for every entry
+        # The run_id contains the timestamp, so sorting by name gives chronological order
+        candidates = []
+        try:
+            with os.scandir(self.runs_root) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        candidates.append(entry.name)
+        except OSError as e:
+            logger.warning("Failed to scan runs directory: %s", e)
+            return runs
 
-            state_file = run_dir / "run_state.json"
-            if state_file.exists():
-                try:
-                    state = json.loads(state_file.read_text(encoding="utf-8"))
-                    runs.append(
-                        {
-                            "run_id": state.get("run_id", run_dir.name),
-                            "flow_key": state.get("flow_key"),
-                            "status": state.get("status"),
-                            "timestamp": state.get("timestamp"),
-                        }
-                    )
-                except Exception as e:
-                    logger.warning("Failed to load run state %s: %s", run_dir, e)
+        # Sort by name descending (newest first based on run_id timestamp)
+        candidates.sort(reverse=True)
 
+        for run_id in candidates:
             if len(runs) >= limit:
                 break
+
+            run_dir = os.path.join(self.runs_root, run_id)
+            state_file = os.path.join(run_dir, "run_state.json")
+            if not os.path.exists(state_file):
+                continue
+
+            try:
+                with open(state_file, "r", encoding="utf-8") as f:
+                    state = json.load(f)
+                runs.append(
+                    {
+                        "run_id": state.get("run_id", run_id),
+                        "flow_key": state.get("flow_key"),
+                        "status": state.get("status"),
+                        "timestamp": state.get("timestamp"),
+                    }
+                )
+            except Exception as e:
+                logger.warning("Failed to load run state %s: %s", run_dir, e)
 
         return runs
 
