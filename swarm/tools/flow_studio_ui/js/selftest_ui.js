@@ -121,7 +121,7 @@ export function showCopyFallback(text, message) {
       <code class="fs-text-body" style="font-family: monospace; color: #111827;">${escapeHtml(text)}</code>
     </div>
     <p class="fs-text-body fs-text-muted" style="margin: 0 0 8px 0;">Use Ctrl+C to copy</p>
-    <button class="fs-text-body" onclick="this.parentElement.parentElement.remove()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+    <button class="fs-text-body" aria-label="Close message" onclick="this.parentElement.parentElement.remove()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
   `;
     document.body.appendChild(box);
 }
@@ -234,7 +234,7 @@ export function renderSelftestStepModal(step) {
       ${commands.map(cmd => `
         <div class="selftest-command">
           <span class="fs-text-xs" style="flex: 1;">${escapeHtml(cmd)}</span>
-          <button class="selftest-command-copy-btn" onclick="window.copyToClipboard && window.copyToClipboard('${escapeHtml(cmd).replace(/'/g, "\\'")}')" title="Copy">\ud83d\udccb</button>
+          <button class="selftest-command-copy-btn" aria-label="Copy command" onclick="window.copyToClipboard && window.copyToClipboard('${escapeHtml(cmd).replace(/'/g, "\\'")}')" title="Copy">\ud83d\udccb</button>
         </div>
       `).join("")}
     </div>
@@ -313,16 +313,16 @@ export async function renderSelftestTab(container) {
     </div>
 
     <div class="kv-label">View Selftest Plan</div>
-    <button class="fs-text-body" onclick="window.showSelftestPlanModal && window.showSelftestPlanModal()" style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 12px;">
+    <button class="fs-text-body" aria-label="View Full Plan" onclick="window.showSelftestPlanModal && window.showSelftestPlanModal()" style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 12px;">
       \ud83d\udccb View Full Plan
     </button>
 
     <div class="kv-label">Quick Commands</div>
     <div style="display: flex; flex-direction: column; gap: 6px;">
-      <button class="fs-mono-sm" onclick="window.copyAndRun && window.copyAndRun('uv run swarm/tools/selftest.py --plan')" style="padding: 6px 10px; text-align: left; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;">
+      <button class="fs-mono-sm" aria-label="Show plan command" onclick="window.copyAndRun && window.copyAndRun('uv run swarm/tools/selftest.py --plan')" style="padding: 6px 10px; text-align: left; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;">
         Show plan
       </button>
-      <button class="fs-mono-sm" onclick="window.copyAndRun && window.copyAndRun('uv run swarm/tools/selftest.py')" style="padding: 6px 10px; text-align: left; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;">
+      <button class="fs-mono-sm" aria-label="Run selftest command" onclick="window.copyAndRun && window.copyAndRun('uv run swarm/tools/selftest.py')" style="padding: 6px 10px; text-align: left; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;">
         Run selftest
       </button>
     </div>
