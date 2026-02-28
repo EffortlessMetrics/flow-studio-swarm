@@ -164,7 +164,7 @@ Rationale: <1 short paragraph grounded in critic statuses + mismatch check>
 
 ## Routing guidance (how to fill Machine Summary)
 
-The new routing vocabulary uses **intent** and **target** instead of legacy `route_to_flow`/`route_to_agent`:
+The new routing vocabulary uses **intent** and **target** instead of legacy explicit routing instructions:
 
 | Intent | Meaning |
 |--------|---------|
