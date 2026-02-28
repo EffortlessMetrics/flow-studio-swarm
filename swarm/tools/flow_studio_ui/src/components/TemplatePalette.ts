@@ -411,11 +411,9 @@ export class TemplatePalette {
    * Create a single template card
    */
   private createTemplateCard(template: Template): HTMLElement {
-    const card = document.createElement("div");
+    const card = document.createElement("button");
     card.className = "template-palette__card";
     card.setAttribute("draggable", "true");
-    card.setAttribute("role", "button");
-    card.setAttribute("tabindex", "0");
     card.setAttribute("aria-label", `Template: ${template.name}`);
     card.dataset.templateId = template.id;
 

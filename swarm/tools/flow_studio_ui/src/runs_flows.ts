@@ -583,7 +583,7 @@ export async function loadFlows(options: { autoSelect?: boolean } = {}): Promise
   }
 
   flows.forEach(flow => {
-    const item = document.createElement("div");
+    const item = document.createElement("button");
     item.className = "flow-item";
     item.dataset.key = flow.key;
 

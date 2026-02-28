@@ -336,6 +336,13 @@
       cursor: pointer;
     }
     .flow-item {
+      background: none;
+      border: none;
+      text-align: left;
+      width: 100%;
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
       padding: 6px 8px;
       border-radius: 4px;
       cursor: pointer;
@@ -609,6 +616,13 @@
       display: block;
     }
     .tour-menu-item {
+      background: none;
+      border: none;
+      text-align: left;
+      width: 100%;
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
       padding: 8px 12px;
       cursor: pointer;
       border-bottom: 1px solid #f3f4f6;
@@ -3652,3 +3666,16 @@
       outline: none;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
+
+/* Resets for dynamically generated button elements replacing div */
+.template-palette__card,
+.inventory-counts__flow-item {
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  padding: 0; /* Let specific styles apply if needed */
+}
