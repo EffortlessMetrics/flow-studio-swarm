@@ -72,38 +72,50 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
+    @patch("swarm.runtime.shadow_fork.ShadowFork._resolve_base_ref")
+    @patch("swarm.runtime.shadow_fork.ShadowFork._get_current_branch")
+    def test_create_fails_if_base_branch_missing(self, mock_get_current, mock_resolve, tmp_path):
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
+        # Resolve base ref to the nonexistent branch
+        mock_resolve.return_value = "nonexistent"
+        mock_get_current.return_value = "main"
+
         with patch.object(fork, "_run_git") as mock_git:
+            # We need 2 responses:
+            # 1. status --porcelain (no uncommitted changes)
+            # 2. checkout -b (fails)
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal: Not a valid object name: 'nonexistent'"),  # checkout fails
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
-    def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
+    @patch("swarm.runtime.shadow_fork.ShadowFork._resolve_base_ref")
+    @patch("swarm.runtime.shadow_fork.ShadowFork._get_current_branch")
+    def test_create_warns_on_uncommitted_changes(self, mock_get_current, mock_resolve, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
+        import logging
+        caplog.set_level(logging.INFO)
+
         fork = ShadowFork(repo_root=tmp_path)
+        mock_resolve.return_value = "main"
+        mock_get_current.return_value = "main"
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
+                (True, " M file.txt", ""),  # status --porcelain (uncommitted changes)
+                (True, "", ""),  # checkout -b
             ]
 
-            # Create hooks directory for the test
-            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+            # Mock block_upstream_push to avoid filesystem side effects
+            with patch.object(fork, "block_upstream_push"):
+                fork.create(base_branch="main")
 
-            fork.create()
-
-            assert "uncommitted changes" in caplog.text.lower()
+        assert "uncommitted changes" in caplog.text.lower()
 
 
 class TestShadowForkGetDiff:
