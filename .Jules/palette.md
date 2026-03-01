@@ -1,0 +1,3 @@
+## 2024-03-01 - Add missing accessibility context to copy buttons
+**Learning:** Generic UI utility buttons (like `copy-btn`) in Flow Studio lack built-in accessibility context and must explicitly include context-specific `aria-label` attributes in their HTML fragments to properly support screen readers.
+**Action:** When adding utility buttons, ensure `aria-label` attributes are included to provide context to screen reader users.
