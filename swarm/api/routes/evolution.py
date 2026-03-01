@@ -19,6 +19,8 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from swarm.api.routes.validation_utils import _validate_path_param
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/evolution", tags=["evolution"])
@@ -214,6 +216,7 @@ async def list_all_pending_patches(limit: int = 50):
 
 @router.get("/{run_id}", response_model=PendingPatchesResponse)
 async def get_run_evolution_patches(run_id: str):
+    run_id = _validate_path_param(run_id, "run_id")
     """Get evolution patches for a specific run.
 
     Args:
@@ -256,6 +259,8 @@ async def get_evolution_patch_details(
     patch_id: str,
     if_none_match: Optional[str] = Header(None, alias="If-None-Match"),
 ):
+    run_id = _validate_path_param(run_id, "run_id")
+    patch_id = _validate_path_param(patch_id, "patch_id")
     """Get detailed information about a specific evolution patch.
 
     Args:
@@ -321,6 +326,8 @@ async def get_evolution_patch_details(
 
 @router.post("/{run_id}/validate/{patch_id}", response_model=PatchValidationResponse)
 async def validate_evolution_patch_endpoint(run_id: str, patch_id: str):
+    run_id = _validate_path_param(run_id, "run_id")
+    patch_id = _validate_path_param(patch_id, "patch_id")
     """Validate an evolution patch without applying it.
 
     Args:
@@ -382,6 +389,8 @@ async def apply_evolution_patch_endpoint(
     request: ApplyEvolutionRequest,
     if_match: Optional[str] = Header(None, alias="If-Match"),
 ):
+    _validate_path_param(request.run_id, "run_id")
+    _validate_path_param(request.patch_id, "patch_id")
     """Apply an evolution patch.
 
     Validates and optionally applies an evolution patch from wisdom outputs.
@@ -536,6 +545,8 @@ async def reject_evolution_patch_endpoint(
     patch_id: str,
     request: RejectEvolutionRequest,
 ):
+    run_id = _validate_path_param(run_id, "run_id")
+    patch_id = _validate_path_param(patch_id, "patch_id")
     """Reject an evolution patch with a documented reason.
 
     Records the decision to reject a patch for audit purposes.
