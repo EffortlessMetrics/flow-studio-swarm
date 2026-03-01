@@ -389,8 +389,8 @@ async def apply_evolution_patch_endpoint(
     request: ApplyEvolutionRequest,
     if_match: Optional[str] = Header(None, alias="If-Match"),
 ):
-    run_id = _validate_path_param(request.run_id, "run_id")
-    patch_id = _validate_path_param(request.patch_id, "patch_id")
+    _validate_path_param(request.run_id, "run_id")
+    _validate_path_param(request.patch_id, "patch_id")
     """Apply an evolution patch.
 
     Validates and optionally applies an evolution patch from wisdom outputs.
