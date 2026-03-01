@@ -1,0 +1,3 @@
+## 2024-05-24 - Context-specific `aria-label`s for generic UI utility buttons
+**Learning:** Generic UI utility buttons like "Copy" or "Edit" without context-specific descriptions create ambiguity for screen reader users, making it difficult to understand the purpose or scope of the action.
+**Action:** When adding or modifying generic UI utility buttons, always include context-specific `aria-label` attributes to provide clear descriptions, allowing users relying on assistive technologies to understand the action's intent.
