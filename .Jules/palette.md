@@ -1,0 +1,3 @@
+## 2024-03-01 - Missing ARIA Labels on Generic Copy Buttons
+**Learning:** Generic design system utility classes like `copy-btn` are frequently reused across different components (header, canvas, inspector), but their context changes. Because they don't have built-in accessibility properties, implementations easily omit `aria-label` attributes, making them inaccessible to screen readers.
+**Action:** Always audit generic, highly reused utility buttons (like copy, delete, or edit buttons) across the entire codebase to ensure they include context-specific `aria-label` attributes where appropriate. Adding attributes to the HTML fragments prevents accessibility gaps.
