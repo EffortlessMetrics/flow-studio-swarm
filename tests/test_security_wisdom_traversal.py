@@ -41,6 +41,28 @@ def test_wisdom_artifacts_traversal(payload: str):
 
 
 @pytest.mark.parametrize("payload", TRAVERSAL_PAYLOADS)
+def test_evolution_apply_patch_body_traversal(payload: str):
+    """Test apply_evolution_patch_endpoint rejects traversal in JSON body patch_id."""
+    response = client.post(
+        "/api/v3/evolution/apply",
+        json={"patch_id": f"valid_run:{payload}", "dry_run": True}
+    )
+    assert response.status_code in (400, 404)
+    if response.status_code == 400:
+        data = response.json()
+        assert "invalid_path_component" in data["detail"]["error"]
+
+    response2 = client.post(
+        "/api/v3/evolution/apply",
+        json={"patch_id": f"{payload}:valid_patch", "dry_run": True}
+    )
+    assert response2.status_code in (400, 404)
+    if response2.status_code == 400:
+        data = response2.json()
+        assert "invalid_path_component" in data["detail"]["error"]
+
+
+@pytest.mark.parametrize("payload", TRAVERSAL_PAYLOADS)
 def test_wisdom_content_run_id_traversal(payload: str):
     """Test get_wisdom_content rejects traversal in run_id."""
     response = client.get(f"/api/v3/wisdom/{payload}/some_artifact.md")

@@ -413,11 +413,6 @@ async def apply_evolution_patch_endpoint(
         409: Validation failed.
         412: ETag mismatch.
     """
-    if request.patch_id and ":" in request.patch_id:
-        run_id, patch_id = request.patch_id.split(":", 1)
-        _validate_path_param(run_id, "run_id")
-        _validate_path_param(patch_id, "patch_id")
-
     evolution = _get_evolution_module()
     runs_root = _get_runs_root()
     repo_root = _get_repo_root()
@@ -425,9 +420,13 @@ async def apply_evolution_patch_endpoint(
     # Parse patch_id (may be "run_id:patch_id" or just "patch_id")
     if ":" in request.patch_id:
         run_id, patch_id = request.patch_id.split(":", 1)
+        _validate_path_param(run_id, "run_id")
+        _validate_path_param(patch_id, "patch_id")
     else:
         # Search all recent runs for this patch_id
         patch_id = request.patch_id
+        _validate_path_param(patch_id, "patch_id")
+
         run_id = None
         pending = evolution["list_pending_patches"](runs_root, limit=50)
         for rid, patches in pending:
@@ -444,6 +443,8 @@ async def apply_evolution_patch_endpoint(
                     "details": {"patch_id": patch_id},
                 },
             )
+
+    _validate_path_param(run_id, "run_id")
 
     wisdom_dir = runs_root / run_id / "wisdom"
 
