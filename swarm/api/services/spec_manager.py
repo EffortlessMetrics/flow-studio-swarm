@@ -129,10 +129,11 @@ class SpecManager:
 
         # Also check config/flows for legacy flow definitions
         if self.flows_config.exists():
+            seen_flow_ids = {f["id"] for f in flows}
             for yaml_file in self.flows_config.glob("*.yaml"):
                 flow_id = yaml_file.stem
                 # Skip if already loaded from spec/flows
-                if any(f["id"] == flow_id for f in flows):
+                if flow_id in seen_flow_ids:
                     continue
                 try:
                     flow_data = self._load_yaml(yaml_file)
@@ -328,10 +329,11 @@ class SpecManager:
         # Also load station specs as implicit templates
         stations_dir = self.spec_root / "stations"
         if stations_dir.exists():
+            seen_template_ids = {t["id"] for t in templates}
             for yaml_file in stations_dir.glob("*.yaml"):
                 station_id = yaml_file.stem
                 # Skip if already have explicit template
-                if any(t["id"] == station_id for t in templates):
+                if station_id in seen_template_ids:
                     continue
                 try:
                     station_data = self._load_yaml(yaml_file)
