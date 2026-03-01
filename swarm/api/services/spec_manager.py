@@ -129,10 +129,11 @@ class SpecManager:
 
         # Also check config/flows for legacy flow definitions
         if self.flows_config.exists():
+            seen_flow_ids = {f["id"] for f in flows}
             for yaml_file in self.flows_config.glob("*.yaml"):
                 flow_id = yaml_file.stem
                 # Skip if already loaded from spec/flows
-                if any(f["id"] == flow_id for f in flows):
+                if flow_id in seen_flow_ids:
                     continue
                 try:
                     flow_data = self._load_yaml(yaml_file)
@@ -328,10 +329,11 @@ class SpecManager:
         # Also load station specs as implicit templates
         stations_dir = self.spec_root / "stations"
         if stations_dir.exists():
+            seen_template_ids = {t["id"] for t in templates}
             for yaml_file in stations_dir.glob("*.yaml"):
                 station_id = yaml_file.stem
                 # Skip if already have explicit template
-                if any(t["id"] == station_id for t in templates):
+                if station_id in seen_template_ids:
                     continue
                 try:
                     station_data = self._load_yaml(yaml_file)
@@ -503,40 +505,27 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        import os
+        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
+            if not run_dir.is_dir():
+                continue
 
-        # Get candidates efficiently using os.scandir to avoid Path object instantiation
-        candidates = []
-        try:
-            with os.scandir(self.runs_root) as it:
-                for entry in it:
-                    if entry.is_dir():
-                        # Sort chronologically by directory name descending
-                        candidates.append(entry.name)
-        except OSError:
-            return runs
-
-        candidates.sort(reverse=True)
-
-        for dir_name in candidates:
-            if len(runs) >= limit:
-                break
-
-            state_file_path = os.path.join(self.runs_root, dir_name, "run_state.json")
-            if os.path.exists(state_file_path):
+            state_file = run_dir / "run_state.json"
+            if state_file.exists():
                 try:
-                    with open(state_file_path, "r", encoding="utf-8") as f:
-                        state = json.load(f)
+                    state = json.loads(state_file.read_text(encoding="utf-8"))
                     runs.append(
                         {
-                            "run_id": state.get("run_id", dir_name),
+                            "run_id": state.get("run_id", run_dir.name),
                             "flow_key": state.get("flow_key"),
                             "status": state.get("status"),
                             "timestamp": state.get("timestamp"),
                         }
                     )
                 except Exception as e:
-                    logger.warning("Failed to load run state %s: %s", dir_name, e)
+                    logger.warning("Failed to load run state %s: %s", run_dir, e)
+
+            if len(runs) >= limit:
+                break
 
         return runs
 

@@ -77,7 +77,6 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            # We must mock _resolve_base_ref since its implementation uses _run_git too.
             with patch.object(fork, "_resolve_base_ref", return_value="nonexistent"):
                 mock_git.side_effect = [
                     (True, "main", ""),  # Get current branch
