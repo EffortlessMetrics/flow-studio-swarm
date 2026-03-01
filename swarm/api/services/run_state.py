@@ -30,7 +30,7 @@ class RunStateManager:
 
     def __init__(self, runs_root: Path):
         self.runs_root = runs_root
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: Dict[str, tuple[float, Dict[str, Any]]] = {}
         self._locks: Dict[str, asyncio.Lock] = {}
 
     def _get_lock(self, run_id: str) -> asyncio.Lock:
@@ -94,16 +94,19 @@ class RunStateManager:
         """Get run state without locking (internal use only)."""
         # Check cache first
         if run_id in self._cache:
-            state = self._cache[run_id]
+            _, state = self._cache[run_id]
             return state, self._compute_etag(state)
 
-        # Load from disk
         state_path = self._state_path(run_id)
-        if not state_path.exists():
+
+        try:
+            mtime = state_path.stat().st_mtime
+        except FileNotFoundError:
             raise FileNotFoundError(f"Run '{run_id}' not found")
 
+        # Load from disk
         state = json.loads(state_path.read_text(encoding="utf-8"))
-        self._cache[run_id] = state
+        self._cache[run_id] = (mtime, state)
         return state, self._compute_etag(state)
 
     async def get_run(self, run_id: str) -> tuple[Dict[str, Any], str]:
@@ -143,7 +146,8 @@ class RunStateManager:
         tmp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
         os.replace(tmp_path, state_path)
 
-        self._cache[run_id] = state
+        mtime = state_path.stat().st_mtime
+        self._cache[run_id] = (mtime, state)
 
     def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
         """List recent runs.
@@ -179,10 +183,18 @@ class RunStateManager:
                 continue
 
             try:
-                state = json.loads(state_path.read_text(encoding="utf-8"))
+                mtime = state_path.stat().st_mtime
+                run_id = run_dir.name
+
+                if run_id in self._cache and self._cache[run_id][0] == mtime:
+                    state = self._cache[run_id][1]
+                else:
+                    state = json.loads(state_path.read_text(encoding="utf-8"))
+                    self._cache[run_id] = (mtime, state)
+
                 runs.append(
                     {
-                        "run_id": state.get("run_id", run_dir.name),
+                        "run_id": state.get("run_id", run_id),
                         "flow_key": state.get("flow_id", "").split("-")[-1]
                         if state.get("flow_id")
                         else None,
