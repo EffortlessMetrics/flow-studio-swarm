@@ -20,6 +20,8 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from swarm.api.routes.validation_utils import _validate_path_param
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wisdom", tags=["wisdom"])
@@ -406,6 +408,7 @@ def _apply_wisdom_patches(
 
 @router.get("/{run_id}", response_model=WisdomArtifactsResponse)
 async def get_wisdom_artifacts(run_id: str):
+    run_id = _validate_path_param(run_id, "run_id")
     """Get list of wisdom artifacts for a run.
 
     Returns metadata about available wisdom outputs including:
@@ -491,6 +494,8 @@ async def get_wisdom_content(
     artifact_name: str,
     if_none_match: Optional[str] = Header(None, alias="If-None-Match"),
 ):
+    run_id = _validate_path_param(run_id, "run_id")
+    artifact_name = _validate_path_param(artifact_name, "artifact_name")
     """Get the content of a specific wisdom artifact.
 
     Args:
@@ -567,6 +572,7 @@ async def apply_wisdom_patch(
     request: ApplyPatchRequest,
     if_match: Optional[str] = Header(None, alias="If-Match"),
 ):
+    run_id = _validate_path_param(run_id, "run_id")
     """Apply a wisdom evolution patch.
 
     Validates and optionally applies a flow evolution patch from wisdom outputs.
@@ -736,6 +742,7 @@ async def reject_wisdom_patch(
     run_id: str,
     request: RejectPatchRequest,
 ):
+    run_id = _validate_path_param(run_id, "run_id")
     """Reject a wisdom patch with a reason.
 
     Records the decision to reject a patch for audit purposes.
@@ -796,6 +803,7 @@ async def apply_wisdom_patches(
     request: WisdomApplyRequest,
     if_match: Optional[str] = Header(None, alias="If-Match"),
 ):
+    run_id = _validate_path_param(run_id, "run_id")
     """Apply wisdom patches at run boundary with policy controls.
 
     This endpoint is designed for automated patch application at the end
