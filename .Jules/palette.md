@@ -1,0 +1,3 @@
+## 2024-05-18 - Generic Utility Buttons Require Context-Specific ARIA Labels
+**Learning:** Generic utility UI buttons (like `copy-btn` components) that are visually clear from their nearby context lack built-in accessibility context. When a screen reader focuses on these buttons, reading "Copy" is not informative enough and leaves users unsure of what is being copied.
+**Action:** Always explicitly include context-specific `aria-label` attributes in HTML fragments for generic utility buttons to properly support screen readers (e.g., `aria-label="Copy dev-check command to clipboard"`).
