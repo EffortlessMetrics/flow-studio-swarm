@@ -503,27 +503,40 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        import os
 
-            state_file = run_dir / "run_state.json"
-            if state_file.exists():
+        # Get candidates efficiently using os.scandir to avoid Path object instantiation
+        candidates = []
+        try:
+            with os.scandir(self.runs_root) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        # Sort chronologically by directory name descending
+                        candidates.append(entry.name)
+        except OSError:
+            return runs
+
+        candidates.sort(reverse=True)
+
+        for dir_name in candidates:
+            if len(runs) >= limit:
+                break
+
+            state_file_path = os.path.join(self.runs_root, dir_name, "run_state.json")
+            if os.path.exists(state_file_path):
                 try:
-                    state = json.loads(state_file.read_text(encoding="utf-8"))
+                    with open(state_file_path, "r", encoding="utf-8") as f:
+                        state = json.load(f)
                     runs.append(
                         {
-                            "run_id": state.get("run_id", run_dir.name),
+                            "run_id": state.get("run_id", dir_name),
                             "flow_key": state.get("flow_key"),
                             "status": state.get("status"),
                             "timestamp": state.get("timestamp"),
                         }
                     )
                 except Exception as e:
-                    logger.warning("Failed to load run state %s: %s", run_dir, e)
-
-            if len(runs) >= limit:
-                break
+                    logger.warning("Failed to load run state %s: %s", dir_name, e)
 
         return runs
 
