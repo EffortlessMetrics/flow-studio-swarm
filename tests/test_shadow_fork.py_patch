@@ -1,0 +1,10 @@
+--- tests/test_shadow_fork.py
++++ tests/test_shadow_fork.py
+@@ -6,6 +6,7 @@
+ """
+
+ from unittest.mock import patch
++import logging
+
+ import pytest
+ from swarm.runtime.shadow_fork import (
