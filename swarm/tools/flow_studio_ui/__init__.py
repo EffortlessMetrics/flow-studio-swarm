@@ -13,7 +13,7 @@ _UI_DIR = Path(__file__).parent
 
 # Eagerly load at import time so the Defender scan happens during server startup,
 # not on the first user request.
-_INDEX_HTML_CACHE: str = None
+_INDEX_HTML_CACHE: str = (_UI_DIR / "index.html").read_text(encoding="utf-8")
 
 
 def get_index_html() -> str:
@@ -25,9 +25,6 @@ def get_index_html() -> str:
     Returns:
         str: Complete HTML document for the Flow Studio UI.
     """
-    global _INDEX_HTML_CACHE
-    if _INDEX_HTML_CACHE is None:
-        _INDEX_HTML_CACHE = (_UI_DIR / "index.html").read_text(encoding="utf-8")
     return _INDEX_HTML_CACHE
 
 
