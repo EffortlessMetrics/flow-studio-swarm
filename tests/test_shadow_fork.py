@@ -76,30 +76,45 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        def mock_run_git(args, **kwargs):
+            if "symbolic-ref" in args:
+                return True, "main", ""
+            if "status" in args:
+                return True, "", ""
+            if "rev-parse" in args:
+                if args[-1] == "HEAD":
+                    return True, "12345", ""
+                return False, "", "fatal: ambiguous argument"
+            if "checkout" in args:
+                return False, "", "fatal: cannot create branch"
+            return True, "", ""
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+        with patch.object(fork, "_run_git", side_effect=mock_run_git):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+        def mock_run_git(args, **kwargs):
+            if "symbolic-ref" in args:
+                return True, "main", ""
+            if "status" in args:
+                return True, " M file.txt", ""
+            if "rev-parse" in args:
+                return True, "12345", ""
+            if "checkout" in args:
+                return True, "", ""
+            return True, "", ""
 
+        with patch.object(fork, "_run_git", side_effect=mock_run_git):
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+            # Need to capture the custom logger output
+            import logging
+            caplog.set_level(logging.WARNING, logger="swarm.runtime.shadow_fork")
 
             fork.create()
 
