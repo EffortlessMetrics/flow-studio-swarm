@@ -312,14 +312,14 @@ class RunService:
                     all_ids.append(rid)
 
         if include_legacy:
-            active_ids, legacy_ids = storage.scan_runs()
+            # Get all run directories without file existence checks (much faster)
+            other_ids = storage.list_all_run_ids()
+            other_ids.sort(reverse=True)
         else:
+            # If we don't include legacy, we have to check for meta.json anyway
+            # to know if it's active. This might be slow but it's the non-default path.
             active_ids = storage.list_runs()
-            legacy_ids = []
-
-        # Combine active and legacy, sort by ID descending
-        # Assumption: run_id lexicographical order ~= chronological order
-        other_ids = sorted(active_ids + legacy_ids, reverse=True)
+            other_ids = sorted(active_ids, reverse=True)
 
         for rid in other_ids:
             if rid not in seen_ids:
@@ -332,7 +332,9 @@ class RunService:
         summaries = []
         # Create sets for fast lookups during summary creation
         example_set = set(storage.discover_example_runs()) if include_examples else set()
-        legacy_set = set(legacy_ids)
+        # If include_legacy is True, other_ids has all dirs, so we can treat them as potential legacy.
+        # We only actually try to load them if they don't have meta.json
+        legacy_set = set(other_ids) if include_legacy else set()
 
         for rid in sliced_ids:
             summary = None
@@ -342,6 +344,8 @@ class RunService:
             else:
                 summary = storage.read_summary(rid)
                 if not summary and rid in legacy_set:
+                    # Attempt to create legacy summary. This will return None if it's
+                    # just an invalid or empty directory (neither active nor legacy).
                     summary = self._create_legacy_summary(rid, is_example=False)
 
             if summary:
