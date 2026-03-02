@@ -1,8 +1,8 @@
-import pytest
-from pathlib import Path
-from datetime import datetime, timezone
 import json
+from datetime import datetime, timezone
+
 from swarm.tools.runs_gc import RunInfo
+
 
 def test_run_info_lazy_loading(tmp_path):
     run_dir = tmp_path / "test_run"
