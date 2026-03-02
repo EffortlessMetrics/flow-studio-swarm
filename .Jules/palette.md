@@ -1,0 +1,3 @@
+## 2024-05-24 - Provide explicit ARIA labels to utility copy buttons
+**Learning:** Utility buttons that perform copy actions (`copy-btn`) typically have generic visual labels like "Copy", but they lack semantic context about what content is actually being copied. While sighted users can infer this from adjacent UI elements, screen readers need explicit association. Simply setting a generic `title="Copy to clipboard"` is insufficient for true accessibility.
+**Action:** When creating reusable copy button components or using hardcoded utility buttons, explicitly set `aria-label` specifying the content being copied (e.g., `aria-label="Copy 'make dev-check' command to clipboard"`).
