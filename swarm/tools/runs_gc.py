@@ -20,10 +20,9 @@ import json
 import logging
 import shutil
 import sys
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -51,24 +50,70 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class RunInfo:
     """Information about a run for GC decisions."""
 
-    run_id: str
-    path: Path
-    run_type: str  # "active", "example", "legacy"
-    size_bytes: int
-    mtime: datetime
-    has_meta: bool
-    is_corrupt: bool
-    tags: List[str]
+    def __init__(
+        self,
+        run_id: str,
+        path: Path,
+        run_type: str,
+        mtime: datetime,
+        has_meta: bool,
+    ):
+        self.run_id = run_id
+        self.path = path
+        self.run_type = run_type
+        self.mtime = mtime
+        self.has_meta = has_meta
+
+        # Lazy loaded fields
+        self._size_bytes: Optional[int] = None
+        self._tags: Optional[List[str]] = None
+        self._is_corrupt: Optional[bool] = None
+
+    def __repr__(self) -> str:
+        return f"RunInfo(run_id='{self.run_id}', run_type='{self.run_type}', path='{self.path}')"
 
     @property
     def age_days(self) -> float:
         """Age in days since last modification."""
         now = datetime.now(timezone.utc)
         return (now - self.mtime).total_seconds() / 86400
+
+    @property
+    def size_bytes(self) -> int:
+        if self._size_bytes is None:
+            self._size_bytes = get_dir_size(self.path)
+        return self._size_bytes
+
+    def _load_meta(self) -> None:
+        if self._tags is not None and self._is_corrupt is not None:
+            return
+
+        self._tags = []
+        self._is_corrupt = False
+
+        if self.has_meta:
+            meta_path = self.path / META_FILE
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self._tags = data.get("tags", [])
+            except (json.JSONDecodeError, OSError):
+                self._is_corrupt = True
+
+    @property
+    def tags(self) -> List[str]:
+        if self._tags is None:
+            self._load_meta()
+        return self._tags
+
+    @property
+    def is_corrupt(self) -> bool:
+        if self._is_corrupt is None:
+            self._load_meta()
+        return self._is_corrupt
 
 
 def get_dir_size(path: Path) -> int:
@@ -90,17 +135,6 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     """Collect information about a single run."""
     meta_path = run_path / META_FILE
     has_meta = meta_path.exists()
-    is_corrupt = False
-    tags: List[str] = []
-
-    # Check if metadata is corrupt
-    if has_meta:
-        try:
-            with open(meta_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            tags = data.get("tags", [])
-        except (json.JSONDecodeError, OSError):
-            is_corrupt = True
 
     # Get modification time
     try:
@@ -109,18 +143,12 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     except OSError:
         mtime = datetime.now(timezone.utc)
 
-    # Get size
-    size_bytes = get_dir_size(run_path)
-
     return RunInfo(
         run_id=run_id,
         path=run_path,
         run_type=run_type,
-        size_bytes=size_bytes,
         mtime=mtime,
         has_meta=has_meta,
-        is_corrupt=is_corrupt,
-        tags=tags,
     )
 
 
