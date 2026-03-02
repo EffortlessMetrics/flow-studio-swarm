@@ -109,6 +109,25 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
+    # Also extract uiids from the data-inline-source script tag body since they are basically fragments
+    in_script = False
+    for line_num, line in enumerate(html.split("\n"), start=1):
+        if script_start.search(line):
+            in_script = True
+        if script_end.search(line):
+            in_script = False
+            continue
+
+        if in_script:
+            for match in pattern.finditer(line):
+                value = match.group(1)
+                # Skip JavaScript template literals (e.g., ${id} in compiled JS)
+                if "${" in value:
+                    continue
+                # Add if not already found in normal HTML
+                if not any(u == value for u, _ in uiids):
+                    uiids.append((value, line_num))
+
     return uiids
 
 
