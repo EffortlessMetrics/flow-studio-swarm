@@ -3,6 +3,10 @@ from swarm.runtime import storage
 from swarm.runtime.safe_paths import validate_path_component
 from swarm.tools.flow_studio.services import run_artifacts
 from swarm.tools.run_inspector import RunInspector
+from fastapi.testclient import TestClient
+from swarm.api.asgi import app
+
+client = TestClient(app)
 
 
 def test_validate_path_component_valid():
@@ -204,3 +208,102 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+def test_evolution_api_path_traversal():
+    """Test that the Evolution API prevents path traversal via run_id and patch_id."""
+    # Test path traversal in get_run_evolution_patches
+    response = client.get("/api/evolution/%2e%2e%5cetc")
+    assert response.status_code == 400
+    assert "invalid_path_parameter" in response.json()["detail"]["error"]
+
+    # Test path traversal in get_evolution_patch_details (run_id)
+    response = client.get("/api/evolution/%2e%2e%5cetc/valid-patch-id")
+    assert response.status_code == 400
+
+    # Test path traversal in get_evolution_patch_details (patch_id)
+    response = client.get("/api/evolution/valid-run-id/%2e%2e%5cetc")
+    assert response.status_code == 400
+
+    # Test path traversal in validate_evolution_patch_endpoint
+    response = client.post("/api/evolution/valid-run-id/validate/%2e%2e%5cetc")
+    assert response.status_code == 400
+
+    # Test path traversal in apply_evolution_patch_endpoint (composite ID)
+    response = client.post(
+        "/api/evolution/apply",
+        json={
+            "patch_id": "valid-run-id:%2e%2e%5cetc",
+            "dry_run": True,
+            "create_backup": True,
+        }
+    )
+    assert response.status_code == 400
+
+    # Test path traversal in apply_evolution_patch_endpoint (patch_id only)
+    response = client.post(
+        "/api/evolution/apply",
+        json={
+            "patch_id": "%2e%2e%5cetc",
+            "dry_run": True,
+            "create_backup": True,
+        }
+    )
+    assert response.status_code == 400
+
+    # Test path traversal in reject_evolution_patch_endpoint
+    response = client.post(
+        "/api/evolution/valid-run-id/reject/%2e%2e%5cetc",
+        json={
+            "patch_id": "%2e%2e%5cetc",
+            "reason": "Test reason"
+        }
+    )
+    assert response.status_code == 400
+
+
+def test_wisdom_api_path_traversal():
+    """Test that the Wisdom API prevents path traversal via run_id and artifact_name."""
+    # Test path traversal in get_wisdom_artifacts
+    response = client.get("/api/wisdom/%2e%2e%5cetc")
+    assert response.status_code == 400
+    assert "invalid_path_parameter" in response.json()["detail"]["error"]
+
+    # Test path traversal in get_wisdom_content (run_id)
+    response = client.get("/api/wisdom/%2e%2e%5cetc/valid-artifact.md")
+    assert response.status_code == 400
+
+    # Test path traversal in get_wisdom_content (artifact_name)
+    response = client.get("/api/wisdom/valid-run-id/%2e%2e%5cetc")
+    assert response.status_code == 400
+
+    # Test path traversal in apply_wisdom_patch
+    response = client.post(
+        "/api/wisdom/valid-run-id/apply",
+        json={
+            "artifact_name": "%2e%2e%5cetc",
+            "dry_run": True,
+        }
+    )
+    assert response.status_code == 400
+
+    # Test path traversal in reject_wisdom_patch
+    response = client.post(
+        "/api/wisdom/valid-run-id/reject",
+        json={
+            "artifact_name": "%2e%2e%5cetc",
+            "reason": "Test reason"
+        }
+    )
+    assert response.status_code == 400
+
+    # Test path traversal in apply_wisdom_patches
+    response = client.post(
+        "/api/wisdom/%2e%2e%5cetc/apply-patches",
+        json={
+            "dry_run": True,
+            "patch_type": "flow_evolution",
+            "policy": "safe"
+        }
+    )
+    assert response.status_code == 400
