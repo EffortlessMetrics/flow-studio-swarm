@@ -20,6 +20,8 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from .validation_utils import _validate_path_param
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wisdom", tags=["wisdom"])
@@ -422,6 +424,7 @@ async def get_wisdom_artifacts(run_id: str):
     Raises:
         404: Run not found or no wisdom artifacts.
     """
+    run_id = _validate_path_param(run_id, "run_id")
     wisdom_dir = _get_run_wisdom_dir(run_id)
 
     if not wisdom_dir.exists():
@@ -505,6 +508,9 @@ async def get_wisdom_content(
         404: Artifact not found.
         304: Not modified (if ETag matches).
     """
+    run_id = _validate_path_param(run_id, "run_id")
+    artifact_name = _validate_path_param(artifact_name, "artifact_name")
+
     wisdom_dir = _get_run_wisdom_dir(run_id)
     artifact_path = wisdom_dir / artifact_name
 
@@ -586,8 +592,11 @@ async def apply_wisdom_patch(
         409: Patch validation failed.
         412: ETag mismatch.
     """
+    run_id = _validate_path_param(run_id, "run_id")
+    artifact_name = _validate_path_param(request.artifact_name, "artifact_name")
+
     wisdom_dir = _get_run_wisdom_dir(run_id)
-    patch_path = wisdom_dir / request.artifact_name
+    patch_path = wisdom_dir / artifact_name
 
     if not patch_path.exists():
         raise HTTPException(
@@ -747,6 +756,9 @@ async def reject_wisdom_patch(
     Returns:
         RejectPatchResponse confirming rejection.
     """
+    run_id = _validate_path_param(run_id, "run_id")
+    artifact_name = _validate_path_param(request.artifact_name, "artifact_name")
+
     wisdom_dir = _get_run_wisdom_dir(run_id)
 
     if not wisdom_dir.exists():
@@ -760,13 +772,13 @@ async def reject_wisdom_patch(
         )
 
     # Record rejection
-    rejection_path = wisdom_dir / f".rejected_{request.artifact_name}"
+    rejection_path = wisdom_dir / f".rejected_{artifact_name}"
     try:
         rejection_path.write_text(
             json.dumps(
                 {
                     "rejected_at": datetime.now(timezone.utc).isoformat(),
-                    "artifact_name": request.artifact_name,
+                    "artifact_name": artifact_name,
                     "reason": request.reason,
                 }
             )
@@ -821,6 +833,8 @@ async def apply_wisdom_patches(
         404: Run or wisdom artifacts not found.
         400: Invalid patch_type or policy.
     """
+    run_id = _validate_path_param(run_id, "run_id")
+
     # Validate request parameters
     if request.patch_type not in ("flow_evolution", "station_tuning"):
         raise HTTPException(

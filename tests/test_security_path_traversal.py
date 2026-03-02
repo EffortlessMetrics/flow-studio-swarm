@@ -204,3 +204,17 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_evolution_get_pending_path_traversal():
+    from fastapi.testclient import TestClient
+    from swarm.api.asgi import app
+    client = TestClient(app)
+    resp = client.get("/api/evolution/..%5c..%5cetc")
+    assert resp.status_code == 400
+
+def test_wisdom_get_artifacts_path_traversal():
+    from fastapi.testclient import TestClient
+    from swarm.api.asgi import app
+    client = TestClient(app)
+    resp = client.get("/api/wisdom/..%5c..%5cetc")
+    assert resp.status_code == 400
