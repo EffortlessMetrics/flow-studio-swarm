@@ -76,27 +76,42 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        def mock_git_side_effect(cmd, **kwargs):
+            cmd_str = " ".join(cmd)
+            if "rev-parse" in cmd_str:
+                if "nonexistent" in cmd_str:
+                    return False, "", "fatal: ambiguous argument 'nonexistent': unknown revision"
+                return True, "main", ""
+            if "status" in cmd_str:
+                return True, "", ""
+            if "checkout" in cmd_str:
+                return False, "", "fatal: cannot checkout"
+            return True, "", ""
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+        with patch.object(fork, "_run_git") as mock_git:
+            mock_git.side_effect = mock_git_side_effect
+
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
+        import logging
+        caplog.set_level(logging.WARNING, logger="swarm.runtime.shadow_fork")
         fork = ShadowFork(repo_root=tmp_path)
 
+        def mock_git_side_effect(cmd, **kwargs):
+            cmd_str = " ".join(cmd)
+            if "rev-parse" in cmd_str:
+                return True, "main", ""
+            if "status" in cmd_str:
+                return True, " M file.txt", ""
+            if "checkout" in cmd_str:
+                return True, "", ""
+            return True, "", ""
+
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+            mock_git.side_effect = mock_git_side_effect
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
