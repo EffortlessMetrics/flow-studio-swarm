@@ -820,6 +820,35 @@ def summarize_navigator_events(
 # -----------------------------------------------------------------------------
 
 
+def list_all_run_ids(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """List all directory names in the runs directory quickly.
+
+    This is a fast-path scanner that iterates os.scandir and returns
+    all directory names, omitting any expensive file existence checks
+    (like checking for meta.json or flow keys). Skips hidden and cache
+    directories.
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of all run directory names, sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    run_ids: List[RunId] = []
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if entry.is_dir() and not entry.name.startswith((".", "__")):
+                    run_ids.append(entry.name)
+    except OSError:
+        pass
+
+    return sorted(run_ids)
+
+
 def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     """List all run IDs that have meta.json files.
 
