@@ -92,13 +92,20 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
+        # We DO NOT skip the embedded JS bundle (<script type="application/json" data-inline-source...>)
+        # because the JS bundle contains the actual DOM templates generated via esbuild,
+        # which include data-uiid attributes we want to verify.
         if script_start.search(line):
-            in_script = True
-        if script_end.search(line):
-            in_script = False
-            continue  # Skip the closing script line
+            # Only enter 'in_script' state if it's not our JS bundle script block
+            if "data-inline-source" not in line:
+                in_script = True
 
-        # Skip lines inside script tags
+        if script_end.search(line):
+            if in_script:
+                in_script = False
+                continue  # Skip the closing script line itself
+
+        # Skip lines inside executable script tags
         if in_script:
             continue
 
@@ -109,7 +116,16 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate UIIDs found in the document to handle the fact that
+    # some fragments appear in both the static HTML body and the bundled JS string
+    seen = set()
+    deduped_uiids = []
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            deduped_uiids.append((value, line_num))
+
+    return deduped_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
