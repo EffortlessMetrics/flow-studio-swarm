@@ -312,19 +312,23 @@ class RunService:
                     all_ids.append(rid)
 
         if include_legacy:
-            active_ids, legacy_ids = storage.scan_runs()
+            # Fast-path: grab all IDs, don't check file existence
+            other_ids = storage.list_all_run_ids()
+            # Sort descending for chronological order
+            other_ids.sort(reverse=True)
+            for rid in other_ids:
+                if rid not in seen_ids:
+                    seen_ids.add(rid)
+                    all_ids.append(rid)
         else:
+            # Slower path: must check for meta.json to exclude legacy
             active_ids = storage.list_runs()
-            legacy_ids = []
-
-        # Combine active and legacy, sort by ID descending
-        # Assumption: run_id lexicographical order ~= chronological order
-        other_ids = sorted(active_ids + legacy_ids, reverse=True)
-
-        for rid in other_ids:
-            if rid not in seen_ids:
-                seen_ids.add(rid)
-                all_ids.append(rid)
+            # Sort descending for chronological order
+            active_ids.sort(reverse=True)
+            for rid in active_ids:
+                if rid not in seen_ids:
+                    seen_ids.add(rid)
+                    all_ids.append(rid)
 
         total = len(all_ids)
         sliced_ids = all_ids[offset : offset + limit]
@@ -332,7 +336,6 @@ class RunService:
         summaries = []
         # Create sets for fast lookups during summary creation
         example_set = set(storage.discover_example_runs()) if include_examples else set()
-        legacy_set = set(legacy_ids)
 
         for rid in sliced_ids:
             summary = None
@@ -341,7 +344,8 @@ class RunService:
                 summary = self._create_legacy_summary(rid, is_example=True)
             else:
                 summary = storage.read_summary(rid)
-                if not summary and rid in legacy_set:
+                # If meta.json doesn't exist but we included legacy, try to load as legacy
+                if not summary and include_legacy:
                     summary = self._create_legacy_summary(rid, is_example=False)
 
             if summary:
