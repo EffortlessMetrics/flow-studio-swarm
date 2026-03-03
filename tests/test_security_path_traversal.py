@@ -187,6 +187,7 @@ def test_run_state_manager_path_validation(tmp_path):
 
     asyncio.run(run_tests())
 
+
 def test_run_tailer_path_validation(tmp_path):
     """Test that RunTailer validates run_id against path traversal."""
     from swarm.runtime.db import StatsDB
