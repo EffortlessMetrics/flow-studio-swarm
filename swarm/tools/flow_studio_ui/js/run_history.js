@@ -326,7 +326,7 @@ function renderRunHistoryEmpty() {
     const commandBlock = `
     <div class="path-with-copy" style="justify-content: center; margin-top: 8px;">
       <code class="mono fs-text-xs" style="background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 4px;">${cmd}</code>
-      <button class="copy-cmd-btn copy-btn" data-cmd="${cmd}" aria-label="Copy command" title="Copy to clipboard">
+      <button class="copy-cmd-btn copy-btn" data-cmd="${cmd}" aria-label="Copy ${escapeHtml(cmd)}" title="Copy to clipboard">
         Copy
       </button>
     </div>

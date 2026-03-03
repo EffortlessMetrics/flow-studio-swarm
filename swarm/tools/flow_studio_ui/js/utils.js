@@ -76,6 +76,7 @@ export function createCopyButton(text, label = "Copy") {
     btn.className = "copy-btn";
     btn.textContent = label;
     btn.title = "Copy to clipboard";
+    btn.setAttribute("aria-label", `Copy ${text}`);
     btn.addEventListener("click", () => {
         void copyToClipboard(text);
         btn.textContent = "Copied!";
