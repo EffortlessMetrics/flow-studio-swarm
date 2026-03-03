@@ -204,3 +204,50 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_evolution_api_path_validation():
+    """Test that the Evolution API endpoints validate path components to prevent traversal."""
+    import asyncio
+    from fastapi import HTTPException
+
+    from swarm.api.routes.evolution import (
+        ApplyEvolutionRequest,
+        RejectEvolutionRequest,
+        apply_evolution_patch_endpoint,
+        get_evolution_patch_details,
+        get_run_evolution_patches,
+        reject_evolution_patch_endpoint,
+        validate_evolution_patch_endpoint,
+    )
+
+    async def run_tests():
+        with pytest.raises(HTTPException) as exc_info:
+            await get_run_evolution_patches("../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_evolution_patch_details("valid-run", "../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await validate_evolution_patch_endpoint("valid-run", "..\\windows\\system32")
+        assert exc_info.value.status_code == 400
+
+        # For apply, testing with "patch_id" triggers list_pending_patches logic which requires SpecManager.
+        # We only test the fast-fail traversal check before it hits the DB.
+
+        # Test apply_evolution_patch_endpoint with run_id:patch_id
+        # We omit tests for `apply_evolution_patch_endpoint` without mocking because extracting the ID
+        # occurs *after* `_get_runs_root()` which requires a fully initialized SpecManager in testing.
+        # But we know `_validate_ids` applies uniformly.
+
+        req = RejectEvolutionRequest(patch_id="valid-patch", reason="testing")
+        with pytest.raises(HTTPException) as exc_info:
+            await reject_evolution_patch_endpoint("..", "valid-patch", req)
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await reject_evolution_patch_endpoint("valid-run", "../etc", req)
+        assert exc_info.value.status_code == 400
+
+    asyncio.run(run_tests())
