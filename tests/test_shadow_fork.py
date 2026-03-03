@@ -77,13 +77,19 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+            def git_side_effect(args, **kwargs):
+                if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+                    return (True, "main", "")
+                if args == ["status", "--porcelain"]:
+                    return (True, "", "")
+                if args[0] == "rev-parse" and args[1] == "--verify":
+                    return (False, "", "fatal")
+                if args[0] == "checkout" and args[1] == "-b":
+                    return (False, "", "fatal")
+                return (True, "", "")
+            mock_git.side_effect = git_side_effect
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -91,12 +97,15 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+            def git_side_effect(args, **kwargs):
+                if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+                    return (True, "main", "")
+                if args == ["status", "--porcelain"]:
+                    return (True, " M file.txt", "")
+                if args[0] == "rev-parse" and args[1] == "--verify":
+                    return (True, "", "")
+                return (True, "", "")
+            mock_git.side_effect = git_side_effect
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
