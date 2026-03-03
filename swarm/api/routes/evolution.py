@@ -19,6 +19,8 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/evolution", tags=["evolution"])
@@ -134,6 +136,8 @@ def _get_runs_root() -> Path:
     return manager.runs_root
 
 
+
+
 def _get_evolution_module():
     """Import evolution module (lazy to avoid circular imports)."""
     from swarm.runtime.evolution import (
@@ -224,7 +228,13 @@ async def get_run_evolution_patches(run_id: str):
 
     Raises:
         404: Run not found or no wisdom outputs.
+        400: Invalid run_id.
     """
+    try:
+        run_id = validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     evolution = _get_evolution_module()
     runs_root = _get_runs_root()
 
@@ -268,7 +278,14 @@ async def get_evolution_patch_details(
 
     Raises:
         404: Patch not found.
+        400: Invalid run_id or patch_id.
     """
+    try:
+        run_id = validate_path_component(run_id, "run_id")
+        patch_id = validate_path_component(patch_id, "patch_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     evolution = _get_evolution_module()
     runs_root = _get_runs_root()
 
@@ -332,7 +349,14 @@ async def validate_evolution_patch_endpoint(run_id: str, patch_id: str):
 
     Raises:
         404: Patch not found.
+        400: Invalid run_id or patch_id.
     """
+    try:
+        run_id = validate_path_component(run_id, "run_id")
+        patch_id = validate_path_component(patch_id, "patch_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     evolution = _get_evolution_module()
     runs_root = _get_runs_root()
     repo_root = _get_repo_root()
@@ -402,18 +426,29 @@ async def apply_evolution_patch_endpoint(
         404: Patch not found.
         409: Validation failed.
         412: ETag mismatch.
+        400: Invalid run_id or patch_id.
     """
+    if ":" in request.patch_id:
+        run_id, patch_id = request.patch_id.split(":", 1)
+        try:
+            run_id = validate_path_component(run_id, "run_id")
+            patch_id = validate_path_component(patch_id, "patch_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    else:
+        # Search all recent runs for this patch_id
+        patch_id = request.patch_id
+        try:
+            patch_id = validate_path_component(patch_id, "patch_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        run_id = None
+
     evolution = _get_evolution_module()
     runs_root = _get_runs_root()
     repo_root = _get_repo_root()
 
-    # Parse patch_id (may be "run_id:patch_id" or just "patch_id")
-    if ":" in request.patch_id:
-        run_id, patch_id = request.patch_id.split(":", 1)
-    else:
-        # Search all recent runs for this patch_id
-        patch_id = request.patch_id
-        run_id = None
+    if run_id is None:
         pending = evolution["list_pending_patches"](runs_root, limit=50)
         for rid, patches in pending:
             if any(p.id == patch_id for p in patches):
@@ -551,7 +586,14 @@ async def reject_evolution_patch_endpoint(
 
     Raises:
         404: Patch not found.
+        400: Invalid run_id or patch_id.
     """
+    try:
+        run_id = validate_path_component(run_id, "run_id")
+        patch_id = validate_path_component(patch_id, "patch_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     import json
 
     runs_root = _get_runs_root()
