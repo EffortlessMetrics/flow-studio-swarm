@@ -20,6 +20,8 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wisdom", tags=["wisdom"])
@@ -161,6 +163,8 @@ def _get_runs_root() -> Path:
 
     manager = get_spec_manager()
     return manager.runs_root
+
+
 
 
 def _get_run_wisdom_dir(run_id: str) -> Path:
@@ -421,7 +425,13 @@ async def get_wisdom_artifacts(run_id: str):
 
     Raises:
         404: Run not found or no wisdom artifacts.
+        400: Invalid run_id.
     """
+    try:
+        run_id = validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     wisdom_dir = _get_run_wisdom_dir(run_id)
 
     if not wisdom_dir.exists():
@@ -504,7 +514,14 @@ async def get_wisdom_content(
     Raises:
         404: Artifact not found.
         304: Not modified (if ETag matches).
+        400: Invalid run_id or artifact_name.
     """
+    try:
+        run_id = validate_path_component(run_id, "run_id")
+        artifact_name = validate_path_component(artifact_name, "artifact_name")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     wisdom_dir = _get_run_wisdom_dir(run_id)
     artifact_path = wisdom_dir / artifact_name
 
@@ -585,7 +602,14 @@ async def apply_wisdom_patch(
         404: Patch artifact not found.
         409: Patch validation failed.
         412: ETag mismatch.
+        400: Invalid run_id or artifact_name.
     """
+    try:
+        run_id = validate_path_component(run_id, "run_id")
+        request.artifact_name = validate_path_component(request.artifact_name, "artifact_name")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     wisdom_dir = _get_run_wisdom_dir(run_id)
     patch_path = wisdom_dir / request.artifact_name
 
@@ -746,7 +770,16 @@ async def reject_wisdom_patch(
 
     Returns:
         RejectPatchResponse confirming rejection.
+
+    Raises:
+        400: Invalid run_id or artifact_name.
     """
+    try:
+        run_id = validate_path_component(run_id, "run_id")
+        request.artifact_name = validate_path_component(request.artifact_name, "artifact_name")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     wisdom_dir = _get_run_wisdom_dir(run_id)
 
     if not wisdom_dir.exists():
@@ -819,8 +852,13 @@ async def apply_wisdom_patches(
 
     Raises:
         404: Run or wisdom artifacts not found.
-        400: Invalid patch_type or policy.
+        400: Invalid run_id, patch_type, or policy.
     """
+    try:
+        run_id = validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     # Validate request parameters
     if request.patch_type not in ("flow_evolution", "station_tuning"):
         raise HTTPException(

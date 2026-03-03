@@ -204,3 +204,80 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_evolution_api_path_traversal():
+    """Test that evolution API endpoints validate run_id and patch_id."""
+    import asyncio
+
+    from fastapi import HTTPException
+    from swarm.api.routes.evolution import (
+        ApplyEvolutionRequest,
+        RejectEvolutionRequest,
+        apply_evolution_patch_endpoint,
+        get_evolution_patch_details,
+        get_run_evolution_patches,
+        reject_evolution_patch_endpoint,
+        validate_evolution_patch_endpoint,
+    )
+
+    async def run_tests():
+        with pytest.raises(HTTPException) as exc:
+            await get_run_evolution_patches("../etc")
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await get_evolution_patch_details("valid", "../etc")
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await validate_evolution_patch_endpoint("valid", "../etc")
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await apply_evolution_patch_endpoint(ApplyEvolutionRequest(patch_id="../etc:valid"))
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await reject_evolution_patch_endpoint("valid", "../etc", RejectEvolutionRequest(patch_id="valid", reason="test"))
+        assert exc.value.status_code == 400
+
+    asyncio.run(run_tests())
+
+def test_wisdom_api_path_traversal():
+    """Test that wisdom API endpoints validate run_id and artifact_name."""
+    import asyncio
+
+    from fastapi import HTTPException
+    from swarm.api.routes.wisdom import (
+        ApplyPatchRequest,
+        RejectPatchRequest,
+        WisdomApplyRequest,
+        apply_wisdom_patch,
+        apply_wisdom_patches,
+        get_wisdom_artifacts,
+        get_wisdom_content,
+        reject_wisdom_patch,
+    )
+
+    async def run_tests():
+        with pytest.raises(HTTPException) as exc:
+            await get_wisdom_artifacts("../etc")
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await get_wisdom_content("valid", "../etc")
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await apply_wisdom_patch("valid", ApplyPatchRequest(artifact_name="../etc"))
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await reject_wisdom_patch("valid", RejectPatchRequest(artifact_name="../etc", reason="test"))
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await apply_wisdom_patches("../etc", WisdomApplyRequest())
+        assert exc.value.status_code == 400
+
+    asyncio.run(run_tests())
