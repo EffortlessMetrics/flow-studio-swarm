@@ -85,9 +85,11 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     uiids = []
     pattern = re.compile(r'data-uiid="([^"]+)"')
 
-    # Track whether we're inside a script tag
+    # Track whether we're inside a standard script tag (executable JavaScript)
+    # We DO NOT want to skip the "flowstudio-js-bundle" block, because esbuild
+    # inlines HTML templates (which contain actual DOM UIIDs) inside this block.
     in_script = False
-    script_start = re.compile(r"<script\b", re.IGNORECASE)
+    script_start = re.compile(r"<script\b(?![^>]*data-inline-source=\"flowstudio-js-bundle\")", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
@@ -96,9 +98,11 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             in_script = True
         if script_end.search(line):
             in_script = False
-            continue  # Skip the closing script line
+            # Only skip the closing script line if we were actually skipping a script
+            # If we're inside the JS bundle block, we want to parse it.
+            # But the script_end regex will trigger here. It's okay, we just set in_script=False.
 
-        # Skip lines inside script tags
+        # Skip lines inside script tags (unless it's the inline JS bundle block)
         if in_script:
             continue
 
@@ -109,7 +113,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate extracted uiids by value (keep the first line number found)
+    deduped_uiids = []
+    seen = set()
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            deduped_uiids.append((value, line_num))
+
+    return deduped_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
