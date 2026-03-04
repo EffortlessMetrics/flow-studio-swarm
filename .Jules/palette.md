@@ -1,0 +1,3 @@
+## 2024-05-24 - Context-Specific ARIA Labels for Generic UI Utility Buttons
+**Learning:** Generic UI utility buttons like 'Copy' (`copy-btn`) in Flow Studio must explicitly include context-specific `aria-label` attributes in their HTML fragments to properly support screen readers. Otherwise, users relying on assistive technologies will hear repeated identical labels (e.g., "Copy, button") without knowing what action they are triggering.
+**Action:** Always verify that generic buttons (like `copy-btn`, `delete-btn`, `edit-btn`) provide sufficient context through `aria-label` or `aria-labelledby` attributes. Ensure this rule is checked whenever adding or modifying interactive UI components in the HTML fragments.
