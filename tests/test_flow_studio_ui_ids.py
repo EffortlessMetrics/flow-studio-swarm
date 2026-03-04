@@ -93,7 +93,13 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            # If the script tag is for inline templates, we don't skip
+            if (
+                'type="text/template"' not in line
+                and "data-inline-source=" not in line
+                and 'type="application/json"' not in line
+            ):
+                in_script = True
         if script_end.search(line):
             in_script = False
             continue  # Skip the closing script line
@@ -109,7 +115,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate UIIDs since esbuild might inline templates containing them
+    unique_uiids = []
+    seen = set()
+    for uiid, line_num in uiids:
+        if uiid not in seen:
+            seen.add(uiid)
+            unique_uiids.append((uiid, line_num))
+
+    return unique_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:

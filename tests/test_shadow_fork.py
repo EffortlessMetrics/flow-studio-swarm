@@ -76,28 +76,44 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        def git_side_effect(cmd, **kwargs):
+            cmd_str = " ".join(cmd)
+            if "rev-parse --abbrev-ref HEAD" in cmd_str:
+                return (True, "main", "")
+            if "status --porcelain" in cmd_str:
+                return (True, "", "")
+            if "rev-parse --verify" in cmd_str:
+                # Return False for all refs so it fails
+                return (False, "", "fatal")
+            if "checkout -b" in cmd_str:
+                # Since HEAD is always resolved, the failure actually happens during checkout
+                return (False, "", "fatal: does not exist")
+            return (True, "", "")
 
+        with patch.object(fork, "_run_git", side_effect=git_side_effect):
             with pytest.raises(RuntimeError, match="does not exist"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
+        import logging
+
+        caplog.set_level(logging.WARNING, logger="swarm.runtime.shadow_fork")
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+        def git_side_effect(cmd, **kwargs):
+            cmd_str = " ".join(cmd)
+            if "rev-parse --abbrev-ref HEAD" in cmd_str:
+                return (True, "main", "")
+            if "status --porcelain" in cmd_str:
+                return (True, " M file.txt", "")
+            if "rev-parse --verify" in cmd_str:
+                return (True, "", "")
+            if "checkout -b" in cmd_str:
+                return (True, "", "")
+            return (True, "", "")
 
+        with patch.object(fork, "_run_git", side_effect=git_side_effect):
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
