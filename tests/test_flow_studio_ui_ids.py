@@ -83,6 +83,7 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
         List of (uiid_value, line_number) tuples
     """
     uiids = []
+    seen = set()
     pattern = re.compile(r'data-uiid="([^"]+)"')
 
     # Track whether we're inside a script tag
@@ -93,7 +94,10 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            if 'type="application/json"' in line and 'data-inline-source="flowstudio-js-bundle"' in line:
+                in_script = False # Don't skip our special JSON template script
+            else:
+                in_script = True
         if script_end.search(line):
             in_script = False
             continue  # Skip the closing script line
@@ -107,7 +111,9 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
                 continue
-            uiids.append((value, line_num))
+            if value not in seen:
+                seen.add(value)
+                uiids.append((value, line_num))
 
     return uiids
 
