@@ -1,0 +1,4 @@
+## 2025-01-20 - [Evolution API Path Traversal]
+**Vulnerability:** Path traversal via run_id and patch_id path parameters in Evolution APIs allowing file system traversal.
+**Learning:** Application-level validation is required to stop API-encoded directory traversal, as `fastapi` does not fully normalize all traversal payloads. The lack of `validate_path_component` checks for user-supplied identifiers can allow for path traversal attacks resulting in unauthorized file access or modifications.
+**Prevention:** Always validate path parameters with `validate_path_component(param, "param_name")` in endpoints performing operations linked to file paths (e.g. `_get_runs_root() / run_id / "wisdom"`). Throw `HTTPException(status_code=400, detail=str(e))` if a `ValueError` is raised during validation.
