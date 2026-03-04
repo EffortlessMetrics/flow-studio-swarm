@@ -820,6 +820,35 @@ def summarize_navigator_events(
 # -----------------------------------------------------------------------------
 
 
+def list_all_run_ids(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """List all run IDs in the runs directory quickly without checking file existence.
+
+    This provides a fast path for operations that need to paginate through all runs
+    (both active and legacy) without paying the cost of stating every run directory
+    to look for meta.json.
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of all run IDs (directory names), sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    run_ids: List[RunId] = []
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                # Ignore files and hidden/system directories
+                if entry.is_dir() and not entry.name.startswith(".") and not entry.name.startswith("__"):
+                    run_ids.append(entry.name)
+    except OSError:
+        pass
+
+    return run_ids
+
+
 def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     """List all run IDs that have meta.json files.
 
