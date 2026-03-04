@@ -204,3 +204,131 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+def test_evolution_routes_path_validation(monkeypatch):
+    """Test that evolution routes validate path components and raise 400 HTTPExceptions."""
+    import asyncio
+    from fastapi import HTTPException
+
+    from swarm.api.routes import evolution
+    from pathlib import Path
+
+    # Mock _get_runs_root and _get_repo_root to avoid RuntimeError
+    monkeypatch.setattr(evolution, "_get_runs_root", lambda: Path("/dummy/runs"))
+    monkeypatch.setattr(evolution, "_get_repo_root", lambda: Path("/dummy/repo"))
+
+    async def run_tests():
+        # get_run_evolution_patches
+        with pytest.raises(HTTPException) as exc_info:
+            await evolution.get_run_evolution_patches("../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        # get_evolution_patch_details
+        with pytest.raises(HTTPException) as exc_info:
+            await evolution.get_evolution_patch_details("../etc/passwd", "patch-1")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await evolution.get_evolution_patch_details("run-1", "../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        # validate_evolution_patch_endpoint
+        with pytest.raises(HTTPException) as exc_info:
+            await evolution.validate_evolution_patch_endpoint("../etc/passwd", "patch-1")
+        assert exc_info.value.status_code == 400
+
+        # apply_evolution_patch_endpoint
+        from swarm.api.routes.evolution import ApplyEvolutionRequest
+        with pytest.raises(HTTPException) as exc_info:
+            await evolution.apply_evolution_patch_endpoint(
+                ApplyEvolutionRequest(patch_id="../etc/passwd", dry_run=True, create_backup=False)
+            )
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await evolution.apply_evolution_patch_endpoint(
+                ApplyEvolutionRequest(patch_id="../bad:patch-1", dry_run=True, create_backup=False)
+            )
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await evolution.apply_evolution_patch_endpoint(
+                ApplyEvolutionRequest(patch_id="run-1:../bad", dry_run=True, create_backup=False)
+            )
+        assert exc_info.value.status_code == 400
+
+        # reject_evolution_patch_endpoint
+        from swarm.api.routes.evolution import RejectEvolutionRequest
+        with pytest.raises(HTTPException) as exc_info:
+            await evolution.reject_evolution_patch_endpoint(
+                "../etc/passwd", "patch-1", RejectEvolutionRequest(patch_id="patch-1", reason="test")
+            )
+        assert exc_info.value.status_code == 400
+
+    asyncio.run(run_tests())
+
+def test_wisdom_routes_path_validation(monkeypatch):
+    """Test that wisdom routes validate path components and raise 400 HTTPExceptions."""
+    import asyncio
+    from fastapi import HTTPException
+
+    from swarm.api.routes import wisdom
+    from pathlib import Path
+
+    # Mock _get_runs_root and _get_repo_root to avoid RuntimeError
+    monkeypatch.setattr(wisdom, "_get_runs_root", lambda: Path("/dummy/runs"))
+    monkeypatch.setattr(wisdom, "_get_repo_root", lambda: Path("/dummy/repo"))
+
+    async def run_tests():
+        # get_wisdom_artifacts
+        with pytest.raises(HTTPException) as exc_info:
+            await wisdom.get_wisdom_artifacts("../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        # get_wisdom_content
+        with pytest.raises(HTTPException) as exc_info:
+            await wisdom.get_wisdom_content("../etc/passwd", "artifact.json")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await wisdom.get_wisdom_content("run-1", "../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        # apply_wisdom_patch
+        from swarm.api.routes.wisdom import ApplyPatchRequest
+        with pytest.raises(HTTPException) as exc_info:
+            await wisdom.apply_wisdom_patch(
+                "../etc/passwd", ApplyPatchRequest(artifact_name="artifact.json", dry_run=True)
+            )
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await wisdom.apply_wisdom_patch(
+                "run-1", ApplyPatchRequest(artifact_name="../etc/passwd", dry_run=True)
+            )
+        assert exc_info.value.status_code == 400
+
+        # reject_wisdom_patch
+        from swarm.api.routes.wisdom import RejectPatchRequest
+        with pytest.raises(HTTPException) as exc_info:
+            await wisdom.reject_wisdom_patch(
+                "../etc/passwd", RejectPatchRequest(artifact_name="artifact.json", reason="test")
+            )
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await wisdom.reject_wisdom_patch(
+                "run-1", RejectPatchRequest(artifact_name="../etc/passwd", reason="test")
+            )
+        assert exc_info.value.status_code == 400
+
+        # apply_wisdom_patches
+        from swarm.api.routes.wisdom import WisdomApplyRequest
+        with pytest.raises(HTTPException) as exc_info:
+            await wisdom.apply_wisdom_patches(
+                "../etc/passwd", WisdomApplyRequest(dry_run=True, patch_type="flow_evolution", policy="safe")
+            )
+        assert exc_info.value.status_code == 400
+
+    asyncio.run(run_tests())

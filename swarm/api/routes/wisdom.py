@@ -155,6 +155,22 @@ class WisdomApplyResponse(BaseModel):
 # =============================================================================
 
 
+def _validate_param(value: str, name: str) -> str:
+    from swarm.runtime.safe_paths import validate_path_component
+
+    try:
+        return validate_path_component(value, name)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_path",
+                "message": str(e),
+                "details": {name: value},
+            },
+        )
+
+
 def _get_runs_root() -> Path:
     """Get the runs root directory."""
     from ..server import get_spec_manager
@@ -422,6 +438,7 @@ async def get_wisdom_artifacts(run_id: str):
     Raises:
         404: Run not found or no wisdom artifacts.
     """
+    _validate_param(run_id, "run_id")
     wisdom_dir = _get_run_wisdom_dir(run_id)
 
     if not wisdom_dir.exists():
@@ -505,6 +522,8 @@ async def get_wisdom_content(
         404: Artifact not found.
         304: Not modified (if ETag matches).
     """
+    _validate_param(run_id, "run_id")
+    _validate_param(artifact_name, "artifact_name")
     wisdom_dir = _get_run_wisdom_dir(run_id)
     artifact_path = wisdom_dir / artifact_name
 
@@ -586,6 +605,8 @@ async def apply_wisdom_patch(
         409: Patch validation failed.
         412: ETag mismatch.
     """
+    _validate_param(run_id, "run_id")
+    _validate_param(request.artifact_name, "artifact_name")
     wisdom_dir = _get_run_wisdom_dir(run_id)
     patch_path = wisdom_dir / request.artifact_name
 
@@ -747,6 +768,9 @@ async def reject_wisdom_patch(
     Returns:
         RejectPatchResponse confirming rejection.
     """
+    _validate_param(run_id, "run_id")
+    _validate_param(request.artifact_name, "artifact_name")
+
     wisdom_dir = _get_run_wisdom_dir(run_id)
 
     if not wisdom_dir.exists():
@@ -821,6 +845,8 @@ async def apply_wisdom_patches(
         404: Run or wisdom artifacts not found.
         400: Invalid patch_type or policy.
     """
+    _validate_param(run_id, "run_id")
+
     # Validate request parameters
     if request.patch_type not in ("flow_evolution", "station_tuning"):
         raise HTTPException(
