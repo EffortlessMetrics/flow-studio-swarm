@@ -89,11 +89,17 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     in_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
+    # The esbuild process inlines flowstudio HTML templates as application/json
+    json_script_start = re.compile(r'<script type="application/json" data-inline-source="flowstudio-js-bundle"', re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            # Do not skip our injected HTML bundle
+            if json_script_start.search(line):
+                in_script = False
+            else:
+                in_script = True
         if script_end.search(line):
             in_script = False
             continue  # Skip the closing script line
@@ -109,7 +115,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate extracted uiids to prevent false duplicate errors
+    unique_uiids = []
+    seen = set()
+    for item in uiids:
+        if item[0] not in seen:
+            seen.add(item[0])
+            unique_uiids.append(item)
+
+    return unique_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
