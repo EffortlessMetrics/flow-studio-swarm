@@ -204,3 +204,81 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_evolution_api_path_traversal(monkeypatch):
+    """Test that Evolution API endpoints validate path components against traversal."""
+    import asyncio
+    from fastapi import HTTPException
+    from swarm.api.routes import evolution
+    from swarm.api.routes.evolution import (
+        get_run_evolution_patches,
+        get_evolution_patch_details,
+        validate_evolution_patch_endpoint,
+        apply_evolution_patch_endpoint,
+        reject_evolution_patch_endpoint,
+        ApplyEvolutionRequest,
+        RejectEvolutionRequest,
+    )
+
+    # Mock _get_runs_root and _get_repo_root to avoid RuntimeError when SpecManager is not initialized
+    from pathlib import Path
+    monkeypatch.setattr(evolution, "_get_runs_root", lambda: Path("/tmp/runs"))
+    monkeypatch.setattr(evolution, "_get_repo_root", lambda: Path("/tmp/repo"))
+
+    async def run_tests():
+        # get_run_evolution_patches validates run_id
+        with pytest.raises(HTTPException) as excinfo:
+            await get_run_evolution_patches("../etc")
+        assert excinfo.value.status_code == 400
+        assert "invalid_path" in excinfo.value.detail["error"]
+
+        # get_evolution_patch_details validates run_id and patch_id
+        with pytest.raises(HTTPException) as excinfo:
+            await get_evolution_patch_details("../etc", "patch-1")
+        assert excinfo.value.status_code == 400
+        assert "invalid_path" in excinfo.value.detail["error"]
+
+        with pytest.raises(HTTPException) as excinfo:
+            await get_evolution_patch_details("run-1", "../etc")
+        assert excinfo.value.status_code == 400
+        assert "invalid_path" in excinfo.value.detail["error"]
+
+        # validate_evolution_patch_endpoint validates run_id and patch_id
+        with pytest.raises(HTTPException) as excinfo:
+            await validate_evolution_patch_endpoint("../etc", "patch-1")
+        assert excinfo.value.status_code == 400
+        assert "invalid_path" in excinfo.value.detail["error"]
+
+        with pytest.raises(HTTPException) as excinfo:
+            await validate_evolution_patch_endpoint("run-1", "../etc")
+        assert excinfo.value.status_code == 400
+        assert "invalid_path" in excinfo.value.detail["error"]
+
+        # apply_evolution_patch_endpoint validates run_id and patch_id in request.patch_id
+        with pytest.raises(HTTPException) as excinfo:
+            await apply_evolution_patch_endpoint(ApplyEvolutionRequest(patch_id="../etc:patch-1"))
+        assert excinfo.value.status_code == 400
+        assert "invalid_path" in excinfo.value.detail["error"]
+
+        with pytest.raises(HTTPException) as excinfo:
+            await apply_evolution_patch_endpoint(ApplyEvolutionRequest(patch_id="run-1:../etc"))
+        assert excinfo.value.status_code == 400
+        assert "invalid_path" in excinfo.value.detail["error"]
+
+        with pytest.raises(HTTPException) as excinfo:
+            await apply_evolution_patch_endpoint(ApplyEvolutionRequest(patch_id="../etc"))
+        assert excinfo.value.status_code == 400
+        assert "invalid_path" in excinfo.value.detail["error"]
+
+        # reject_evolution_patch_endpoint validates run_id and patch_id
+        with pytest.raises(HTTPException) as excinfo:
+            await reject_evolution_patch_endpoint("../etc", "patch-1", RejectEvolutionRequest(patch_id="patch-1", reason="test"))
+        assert excinfo.value.status_code == 400
+        assert "invalid_path" in excinfo.value.detail["error"]
+
+        with pytest.raises(HTTPException) as excinfo:
+            await reject_evolution_patch_endpoint("run-1", "../etc", RejectEvolutionRequest(patch_id="../etc", reason="test"))
+        assert excinfo.value.status_code == 400
+        assert "invalid_path" in excinfo.value.detail["error"]
+
+    asyncio.run(run_tests())
