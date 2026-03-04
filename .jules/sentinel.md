@@ -1,4 +1,0 @@
-## 2024-05-19 - Fast API Stream Directory Traversal Fix
-**Vulnerability:** Path traversal possible in Server-Sent Events (SSE) streaming endpoint (`/runs/{run_id}/events`) and file writing operations (`write_event`, `write_event_sync`, `generate_run_events`). Due to lacking `run_id` validation before creating the file path (`run_dir = runs_root / run_id`), attackers could append traversal sequences to `run_id` to arbitrary file read/writes.
-**Learning:** Found an endpoints lacking protection from OS-level path traversal inside `swarm/api/routes/events.py`. Note that FastAPI router path normalization does not cover all edge cases, and application level validation such as `validate_path_component` needs to be used strictly.
-**Prevention:** Apply `validate_path_component` systematically for path construction involving inputs. Wrap FastAPI endpoint usages using `try/except ValueError` to raise standard `400 Bad Request` avoiding tracebacks and failing securely.
