@@ -204,3 +204,97 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+@pytest.mark.asyncio
+async def test_evolution_api_path_validation(monkeypatch, tmp_path):
+    """Test that Evolution API endpoints validate path components against traversal."""
+    from fastapi import HTTPException
+    from swarm.api.routes import evolution
+    from swarm.api.routes.evolution import (
+        ApplyEvolutionRequest,
+        RejectEvolutionRequest,
+        apply_evolution_patch_endpoint,
+        get_evolution_patch_details,
+        get_run_evolution_patches,
+        reject_evolution_patch_endpoint,
+        validate_evolution_patch_endpoint,
+    )
+
+    # Mock the root getters to return dummy paths
+    monkeypatch.setattr(evolution, "_get_runs_root", lambda: tmp_path)
+    monkeypatch.setattr(evolution, "_get_repo_root", lambda: tmp_path)
+
+    traversal_inputs = ["../etc/passwd", "..\\windows\\system32", ".."]
+
+    # Test get_run_evolution_patches
+    for bad_id in traversal_inputs:
+        with pytest.raises(HTTPException) as exc:
+            await get_run_evolution_patches(bad_id)
+        assert exc.value.status_code == 400
+        assert "run_id" in str(exc.value.detail)
+
+    # Test get_evolution_patch_details
+    for bad_id in traversal_inputs:
+        with pytest.raises(HTTPException) as exc:
+            await get_evolution_patch_details(bad_id, "valid_patch")
+        assert exc.value.status_code == 400
+        assert "run_id" in str(exc.value.detail)
+
+        with pytest.raises(HTTPException) as exc:
+            await get_evolution_patch_details("valid_run", bad_id)
+        assert exc.value.status_code == 400
+        assert "patch_id" in str(exc.value.detail)
+
+    # Test validate_evolution_patch_endpoint
+    for bad_id in traversal_inputs:
+        with pytest.raises(HTTPException) as exc:
+            await validate_evolution_patch_endpoint(bad_id, "valid_patch")
+        assert exc.value.status_code == 400
+        assert "run_id" in str(exc.value.detail)
+
+        with pytest.raises(HTTPException) as exc:
+            await validate_evolution_patch_endpoint("valid_run", bad_id)
+        assert exc.value.status_code == 400
+        assert "patch_id" in str(exc.value.detail)
+
+    # Test apply_evolution_patch_endpoint
+    for bad_id in traversal_inputs:
+        req = ApplyEvolutionRequest(patch_id=f"{bad_id}:valid_patch", dry_run=True, create_backup=True)
+        with pytest.raises(HTTPException) as exc:
+            await apply_evolution_patch_endpoint(req)
+        assert exc.value.status_code == 400
+        assert "run_id" in str(exc.value.detail)
+
+        req = ApplyEvolutionRequest(patch_id=f"valid_run:{bad_id}", dry_run=True, create_backup=True)
+        with pytest.raises(HTTPException) as exc:
+            await apply_evolution_patch_endpoint(req)
+        assert exc.value.status_code == 400
+        assert "patch_id" in str(exc.value.detail)
+
+    # Better test for apply_evolution_patch_endpoint without composite id
+    def dummy_get_evo_module():
+        return {
+            "list_pending_patches": lambda *args, **kwargs: [("valid_run", [type("obj", (object,), {"id": bad_id})]) for bad_id in traversal_inputs]
+        }
+    monkeypatch.setattr(evolution, "_get_evolution_module", dummy_get_evo_module)
+
+    for bad_id in traversal_inputs:
+        req = ApplyEvolutionRequest(patch_id=bad_id, dry_run=True, create_backup=True)
+        with pytest.raises(HTTPException) as exc:
+            await apply_evolution_patch_endpoint(req)
+        assert exc.value.status_code == 400
+        assert "patch_id" in str(exc.value.detail)
+
+    # Test reject_evolution_patch_endpoint
+    for bad_id in traversal_inputs:
+        req = RejectEvolutionRequest(patch_id=bad_id, reason="test")
+        with pytest.raises(HTTPException) as exc:
+            await reject_evolution_patch_endpoint(bad_id, "valid_patch", req)
+        assert exc.value.status_code == 400
+        assert "run_id" in str(exc.value.detail)
+
+        with pytest.raises(HTTPException) as exc:
+            await reject_evolution_patch_endpoint("valid_run", bad_id, req)
+        assert exc.value.status_code == 400
+        assert "patch_id" in str(exc.value.detail)
