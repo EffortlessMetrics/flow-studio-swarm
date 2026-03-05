@@ -204,3 +204,120 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_evolution_api_path_validation(monkeypatch):
+    """Test that Evolution API validates path components against traversal."""
+    import asyncio
+    from fastapi import HTTPException
+    from swarm.api.routes import evolution
+    from swarm.api.routes.evolution import (
+        ApplyEvolutionRequest,
+        RejectEvolutionRequest,
+        apply_evolution_patch_endpoint,
+        get_evolution_patch_details,
+        get_run_evolution_patches,
+        reject_evolution_patch_endpoint,
+        validate_evolution_patch_endpoint,
+    )
+
+    monkeypatch.setattr(evolution, "_get_runs_root", lambda: None)
+    monkeypatch.setattr(evolution, "_get_repo_root", lambda: None)
+
+    async def run_tests():
+        with pytest.raises(HTTPException) as exc:
+            await get_run_evolution_patches("../bad")
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await get_evolution_patch_details("valid_run", "../bad")
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await validate_evolution_patch_endpoint("valid_run", "../bad")
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await apply_evolution_patch_endpoint(
+                ApplyEvolutionRequest(patch_id="valid_run:../bad")
+            )
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await apply_evolution_patch_endpoint(
+                ApplyEvolutionRequest(patch_id="../bad:valid_patch")
+            )
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await apply_evolution_patch_endpoint(
+                ApplyEvolutionRequest(patch_id="../bad")
+            )
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await reject_evolution_patch_endpoint(
+                "valid_run", "../bad", RejectEvolutionRequest(patch_id="../bad", reason="reason")
+            )
+        assert exc.value.status_code == 400
+
+    asyncio.run(run_tests())
+
+def test_wisdom_api_path_validation(monkeypatch):
+    """Test that Wisdom API validates path components against traversal."""
+    import asyncio
+    from fastapi import HTTPException
+    from swarm.api.routes import wisdom
+    from swarm.api.routes.wisdom import (
+        ApplyPatchRequest,
+        RejectPatchRequest,
+        WisdomApplyRequest,
+        apply_wisdom_patch,
+        apply_wisdom_patches,
+        get_wisdom_artifacts,
+        get_wisdom_content,
+        reject_wisdom_patch,
+    )
+
+    monkeypatch.setattr(wisdom, "_get_runs_root", lambda: None)
+    monkeypatch.setattr(wisdom, "_get_repo_root", lambda: None)
+
+    async def run_tests():
+        with pytest.raises(HTTPException) as exc:
+            await get_wisdom_artifacts("../bad")
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await get_wisdom_content("valid_run", "../bad")
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await apply_wisdom_patch(
+                "valid_run", ApplyPatchRequest(artifact_name="../bad", commit_message="msg")
+            )
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await apply_wisdom_patch(
+                "../bad", ApplyPatchRequest(artifact_name="valid_artifact", commit_message="msg")
+            )
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await reject_wisdom_patch(
+                "valid_run", RejectPatchRequest(artifact_name="../bad", reason="reason")
+            )
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await reject_wisdom_patch(
+                "../bad", RejectPatchRequest(artifact_name="valid_artifact", reason="reason")
+            )
+        assert exc.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc:
+            await apply_wisdom_patches(
+                "../bad", WisdomApplyRequest(patch_type="flow_evolution", policy="safe")
+            )
+        assert exc.value.status_code == 400
+
+    asyncio.run(run_tests())
