@@ -204,3 +204,77 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_evolution_endpoints_path_validation(monkeypatch):
+    """Test that evolution API endpoints validate path components against traversal."""
+    import asyncio
+    from fastapi import HTTPException
+    from pathlib import Path
+
+    # Mock _get_runs_root and _get_repo_root to prevent RuntimeError from uninitialized SpecManager
+    from swarm.api.routes import evolution
+    monkeypatch.setattr(evolution, "_get_runs_root", lambda: Path("/fake/runs"))
+    monkeypatch.setattr(evolution, "_get_repo_root", lambda: Path("/fake/repo"))
+
+    from swarm.api.routes.evolution import (
+        get_run_evolution_patches,
+        get_evolution_patch_details,
+        validate_evolution_patch_endpoint,
+        apply_evolution_patch_endpoint,
+        reject_evolution_patch_endpoint,
+        ApplyEvolutionRequest,
+        RejectEvolutionRequest,
+    )
+
+    async def run_tests():
+        # get_run_evolution_patches
+        with pytest.raises(HTTPException) as exc_info:
+            await get_run_evolution_patches("../etc")
+        assert exc_info.value.status_code == 400
+
+        # get_evolution_patch_details
+        with pytest.raises(HTTPException) as exc_info:
+            await get_evolution_patch_details("../etc", "patch_1")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_evolution_patch_details("run_1", "..\\windows")
+        assert exc_info.value.status_code == 400
+
+        # validate_evolution_patch_endpoint
+        with pytest.raises(HTTPException) as exc_info:
+            await validate_evolution_patch_endpoint("../etc", "patch_1")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await validate_evolution_patch_endpoint("run_1", "..\\windows")
+        assert exc_info.value.status_code == 400
+
+        # apply_evolution_patch_endpoint
+        with pytest.raises(HTTPException) as exc_info:
+            req = ApplyEvolutionRequest(patch_id="../etc", dry_run=True, create_backup=True)
+            await apply_evolution_patch_endpoint(req)
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            req = ApplyEvolutionRequest(patch_id="../etc:patch_1", dry_run=True, create_backup=True)
+            await apply_evolution_patch_endpoint(req)
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            req = ApplyEvolutionRequest(patch_id="run_1:..\\windows", dry_run=True, create_backup=True)
+            await apply_evolution_patch_endpoint(req)
+        assert exc_info.value.status_code == 400
+
+        # reject_evolution_patch_endpoint
+        with pytest.raises(HTTPException) as exc_info:
+            req = RejectEvolutionRequest(patch_id="patch_1", reason="test")
+            await reject_evolution_patch_endpoint("../etc", "patch_1", req)
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            req = RejectEvolutionRequest(patch_id="..\\windows", reason="test")
+            await reject_evolution_patch_endpoint("run_1", "..\\windows", req)
+        assert exc_info.value.status_code == 400
+
+    asyncio.run(run_tests())
