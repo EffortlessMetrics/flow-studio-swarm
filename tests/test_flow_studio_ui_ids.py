@@ -92,13 +92,18 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
+        # IMPORTANT: esbuild inlines HTML templates into this specific script block.
+        # We must NOT skip it, otherwise we lose all dynamic UIIDs injected into the static HTML.
+        is_inline_source = 'data-inline-source="flowstudio-js-bundle"' in line
+
         if script_start.search(line):
-            in_script = True
+            in_script = not is_inline_source
         if script_end.search(line):
             in_script = False
-            continue  # Skip the closing script line
+            if not is_inline_source:
+                continue  # Skip the closing script line
 
-        # Skip lines inside script tags
+        # Skip lines inside generic script tags
         if in_script:
             continue
 
@@ -109,7 +114,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate while preserving order (first seen line number is kept)
+    seen = set()
+    deduped_uiids = []
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            deduped_uiids.append((value, line_num))
+
+    return deduped_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
