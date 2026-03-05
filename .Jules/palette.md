@@ -1,0 +1,3 @@
+## 2024-05-24 - Context-specific ARIA labels for generic utility buttons
+**Learning:** I discovered that having generic utility buttons, like "Copy" buttons (`.copy-btn`) without context-specific `aria-label` attributes causes accessibility issues. Screen readers will only read "Copy", providing no context on what is actually being copied when multiple such buttons exist on the page.
+**Action:** Always provide context-specific `aria-label` attributes (e.g., `aria-label="Copy make dev-check command to clipboard"`) to generic utility buttons like copy buttons, even if their visible text content is generic.
