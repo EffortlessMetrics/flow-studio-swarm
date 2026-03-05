@@ -88,15 +88,19 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     # Track whether we're inside a script tag
     in_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
+    # the html inline bundle must not be ignored
+    script_bundle = re.compile(r'data-inline-source="flowstudio-js-bundle"', re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            if not script_bundle.search(line):
+                in_script = True
         if script_end.search(line):
-            in_script = False
-            continue  # Skip the closing script line
+            if in_script:
+                in_script = False
+                continue  # Skip the closing script line
 
         # Skip lines inside script tags
         if in_script:
@@ -109,7 +113,13 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate using a dictionary to keep the first seen line number
+    unique_uiids = {}
+    for value, line_num in uiids:
+        if value not in unique_uiids:
+            unique_uiids[value] = line_num
+
+    return list(unique_uiids.items())
 
 
 def validate_uiid(uiid: str) -> List[str]:
