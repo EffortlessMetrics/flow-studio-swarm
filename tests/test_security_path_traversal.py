@@ -208,6 +208,7 @@ def test_run_tailer_path_validation(tmp_path):
 def test_evolution_api_path_validation(monkeypatch):
     """Test that Evolution API validates path components against traversal."""
     import asyncio
+
     from fastapi import HTTPException
     from swarm.api.routes import evolution
     from swarm.api.routes.evolution import (
@@ -265,6 +266,7 @@ def test_evolution_api_path_validation(monkeypatch):
 def test_wisdom_api_path_validation(monkeypatch):
     """Test that Wisdom API validates path components against traversal."""
     import asyncio
+
     from fastapi import HTTPException
     from swarm.api.routes import wisdom
     from swarm.api.routes.wisdom import (
