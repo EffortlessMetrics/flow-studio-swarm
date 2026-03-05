@@ -113,7 +113,16 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate extracted uiids while preserving order to prevent false duplicates
+    # if a script tag contents are considered alongside original HTML
+    seen = set()
+    deduped_uiids = []
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            deduped_uiids.append((value, line_num))
+
+    return deduped_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
