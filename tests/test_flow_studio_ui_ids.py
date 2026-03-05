@@ -87,7 +87,7 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
 
     # Track whether we're inside a script tag
     in_script = False
-    script_start = re.compile(r"<script\b", re.IGNORECASE)
+    script_start = re.compile(r'<script\b(?!.*type="application/json")', re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
@@ -98,7 +98,7 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             in_script = False
             continue  # Skip the closing script line
 
-        # Skip lines inside script tags
+        # Skip lines inside script tags (unless it's an application/json block which is used to bundle fragments)
         if in_script:
             continue
 
@@ -109,7 +109,17 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate because inline HTML in JS bundle causes duplicates
+    # that we shouldn't fail the "unique IDs" check for
+    # We want to preserve the line number of the first occurrence
+    unique_uiids = []
+    seen = set()
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            unique_uiids.append((value, line_num))
+
+    return unique_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
