@@ -820,6 +820,33 @@ def summarize_navigator_events(
 # -----------------------------------------------------------------------------
 
 
+def list_all_run_ids(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """List all potential run IDs without validating their contents.
+
+    Fast-path scanner that avoids disk I/O (os.path.exists) for individual
+    files. It explicitly ignores hidden directories (starting with '.' or '__').
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of all directory names, sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    run_ids: List[RunId] = []
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if entry.is_dir() and not entry.name.startswith((".", "__")):
+                    run_ids.append(entry.name)
+    except OSError:
+        pass
+
+    return sorted(run_ids)
+
+
 def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     """List all run IDs that have meta.json files.
 
