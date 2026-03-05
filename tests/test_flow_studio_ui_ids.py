@@ -90,15 +90,19 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     script_start = re.compile(r"<script\b", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
+    # We do NOT skip the inline JS bundle source where the HTML string template lives
+    inline_script_bundle = re.compile(r'<script type="application/json" data-inline-source="flowstudio-js-bundle">', re.IGNORECASE)
+
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            if not inline_script_bundle.search(line):
+                in_script = True
         if script_end.search(line):
             in_script = False
             continue  # Skip the closing script line
 
-        # Skip lines inside script tags
+        # Skip lines inside script tags unless it's the specific bundle script containing HTML string templates
         if in_script:
             continue
 
@@ -109,7 +113,17 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate the extracted uiids by value. If a value appears multiple times (e.g. because it's
+    # both in the HTML template inside the <script> bundle and the standalone HTML fragments),
+    # we just take the first line number.
+    deduped_uiids = []
+    seen_values = set()
+    for value, line_num in uiids:
+        if value not in seen_values:
+            deduped_uiids.append((value, line_num))
+            seen_values.add(value)
+
+    return deduped_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
