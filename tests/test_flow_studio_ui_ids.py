@@ -93,10 +93,14 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            # Do not skip application/json tags which often hold html templates from esbuild
+            if "type=\"application/json\"" not in line.lower() and "data-inline-source=\"flowstudio-js-bundle\"" not in line.lower():
+                in_script = True
         if script_end.search(line):
+            if in_script:
+                in_script = False
+                continue  # Skip the closing script line
             in_script = False
-            continue  # Skip the closing script line
 
         # Skip lines inside script tags
         if in_script:
