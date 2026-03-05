@@ -204,3 +204,68 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_evolution_api_path_validation(monkeypatch):
+    """Test that Evolution API validates path components directly."""
+    import asyncio
+
+    from fastapi import HTTPException
+    from swarm.api.routes import evolution
+    from swarm.api.routes.evolution import (
+        ApplyEvolutionRequest,
+        RejectEvolutionRequest,
+        apply_evolution_patch_endpoint,
+        get_evolution_patch_details,
+        get_run_evolution_patches,
+        reject_evolution_patch_endpoint,
+        validate_evolution_patch_endpoint,
+    )
+
+    monkeypatch.setattr(evolution, '_get_runs_root', lambda: None)
+    monkeypatch.setattr(evolution, '_get_repo_root', lambda: None)
+
+
+    async def run_tests():
+        # get_run_evolution_patches
+        with pytest.raises(HTTPException) as exc_info:
+            await get_run_evolution_patches("../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        # get_evolution_patch_details
+        with pytest.raises(HTTPException) as exc_info:
+            await get_evolution_patch_details("valid_run", "../bad_patch")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_evolution_patch_details("../bad_run", "valid_patch")
+        assert exc_info.value.status_code == 400
+
+        # validate_evolution_patch_endpoint
+        with pytest.raises(HTTPException) as exc_info:
+            await validate_evolution_patch_endpoint("valid_run", "../bad_patch")
+        assert exc_info.value.status_code == 400
+
+        # reject_evolution_patch_endpoint
+        with pytest.raises(HTTPException) as exc_info:
+            req = RejectEvolutionRequest(patch_id="../bad_patch", reason="test")
+            await reject_evolution_patch_endpoint("valid_run", "../bad_patch", req)
+        assert exc_info.value.status_code == 400
+
+        # apply_evolution_patch_endpoint
+        with pytest.raises(HTTPException) as exc_info:
+            req = ApplyEvolutionRequest(patch_id="../bad_patch")
+            await apply_evolution_patch_endpoint(req)
+        assert exc_info.value.status_code == 400
+
+        # apply_evolution_patch_endpoint (composite ID)
+        with pytest.raises(HTTPException) as exc_info:
+            req = ApplyEvolutionRequest(patch_id="../bad_run:valid_patch")
+            await apply_evolution_patch_endpoint(req)
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            req = ApplyEvolutionRequest(patch_id="valid_run:../bad_patch")
+            await apply_evolution_patch_endpoint(req)
+        assert exc_info.value.status_code == 400
+
+    asyncio.run(run_tests())
