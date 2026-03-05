@@ -1,0 +1,3 @@
+## 2025-03-05 - Add context-specific ARIA labels to generic buttons
+**Learning:** Generic utility UI buttons (like `copy-btn`) used across different context containers in Flow Studio may visually appear understandable to sighted users due to proximity to their target element (like a command line string), but are read confusingly as just "Copy button" to screen readers without context. They need explicit, context-specific `aria-label`s to properly indicate exactly what text or action they are copying.
+**Action:** Always include explicit `aria-label` properties explaining the exact contextual action on utility buttons when reusing them across multiple areas.
