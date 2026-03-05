@@ -1228,31 +1228,30 @@ export interface CytoscapeEvent {
  * - inspector: Right details panel (steps/agents/artifacts)
  * - modal: Modal dialogs (selftest, shortcuts)
  * - sdlc_bar: SDLC progress bar between header and content
- */
  * dynamic pattern: flow_studio.sidebar.run_history.item:
  * dynamic pattern: flow_studio.sidebar.run_history.item.badge.backend:
  * dynamic pattern: flow_studio.sidebar.run_history.item.badge.exemplar:
  */
 export type FlowStudioUIID =
-  | "flow_studio.modal.run_detail.inventory.container"
-  | "flow_studio.inspector.teaching_notes_structured"
-  | "flow_studio.modal.context_budget.input.total"
-  | "flow_studio.header.reload.copy_btn"
-  | "flow_studio.modal.run_detail.boundary.container"
-  | "flow_studio.modal.context_budget.input.older"
-  | "flow_studio.sidebar.compare_selector.select"
-  | "flow_studio.modal.selftest.close"
-  | "flow_studio.sidebar.run_control.stop"
-  | "flow_studio.canvas.empty"
-  | "flow_studio.canvas.legend.content"
-  | "flow_studio.sdlc_bar.flows"
-  | "flow_studio.modal.run_detail.boundary.toggle"
-  | "flow_studio.modal.run_detail.boundary"
-  | "flow_studio.modal.selftest.body"
-  | "flow_studio.modal.run_detail.inventory"
-  | "flow_studio.modal.context_budget.input.recent"
-  | "flow_studio.modal.shortcuts.close"
   // Root
+  | "flow_studio.modal.shortcuts.close"
+  | "flow_studio.modal.context_budget.input.recent"
+  | "flow_studio.modal.run_detail.inventory"
+  | "flow_studio.modal.selftest.body"
+  | "flow_studio.modal.run_detail.boundary"
+  | "flow_studio.modal.run_detail.boundary.toggle"
+  | "flow_studio.sdlc_bar.flows"
+  | "flow_studio.canvas.legend.content"
+  | "flow_studio.canvas.empty"
+  | "flow_studio.sidebar.run_control.stop"
+  | "flow_studio.modal.selftest.close"
+  | "flow_studio.sidebar.compare_selector.select"
+  | "flow_studio.modal.context_budget.input.older"
+  | "flow_studio.modal.run_detail.boundary.container"
+  | "flow_studio.header.reload.copy_btn"
+  | "flow_studio.modal.context_budget.input.total"
+  | "flow_studio.inspector.teaching_notes_structured"
+  | "flow_studio.modal.run_detail.inventory.container"
   | "flow_studio"
   // Header
   | "flow_studio.header"
