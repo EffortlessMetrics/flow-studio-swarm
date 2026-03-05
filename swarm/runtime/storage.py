@@ -851,6 +851,37 @@ def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     return sorted(run_ids)
 
 
+def list_all_run_ids(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """Fast-path directory scanner that lists all run IDs without file checks.
+
+    This function avoids eager file existence checks (like os.path.exists)
+    and just returns all valid candidate directories. Useful for O(1) pagination
+    where we defer loading run metadata.
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of all candidate run IDs (directories), sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    run_ids: List[RunId] = []
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                # Explicitly ignore hidden directories and caches to prevent
+                # them from polluting run lists and inflating pagination totals.
+                if not entry.is_dir() or entry.name.startswith((".", "__")):
+                    continue
+                run_ids.append(entry.name)
+    except OSError:
+        pass
+
+    return sorted(run_ids)
+
+
 def scan_runs(runs_dir: Path = RUNS_DIR) -> Tuple[List[RunId], List[RunId]]:
     """Scan runs directory and classify runs as active (with meta.json) or legacy.
 
