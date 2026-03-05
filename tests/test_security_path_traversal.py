@@ -207,8 +207,10 @@ def test_run_tailer_path_validation(tmp_path):
         tailer.tail_run("..")
 
 
-@pytest.mark.asyncio
-async def test_evolution_api_path_traversal(monkeypatch):
+
+def test_evolution_api_path_traversal(monkeypatch):
+    import asyncio
+
     # Mock dependencies to prevent errors from other initialization
     from pathlib import Path
 
@@ -223,51 +225,48 @@ async def test_evolution_api_path_traversal(monkeypatch):
         reject_evolution_patch_endpoint,
         validate_evolution_patch_endpoint,
     )
-
     monkeypatch.setattr(evolution, "_get_runs_root", lambda: Path("/tmp/fake"))
     monkeypatch.setattr(evolution, "_get_repo_root", lambda: Path("/tmp/fake"))
 
     # get_run_evolution_patches
     with pytest.raises(HTTPException) as exc_info:
-        await get_run_evolution_patches("../etc/passwd")
+        asyncio.run(get_run_evolution_patches("../etc/passwd"))
     assert exc_info.value.status_code == 400
 
     # get_evolution_patch_details run_id
     with pytest.raises(HTTPException) as exc_info:
-        await get_evolution_patch_details("../etc/passwd", "patch-1")
+        asyncio.run(get_evolution_patch_details("../etc/passwd", "patch-1"))
     assert exc_info.value.status_code == 400
 
     # get_evolution_patch_details patch_id
     with pytest.raises(HTTPException) as exc_info:
-        await get_evolution_patch_details("run-1", "../etc/passwd")
+        asyncio.run(get_evolution_patch_details("run-1", "../etc/passwd"))
     assert exc_info.value.status_code == 400
 
     # validate_evolution_patch_endpoint run_id
     with pytest.raises(HTTPException) as exc_info:
-        await validate_evolution_patch_endpoint("../etc/passwd", "patch-1")
+        asyncio.run(validate_evolution_patch_endpoint("../etc/passwd", "patch-1"))
     assert exc_info.value.status_code == 400
 
     # apply_evolution_patch_endpoint with colon
     with pytest.raises(HTTPException) as exc_info:
-        await apply_evolution_patch_endpoint(
-            ApplyEvolutionRequest(
-                patch_id="../etc/passwd:something", dry_run=True, create_backup=False
-            )
-        )
+        asyncio.run(apply_evolution_patch_endpoint(
+            ApplyEvolutionRequest(patch_id="../etc/passwd:something", dry_run=True, create_backup=False)
+        ))
     assert exc_info.value.status_code == 400
 
     # apply_evolution_patch_endpoint without colon
     with pytest.raises(HTTPException) as exc_info:
-        await apply_evolution_patch_endpoint(
+        asyncio.run(apply_evolution_patch_endpoint(
             ApplyEvolutionRequest(patch_id="../etc/passwd", dry_run=True, create_backup=False)
-        )
+        ))
     assert exc_info.value.status_code == 400
 
     # reject_evolution_patch_endpoint
     with pytest.raises(HTTPException) as exc_info:
-        await reject_evolution_patch_endpoint(
+        asyncio.run(reject_evolution_patch_endpoint(
             run_id="../etc/passwd",
             patch_id="patch-1",
             request=RejectEvolutionRequest(patch_id="patch-1", reason="test"),
-        )
+        ))
     assert exc_info.value.status_code == 400
