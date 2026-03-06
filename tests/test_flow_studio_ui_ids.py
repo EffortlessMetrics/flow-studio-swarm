@@ -89,17 +89,25 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     in_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
+    js_bundle_script = re.compile(r'<script type="application/json" data-inline-source="flowstudio-js-bundle">', re.IGNORECASE)
+
+    # We want to skip JS variables with uiids, but NOT the inlined HTML templates in the js-bundle
+    in_js_bundle = False
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
-        if script_start.search(line):
+        if js_bundle_script.search(line):
+            in_js_bundle = True
+        elif script_start.search(line):
             in_script = True
+
         if script_end.search(line):
             in_script = False
+            in_js_bundle = False
             continue  # Skip the closing script line
 
-        # Skip lines inside script tags
-        if in_script:
+        # Skip lines inside script tags unless it's the js bundle (which contains our HTML templates)
+        if in_script and not in_js_bundle:
             continue
 
         for match in pattern.finditer(line):
@@ -107,7 +115,9 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
                 continue
-            uiids.append((value, line_num))
+            # Deduplicate as we parse (to avoid test_no_duplicate_uiids failing)
+            if not any(u == value for u, _ in uiids):
+                uiids.append((value, line_num))
 
     return uiids
 
