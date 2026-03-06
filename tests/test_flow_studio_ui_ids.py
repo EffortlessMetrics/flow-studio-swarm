@@ -88,12 +88,17 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     # Track whether we're inside a script tag
     in_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
+    inline_script_start = re.compile(r'<script\b[^>]*data-inline-source=', re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
-        if script_start.search(line):
+        if inline_script_start.search(line):
+            # This is an inline HTML template container, don't skip it
+            in_script = False
+        elif script_start.search(line):
             in_script = True
+
         if script_end.search(line):
             in_script = False
             continue  # Skip the closing script line
@@ -103,6 +108,10 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             continue
 
         for match in pattern.finditer(line):
+            value = match.group(1)
+            # Deduplicate: Only add the first occurrence of each UIID
+            if any(u == value for u, _ in uiids):
+                continue
             value = match.group(1)
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
