@@ -204,3 +204,61 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_evolution_api_path_validation():
+    """Test that Evolution API validates path components."""
+    import asyncio
+
+    import pytest
+    from fastapi import HTTPException
+    from swarm.api.routes.evolution import (
+        ApplyEvolutionRequest,
+        RejectEvolutionRequest,
+        apply_evolution_patch_endpoint,
+        get_run_evolution_patches,
+        reject_evolution_patch_endpoint,
+        validate_evolution_patch_endpoint,
+    )
+
+    async def run_tests():
+        # get_run_evolution_patches
+        with pytest.raises(HTTPException) as excinfo:
+            await get_run_evolution_patches(run_id="../etc")
+        assert excinfo.value.status_code == 400
+
+        # validate_evolution_patch_endpoint
+        with pytest.raises(HTTPException) as excinfo:
+            await validate_evolution_patch_endpoint(run_id="run1", patch_id="../etc")
+        assert excinfo.value.status_code == 400
+
+        # apply_evolution_patch_endpoint composite patch_id
+        req1 = ApplyEvolutionRequest(patch_id="run1:../etc", dry_run=True, create_backup=False)
+        with pytest.raises(HTTPException) as excinfo:
+            await apply_evolution_patch_endpoint(req1)
+        assert excinfo.value.status_code == 400
+
+        # apply_evolution_patch_endpoint single patch_id
+        req2 = ApplyEvolutionRequest(patch_id="../etc", dry_run=True, create_backup=False)
+        with pytest.raises(HTTPException) as excinfo:
+            await apply_evolution_patch_endpoint(req2)
+        assert excinfo.value.status_code == 400
+
+        # reject_evolution_patch_endpoint
+        req3 = RejectEvolutionRequest(patch_id="../etc", reason="test")
+        with pytest.raises(HTTPException) as excinfo:
+            await reject_evolution_patch_endpoint(run_id="run1", patch_id="../etc", request=req3)
+        assert excinfo.value.status_code == 400
+
+    from swarm.api.routes import evolution
+    # Need to mock _get_runs_root and _get_repo_root to avoid RuntimeError
+    old_runs_root = evolution._get_runs_root
+    old_repo_root = evolution._get_repo_root
+
+    try:
+        from pathlib import Path
+        evolution._get_runs_root = lambda: Path("/tmp")
+        evolution._get_repo_root = lambda: Path("/tmp")
+        asyncio.run(run_tests())
+    finally:
+        evolution._get_runs_root = old_runs_root
+        evolution._get_repo_root = old_repo_root
