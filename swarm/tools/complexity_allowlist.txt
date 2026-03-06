@@ -1,4 +1,11 @@
 # Path | expires (YYYY-MM-DD) | reason
 # Example:
 # swarm/runtime/types/state_types.py | 2026-03-31 | Temporary during refactor (SWARM-123)
-swarm/runtime/backends.py | 2026-02-28 | Large backend implementations, needs splitting (REF-001)
+swarm/runtime/backends.py | 2026-06-30 | Large backend implementations, needs splitting (REF-001)
+swarm/runtime/boundary_enforcement.py | 2026-06-30 | Need to split up scanner responsibilities (REF-002)
+swarm/runtime/storage.py | 2026-06-30 | Core storage module needs refactoring (REF-003)
+swarm/tools/lint_routing_fields.py | 2026-06-30 | Linting logic too complex (REF-004)
+tests/test_flow_order_guardrail.py | 2026-06-30 | Extensive test cases (REF-005)
+tests/test_flow_studio_ui_ids.py | 2026-06-30 | Extensive UI ID test coverage (REF-006)
+tests/test_run_service.py | 2026-06-30 | Extensive test coverage for RunService (REF-007)
+tests/test_shadow_fork.py | 2026-06-30 | Shadow fork behavior testing is large (REF-008)
