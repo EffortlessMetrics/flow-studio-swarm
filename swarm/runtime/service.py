@@ -334,8 +334,12 @@ class RunService:
             if rid in example_set:
                 summary = self._create_legacy_summary(rid, is_example=True)
             else:
+                # read_summary acts as validation for active runs.
                 summary = storage.read_summary(rid)
                 if not summary and include_legacy:
+                    # _create_legacy_summary internally asserts legacy run format logic.
+                    # This ensures we don't incorrectly return empty/invalid directories
+                    # as legacy runs, while remaining lazy for unrequested pages.
                     summary = self._create_legacy_summary(rid, is_example=False)
 
             if summary:
