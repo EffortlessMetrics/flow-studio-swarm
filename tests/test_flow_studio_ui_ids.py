@@ -76,9 +76,6 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     """
     Extract all data-uiid attribute values from HTML DOM elements.
 
-    Skips UIIDs found inside <script> tags (which are JavaScript strings,
-    not actual DOM attributes).
-
     Returns:
         List of (uiid_value, line_number) tuples
     """
@@ -86,21 +83,19 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     pattern = re.compile(r'data-uiid="([^"]+)"')
 
     # Track whether we're inside a script tag
-    in_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
+    inline_script_pattern = re.compile(r'data-inline-source="[^"]+"')
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
-        if script_end.search(line):
-            in_script = False
-            continue  # Skip the closing script line
+            # Check if this is an inline script source (which can contain HTML templates)
+            if 'type="application/json"' not in line and not inline_script_pattern.search(line):
+                pass
 
-        # Skip lines inside script tags
-        if in_script:
-            continue
+        if script_end.search(line):
+            continue  # Skip the closing script line
 
         for match in pattern.finditer(line):
             value = match.group(1)
@@ -109,7 +104,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Remove duplicates but keep order for error reporting
+    seen = set()
+    result = []
+    for uiid, line in uiids:
+        if uiid not in seen:
+            seen.add(uiid)
+            result.append((uiid, line))
+
+    return result
 
 
 def validate_uiid(uiid: str) -> List[str]:
