@@ -1,0 +1,4 @@
+## 2024-05-24 - Path Traversal in Wisdom and Evolution APIs
+**Vulnerability:** Path traversal vulnerabilities identified in `swarm/api/routes/evolution.py` and `swarm/api/routes/wisdom.py`. Parameters such as `run_id`, `patch_id`, and `artifact_name` were directly concatenated into file paths (e.g., `runs_root / run_id / "wisdom"` and `wisdom_dir / artifact_name`) without validation.
+**Learning:** Application-level component extraction and validation (`validate_path_component`) must be applied to user inputs embedded within JSON request bodies or composite IDs (like `run_id:patch_id`) before resolving file system paths. Framework-level path sanitization (like FastAPI's `../` normalization) does not protect against these payloads.
+**Prevention:** Always use `swarm.runtime.safe_paths.validate_path_component` for user-supplied path parameters in FastAPI routes before using them in `Path` constructions.

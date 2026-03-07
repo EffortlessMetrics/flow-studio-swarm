@@ -204,3 +204,71 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_evolution_api_path_traversal(tmp_path, monkeypatch):
+    """Test that Evolution API endpoints validate path components against traversal."""
+    import asyncio
+    from fastapi import HTTPException
+    from swarm.api.routes import evolution
+
+    # Mock to avoid SpecManager initialization errors
+    monkeypatch.setattr(evolution, "_get_runs_root", lambda: tmp_path)
+    monkeypatch.setattr(evolution, "_get_repo_root", lambda: tmp_path)
+
+    async def run_tests():
+        with pytest.raises(HTTPException) as exc_info:
+            await evolution.get_run_evolution_patches("../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await evolution.get_evolution_patch_details("valid_run", "../bad_patch")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            req = evolution.ApplyEvolutionRequest(patch_id="../etc/passwd:something")
+            await evolution.apply_evolution_patch_endpoint(req)
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            req = evolution.ApplyEvolutionRequest(patch_id="valid_run:../etc/passwd")
+            await evolution.apply_evolution_patch_endpoint(req)
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            req = evolution.RejectEvolutionRequest(patch_id="../bad_patch", reason="")
+            await evolution.reject_evolution_patch_endpoint("valid_run", "../bad_patch", req)
+        assert exc_info.value.status_code == 400
+
+    asyncio.run(run_tests())
+
+
+def test_wisdom_api_path_traversal(tmp_path, monkeypatch):
+    """Test that Wisdom API endpoints validate path components against traversal."""
+    import asyncio
+    from fastapi import HTTPException
+    from swarm.api.routes import wisdom
+
+    # Mock to avoid SpecManager initialization errors
+    monkeypatch.setattr(wisdom, "_get_runs_root", lambda: tmp_path)
+    monkeypatch.setattr(wisdom, "_get_repo_root", lambda: tmp_path)
+
+    async def run_tests():
+        with pytest.raises(HTTPException) as exc_info:
+            await wisdom.get_wisdom_artifacts("../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await wisdom.get_wisdom_content("valid_run", "../bad_artifact")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            req = wisdom.ApplyPatchRequest(artifact_name="../bad_artifact", commit_message="")
+            await wisdom.apply_wisdom_patch("valid_run", req)
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            req = wisdom.RejectPatchRequest(artifact_name="../bad_artifact", reason="")
+            await wisdom.reject_wisdom_patch("valid_run", req)
+        assert exc_info.value.status_code == 400
+
+    asyncio.run(run_tests())
