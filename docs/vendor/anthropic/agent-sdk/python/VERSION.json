@@ -1,6 +1,6 @@
 {
   "distribution": "claude-agent-sdk",
-  "generated_at": "2026-03-07T03:51:44+00:00",
+  "generated_at": "2026-03-07T04:00:02+00:00",
   "import_module": "claude_agent_sdk",
   "python": "3.14",
   "version": "0.1.19"

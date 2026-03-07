@@ -990,6 +990,6 @@
       "signature": "(name: str, description: str, input_schema: type | dict[str, Any]) -> collections.abc.Callable[[collections.abc.Callable[[typing.Any], collections.abc.Awaitable[dict[str, typing.Any]]]], claude_agent_sdk.SdkMcpTool[typing.Any]]"
     }
   },
-  "generated_at": "2026-03-07T03:51:44+00:00",
+  "generated_at": "2026-03-07T04:00:02+00:00",
   "module": "claude_agent_sdk"
 }
