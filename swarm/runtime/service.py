@@ -312,14 +312,15 @@ class RunService:
                     all_ids.append(rid)
 
         if include_legacy:
-            active_ids, legacy_ids = storage.scan_runs()
+            # Fast path: get all candidate IDs, validation happens during hydration
+            other_ids = storage.list_all_run_ids()
         else:
-            active_ids = storage.list_runs()
-            legacy_ids = []
+            # Must validate meta.json existence before slicing
+            other_ids = storage.list_runs()
 
-        # Combine active and legacy, sort by ID descending
+        # Sort by ID descending
         # Assumption: run_id lexicographical order ~= chronological order
-        other_ids = sorted(active_ids + legacy_ids, reverse=True)
+        other_ids.sort(reverse=True)
 
         for rid in other_ids:
             if rid not in seen_ids:
@@ -332,7 +333,6 @@ class RunService:
         summaries = []
         # Create sets for fast lookups during summary creation
         example_set = set(storage.discover_example_runs()) if include_examples else set()
-        legacy_set = set(legacy_ids)
 
         for rid in sliced_ids:
             summary = None
@@ -341,8 +341,11 @@ class RunService:
                 summary = self._create_legacy_summary(rid, is_example=True)
             else:
                 summary = storage.read_summary(rid)
-                if not summary and rid in legacy_set:
-                    summary = self._create_legacy_summary(rid, is_example=False)
+                if not summary and include_legacy:
+                    # Validate it's actually a legacy run (no meta.json) to prevent active runs
+                    # with corrupt meta.json from being incorrectly hydrated as legacy runs.
+                    if not (storage.get_run_path(rid) / storage.META_FILE).exists():
+                        summary = self._create_legacy_summary(rid, is_example=False)
 
             if summary:
                 summaries.append(summary)
