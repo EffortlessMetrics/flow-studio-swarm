@@ -187,6 +187,32 @@ def test_run_state_manager_path_validation(tmp_path):
 
     asyncio.run(run_tests())
 
+def test_evolution_apply_path_traversal(monkeypatch, tmp_path):
+    """Test that Evolution apply endpoint validates composite patch_id against path traversal."""
+    import asyncio
+    from fastapi import HTTPException
+    from swarm.api.routes import evolution
+    from swarm.api.routes.evolution import apply_evolution_patch_endpoint, ApplyEvolutionRequest
+
+    monkeypatch.setattr(evolution, "_get_runs_root", lambda: tmp_path)
+    monkeypatch.setattr(evolution, "_get_repo_root", lambda: tmp_path)
+
+    async def run_tests():
+        with pytest.raises(HTTPException) as exc_info:
+            await apply_evolution_patch_endpoint(
+                request=ApplyEvolutionRequest(patch_id="../etc:FLOW-PATCH-001", dry_run=True, create_backup=True)
+            )
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await apply_evolution_patch_endpoint(
+                request=ApplyEvolutionRequest(patch_id="run_id:../FLOW-PATCH-001", dry_run=True, create_backup=True)
+            )
+        assert exc_info.value.status_code == 400
+
+    asyncio.run(run_tests())
+
+
 def test_run_tailer_path_validation(tmp_path):
     """Test that RunTailer validates run_id against path traversal."""
     from swarm.runtime.db import StatsDB
