@@ -204,3 +204,68 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+@pytest.fixture
+def mock_managers(monkeypatch, tmp_path):
+    # Mock manager methods depending on where tests import them
+    monkeypatch.setattr("swarm.api.routes.wisdom._get_runs_root", lambda: tmp_path / "runs")
+    monkeypatch.setattr("swarm.api.routes.wisdom._get_repo_root", lambda: tmp_path / "repo")
+    monkeypatch.setattr("swarm.api.routes.evolution._get_runs_root", lambda: tmp_path / "runs")
+    monkeypatch.setattr("swarm.api.routes.evolution._get_repo_root", lambda: tmp_path / "repo")
+    return tmp_path
+
+@pytest.mark.anyio
+async def test_get_wisdom_artifacts_path_traversal(mock_managers):
+    from fastapi import HTTPException
+    from swarm.api.routes.wisdom import get_wisdom_artifacts
+    with pytest.raises(HTTPException) as exc_info:
+        await get_wisdom_artifacts("../etc")
+    assert exc_info.value.status_code == 400
+
+@pytest.mark.anyio
+async def test_get_wisdom_content_path_traversal(mock_managers):
+    from fastapi import HTTPException
+    from swarm.api.routes.wisdom import get_wisdom_content
+    with pytest.raises(HTTPException) as exc_info:
+        await get_wisdom_content("valid_run", "../etc/passwd")
+    assert exc_info.value.status_code == 400
+
+@pytest.mark.anyio
+async def test_get_run_evolution_patches_path_traversal(mock_managers):
+    from fastapi import HTTPException
+    from swarm.api.routes.evolution import get_run_evolution_patches
+    with pytest.raises(HTTPException) as exc_info:
+        await get_run_evolution_patches("../etc")
+    assert exc_info.value.status_code == 400
+
+@pytest.mark.anyio
+async def test_validate_evolution_patch_endpoint_path_traversal(mock_managers):
+    from fastapi import HTTPException
+    from swarm.api.routes.evolution import validate_evolution_patch_endpoint
+    with pytest.raises(HTTPException) as exc_info:
+        await validate_evolution_patch_endpoint("valid_run", "../etc/passwd")
+    assert exc_info.value.status_code == 400
+
+@pytest.mark.anyio
+async def test_reject_evolution_patch_endpoint_path_traversal(mock_managers):
+    from fastapi import HTTPException
+    from swarm.api.routes.evolution import reject_evolution_patch_endpoint, RejectEvolutionRequest
+    with pytest.raises(HTTPException) as exc_info:
+        await reject_evolution_patch_endpoint("valid_run", "../etc/passwd", RejectEvolutionRequest(patch_id="patch1", reason="test"))
+    assert exc_info.value.status_code == 400
+
+@pytest.mark.anyio
+async def test_get_evolution_patch_details_path_traversal(mock_managers):
+    from fastapi import HTTPException
+    from swarm.api.routes.evolution import get_evolution_patch_details
+    with pytest.raises(HTTPException) as exc_info:
+        await get_evolution_patch_details("valid_run", "../etc/passwd")
+    assert exc_info.value.status_code == 400
+
+@pytest.mark.anyio
+async def test_apply_evolution_patch_endpoint_path_traversal(mock_managers):
+    from fastapi import HTTPException
+    from swarm.api.routes.evolution import apply_evolution_patch_endpoint, ApplyEvolutionRequest
+    with pytest.raises(HTTPException) as exc_info:
+        await apply_evolution_patch_endpoint(ApplyEvolutionRequest(patch_id="valid_run:../etc/passwd"))
+    assert exc_info.value.status_code == 400
