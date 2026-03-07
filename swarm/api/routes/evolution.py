@@ -19,6 +19,8 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/evolution", tags=["evolution"])
@@ -409,10 +411,33 @@ async def apply_evolution_patch_endpoint(
 
     # Parse patch_id (may be "run_id:patch_id" or just "patch_id")
     if ":" in request.patch_id:
-        run_id, patch_id = request.patch_id.split(":", 1)
+        raw_run_id, raw_patch_id = request.patch_id.split(":", 1)
+        try:
+            run_id = validate_path_component(raw_run_id, "run_id")
+            patch_id = validate_path_component(raw_patch_id, "patch_id")
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_path_component",
+                    "message": str(e),
+                    "details": {},
+                },
+            )
     else:
+        try:
+            patch_id = validate_path_component(request.patch_id, "patch_id")
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_path_component",
+                    "message": str(e),
+                    "details": {},
+                },
+            )
+
         # Search all recent runs for this patch_id
-        patch_id = request.patch_id
         run_id = None
         pending = evolution["list_pending_patches"](runs_root, limit=50)
         for rid, patches in pending:

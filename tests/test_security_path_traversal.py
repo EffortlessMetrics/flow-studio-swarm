@@ -187,6 +187,7 @@ def test_run_state_manager_path_validation(tmp_path):
 
     asyncio.run(run_tests())
 
+
 def test_run_tailer_path_validation(tmp_path):
     """Test that RunTailer validates run_id against path traversal."""
     from swarm.runtime.db import StatsDB
@@ -204,3 +205,32 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+def test_evolution_apply_path_traversal():
+    """Test that the Evolution API validates patch_id against path traversal."""
+    import asyncio
+    from unittest.mock import MagicMock, patch
+
+    from fastapi import HTTPException
+    from swarm.api.routes.evolution import ApplyEvolutionRequest, apply_evolution_patch_endpoint
+
+    request = ApplyEvolutionRequest(
+        patch_id="../../etc:my-patch",
+        dry_run=True,
+        create_backup=False,
+    )
+
+    async def run_test():
+        with (
+            patch("swarm.api.routes.evolution._get_runs_root", return_value=MagicMock()),
+            patch("swarm.api.routes.evolution._get_repo_root", return_value=MagicMock()),
+            patch("swarm.api.routes.evolution._get_evolution_module", return_value=MagicMock()),
+        ):
+            with pytest.raises(HTTPException) as excinfo:
+                await apply_evolution_patch_endpoint(request=request)
+
+            assert excinfo.value.status_code == 400
+            assert "invalid_path_component" in str(excinfo.value.detail)
+
+    asyncio.run(run_test())
