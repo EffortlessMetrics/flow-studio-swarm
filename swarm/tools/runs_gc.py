@@ -18,9 +18,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import shutil
 import sys
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
@@ -51,18 +51,58 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class RunInfo:
     """Information about a run for GC decisions."""
 
-    run_id: str
-    path: Path
-    run_type: str  # "active", "example", "legacy"
-    size_bytes: int
-    mtime: datetime
-    has_meta: bool
-    is_corrupt: bool
-    tags: List[str]
+    def __init__(self, run_id: str, path: Path, run_type: str, mtime: datetime):
+        self.run_id = run_id
+        self.path = path
+        self.run_type = run_type
+        self.mtime = mtime
+
+        self._size_bytes: int | None = None
+        self._meta_loaded: bool = False
+        self._has_meta: bool = False
+        self._is_corrupt: bool = False
+        self._tags: List[str] = []
+
+    def _load_meta(self) -> None:
+        if self._meta_loaded:
+            return
+
+        meta_path = self.path / META_FILE
+        self._has_meta = meta_path.exists()
+
+        if self._has_meta:
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self._tags = data.get("tags", [])
+            except (json.JSONDecodeError, OSError):
+                self._is_corrupt = True
+
+        self._meta_loaded = True
+
+    @property
+    def size_bytes(self) -> int:
+        if self._size_bytes is None:
+            self._size_bytes = get_dir_size(self.path)
+        return self._size_bytes
+
+    @property
+    def has_meta(self) -> bool:
+        self._load_meta()
+        return self._has_meta
+
+    @property
+    def is_corrupt(self) -> bool:
+        self._load_meta()
+        return self._is_corrupt
+
+    @property
+    def tags(self) -> List[str]:
+        self._load_meta()
+        return self._tags
 
     @property
     def age_days(self) -> float:
@@ -86,44 +126,6 @@ def get_dir_size(path: Path) -> int:
     return total
 
 
-def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
-    """Collect information about a single run."""
-    meta_path = run_path / META_FILE
-    has_meta = meta_path.exists()
-    is_corrupt = False
-    tags: List[str] = []
-
-    # Check if metadata is corrupt
-    if has_meta:
-        try:
-            with open(meta_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            tags = data.get("tags", [])
-        except (json.JSONDecodeError, OSError):
-            is_corrupt = True
-
-    # Get modification time
-    try:
-        stat = run_path.stat()
-        mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
-    except OSError:
-        mtime = datetime.now(timezone.utc)
-
-    # Get size
-    size_bytes = get_dir_size(run_path)
-
-    return RunInfo(
-        run_id=run_id,
-        path=run_path,
-        run_type=run_type,
-        size_bytes=size_bytes,
-        mtime=mtime,
-        has_meta=has_meta,
-        is_corrupt=is_corrupt,
-        tags=tags,
-    )
-
-
 def discover_all_runs() -> List[RunInfo]:
     """Discover all runs from runs/ and examples/ directories."""
     runs: List[RunInfo] = []
@@ -131,26 +133,39 @@ def discover_all_runs() -> List[RunInfo]:
 
     # Examples (always preserved)
     if EXAMPLES_DIR.exists():
-        for entry in EXAMPLES_DIR.iterdir():
-            if entry.is_dir() and not entry.name.startswith("."):
-                if entry.name not in seen:
-                    seen.add(entry.name)
-                    runs.append(get_run_info(entry.name, entry, "example"))
+        with os.scandir(EXAMPLES_DIR) as it:
+            for entry in it:
+                if entry.is_dir() and not entry.name.startswith((".", "__")):
+                    if entry.name not in seen:
+                        seen.add(entry.name)
+                        try:
+                            stat = entry.stat(follow_symlinks=False)
+                            mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+                        except OSError:
+                            mtime = datetime.now(timezone.utc)
+                        runs.append(RunInfo(entry.name, Path(entry.path), "example", mtime))
 
     # Active runs with meta.json
     if RUNS_DIR.exists():
-        for entry in RUNS_DIR.iterdir():
-            if entry.is_dir() and not entry.name.startswith("."):
-                if entry.name in seen:
-                    continue
-                seen.add(entry.name)
+        with os.scandir(RUNS_DIR) as it:
+            for entry in it:
+                if entry.is_dir() and not entry.name.startswith((".", "__")):
+                    if entry.name in seen:
+                        continue
+                    seen.add(entry.name)
 
-                meta_path = entry / META_FILE
-                if meta_path.exists():
-                    runs.append(get_run_info(entry.name, entry, "active"))
-                else:
-                    # Legacy run (no meta.json)
-                    runs.append(get_run_info(entry.name, entry, "legacy"))
+                    try:
+                        stat = entry.stat(follow_symlinks=False)
+                        mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+                    except OSError:
+                        mtime = datetime.now(timezone.utc)
+
+                    meta_path = Path(entry.path) / META_FILE
+                    if meta_path.exists():
+                        runs.append(RunInfo(entry.name, Path(entry.path), "active", mtime))
+                    else:
+                        # Legacy run (no meta.json)
+                        runs.append(RunInfo(entry.name, Path(entry.path), "legacy", mtime))
 
     return runs
 
