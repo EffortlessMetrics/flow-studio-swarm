@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import shutil
 import sys
 from dataclasses import dataclass
@@ -71,16 +72,19 @@ class RunInfo:
         return (now - self.mtime).total_seconds() / 86400
 
 
-def get_dir_size(path: Path) -> int:
-    """Get total size of a directory in bytes."""
+def get_dir_size(path: Path | str) -> int:
+    """Get total size of a directory in bytes using os.scandir recursively."""
     total = 0
     try:
-        for entry in path.rglob("*"):
-            if entry.is_file():
-                try:
-                    total += entry.stat().st_size
-                except OSError:
-                    pass
+        with os.scandir(path) as it:
+            for entry in it:
+                if entry.is_file(follow_symlinks=False):
+                    try:
+                        total += entry.stat(follow_symlinks=False).st_size
+                    except OSError:
+                        pass
+                elif entry.is_dir(follow_symlinks=False):
+                    total += get_dir_size(entry.path)
     except OSError:
         pass
     return total
