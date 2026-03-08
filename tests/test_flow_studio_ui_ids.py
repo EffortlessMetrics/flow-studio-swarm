@@ -93,7 +93,10 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            # Special exception: The flowstudio-js-bundle script contains inlined HTML templates
+            # created by esbuild, which contain actual DOM attributes. We should not skip this block.
+            if 'data-inline-source="flowstudio-js-bundle"' not in line:
+                in_script = True
         if script_end.search(line):
             in_script = False
             continue  # Skip the closing script line
@@ -109,7 +112,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate while preserving the first seen line number
+    unique_uiids = []
+    seen = set()
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            unique_uiids.append((value, line_num))
+
+    return unique_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
