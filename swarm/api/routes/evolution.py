@@ -432,18 +432,23 @@ async def apply_evolution_patch_endpoint(
     # Parse patch_id (may be "run_id:patch_id" or just "patch_id")
     if ":" in request.patch_id:
         run_id, patch_id = request.patch_id.split(":", 1)
+
+        # SECURITY: Prevent path traversal in run_id and patch_id
+        try:
+            validate_path_component(run_id, "run_id")
+            validate_path_component(patch_id, "patch_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     else:
         # Search all recent runs for this patch_id
         patch_id = request.patch_id
         run_id = None
 
-    # SECURITY: Prevent path traversal in run_id and patch_id
-    try:
-        if run_id is not None:
-            validate_path_component(run_id, "run_id")
-        validate_path_component(patch_id, "patch_id")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # SECURITY: Prevent path traversal in patch_id
+        try:
+            validate_path_component(patch_id, "patch_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     if run_id is None:
         pending = evolution["list_pending_patches"](runs_root, limit=50)
