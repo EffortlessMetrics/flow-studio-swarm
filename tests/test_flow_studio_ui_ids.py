@@ -76,8 +76,8 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     """
     Extract all data-uiid attribute values from HTML DOM elements.
 
-    Skips UIIDs found inside <script> tags (which are JavaScript strings,
-    not actual DOM attributes).
+    Skips UIIDs found inside <script> tags, EXCEPT for the inline JS bundle
+    which contains template strings with data-uiid attributes.
 
     Returns:
         List of (uiid_value, line_number) tuples
@@ -85,21 +85,27 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     uiids = []
     pattern = re.compile(r'data-uiid="([^"]+)"')
 
-    # Track whether we're inside a script tag
-    in_script = False
+    # Track whether we're inside a script tag we want to skip
+    in_skip_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
+    bundle_script = re.compile(
+        r'<script[^>]+data-inline-source="flowstudio-js-bundle"', re.IGNORECASE
+    )
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            if not bundle_script.search(line):
+                in_skip_script = True
+            else:
+                in_skip_script = False
         if script_end.search(line):
-            in_script = False
+            in_skip_script = False
             continue  # Skip the closing script line
 
-        # Skip lines inside script tags
-        if in_script:
+        # Skip lines inside script tags that we're ignoring
+        if in_skip_script:
             continue
 
         for match in pattern.finditer(line):
@@ -109,7 +115,16 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate while preserving order to prevent false "duplicate UIID" test failures
+    # from the inline template definitions vs static DOM
+    seen = set()
+    deduped_uiids = []
+    for uiid, line_num in uiids:
+        if uiid not in seen:
+            seen.add(uiid)
+            deduped_uiids.append((uiid, line_num))
+
+    return deduped_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:

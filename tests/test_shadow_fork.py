@@ -77,13 +77,22 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            def mock_git_impl(args, **kwargs):
+                cmd = " ".join(args)
+                if "rev-parse --abbrev-ref HEAD" in cmd:
+                    return True, "main", ""
+                elif "rev-parse --verify" in cmd:
+                    return False, "", "fatal"
+                elif "status --porcelain" in cmd:
+                    return True, "", ""
+                elif "checkout -b" in cmd:
+                    return False, "", "fatal"
+                return True, "", ""
+
+            mock_git.side_effect = mock_git_impl
+
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -91,12 +100,22 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+
+            def mock_git_impl(args, **kwargs):
+                cmd = " ".join(args)
+                if "rev-parse --abbrev-ref HEAD" in cmd:
+                    return True, "main", ""
+                elif "rev-parse --verify" in cmd:
+                    return True, "", ""
+                elif "status --porcelain" in cmd:
+                    return True, " M file.txt\n", ""
+                elif "checkout -b" in cmd:
+                    return True, "", ""
+                elif "rev-parse" in cmd:
+                    return True, "test-hash", ""
+                return True, "", ""
+
+            mock_git.side_effect = mock_git_impl
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
