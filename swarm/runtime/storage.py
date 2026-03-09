@@ -890,6 +890,34 @@ def scan_runs(runs_dir: Path = RUNS_DIR) -> Tuple[List[RunId], List[RunId]]:
     return sorted(active_runs), sorted(legacy_runs)
 
 
+def list_all_run_ids(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """Fast-path function to get all potential run directory names without file existence checks.
+
+    This is used by paginated list endpoints to quickly get the total count and slice
+    before doing expensive hydration. It intentionally over-approximates by including
+    any non-hidden directory, relying on hydration methods to cleanly reject invalid ones.
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of all non-hidden directory names, sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    run_ids: List[RunId] = []
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if entry.is_dir() and not entry.name.startswith(".") and not entry.name.startswith("__"):
+                    run_ids.append(entry.name)
+    except OSError:
+        pass
+
+    return sorted(run_ids)
+
+
 def discover_legacy_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     """Find runs that have flow artifacts but no meta.json (legacy runs).
 
