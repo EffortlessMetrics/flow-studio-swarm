@@ -20,6 +20,8 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wisdom", tags=["wisdom"])
@@ -422,6 +424,18 @@ async def get_wisdom_artifacts(run_id: str):
     Raises:
         404: Run not found or no wisdom artifacts.
     """
+    try:
+        run_id = validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_path",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
     wisdom_dir = _get_run_wisdom_dir(run_id)
 
     if not wisdom_dir.exists():
@@ -505,6 +519,19 @@ async def get_wisdom_content(
         404: Artifact not found.
         304: Not modified (if ETag matches).
     """
+    try:
+        run_id = validate_path_component(run_id, "run_id")
+        artifact_name = validate_path_component(artifact_name, "artifact_name")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_path",
+                "message": str(e),
+                "details": {"run_id": run_id, "artifact_name": artifact_name},
+            },
+        )
+
     wisdom_dir = _get_run_wisdom_dir(run_id)
     artifact_path = wisdom_dir / artifact_name
 
