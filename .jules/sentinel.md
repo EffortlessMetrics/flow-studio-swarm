@@ -1,0 +1,4 @@
+## 2024-05-18 - Path Traversal in FastAPI Path Parameters
+**Vulnerability:** Path traversal via FastAPI path parameters (`run_id`, `artifact_name`) being used directly in file system operations without prior validation in `swarm/api/routes/wisdom.py`. Framework-level sanitization might not protect against traversal when malicious payloads are part of complex composite strings.
+**Learning:** Application-level component extraction and validation (`validate_path_component`) must be applied explicitly to user-controlled path parameters before resolving file system paths to prevent directory traversal. Ensure proper exception handling (catching `ValueError`) to return 400 Bad Request instead of causing 500 errors.
+**Prevention:** Always use `swarm.runtime.safe_paths.validate_path_component` to validate any path parameter or segment derived from user input before passing it to file system operations (like `Path` joins).
