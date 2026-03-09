@@ -36,8 +36,8 @@
         <div id="tour-menu" class="tour-dropdown-menu" role="menu" aria-label="Available tours" data-uiid="flow_studio.header.tour.menu"></div>
       </div>
       <div class="mode-toggle" role="group" aria-label="View mode" data-uiid="flow_studio.header.mode">
-        <button id="mode-author" class="active" title="Show all paths, CLI commands, and technical details" aria-pressed="true" data-uiid="flow_studio.header.mode.author">Author</button>
-        <button id="mode-operator" title="Simplified view focused on run status and decisions" aria-pressed="false" data-uiid="flow_studio.header.mode.operator">Operator</button>
+        <button id="mode-author" class="active" title="Show all paths, CLI commands, and technical details" aria-pressed="true" aria-label="Author mode" data-uiid="flow_studio.header.mode.author">Author</button>
+        <button id="mode-operator" title="Simplified view focused on run status and decisions" aria-pressed="false" aria-label="Operator mode" data-uiid="flow_studio.header.mode.operator">Operator</button>
       </div>
       <button id="profile-badge" class="muted fs-status-button fs-profile-badge" title="Current swarm profile" data-uiid="flow_studio.header.profile">
         <span id="profile-icon" aria-hidden="true">&#128230;</span>
@@ -52,14 +52,14 @@
         <input type="checkbox" id="governance-overlay-checkbox" />
         <span>Show Issues</span>
       </label>
-      <button id="teaching-mode-toggle" class="teaching-mode-toggle" title="Enable Teaching Mode for learning-focused features" aria-pressed="false" data-uiid="flow_studio.header.teaching_mode.toggle">
+      <button id="teaching-mode-toggle" class="teaching-mode-toggle" title="Enable Teaching Mode for learning-focused features" aria-pressed="false" aria-label="Toggle teaching mode" data-uiid="flow_studio.header.teaching_mode.toggle">
         <span class="teaching-mode-icon" aria-hidden="true">&#127891;</span>
         <span class="teaching-mode-label">Teach</span>
       </button>
       <div class="muted author-only" style="display: flex; align-items: center; gap: 8px;" data-uiid="flow_studio.header.reload">
         <span class="mono">make dev-check</span>
-        <button id="copy-dev-check-btn" class="copy-btn" title="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
-        <button id="reload-btn" class="fs-button-small" data-uiid="flow_studio.header.reload.btn">Reload</button>
+        <button id="copy-dev-check-btn" class="copy-btn" title="Copy command to clipboard" aria-label="Copy reload command" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
+        <button id="reload-btn" class="fs-button-small" aria-label="Reload" data-uiid="flow_studio.header.reload.btn">Reload</button>
       </div>
       <button id="help-btn" class="fs-icon-button" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
     </nav>
@@ -112,8 +112,8 @@
     <div style="margin-bottom: 12px;" data-uiid="flow_studio.sidebar.view_toggle">
       <label class="muted" style="font-size: 10px; display: block; margin-bottom: 4px;">VIEW</label>
       <div class="view-toggle" role="group" aria-label="Graph view mode">
-        <button id="view-agents" class="active" title="Show steps and agents" aria-pressed="true" data-uiid="flow_studio.sidebar.view_toggle.agents">Steps/Agents</button>
-        <button id="view-artifacts" title="Show steps and artifacts" aria-pressed="false" data-uiid="flow_studio.sidebar.view_toggle.artifacts">Artifacts</button>
+        <button id="view-agents" class="active" title="Show steps and agents" aria-pressed="true" aria-label="Show steps and agents" data-uiid="flow_studio.sidebar.view_toggle.agents">Steps/Agents</button>
+        <button id="view-artifacts" title="Show steps and artifacts" aria-pressed="false" aria-label="Show steps and artifacts" data-uiid="flow_studio.sidebar.view_toggle.artifacts">Artifacts</button>
       </div>
     </div>
     <div style="margin-bottom: 12px;" data-uiid="flow_studio.sidebar.backend_selector">
@@ -140,9 +140,9 @@
         </button>
       </div>
       <div id="run-history-filter" class="run-history-filter" role="group" aria-label="Run filters" data-uiid="flow_studio.sidebar.run_history.filter">
-        <button type="button" aria-pressed="true" class="filter-btn active" data-filter="all">All</button>
-        <button type="button" aria-pressed="false" class="filter-btn" data-filter="example">Examples</button>
-        <button type="button" aria-pressed="false" class="filter-btn" data-filter="active">Active</button>
+        <button type="button" aria-pressed="true" class="filter-btn active" aria-label="Show all runs" data-filter="all">All</button>
+        <button type="button" aria-pressed="false" class="filter-btn" aria-label="Show example runs" data-filter="example">Examples</button>
+        <button type="button" aria-pressed="false" class="filter-btn" aria-label="Show active runs" data-filter="active">Active</button>
       </div>
       <div id="run-history-list" class="run-history-list" role="list" aria-label="Run history" data-uiid="flow_studio.sidebar.run_history.list">
         <div class="muted" style="padding: 8px; font-size: 11px;">Loading...</div>
@@ -214,11 +214,11 @@
         </div>
         <div class="command-line">
            <span class="command-text">uv run swarm/tools/gen_flows.py</span>
-           <button class="copy-btn" onclick="navigator.clipboard.writeText('uv run swarm/tools/gen_flows.py').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard">Copy</button>
+           <button class="copy-btn" onclick="navigator.clipboard.writeText('uv run swarm/tools/gen_flows.py').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard" aria-label="Copy to clipboard">Copy</button>
         </div>
         <div class="command-line">
            <span class="command-text">make validate-swarm</span>
-           <button class="copy-btn" onclick="navigator.clipboard.writeText('make validate-swarm').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard">Copy</button>
+           <button class="copy-btn" onclick="navigator.clipboard.writeText('make validate-swarm').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard" aria-label="Copy to clipboard">Copy</button>
         </div>
       </div>
       <p style="margin-top: 12px; font-size: 12px; color: #6b7280;">
@@ -391,23 +391,23 @@
     <div class="settings-presets">
       <h4>Quick Presets</h4>
       <div class="preset-buttons">
-        <button class="btn-preset" data-preset="lean" title="Minimal history for fast execution">
+        <button class="btn-preset" data-preset="lean" title="Minimal history for fast execution" aria-label="Lean preset">
           Lean (25k tokens)
         </button>
-        <button class="btn-preset" data-preset="balanced" title="Default balanced settings">
+        <button class="btn-preset" data-preset="balanced" title="Default balanced settings" aria-label="Balanced preset">
           Balanced (50k tokens)
         </button>
-        <button class="btn-preset" data-preset="heavy" title="Maximum context for complex flows">
+        <button class="btn-preset" data-preset="heavy" title="Maximum context for complex flows" aria-label="Heavy preset">
           Heavy (100k tokens)
         </button>
       </div>
     </div>
 
     <div class="settings-actions">
-      <button class="btn-secondary" data-uiid="flow_studio.modal.context_budget.reset">
+      <button class="btn-secondary" aria-label="Reset to defaults" data-uiid="flow_studio.modal.context_budget.reset">
         Reset to Defaults
       </button>
-      <button class="btn-primary" data-uiid="flow_studio.modal.context_budget.save">
+      <button class="btn-primary" aria-label="Save to profile" data-uiid="flow_studio.modal.context_budget.save">
         Save to Profile
       </button>
     </div>
@@ -4793,9 +4793,16 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
     list.className = "fs-text-body";
     list.style.lineHeight = "1.8";
     usage.forEach(u => {
-        const item = document.createElement("div");
+        const item = document.createElement("button");
         item.style.cursor = "pointer";
         item.style.padding = "2px 0";
+        item.style.background = "none";
+        item.style.border = "none";
+        item.style.textAlign = "left";
+        item.style.width = "100%";
+        item.style.fontFamily = "inherit";
+        item.style.fontSize = "inherit";
+        item.style.color = "inherit";
         item.innerHTML = renderAgentUsageItem(u.flow_title, u.step_title);
         item.title = `Click to navigate to ${u.flow}:${u.step}`;
         item.addEventListener("click", async () => {
@@ -4819,6 +4826,8 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
         });
         item.addEventListener("mouseenter", () => { item.style.background = "#f3f4f6"; });
         item.addEventListener("mouseleave", () => { item.style.background = "transparent"; });
+        item.addEventListener("focus", () => { item.style.background = "#f3f4f6"; });
+        item.addEventListener("blur", () => { item.style.background = "transparent"; });
         list.appendChild(item);
     });
     container.appendChild(list);
@@ -5246,10 +5255,16 @@ export async function showStepDetails(data, callbacks = {}) {
         }
         else {
             stepAgents.forEach(agentKey => {
-                const agentLink = document.createElement("div");
+                const agentLink = document.createElement("button");
                 agentLink.style.cursor = "pointer";
                 agentLink.style.padding = "2px 0";
                 agentLink.style.color = "#3b82f6";
+                agentLink.style.background = "none";
+                agentLink.style.border = "none";
+                agentLink.style.textAlign = "left";
+                agentLink.style.width = "100%";
+                agentLink.style.fontFamily = "inherit";
+                agentLink.style.fontSize = "inherit";
                 agentLink.innerHTML = `<span class="mono">${escapeHtml(agentKey)}</span>`;
                 agentLink.title = `Click to view agent: ${agentKey}`;
                 agentLink.addEventListener("click", async () => {
@@ -5262,6 +5277,14 @@ export async function showStepDetails(data, callbacks = {}) {
                     agentLink.style.textDecoration = "underline";
                 });
                 agentLink.addEventListener("mouseleave", () => {
+                    agentLink.style.background = "transparent";
+                    agentLink.style.textDecoration = "none";
+                });
+                agentLink.addEventListener("focus", () => {
+                    agentLink.style.background = "#f3f4f6";
+                    agentLink.style.textDecoration = "underline";
+                });
+                agentLink.addEventListener("blur", () => {
                     agentLink.style.background = "transparent";
                     agentLink.style.textDecoration = "none";
                 });
@@ -10133,7 +10156,10 @@ export function renderNoRuns() {
       <div class="fs-empty-icon" aria-hidden="true">\u{1F4C2}</div>
       <p class="fs-empty-title">No runs yet</p>
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
-      <code class="mono fs-empty-command">make demo-run</code>
+      <div class="fs-copy-command">
+        <code class="mono fs-empty-command">make demo-run</code>
+        <button class="fs-icon-button copy-button" title="Copy command" onclick="navigator.clipboard.writeText('make demo-run'); this.textContent='\u2713'; setTimeout(() => this.textContent='\uD83D\uDCCB', 2000)">\uD83D\uDCCB</button>
+      </div>
     </div>
   `;
 }
