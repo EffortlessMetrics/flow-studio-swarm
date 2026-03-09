@@ -76,8 +76,8 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     """
     Extract all data-uiid attribute values from HTML DOM elements.
 
-    Skips UIIDs found inside <script> tags (which are JavaScript strings,
-    not actual DOM attributes).
+    Skips UIIDs found inside regular <script> tags, but includes the UIIDs
+    in the inline data script bundle where esbuild injects HTML templates.
 
     Returns:
         List of (uiid_value, line_number) tuples
@@ -87,19 +87,25 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
 
     # Track whether we're inside a script tag
     in_script = False
+    is_bundle_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
+    bundle_script_start = re.compile(
+        r'<script type="application/json" data-inline-source="flowstudio-js-bundle">', re.IGNORECASE
+    )
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
             in_script = True
+            is_bundle_script = bool(bundle_script_start.search(line))
         if script_end.search(line):
             in_script = False
+            is_bundle_script = False
             continue  # Skip the closing script line
 
-        # Skip lines inside script tags
-        if in_script:
+        # Skip lines inside regular script tags, but process the bundle script
+        if in_script and not is_bundle_script:
             continue
 
         for match in pattern.finditer(line):
@@ -109,7 +115,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate extracted uiids while preserving order (first seen line number)
+    seen = set()
+    deduped_uiids = []
+    for uiid, line_num in uiids:
+        if uiid not in seen:
+            seen.add(uiid)
+            deduped_uiids.append((uiid, line_num))
+
+    return deduped_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
