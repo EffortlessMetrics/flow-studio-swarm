@@ -353,6 +353,20 @@ async def stream_run_events(run_id: str, request: Request):
         event: run:completed
         data: {"run_id": "abc123", "status": "succeeded"}
     """
+    from swarm.runtime.safe_paths import validate_path_component
+
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_path",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
     # Get runs root from spec manager
     from ..server import get_spec_manager
 
@@ -416,6 +430,8 @@ async def write_event(
         event_type: Event type name.
         data: Event data.
     """
+    from swarm.runtime.safe_paths import validate_path_component
+    validate_path_component(run_id, "run_id")
     events_file = runs_root / run_id / "events.jsonl"
     events_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -443,6 +459,8 @@ def write_event_sync(
         event_type: Event type name.
         data: Event data.
     """
+    from swarm.runtime.safe_paths import validate_path_component
+    validate_path_component(run_id, "run_id")
     events_file = runs_root / run_id / "events.jsonl"
     events_file.parent.mkdir(parents=True, exist_ok=True)
 
