@@ -21,7 +21,7 @@ import logging
 import os
 import shutil
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
@@ -59,17 +59,11 @@ class RunInfo:
     run_id: str
     path: Path
     run_type: str  # "active", "example", "legacy"
+    size_bytes: int
     mtime: datetime
     has_meta: bool
     is_corrupt: bool
     tags: List[str]
-    _size_bytes: int = field(default=-1, repr=False)
-
-    @property
-    def size_bytes(self) -> int:
-        if self._size_bytes == -1:
-            self._size_bytes = get_dir_size(self.path)
-        return self._size_bytes
 
     @property
     def age_days(self) -> float:
@@ -124,10 +118,14 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     except OSError:
         mtime = datetime.now(timezone.utc)
 
+    # Get size
+    size_bytes = get_dir_size(run_path)
+
     return RunInfo(
         run_id=run_id,
         path=run_path,
         run_type=run_type,
+        size_bytes=size_bytes,
         mtime=mtime,
         has_meta=has_meta,
         is_corrupt=is_corrupt,
