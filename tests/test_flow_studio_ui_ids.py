@@ -85,9 +85,9 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     uiids = []
     pattern = re.compile(r'data-uiid="([^"]+)"')
 
-    # Track whether we're inside a script tag
+    # Track whether we're inside a script tag, UNLESS it's an inline bundle
     in_script = False
-    script_start = re.compile(r"<script\b", re.IGNORECASE)
+    script_start = re.compile(r"<script\b(?!.*data-inline-source)", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
@@ -98,7 +98,7 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             in_script = False
             continue  # Skip the closing script line
 
-        # Skip lines inside script tags
+        # Skip lines inside script tags (except inline source blocks which contain HTML templates)
         if in_script:
             continue
 
@@ -109,7 +109,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate uiids
+    seen = set()
+    deduped_uiids = []
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            deduped_uiids.append((value, line_num))
+
+    return deduped_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
