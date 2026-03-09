@@ -187,6 +187,7 @@ def test_run_state_manager_path_validation(tmp_path):
 
     asyncio.run(run_tests())
 
+
 def test_run_tailer_path_validation(tmp_path):
     """Test that RunTailer validates run_id against path traversal."""
     from swarm.runtime.db import StatsDB
@@ -204,3 +205,143 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+def test_wisdom_api_path_traversal(monkeypatch):
+    """Test that Wisdom API routes validate path parameters against path traversal."""
+    import asyncio
+
+    # Mock dependencies to avoid actual filesystem or server access during tests
+    from pathlib import Path
+
+    from fastapi import HTTPException
+    from swarm.api.routes.wisdom import (
+        ApplyPatchRequest,
+        RejectPatchRequest,
+        WisdomApplyRequest,
+        apply_wisdom_patch,
+        apply_wisdom_patches,
+        get_wisdom_artifacts,
+        get_wisdom_content,
+        reject_wisdom_patch,
+    )
+
+    monkeypatch.setattr("swarm.api.routes.wisdom._get_runs_root", lambda: Path("/mock/runs"))
+
+    async def run_tests():
+        # Test get_wisdom_artifacts
+        with pytest.raises(HTTPException) as exc_info:
+            await get_wisdom_artifacts("../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        # Test get_wisdom_content
+        with pytest.raises(HTTPException) as exc_info:
+            await get_wisdom_content("../etc", "artifact.json")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_wisdom_content("valid-run", "../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        # Test apply_wisdom_patch
+        req = ApplyPatchRequest(artifact_name="artifact.json")
+        with pytest.raises(HTTPException) as exc_info:
+            await apply_wisdom_patch("../etc", req)
+        assert exc_info.value.status_code == 400
+
+        bad_req = ApplyPatchRequest(artifact_name="../etc/passwd")
+        with pytest.raises(HTTPException) as exc_info:
+            await apply_wisdom_patch("valid-run", bad_req)
+        assert exc_info.value.status_code == 400
+
+        # Test reject_wisdom_patch
+        req = RejectPatchRequest(artifact_name="artifact.json", reason="test")
+        with pytest.raises(HTTPException) as exc_info:
+            await reject_wisdom_patch("../etc", req)
+        assert exc_info.value.status_code == 400
+
+        bad_req = RejectPatchRequest(artifact_name="../etc/passwd", reason="test")
+        with pytest.raises(HTTPException) as exc_info:
+            await reject_wisdom_patch("valid-run", bad_req)
+        assert exc_info.value.status_code == 400
+
+        # Test apply_wisdom_patches
+        req = WisdomApplyRequest(patch_type="flow_evolution", policy="safe")
+        with pytest.raises(HTTPException) as exc_info:
+            await apply_wisdom_patches("../etc", req)
+        assert exc_info.value.status_code == 400
+
+    asyncio.run(run_tests())
+
+
+def test_evolution_api_path_traversal(monkeypatch):
+    """Test that Evolution API routes validate path parameters against path traversal."""
+    import asyncio
+
+    # Mock dependencies
+    from pathlib import Path
+
+    from fastapi import HTTPException
+    from swarm.api.routes.evolution import (
+        ApplyEvolutionRequest,
+        RejectEvolutionRequest,
+        apply_evolution_patch_endpoint,
+        get_evolution_patch_details,
+        get_run_evolution_patches,
+        reject_evolution_patch_endpoint,
+        validate_evolution_patch_endpoint,
+    )
+
+    monkeypatch.setattr("swarm.api.routes.evolution._get_runs_root", lambda: Path("/mock/runs"))
+    monkeypatch.setattr("swarm.api.routes.evolution._get_repo_root", lambda: Path("/mock/repo"))
+    monkeypatch.setattr(
+        "swarm.api.routes.evolution._get_evolution_module",
+        lambda: {"list_pending_patches": lambda *args, **kwargs: []},
+    )
+
+    async def run_tests():
+        # Test get_run_evolution_patches
+        with pytest.raises(HTTPException) as exc_info:
+            await get_run_evolution_patches("../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        # Test get_evolution_patch_details
+        with pytest.raises(HTTPException) as exc_info:
+            await get_evolution_patch_details("../etc", "patch-1")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_evolution_patch_details("valid-run", "../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        # Test validate_evolution_patch_endpoint
+        with pytest.raises(HTTPException) as exc_info:
+            await validate_evolution_patch_endpoint("../etc", "patch-1")
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await validate_evolution_patch_endpoint("valid-run", "../etc/passwd")
+        assert exc_info.value.status_code == 400
+
+        # Test apply_evolution_patch_endpoint
+        bad_req = ApplyEvolutionRequest(patch_id="../etc/passwd:patch-1")
+        with pytest.raises(HTTPException) as exc_info:
+            await apply_evolution_patch_endpoint(bad_req)
+        assert exc_info.value.status_code == 400
+
+        bad_req2 = ApplyEvolutionRequest(patch_id="valid-run:../etc/passwd")
+        with pytest.raises(HTTPException) as exc_info:
+            await apply_evolution_patch_endpoint(bad_req2)
+        assert exc_info.value.status_code == 400
+
+        # Test reject_evolution_patch_endpoint
+        req = RejectEvolutionRequest(patch_id="patch-1", reason="test")
+        with pytest.raises(HTTPException) as exc_info:
+            await reject_evolution_patch_endpoint("../etc", "patch-1", req)
+        assert exc_info.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_info:
+            await reject_evolution_patch_endpoint("valid-run", "../etc/passwd", req)
+        assert exc_info.value.status_code == 400
+
+    asyncio.run(run_tests())
