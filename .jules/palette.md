@@ -1,0 +1,3 @@
+## 2024-03-09 - Context-specific ARIA labels for generic UI buttons
+**Learning:** Generic utility buttons (like `.copy-btn`) used in multiple contexts within Flow Studio (e.g., header, inspector, modals) need explicit `aria-label` attributes in their respective HTML fragments. The default `title="Copy to clipboard"` does not provide enough screen reader context about *what* is being copied.
+**Action:** When adding or reusing generic utility buttons across different views, always ensure they are instantiated with context-specific `aria-label`s (e.g., `aria-label="Copy make dev-check command to clipboard"`) rather than relying solely on generic text content or title attributes.
