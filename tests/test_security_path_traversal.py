@@ -204,3 +204,118 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+@pytest.mark.anyio
+async def test_evolution_api_path_validation(tmp_path, monkeypatch):
+    import swarm.api.routes.evolution as evo
+    from swarm.api.routes.evolution import (
+        get_run_evolution_patches,
+        validate_evolution_patch_endpoint,
+        apply_evolution_patch_endpoint,
+        reject_evolution_patch_endpoint,
+        ApplyEvolutionRequest,
+        RejectEvolutionRequest
+    )
+    from fastapi import HTTPException
+
+    # Mock dependencies
+    monkeypatch.setattr(evo, "_get_runs_root", lambda: tmp_path)
+    monkeypatch.setattr(evo, "_get_repo_root", lambda: tmp_path)
+    monkeypatch.setattr(evo, "_get_evolution_module", lambda: {
+        "generate_evolution_patch": lambda *args, **kwargs: [],
+        "list_pending_patches": lambda *args, **kwargs: []
+    })
+
+    # 1. get_run_evolution_patches
+    with pytest.raises(HTTPException) as exc:
+        await get_run_evolution_patches("../etc")
+    assert exc.value.status_code == 400
+
+    # 2. validate_evolution_patch_endpoint
+    with pytest.raises(HTTPException) as exc:
+        await validate_evolution_patch_endpoint("../etc", "patch-1")
+    assert exc.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc:
+        await validate_evolution_patch_endpoint("valid-run", "../patch-1")
+    assert exc.value.status_code == 400
+
+    # 3. apply_evolution_patch_endpoint
+    req = ApplyEvolutionRequest(patch_id="../etc:patch", dry_run=True, create_backup=False)
+    with pytest.raises(HTTPException) as exc:
+        await apply_evolution_patch_endpoint(req)
+    assert exc.value.status_code == 400
+
+    req2 = ApplyEvolutionRequest(patch_id="valid-run:../patch", dry_run=True, create_backup=False)
+    with pytest.raises(HTTPException) as exc:
+        await apply_evolution_patch_endpoint(req2)
+    assert exc.value.status_code == 400
+
+    # 4. reject_evolution_patch_endpoint
+    rej = RejectEvolutionRequest(patch_id="patch", reason="test")
+    with pytest.raises(HTTPException) as exc:
+        await reject_evolution_patch_endpoint("../etc", "patch", rej)
+    assert exc.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc:
+        await reject_evolution_patch_endpoint("valid-run", "../patch", rej)
+    assert exc.value.status_code == 400
+
+@pytest.mark.anyio
+async def test_wisdom_api_path_validation(tmp_path, monkeypatch):
+    import swarm.api.routes.wisdom as wis
+    from swarm.api.routes.wisdom import (
+        get_wisdom_artifacts,
+        get_wisdom_content,
+        apply_wisdom_patch,
+        reject_wisdom_patch,
+        apply_wisdom_patches,
+        ApplyPatchRequest,
+        RejectPatchRequest,
+        WisdomApplyRequest
+    )
+    from fastapi import HTTPException
+
+    # Mock dependencies
+    monkeypatch.setattr(wis, "_get_runs_root", lambda: tmp_path)
+    monkeypatch.setattr(wis, "_get_repo_root", lambda: tmp_path)
+
+    # 1. get_wisdom_artifacts
+    with pytest.raises(HTTPException) as exc:
+        await get_wisdom_artifacts("../etc")
+    assert exc.value.status_code == 400
+
+    # 2. get_wisdom_content
+    with pytest.raises(HTTPException) as exc:
+        await get_wisdom_content("../etc", "artifact.md")
+    assert exc.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc:
+        await get_wisdom_content("valid-run", "../etc/passwd")
+    assert exc.value.status_code == 400
+
+    # 3. apply_wisdom_patch
+    req = ApplyPatchRequest(dry_run=True, artifact_name="../patch")
+    with pytest.raises(HTTPException) as exc:
+        await apply_wisdom_patch("../etc", req)
+    assert exc.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc:
+        await apply_wisdom_patch("valid-run", req)
+    assert exc.value.status_code == 400
+
+    # 4. reject_wisdom_patch
+    rej = RejectPatchRequest(artifact_name="../patch", reason="test")
+    with pytest.raises(HTTPException) as exc:
+        await reject_wisdom_patch("../etc", rej)
+    assert exc.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc:
+        await reject_wisdom_patch("valid-run", rej)
+    assert exc.value.status_code == 400
+
+    # 5. apply_wisdom_patches
+    ap_req = WisdomApplyRequest(dry_run=True)
+    with pytest.raises(HTTPException) as exc:
+        await apply_wisdom_patches("../etc", ap_req)
+    assert exc.value.status_code == 400

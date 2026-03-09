@@ -19,9 +19,19 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/evolution", tags=["evolution"])
+
+
+def _validate_path(val: str, name: str) -> None:
+    if val is not None:
+        try:
+            validate_path_component(val, name)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail={"error": "invalid_path", "message": str(e), "details": {name: val}})
 
 
 # =============================================================================
@@ -225,6 +235,7 @@ async def get_run_evolution_patches(run_id: str):
     Raises:
         404: Run not found or no wisdom outputs.
     """
+    _validate_path(run_id, "run_id")
     evolution = _get_evolution_module()
     runs_root = _get_runs_root()
 
@@ -269,6 +280,8 @@ async def get_evolution_patch_details(
     Raises:
         404: Patch not found.
     """
+    _validate_path(run_id, "run_id")
+    _validate_path(patch_id, "patch_id")
     evolution = _get_evolution_module()
     runs_root = _get_runs_root()
 
@@ -333,6 +346,8 @@ async def validate_evolution_patch_endpoint(run_id: str, patch_id: str):
     Raises:
         404: Patch not found.
     """
+    _validate_path(run_id, "run_id")
+    _validate_path(patch_id, "patch_id")
     evolution = _get_evolution_module()
     runs_root = _get_runs_root()
     repo_root = _get_repo_root()
@@ -403,6 +418,12 @@ async def apply_evolution_patch_endpoint(
         409: Validation failed.
         412: ETag mismatch.
     """
+    if ":" in request.patch_id:
+        r_id, p_id = request.patch_id.split(":", 1)
+        _validate_path(r_id, "run_id")
+        _validate_path(p_id, "patch_id")
+    else:
+        _validate_path(request.patch_id, "patch_id")
     evolution = _get_evolution_module()
     runs_root = _get_runs_root()
     repo_root = _get_repo_root()
@@ -552,6 +573,8 @@ async def reject_evolution_patch_endpoint(
     Raises:
         404: Patch not found.
     """
+    _validate_path(run_id, "run_id")
+    _validate_path(patch_id, "patch_id")
     import json
 
     runs_root = _get_runs_root()
