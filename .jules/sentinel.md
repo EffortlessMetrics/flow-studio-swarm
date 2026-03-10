@@ -1,0 +1,4 @@
+## 2024-05-24 - Missing path validation in evolution and wisdom routes
+**Vulnerability:** Many API routes in `swarm/api/routes/evolution.py` and `swarm/api/routes/wisdom.py` accept path parameters (`run_id`, `patch_id`, `artifact_name`) but do not validate them against path traversal, leading to potential path traversal vulnerabilities when these variables are used to construct file paths.
+**Learning:** In FastAPI, standard types like `str` do not provide directory traversal protection. Applications must explicitly validate dynamic parts of file paths using something like `validate_path_component`.
+**Prevention:** Always use `validate_path_component` on path parameters (like `run_id`, `patch_id`, `artifact_name`) immediately when entering the route handler, catching `ValueError` to raise a `400` error if validation fails.
