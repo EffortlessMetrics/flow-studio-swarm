@@ -19,6 +19,8 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 
+from swarm.runtime.safe_paths import validate_path_component
+
 from ..services.run_state import get_state_manager
 from .runs_models import (
     InjectRequest,
@@ -68,6 +70,12 @@ async def pause_run(
         409: Run is not in a pausable state.
         412: ETag mismatch.
     """
+    try:
+        if run_id is not None:
+            validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     state_manager = get_state_manager()
     expected_etag = if_match.strip('"') if if_match else None
 
@@ -168,6 +176,12 @@ async def resume_run(
         409: Run is not in a resumable state.
         412: ETag mismatch.
     """
+    try:
+        if run_id is not None:
+            validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     state_manager = get_state_manager()
     expected_etag = if_match.strip('"') if if_match else None
 
@@ -266,6 +280,12 @@ async def inject_node(
         409: Run is not in an injectable state.
         412: ETag mismatch.
     """
+    try:
+        if run_id is not None:
+            validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     state_manager = get_state_manager()
     expected_etag = if_match.strip('"') if if_match else None
 
@@ -382,6 +402,12 @@ async def interrupt_run(
         409: Run is not in an interruptible state.
         412: ETag mismatch.
     """
+    try:
+        if run_id is not None:
+            validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     state_manager = get_state_manager()
     expected_etag = if_match.strip('"') if if_match else None
 
@@ -487,6 +513,12 @@ async def cancel_run(
         409: Run is already completed.
         412: ETag mismatch.
     """
+    try:
+        if run_id is not None:
+            validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     state_manager = get_state_manager()
     expected_etag = if_match.strip('"') if if_match else None
 
@@ -569,6 +601,12 @@ async def stop_run(
         409: Run is not in a stoppable state.
         412: ETag mismatch.
     """
+    try:
+        if run_id is not None:
+            validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     state_manager = get_state_manager()
     expected_etag = if_match.strip('"') if if_match else None
 
