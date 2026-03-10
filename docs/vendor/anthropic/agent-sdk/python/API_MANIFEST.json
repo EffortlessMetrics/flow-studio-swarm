@@ -25,14 +25,14 @@
           "default": "None",
           "default_factory": null,
           "name": "model",
-          "type": "typing.Optional[typing.Literal['sonnet', 'opus', 'haiku', 'inherit']]"
+          "type": "typing.Literal['sonnet', 'opus', 'haiku', 'inherit'] | None"
         }
       ],
       "doc_first_line": "Agent definition configuration.",
       "kind": "class",
       "methods": [],
       "name": "AgentDefinition",
-      "signature": "(description: str, prompt: str, tools: list[str] | None = None, model: Optional[Literal['sonnet', 'opus', 'haiku', 'inherit']] = None) -> None"
+      "signature": "(description: str, prompt: str, tools: list[str] | None = None, model: Literal['sonnet', 'opus', 'haiku', 'inherit'] | None = None) -> None"
     },
     "Any": {
       "dataclass_fields": null,
@@ -66,14 +66,14 @@
           "default": "None",
           "default_factory": null,
           "name": "error",
-          "type": "typing.Optional[typing.Literal['authentication_failed', 'billing_error', 'rate_limit', 'invalid_request', 'server_error', 'unknown']]"
+          "type": "typing.Literal['authentication_failed', 'billing_error', 'rate_limit', 'invalid_request', 'server_error', 'unknown'] | None"
         }
       ],
       "doc_first_line": "Assistant message with content blocks.",
       "kind": "class",
       "methods": [],
       "name": "AssistantMessage",
-      "signature": "(content: list[claude_agent_sdk.types.TextBlock | claude_agent_sdk.types.ThinkingBlock | claude_agent_sdk.types.ToolUseBlock | claude_agent_sdk.types.ToolResultBlock], model: str, parent_tool_use_id: str | None = None, error: Optional[Literal['authentication_failed', 'billing_error', 'rate_limit', 'invalid_request', 'server_error', 'unknown']] = None) -> None"
+      "signature": "(content: list[claude_agent_sdk.types.TextBlock | claude_agent_sdk.types.ThinkingBlock | claude_agent_sdk.types.ToolUseBlock | claude_agent_sdk.types.ToolResultBlock], model: str, parent_tool_use_id: str | None = None, error: Literal['authentication_failed', 'billing_error', 'rate_limit', 'invalid_request', 'server_error', 'unknown'] | None = None) -> None"
     },
     "Awaitable": {
       "dataclass_fields": null,
@@ -153,13 +153,13 @@
           "default": null,
           "default_factory": "<class 'dict'>",
           "name": "mcp_servers",
-          "type": "dict[str, claude_agent_sdk.types.McpStdioServerConfig | claude_agent_sdk.types.McpSSEServerConfig | claude_agent_sdk.types.McpHttpServerConfig | claude_agent_sdk.types.McpSdkServerConfig] | str | pathlib._local.Path"
+          "type": "dict[str, claude_agent_sdk.types.McpStdioServerConfig | claude_agent_sdk.types.McpSSEServerConfig | claude_agent_sdk.types.McpHttpServerConfig | claude_agent_sdk.types.McpSdkServerConfig] | str | pathlib.Path"
         },
         {
           "default": "None",
           "default_factory": null,
           "name": "permission_mode",
-          "type": "typing.Optional[typing.Literal['default', 'acceptEdits', 'plan', 'bypassPermissions']]"
+          "type": "typing.Literal['default', 'acceptEdits', 'plan', 'bypassPermissions'] | None"
         },
         {
           "default": "False",
@@ -219,13 +219,13 @@
           "default": "None",
           "default_factory": null,
           "name": "cwd",
-          "type": "str | pathlib._local.Path | None"
+          "type": "str | pathlib.Path | None"
         },
         {
           "default": "None",
           "default_factory": null,
           "name": "cli_path",
-          "type": "str | pathlib._local.Path | None"
+          "type": "str | pathlib.Path | None"
         },
         {
           "default": "None",
@@ -237,7 +237,7 @@
           "default": null,
           "default_factory": "<class 'list'>",
           "name": "add_dirs",
-          "type": "list[str | pathlib._local.Path]"
+          "type": "list[str | pathlib.Path]"
         },
         {
           "default": null,
@@ -279,7 +279,7 @@
           "default": "None",
           "default_factory": null,
           "name": "hooks",
-          "type": "dict[typing.Union[typing.Literal['PreToolUse'], typing.Literal['PostToolUse'], typing.Literal['UserPromptSubmit'], typing.Literal['Stop'], typing.Literal['SubagentStop'], typing.Literal['PreCompact']], list[claude_agent_sdk.types.HookMatcher]] | None"
+          "type": "dict[typing.Literal['PreToolUse'] | typing.Literal['PostToolUse'] | typing.Literal['UserPromptSubmit'] | typing.Literal['Stop'] | typing.Literal['SubagentStop'] | typing.Literal['PreCompact'], list[claude_agent_sdk.types.HookMatcher]] | None"
         },
         {
           "default": "None",
@@ -346,7 +346,7 @@
       "kind": "class",
       "methods": [],
       "name": "ClaudeAgentOptions",
-      "signature": "(tools: list[str] | claude_agent_sdk.types.ToolsPreset | None = None, allowed_tools: list[str] = <factory>, system_prompt: str | claude_agent_sdk.types.SystemPromptPreset | None = None, mcp_servers: dict[str, claude_agent_sdk.types.McpStdioServerConfig | claude_agent_sdk.types.McpSSEServerConfig | claude_agent_sdk.types.McpHttpServerConfig | claude_agent_sdk.types.McpSdkServerConfig] | str | pathlib._local.Path = <factory>, permission_mode: Optional[Literal['default', 'acceptEdits', 'plan', 'bypassPermissions']] = None, continue_conversation: bool = False, resume: str | None = None, max_turns: int | None = None, max_budget_usd: float | None = None, disallowed_tools: list[str] = <factory>, model: str | None = None, fallback_model: str | None = None, betas: list[typing.Literal['context-1m-2025-08-07']] = <factory>, permission_prompt_tool_name: str | None = None, cwd: str | pathlib._local.Path | None = None, cli_path: str | pathlib._local.Path | None = None, settings: str | None = None, add_dirs: list[str | pathlib._local.Path] = <factory>, env: dict[str, str] = <factory>, extra_args: dict[str, str | None] = <factory>, max_buffer_size: int | None = None, debug_stderr: Any = <stream>, stderr: collections.abc.Callable[[str], None] | None = None, can_use_tool: collections.abc.Callable[[str, dict[str, typing.Any], claude_agent_sdk.types.ToolPermissionContext], collections.abc.Awaitable[claude_agent_sdk.types.PermissionResultAllow | claude_agent_sdk.types.PermissionResultDeny]] | None = None, hooks: dict[typing.Union[typing.Literal['PreToolUse'], typing.Literal['PostToolUse'], typing.Literal['UserPromptSubmit'], typing.Literal['Stop'], typing.Literal['SubagentStop'], typing.Literal['PreCompact']], list[claude_agent_sdk.types.HookMatcher]] | None = None, user: str | None = None, include_partial_messages: bool = False, fork_session: bool = False, agents: dict[str, claude_agent_sdk.types.AgentDefinition] | None = None, setting_sources: list[typing.Literal['user', 'project', 'local']] | None = None, sandbox: claude_agent_sdk.types.SandboxSettings | None = None, plugins: list[claude_agent_sdk.types.SdkPluginConfig] = <factory>, max_thinking_tokens: int | None = None, output_format: dict[str, typing.Any] | None = None, enable_file_checkpointing: bool = False) -> None"
+      "signature": "(tools: list[str] | claude_agent_sdk.types.ToolsPreset | None = None, allowed_tools: list[str] = <factory>, system_prompt: str | claude_agent_sdk.types.SystemPromptPreset | None = None, mcp_servers: dict[str, claude_agent_sdk.types.McpStdioServerConfig | claude_agent_sdk.types.McpSSEServerConfig | claude_agent_sdk.types.McpHttpServerConfig | claude_agent_sdk.types.McpSdkServerConfig] | str | pathlib.Path = <factory>, permission_mode: Literal['default', 'acceptEdits', 'plan', 'bypassPermissions'] | None = None, continue_conversation: bool = False, resume: str | None = None, max_turns: int | None = None, max_budget_usd: float | None = None, disallowed_tools: list[str] = <factory>, model: str | None = None, fallback_model: str | None = None, betas: list[typing.Literal['context-1m-2025-08-07']] = <factory>, permission_prompt_tool_name: str | None = None, cwd: str | pathlib.Path | None = None, cli_path: str | pathlib.Path | None = None, settings: str | None = None, add_dirs: list[str | pathlib.Path] = <factory>, env: dict[str, str] = <factory>, extra_args: dict[str, str | None] = <factory>, max_buffer_size: int | None = None, debug_stderr: Any = <stream>, stderr: collections.abc.Callable[[str], None] | None = None, can_use_tool: collections.abc.Callable[[str, dict[str, Any], claude_agent_sdk.types.ToolPermissionContext], collections.abc.Awaitable[claude_agent_sdk.types.PermissionResultAllow | claude_agent_sdk.types.PermissionResultDeny]] | None = None, hooks: dict[Literal['PreToolUse'] | Literal['PostToolUse'] | Literal['UserPromptSubmit'] | Literal['Stop'] | Literal['SubagentStop'] | Literal['PreCompact'], list[claude_agent_sdk.types.HookMatcher]] | None = None, user: str | None = None, include_partial_messages: bool = False, fork_session: bool = False, agents: dict[str, claude_agent_sdk.types.AgentDefinition] | None = None, setting_sources: list[Literal['user', 'project', 'local']] | None = None, sandbox: claude_agent_sdk.types.SandboxSettings | None = None, plugins: list[claude_agent_sdk.types.SdkPluginConfig] = <factory>, max_thinking_tokens: int | None = None, output_format: dict[str, Any] | None = None, enable_file_checkpointing: bool = False) -> None"
     },
     "ClaudeSDKClient": {
       "dataclass_fields": null,
@@ -376,7 +376,7 @@
       "signature": null
     },
     "ContentBlock": {
-      "doc_first_line": "Represent a PEP 604 union type",
+      "doc_first_line": "Represent a union type",
       "kind": "unknown",
       "name": "ContentBlock",
       "signature": null
@@ -404,13 +404,13 @@
       "signature": null
     },
     "HookInput": {
-      "doc_first_line": "Represent a PEP 604 union type",
+      "doc_first_line": "Represent a union type",
       "kind": "unknown",
       "name": "HookInput",
       "signature": null
     },
     "HookJSONOutput": {
-      "doc_first_line": "Represent a PEP 604 union type",
+      "doc_first_line": "Represent a union type",
       "kind": "unknown",
       "name": "HookJSONOutput",
       "signature": null
@@ -451,13 +451,13 @@
       "signature": null
     },
     "McpServerConfig": {
-      "doc_first_line": "Represent a PEP 604 union type",
+      "doc_first_line": "Represent a union type",
       "kind": "unknown",
       "name": "McpServerConfig",
       "signature": null
     },
     "Message": {
-      "doc_first_line": "Represent a PEP 604 union type",
+      "doc_first_line": "Represent a union type",
       "kind": "unknown",
       "name": "Message",
       "signature": null
@@ -469,7 +469,7 @@
       "signature": "(*args, **kwargs)"
     },
     "PermissionResult": {
-      "doc_first_line": "Represent a PEP 604 union type",
+      "doc_first_line": "Represent a union type",
       "kind": "unknown",
       "name": "PermissionResult",
       "signature": null
@@ -499,7 +499,7 @@
       "kind": "class",
       "methods": [],
       "name": "PermissionResultAllow",
-      "signature": "(behavior: Literal['allow'] = 'allow', updated_input: dict[str, typing.Any] | None = None, updated_permissions: list[claude_agent_sdk.types.PermissionUpdate] | None = None) -> None"
+      "signature": "(behavior: Literal['allow'] = 'allow', updated_input: dict[str, Any] | None = None, updated_permissions: list[claude_agent_sdk.types.PermissionUpdate] | None = None) -> None"
     },
     "PermissionResultDeny": {
       "dataclass_fields": [
@@ -546,13 +546,13 @@
           "default": "None",
           "default_factory": null,
           "name": "behavior",
-          "type": "typing.Optional[typing.Literal['allow', 'deny', 'ask']]"
+          "type": "typing.Literal['allow', 'deny', 'ask'] | None"
         },
         {
           "default": "None",
           "default_factory": null,
           "name": "mode",
-          "type": "typing.Optional[typing.Literal['default', 'acceptEdits', 'plan', 'bypassPermissions']]"
+          "type": "typing.Literal['default', 'acceptEdits', 'plan', 'bypassPermissions'] | None"
         },
         {
           "default": "None",
@@ -564,7 +564,7 @@
           "default": "None",
           "default_factory": null,
           "name": "destination",
-          "type": "typing.Optional[typing.Literal['userSettings', 'projectSettings', 'localSettings', 'session']]"
+          "type": "typing.Literal['userSettings', 'projectSettings', 'localSettings', 'session'] | None"
         }
       ],
       "doc_first_line": "Permission update configuration.",
@@ -573,7 +573,7 @@
         "to_dict"
       ],
       "name": "PermissionUpdate",
-      "signature": "(type: Literal['addRules', 'replaceRules', 'removeRules', 'setMode', 'addDirectories', 'removeDirectories'], rules: list[claude_agent_sdk.types.PermissionRuleValue] | None = None, behavior: Optional[Literal['allow', 'deny', 'ask']] = None, mode: Optional[Literal['default', 'acceptEdits', 'plan', 'bypassPermissions']] = None, directories: list[str] | None = None, destination: Optional[Literal['userSettings', 'projectSettings', 'localSettings', 'session']] = None) -> None"
+      "signature": "(type: Literal['addRules', 'replaceRules', 'removeRules', 'setMode', 'addDirectories', 'removeDirectories'], rules: list[claude_agent_sdk.types.PermissionRuleValue] | None = None, behavior: Literal['allow', 'deny', 'ask'] | None = None, mode: Literal['default', 'acceptEdits', 'plan', 'bypassPermissions'] | None = None, directories: list[str] | None = None, destination: Literal['userSettings', 'projectSettings', 'localSettings', 'session'] | None = None) -> None"
     },
     "PostToolUseHookInput": {
       "dataclass_fields": null,
@@ -674,7 +674,7 @@
       "kind": "class",
       "methods": [],
       "name": "ResultMessage",
-      "signature": "(subtype: str, duration_ms: int, duration_api_ms: int, is_error: bool, num_turns: int, session_id: str, total_cost_usd: float | None = None, usage: dict[str, typing.Any] | None = None, result: str | None = None, structured_output: Any = None) -> None"
+      "signature": "(subtype: str, duration_ms: int, duration_api_ms: int, is_error: bool, num_turns: int, session_id: str, total_cost_usd: float | None = None, usage: dict[str, Any] | None = None, result: str | None = None, structured_output: Any = None) -> None"
     },
     "SandboxIgnoreViolations": {
       "dataclass_fields": null,
@@ -737,7 +737,7 @@
       "kind": "class",
       "methods": [],
       "name": "SdkMcpTool",
-      "signature": "(name: str, description: str, input_schema: type[~T] | dict[str, typing.Any], handler: collections.abc.Callable[[~T], collections.abc.Awaitable[dict[str, typing.Any]]]) -> None"
+      "signature": "(name: str, description: str, input_schema: type[~T] | dict[str, Any], handler: collections.abc.Callable[[~T], collections.abc.Awaitable[dict[str, typing.Any]]]) -> None"
     },
     "SdkPluginConfig": {
       "dataclass_fields": null,
@@ -851,7 +851,7 @@
       "kind": "class",
       "methods": [],
       "name": "ToolPermissionContext",
-      "signature": "(signal: typing.Any | None = None, suggestions: list[claude_agent_sdk.types.PermissionUpdate] = <factory>) -> None"
+      "signature": "(signal: Any | None = None, suggestions: list[claude_agent_sdk.types.PermissionUpdate] = <factory>) -> None"
     },
     "ToolResultBlock": {
       "dataclass_fields": [
@@ -878,7 +878,7 @@
       "kind": "class",
       "methods": [],
       "name": "ToolResultBlock",
-      "signature": "(tool_use_id: str, content: str | list[dict[str, typing.Any]] | None = None, is_error: bool | None = None) -> None"
+      "signature": "(tool_use_id: str, content: str | list[dict[str, Any]] | None = None, is_error: bool | None = None) -> None"
     },
     "ToolUseBlock": {
       "dataclass_fields": [
@@ -969,7 +969,7 @@
       "doc_first_line": "Create an in-process MCP server that runs within your Python application.",
       "kind": "function",
       "name": "create_sdk_mcp_server",
-      "signature": "(name: str, version: str = '1.0.0', tools: list[claude_agent_sdk.SdkMcpTool[typing.Any]] | None = None) -> claude_agent_sdk.types.McpSdkServerConfig"
+      "signature": "(name: str, version: str = '1.0.0', tools: list[claude_agent_sdk.SdkMcpTool[Any]] | None = None) -> claude_agent_sdk.types.McpSdkServerConfig"
     },
     "dataclass": {
       "doc_first_line": "Add dunder methods based on the fields defined in the class.",
@@ -981,15 +981,15 @@
       "doc_first_line": "Query Claude Code for one-shot or unidirectional streaming interactions.",
       "kind": "function",
       "name": "query",
-      "signature": "(*, prompt: str | collections.abc.AsyncIterable[dict[str, typing.Any]], options: claude_agent_sdk.types.ClaudeAgentOptions | None = None, transport: claude_agent_sdk._internal.transport.Transport | None = None) -> collections.abc.AsyncIterator[claude_agent_sdk.types.UserMessage | claude_agent_sdk.types.AssistantMessage | claude_agent_sdk.types.SystemMessage | claude_agent_sdk.types.ResultMessage | claude_agent_sdk.types.StreamEvent]"
+      "signature": "(*, prompt: str | collections.abc.AsyncIterable[dict[str, Any]], options: claude_agent_sdk.types.ClaudeAgentOptions | None = None, transport: claude_agent_sdk._internal.transport.Transport | None = None) -> collections.abc.AsyncIterator[claude_agent_sdk.types.UserMessage | claude_agent_sdk.types.AssistantMessage | claude_agent_sdk.types.SystemMessage | claude_agent_sdk.types.ResultMessage | claude_agent_sdk.types.StreamEvent]"
     },
     "tool": {
       "doc_first_line": "Decorator for defining MCP tools with type safety.",
       "kind": "function",
       "name": "tool",
-      "signature": "(name: str, description: str, input_schema: type | dict[str, typing.Any]) -> collections.abc.Callable[[collections.abc.Callable[[typing.Any], collections.abc.Awaitable[dict[str, typing.Any]]]], claude_agent_sdk.SdkMcpTool[typing.Any]]"
+      "signature": "(name: str, description: str, input_schema: type | dict[str, Any]) -> collections.abc.Callable[[collections.abc.Callable[[typing.Any], collections.abc.Awaitable[dict[str, typing.Any]]]], claude_agent_sdk.SdkMcpTool[typing.Any]]"
     }
   },
-  "generated_at": "2026-01-22T03:29:04+00:00",
+  "generated_at": "2026-03-10T02:15:33+00:00",
   "module": "claude_agent_sdk"
 }
