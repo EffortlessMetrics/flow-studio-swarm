@@ -1,0 +1,4 @@
+## 2024-05-14 - SSE Stream Endpoint Path Traversal
+**Vulnerability:** Path traversal in `stream_run_events` (`GET /runs/{run_id}/events`). The `run_id` parameter was passed directly to construct a local file path (`runs_root / run_id`) without validation, allowing users to specify a malicious `run_id` to traverse paths outside the expected directory.
+**Learning:** SSE stream generation bypasses standard data layer abstractions (where validation might typically occur) because it streams events directly from file components. This means endpoints directly constructing paths must explicitly execute application-level path validation.
+**Prevention:** Explicitly use `validate_path_component` from `swarm.runtime.safe_paths` at the controller layer (in FastAPI endpoint implementations) for dynamic path arguments prior to resolving their system file paths.
