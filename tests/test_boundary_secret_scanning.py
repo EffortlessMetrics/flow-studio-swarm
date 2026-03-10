@@ -1,9 +1,8 @@
-from unittest.mock import MagicMock
-
 import pytest
-from swarm.runtime.boundary_enforcement import BoundaryScanner, ViolationType, WorkspaceState
+from pathlib import Path
+from unittest.mock import MagicMock
+from swarm.runtime.boundary_enforcement import BoundaryScanner, WorkspaceState, ViolationType
 from swarm.runtime.workspace import Workspace
-
 
 @pytest.fixture
 def mock_workspace(tmp_path):
