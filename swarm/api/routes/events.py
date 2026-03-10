@@ -356,7 +356,7 @@ async def stream_run_events(run_id: str, request: Request):
         data: {"run_id": "abc123", "status": "succeeded"}
     """
     try:
-        run_id = validate_path_component(run_id, "run_id")
+        validate_path_component(run_id, "run_id")
     except ValueError as e:
         raise HTTPException(
             status_code=400,

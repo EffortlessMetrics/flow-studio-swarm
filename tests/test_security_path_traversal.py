@@ -188,17 +188,20 @@ def test_run_state_manager_path_validation(tmp_path):
     asyncio.run(run_tests())
 
 
-@pytest.mark.anyio
-async def test_stream_run_events_path_validation():
+def test_stream_run_events_path_validation():
     """Test that stream_run_events validates run_id against path traversal."""
+    import asyncio
     from fastapi import HTTPException
     from swarm.api.routes.events import stream_run_events
 
-    with pytest.raises(HTTPException) as exc_info:
-        await stream_run_events("../etc/passwd", request=None)
+    async def run_tests():
+        with pytest.raises(HTTPException) as exc_info:
+            await stream_run_events("../etc/passwd", request=None)
 
-    assert exc_info.value.status_code == 400
-    assert "invalid characters" in exc_info.value.detail["message"]
+        assert exc_info.value.status_code == 400
+        assert "invalid characters" in exc_info.value.detail["message"]
+
+    asyncio.run(run_tests())
 
 
 def test_run_tailer_path_validation(tmp_path):
