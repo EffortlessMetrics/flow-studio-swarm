@@ -87,8 +87,11 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
 
     # Track whether we're inside a script tag
     in_script = False
-    script_start = re.compile(r"<script\b", re.IGNORECASE)
+    script_start = re.compile(r"<script\b(?!.*type=\"application/json\")", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
+
+    # Store unique uiids to avoid duplicates from multiple occurrences
+    unique_uiids = {}
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
@@ -107,9 +110,10 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
                 continue
-            uiids.append((value, line_num))
+            if value not in unique_uiids:
+                unique_uiids[value] = line_num
 
-    return uiids
+    return [(uiid, line) for uiid, line in unique_uiids.items()]
 
 
 def validate_uiid(uiid: str) -> List[str]:
