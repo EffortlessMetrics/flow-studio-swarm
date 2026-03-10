@@ -25,7 +25,7 @@ Usage:
         write_run_state, read_run_state, update_run_state,
         write_envelope, read_envelope, list_envelopes,
         commit_step_completion,
-        list_runs, discover_legacy_runs,
+    list_runs, discover_legacy_runs, list_all_run_ids,
     )
 """
 
@@ -818,6 +818,33 @@ def summarize_navigator_events(
 # -----------------------------------------------------------------------------
 # Run Listing
 # -----------------------------------------------------------------------------
+
+
+def list_all_run_ids(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """List all candidate run directories quickly without checking file contents.
+
+    Returns all directory names in the runs directory that don't start with
+    '.' or '__'. This is O(1) file system metadata access.
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of directory names, sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    run_ids: List[RunId] = []
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if entry.is_dir() and not entry.name.startswith(".") and not entry.name.startswith("__"):
+                    run_ids.append(entry.name)
+    except OSError:
+        pass
+
+    return sorted(run_ids)
 
 
 def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
