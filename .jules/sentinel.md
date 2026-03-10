@@ -1,0 +1,4 @@
+## 2025-03-10 - Fix Path Traversal in Evolution & Wisdom API Endpoints
+**Vulnerability:** Path Traversal via `run_id`, `patch_id`, and `artifact_name` URL parameters and request bodies in `evolution.py` and `wisdom.py` where input strings were concatenated to form file paths using `/` without validation.
+**Learning:** Even internal API endpoints parsing artifacts and patches dynamically must strictly validate input components before appending to file paths. The risk was that maliciously crafted `patch_id` like `../../../etc/passwd` could expose sensitive files across the system.
+**Prevention:** Always wrap user-supplied path variables (`run_id`, `patch_id`, `artifact_name`, etc.) with `validate_path_component` from `swarm.runtime.safe_paths` inside the endpoint handler before accessing or resolving the `Path` file object. Catch `ValueError` and raise `HTTPException(400)` to ensure a clean failure.
