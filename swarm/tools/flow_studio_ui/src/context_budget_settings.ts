@@ -358,8 +358,10 @@ export function updatePresetButtonStates(): void {
     const presetId = btn.dataset.preset as ContextBudgetPresetId;
     if (presetId === currentPreset) {
       btn.classList.add("active");
+      btn.setAttribute("aria-pressed", "true");
     } else {
       btn.classList.remove("active");
+      btn.setAttribute("aria-pressed", "false");
     }
   });
 }

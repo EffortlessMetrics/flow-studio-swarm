@@ -60,14 +60,14 @@
 
     <div class="settings-presets">
       <h4>Quick Presets</h4>
-      <div class="preset-buttons">
-        <button class="btn-preset" data-preset="lean" title="Minimal history for fast execution">
+      <div class="preset-buttons" role="group" aria-label="Context budget presets">
+        <button type="button" class="btn-preset" data-preset="lean" title="Minimal history for fast execution" aria-pressed="false">
           Lean (25k tokens)
         </button>
-        <button class="btn-preset" data-preset="balanced" title="Default balanced settings">
+        <button type="button" class="btn-preset" data-preset="balanced" title="Default balanced settings" aria-pressed="false">
           Balanced (50k tokens)
         </button>
-        <button class="btn-preset" data-preset="heavy" title="Maximum context for complex flows">
+        <button type="button" class="btn-preset" data-preset="heavy" title="Maximum context for complex flows" aria-pressed="false">
           Heavy (100k tokens)
         </button>
       </div>
