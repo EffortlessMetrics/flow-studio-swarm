@@ -426,7 +426,7 @@ export async function showSelftestPlanModal(): Promise<void> {
           : 'This step passed all checks.';
 
         return `
-          <div class="selftest-plan-item ${tierClass}" onclick="window.showSelftestStepModal && window.showSelftestStepModal('${escapeHtml(step.id)}')" style="${isFailed ? 'background: #fee;' : isDegraded ? 'background: #fff3cd;' : ''}">
+          <button type="button" class="selftest-plan-item ${tierClass}" onclick="window.showSelftestStepModal && window.showSelftestStepModal('${escapeHtml(step.id)}')" style="${isFailed ? 'background: #fee;' : isDegraded ? 'background: #fff3cd;' : ''}">
             <div class="selftest-plan-item-row">
               <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
                 <span style="font-size: 14px;" title="${statusTooltip}">${statusIcon}</span>
@@ -441,7 +441,7 @@ export async function showSelftestPlanModal(): Promise<void> {
               </div>
               <div class="selftest-plan-item-icon">\u2192</div>
             </div>
-          </div>
+          </button>
         `;
       }).join("")}
     </div>
