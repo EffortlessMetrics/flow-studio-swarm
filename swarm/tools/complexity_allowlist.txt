@@ -1,4 +1,8 @@
 # Path | expires (YYYY-MM-DD) | reason
 # Example:
 # swarm/runtime/types/state_types.py | 2026-03-31 | Temporary during refactor (SWARM-123)
-swarm/runtime/backends.py | 2026-02-28 | Large backend implementations, needs splitting (REF-001)
+swarm/runtime/backends.py | 2026-04-30 | Large backend implementations, needs splitting (REF-001)
+swarm/tools/runs_gc.py | 2026-04-30 | CLI script with many branches (REF-002)
+tests/test_flow_order_guardrail.py | 2026-04-30 | Test suite with many tests (REF-003)
+tests/test_flow_studio_ui_ids.py | 2026-04-30 | Comprehensive UI test suite (REF-004)
+tests/test_shadow_fork.py | 2026-04-30 | Test suite with many scenarios (REF-005)
