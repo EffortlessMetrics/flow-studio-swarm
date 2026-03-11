@@ -90,9 +90,10 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     script_start = re.compile(r"<script\b", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
+    seen_values = set()
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
-        if script_start.search(line):
+        if script_start.search(line) and 'data-inline-source="flowstudio-js-bundle"' not in line:
             in_script = True
         if script_end.search(line):
             in_script = False
@@ -107,7 +108,9 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
                 continue
-            uiids.append((value, line_num))
+            if value not in seen_values:
+                uiids.append((value, line_num))
+                seen_values.add(value)
 
     return uiids
 
