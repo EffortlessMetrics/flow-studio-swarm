@@ -33,6 +33,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from swarm.runtime.safe_paths import validate_path_component
 
 def find_run_path(run_id: str) -> Optional[Path]:
     """Find the path to a run directory.
@@ -47,6 +48,8 @@ def find_run_path(run_id: str) -> Optional[Path]:
     Returns:
         Path to run directory, or None if not found
     """
+    validate_path_component(run_id, "run_id")
+
     runs_path = _REPO_ROOT / "swarm" / "runs" / run_id
     if runs_path.exists():
         return runs_path

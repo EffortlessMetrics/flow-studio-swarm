@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from swarm.config.flow_registry import get_flow_order
 from swarm.runtime.storage import find_run_path
+from swarm.runtime.safe_paths import validate_path_component
 
 logger = logging.getLogger(__name__)
 
@@ -399,6 +400,11 @@ async def get_boundary_review(
     Raises:
         404: Run not found.
     """
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"error": "invalid_path", "message": str(e)})
+
     # Find run path (checks both runs/ and examples/)
     run_base = find_run_path(run_id)
     if run_base is None:

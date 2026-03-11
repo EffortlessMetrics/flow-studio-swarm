@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from swarm.runtime.safe_paths import validate_path_component
+
 
 @dataclass
 class FlowStudioConfig:
@@ -109,10 +111,12 @@ class FlowStudioConfig:
 
     def get_run_path(self, run_id: str) -> Path:
         """Get path to a specific run."""
+        validate_path_component(run_id, "run_id")
         return self.runs_dir / run_id
 
     def get_example_path(self, example_id: str) -> Path:
         """Get path to a specific example."""
+        validate_path_component(example_id, "example_id")
         return self.examples_dir / example_id
 
     def list_flows(self) -> list[Path]:

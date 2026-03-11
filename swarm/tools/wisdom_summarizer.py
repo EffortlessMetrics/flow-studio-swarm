@@ -33,6 +33,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from swarm.config.flow_registry import get_flow_order  # noqa: E402
+from swarm.runtime.safe_paths import validate_path_component  # noqa: E402
 
 
 @dataclass
@@ -122,6 +123,8 @@ class WisdomSummarizer:
         Returns:
             Path to the run directory, or None if not found.
         """
+        validate_path_component(run_id, "run_id")
+
         # Check examples first
         example_path = self.examples_dir / run_id
         if example_path.exists():

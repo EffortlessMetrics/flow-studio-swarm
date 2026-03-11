@@ -858,6 +858,13 @@ def main():
     # Determine runs directory
     from .storage import find_run_path
 
+    from swarm.runtime.safe_paths import validate_path_component
+    try:
+        validate_path_component(args.run_id, "run_id")
+    except ValueError as e:
+        print(f"Invalid run ID: {e}")
+        sys.exit(1)
+
     if args.runs_dir:
         run_base = args.runs_dir / args.run_id
     else:
