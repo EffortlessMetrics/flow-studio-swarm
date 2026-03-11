@@ -9484,7 +9484,7 @@ export async function showSelftestPlanModal() {
                 ? 'This step has non-blocking issues. Work can proceed but review recommended.'
                 : 'This step passed all checks.';
         return `
-          <button type="button" class="selftest-plan-item ${tierClass}" onclick="window.showSelftestStepModal && window.showSelftestStepModal('${escapeHtml(step.id)}')" style="${isFailed ? 'background: #fee;' : isDegraded ? 'background: #fff3cd;' : ''}">
+          <div class="selftest-plan-item ${tierClass}" onclick="window.showSelftestStepModal && window.showSelftestStepModal('${escapeHtml(step.id)}')" style="${isFailed ? 'background: #fee;' : isDegraded ? 'background: #fff3cd;' : ''}">
             <div class="selftest-plan-item-row">
               <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
                 <span style="font-size: 14px;" title="${statusTooltip}">${statusIcon}</span>
@@ -9499,7 +9499,7 @@ export async function showSelftestPlanModal() {
               </div>
               <div class="selftest-plan-item-icon">\u2192</div>
             </div>
-          </button>
+          </div>
         `;
     }).join("")}
     </div>
