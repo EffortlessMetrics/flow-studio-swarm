@@ -1,0 +1,4 @@
+## 2024-03-11 - Path Traversal in FastAPI Routes
+**Vulnerability:** Path Traversal vulnerability in FastAPI route parameters (`run_id`, `patch_id`, `station_id`, `flow_id`). The paths were constructed dynamically using `path_base / user_input` without sanitizing `user_input` first, exposing the file system.
+**Learning:** Framework-level sanitization isn't enough when dealing with concatenated path strings or dynamically read inputs. Even though `run_id` and `patch_id` seem harmless, they must be validated before they are used to query the underlying OS file system, because FastAPI routes are essentially untrusted inputs.
+**Prevention:** Always use `validate_path_component(param, "param_name")` from `swarm.runtime.safe_paths` at the absolute top of the endpoint (immediately after parsing) for any parameter that will be used to construct a file or directory path.
