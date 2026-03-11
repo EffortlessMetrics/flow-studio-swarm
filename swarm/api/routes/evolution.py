@@ -420,9 +420,12 @@ async def apply_evolution_patch_endpoint(
     # Parse patch_id (may be "run_id:patch_id" or just "patch_id")
     if ":" in request.patch_id:
         run_id, patch_id = request.patch_id.split(":", 1)
+        validate_path_component(run_id, "run_id")
+        validate_path_component(patch_id, "patch_id")
     else:
         # Search all recent runs for this patch_id
         patch_id = request.patch_id
+        validate_path_component(patch_id, "patch_id")
         run_id = None
         pending = evolution["list_pending_patches"](runs_root, limit=50)
         for rid, patches in pending:
@@ -439,9 +442,6 @@ async def apply_evolution_patch_endpoint(
                     "details": {"patch_id": patch_id},
                 },
             )
-
-    validate_path_component(run_id, "run_id")
-    validate_path_component(patch_id, "patch_id")
 
     wisdom_dir = runs_root / run_id / "wisdom"
 
@@ -565,10 +565,9 @@ async def reject_evolution_patch_endpoint(
     Raises:
         404: Patch not found.
     """
-    import json
-
     validate_path_component(run_id, "run_id")
     validate_path_component(patch_id, "patch_id")
+    import json
 
     runs_root = _get_runs_root()
     wisdom_dir = runs_root / run_id / "wisdom"
