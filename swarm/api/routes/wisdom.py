@@ -20,6 +20,8 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wisdom", tags=["wisdom"])
@@ -165,6 +167,7 @@ def _get_runs_root() -> Path:
 
 def _get_run_wisdom_dir(run_id: str) -> Path:
     """Get the wisdom directory for a run."""
+    validate_path_component(run_id, "run_id")
     return _get_runs_root() / run_id / "wisdom"
 
 
