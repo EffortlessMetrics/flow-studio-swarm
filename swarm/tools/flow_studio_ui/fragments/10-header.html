@@ -21,11 +21,11 @@
         <button id="mode-author" class="active" title="Show all paths, CLI commands, and technical details" aria-pressed="true" data-uiid="flow_studio.header.mode.author">Author</button>
         <button id="mode-operator" title="Simplified view focused on run status and decisions" aria-pressed="false" data-uiid="flow_studio.header.mode.operator">Operator</button>
       </div>
-      <button id="profile-badge" class="muted fs-status-button fs-profile-badge" title="Current swarm profile" data-uiid="flow_studio.header.profile">
+      <button id="profile-badge" class="muted fs-status-button fs-profile-badge" title="Current swarm profile" aria-label="Current swarm profile" data-uiid="flow_studio.header.profile">
         <span id="profile-icon" aria-hidden="true">&#128230;</span>
         <span id="profile-text" aria-live="polite">Profile: Loading...</span>
       </button>
-      <button id="governance-badge" class="muted fs-status-button" title="Click to view governance status" data-uiid="flow_studio.header.governance">
+      <button id="governance-badge" class="muted fs-status-button" title="Click to view governance status" aria-label="View governance status" data-uiid="flow_studio.header.governance">
         <span id="governance-icon" aria-hidden="true">⏳</span>
         <span id="governance-text" aria-live="polite">Checking...</span>
         <span id="governance-issues-count" class="governance-issues-badge" style="display: none;" aria-live="polite">0</span>
@@ -40,8 +40,8 @@
       </button>
       <div class="muted author-only" style="display: flex; align-items: center; gap: 8px;" data-uiid="flow_studio.header.reload">
         <span class="mono">make dev-check</span>
-        <button id="copy-dev-check-btn" class="copy-btn" title="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
-        <button id="reload-btn" class="fs-button-small" data-uiid="flow_studio.header.reload.btn">Reload</button>
+        <button id="copy-dev-check-btn" class="copy-btn" title="Copy command to clipboard" aria-label="Copy make dev-check command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
+        <button id="reload-btn" class="fs-button-small" aria-label="Reload Flow Studio" data-uiid="flow_studio.header.reload.btn">Reload</button>
       </div>
       <button id="help-btn" class="fs-icon-button" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
     </nav>
