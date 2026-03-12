@@ -90,10 +90,13 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     script_start = re.compile(r"<script\b", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
+    seen = set()
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            # Special case: allow extracting UIIDs from the inlined application/json JS bundle
+            if 'type="application/json"' not in line or 'data-inline-source="flowstudio-js-bundle"' not in line:
+                in_script = True
         if script_end.search(line):
             in_script = False
             continue  # Skip the closing script line
@@ -107,7 +110,12 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
                 continue
-            uiids.append((value, line_num))
+
+            # Deduplicate while preserving line numbers to prevent false duplicate errors
+            # (since esbuild duplicates fragments into the JS bundle)
+            if value not in seen:
+                seen.add(value)
+                uiids.append((value, line_num))
 
     return uiids
 
