@@ -1923,6 +1923,11 @@
       color: var(--fs-color-accent);
     }
 
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
+
     .run-history-list {
       max-height: 200px;
       overflow-y: auto;
