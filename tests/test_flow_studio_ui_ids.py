@@ -751,11 +751,12 @@ class TestRunDetailModalUIIDs:
 
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        # Read the typescript file instead of HTML since it's dynamically rendered
+        ts_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "src" / "run_detail_modal.ts"
+        content = ts_file.read_text(encoding="utf-8")
 
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
+        assert uiid in content, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
             "This UIID is required for test automation to trigger re-runs."
         )
@@ -765,17 +766,28 @@ class TestRunDetailModalUIIDs:
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
+        # Read the typescript file for dynamically rendered elements
+        ts_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "src" / "run_detail_modal.ts"
+        ts_content = ts_file.read_text(encoding="utf-8")
+
         # Expected run detail modal UIIDs
         expected_modal = [
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
+        ]
+
+        dynamic_expected_modal = [
             "flow_studio.modal.run_detail.rerun",
         ]
 
         missing = [e for e in expected_modal if e not in uiids]
         if missing:
             pytest.fail(f"Missing expected run detail modal UIIDs: {', '.join(missing)}")
+
+        missing_dynamic = [e for e in dynamic_expected_modal if e not in ts_content]
+        if missing_dynamic:
+            pytest.fail(f"Missing expected dynamic run detail modal UIIDs: {', '.join(missing_dynamic)}")
 
     def test_run_detail_modal_is_dialog(self):
         """Run detail modal should have proper dialog role for accessibility."""
