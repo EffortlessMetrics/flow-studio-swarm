@@ -204,3 +204,35 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+def test_events_routes_path_validation(tmp_path):
+    """Test that events module routes validate path components."""
+    import asyncio
+    from swarm.api.routes.events import generate_run_events, write_event, write_event_sync
+
+    async def run_tests():
+        # generate_run_events validates run_id
+        generator = generate_run_events("../etc", tmp_path)
+        with pytest.raises(ValueError, match="run_id"):
+            await anext(generator)
+
+        generator2 = generate_run_events("..", tmp_path)
+        with pytest.raises(ValueError, match="run_id"):
+            await anext(generator2)
+
+        # write_event validates run_id (fails gracefully and returns without writing)
+        await write_event("../etc", tmp_path, "event", {})
+        assert not (tmp_path / "../etc/events.jsonl").exists()
+
+        await write_event("..", tmp_path, "event", {})
+        assert not (tmp_path / "../events.jsonl").exists()
+
+    asyncio.run(run_tests())
+
+    # write_event_sync validates run_id (fails gracefully and returns without writing)
+    write_event_sync("../etc", tmp_path, "event", {})
+    assert not (tmp_path / "../etc/events.jsonl").exists()
+
+    write_event_sync("..", tmp_path, "event", {})
+    assert not (tmp_path / "../events.jsonl").exists()
