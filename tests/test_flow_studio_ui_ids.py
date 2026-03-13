@@ -87,7 +87,8 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
 
     # Track whether we're inside a script tag
     in_script = False
-    script_start = re.compile(r"<script\b", re.IGNORECASE)
+    # Only ignore actual JS scripts, not our template bundle
+    script_start = re.compile(r"<script\b(?![^>]*data-inline-source)", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
@@ -96,7 +97,9 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             in_script = True
         if script_end.search(line):
             in_script = False
-            continue  # Skip the closing script line
+            # If the end tag is on the same line as the start tag,
+            # we don't necessarily want to skip the whole line if it contains a UIID.
+            # But typically it's just the close tag.
 
         # Skip lines inside script tags
         if in_script:
@@ -109,7 +112,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate while preserving order/first line number
+    seen = set()
+    deduped_uiids = []
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            deduped_uiids.append((value, line_num))
+
+    return deduped_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:

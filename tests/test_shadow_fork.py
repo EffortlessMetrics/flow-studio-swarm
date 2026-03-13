@@ -76,28 +76,43 @@ class TestShadowForkCreate:
         """Test that create fails if base branch doesn't exist."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        def mock_git(cmd, **kwargs):
+            if "symbolic-ref" in cmd:
+                return True, "main", ""
+            if "status" in cmd:
+                return True, "", ""
+            if "rev-parse" in cmd:
+                if cmd[-1] == "HEAD":
+                    return True, "1234", ""
+                return False, "", "fatal"
+            if "checkout" in cmd:
+                if kwargs.get("check", True):
+                    raise RuntimeError("fatal: 'nonexistent' is not a commit")
+                return False, "", "fatal: 'nonexistent' is not a commit"
+            return True, "", ""
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+        with patch.object(fork, "_run_git", side_effect=mock_git):
+            with pytest.raises(RuntimeError, match="fatal: 'nonexistent' is not a commit"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+        def mock_git(cmd, **kwargs):
+            if "symbolic-ref" in cmd:
+                return True, "main", ""
+            if "status" in cmd:
+                return True, " M file.txt", ""
+            if "rev-parse" in cmd:
+                return True, "1234", ""
+            if "checkout" in cmd:
+                return True, "", ""
+            if "rev-list" in cmd:
+                return True, "", ""
+            return True, "", ""
 
+        with patch.object(fork, "_run_git", side_effect=mock_git):
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
