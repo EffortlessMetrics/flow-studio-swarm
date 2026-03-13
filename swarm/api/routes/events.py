@@ -431,7 +431,12 @@ async def write_event(
         event_type: Event type name.
         data: Event data.
     """
-    validate_path_component(run_id, "run_id")
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        logger.warning("Failed to write event due to invalid run_id: %s", e)
+        return
+
     events_file = runs_root / run_id / "events.jsonl"
     events_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -459,7 +464,12 @@ def write_event_sync(
         event_type: Event type name.
         data: Event data.
     """
-    validate_path_component(run_id, "run_id")
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        logger.warning("Failed to write sync event due to invalid run_id: %s", e)
+        return
+
     events_file = runs_root / run_id / "events.jsonl"
     events_file.parent.mkdir(parents=True, exist_ok=True)
 

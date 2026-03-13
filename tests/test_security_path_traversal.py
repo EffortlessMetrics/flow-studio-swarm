@@ -221,18 +221,18 @@ def test_events_routes_path_validation(tmp_path):
         with pytest.raises(ValueError, match="run_id"):
             await anext(generator2)
 
-        # write_event validates run_id
-        with pytest.raises(ValueError, match="run_id"):
-            await write_event("../etc", tmp_path, "event", {})
+        # write_event validates run_id (fails gracefully and returns without writing)
+        await write_event("../etc", tmp_path, "event", {})
+        assert not (tmp_path / "../etc/events.jsonl").exists()
 
-        with pytest.raises(ValueError, match="run_id"):
-            await write_event("..", tmp_path, "event", {})
+        await write_event("..", tmp_path, "event", {})
+        assert not (tmp_path / "../events.jsonl").exists()
 
     asyncio.run(run_tests())
 
-    # write_event_sync validates run_id
-    with pytest.raises(ValueError, match="run_id"):
-        write_event_sync("../etc", tmp_path, "event", {})
+    # write_event_sync validates run_id (fails gracefully and returns without writing)
+    write_event_sync("../etc", tmp_path, "event", {})
+    assert not (tmp_path / "../etc/events.jsonl").exists()
 
-    with pytest.raises(ValueError, match="run_id"):
-        write_event_sync("..", tmp_path, "event", {})
+    write_event_sync("..", tmp_path, "event", {})
+    assert not (tmp_path / "../events.jsonl").exists()
