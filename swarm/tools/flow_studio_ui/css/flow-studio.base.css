@@ -1896,6 +1896,11 @@
       transform: rotate(-90deg);
     }
 
+    .run-history-header .collapse-toggle:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
+
     .run-history-filter {
       display: flex;
       gap: var(--fs-spacing-xs);
@@ -1915,6 +1920,11 @@
 
     .run-history-filter .filter-btn:hover {
       border-color: var(--fs-color-accent);
+    }
+
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
 
     .run-history-filter .filter-btn.active {
