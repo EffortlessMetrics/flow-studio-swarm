@@ -89,11 +89,18 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     in_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
+    js_bundle_script_start = re.compile(r'<script type="application/json" data-inline-source="flowstudio-js-bundle">', re.IGNORECASE)
+
+    seen_uiids = set()
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            # Special case: do not treat our JS bundle as a generic script block to skip
+            if js_bundle_script_start.search(line):
+                in_script = False
+            else:
+                in_script = True
         if script_end.search(line):
             in_script = False
             continue  # Skip the closing script line
@@ -107,7 +114,9 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
                 continue
-            uiids.append((value, line_num))
+            if value not in seen_uiids:
+                seen_uiids.add(value)
+                uiids.append((value, line_num))
 
     return uiids
 
