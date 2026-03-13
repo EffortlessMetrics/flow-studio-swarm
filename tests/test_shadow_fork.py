@@ -77,21 +77,13 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            def git_side_effect(cmd, **kwargs):
-                if cmd == ["branch", "--show-current"]:
-                    return True, "main", ""
-                elif cmd == ["status", "--porcelain"]:
-                    return True, "", ""
-                elif cmd[:2] == ["rev-parse", "--verify"]:
-                    return False, "", "fatal"
-                elif cmd[:2] == ["checkout", "-b"]:
-                    # Simulate failure to checkout
-                    return False, "", "fatal: not a valid object name: 'nonexistent'"
-                return True, "", ""
+            mock_git.side_effect = [
+                (True, "main", ""),  # Get current branch
+                (True, "", ""),  # Check for uncommitted changes
+                (False, "", "fatal"),  # Base branch doesn't exist
+            ]
 
-            mock_git.side_effect = git_side_effect
-
-            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
+            with pytest.raises(RuntimeError, match="does not exist"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -99,16 +91,12 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            def git_side_effect(cmd, **kwargs):
-                if cmd == ["branch", "--show-current"]:
-                    return True, "main", ""
-                elif cmd == ["status", "--porcelain"]:
-                    return True, " M file.txt", ""
-                elif cmd[:2] == ["rev-parse", "--verify"]:
-                    return True, "", ""
-                return True, "", ""
-
-            mock_git.side_effect = git_side_effect
+            mock_git.side_effect = [
+                (True, "main", ""),  # Get current branch
+                (True, " M file.txt", ""),  # Uncommitted changes exist
+                (True, "", ""),  # Verify base branch exists
+                (True, "", ""),  # Create and switch to shadow branch
+            ]
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
