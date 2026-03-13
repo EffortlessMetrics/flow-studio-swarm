@@ -204,3 +204,35 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+
+def test_events_routes_path_validation(tmp_path):
+    """Test that events module routes validate path components."""
+    import asyncio
+    from swarm.api.routes.events import generate_run_events, write_event, write_event_sync
+
+    async def run_tests():
+        # generate_run_events validates run_id
+        generator = generate_run_events("../etc", tmp_path)
+        with pytest.raises(ValueError, match="run_id"):
+            await anext(generator)
+
+        generator2 = generate_run_events("..", tmp_path)
+        with pytest.raises(ValueError, match="run_id"):
+            await anext(generator2)
+
+        # write_event validates run_id
+        with pytest.raises(ValueError, match="run_id"):
+            await write_event("../etc", tmp_path, "event", {})
+
+        with pytest.raises(ValueError, match="run_id"):
+            await write_event("..", tmp_path, "event", {})
+
+    asyncio.run(run_tests())
+
+    # write_event_sync validates run_id
+    with pytest.raises(ValueError, match="run_id"):
+        write_event_sync("../etc", tmp_path, "event", {})
+
+    with pytest.raises(ValueError, match="run_id"):
+        write_event_sync("..", tmp_path, "event", {})
