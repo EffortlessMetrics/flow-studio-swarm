@@ -342,6 +342,7 @@ class RunInspector:
         """
         # Validate path components before constructing paths
         validate_path_component(flow_key, "flow_key")
+        validate_path_component(step_id, "step_id")
 
         run_path = self.get_run_path(run_id)  # validates run_id
         flow_dir = run_path / flow_key if run_path else None
