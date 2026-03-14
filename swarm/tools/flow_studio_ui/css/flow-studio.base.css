@@ -1917,6 +1917,11 @@
       border-color: var(--fs-color-accent);
     }
 
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
+
     .run-history-filter .filter-btn.active {
       background: var(--fs-color-accent-bg);
       border-color: var(--fs-color-accent);
@@ -2651,6 +2656,11 @@
     .run-control-btn:focus {
       outline: none;
       box-shadow: 0 0 0 2px var(--fs-color-accent-bg, #dbeafe);
+    }
+
+    .run-control-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
 
     .run-control-icon {
