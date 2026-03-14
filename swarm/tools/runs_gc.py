@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import shutil
 import sys
 from dataclasses import dataclass
@@ -72,13 +73,20 @@ class RunInfo:
 
 
 def get_dir_size(path: Path) -> int:
-    """Get total size of a directory in bytes."""
+    """Get total size of a directory in bytes using fast os.scandir."""
     total = 0
     try:
-        for entry in path.rglob("*"):
-            if entry.is_file():
+        with os.scandir(path) as it:
+            for entry in it:
                 try:
-                    total += entry.stat().st_size
+                    # Do not use follow_symlinks=False for is_file() or stat()
+                    # to perfectly match original Path.stat() behavior.
+                    if entry.is_file():
+                        total += entry.stat().st_size
+                    # Must use follow_symlinks=False for is_dir() to prevent
+                    # infinite loops during traversal.
+                    elif entry.is_dir(follow_symlinks=False):
+                        total += get_dir_size(Path(entry.path))
                 except OSError:
                     pass
     except OSError:
