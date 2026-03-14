@@ -93,12 +93,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            # Do NOT treat data-inline-source as a regular script block to skip
+            if "data-inline-source=" not in line:
+                in_script = True
         if script_end.search(line):
-            in_script = False
-            continue  # Skip the closing script line
+            if in_script:
+                in_script = False
+                continue  # Skip the closing script line
 
-        # Skip lines inside script tags
+        # Skip lines inside script tags (unless they are inline bundled HTML templates)
         if in_script:
             continue
 
@@ -109,7 +112,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate UIIDs, keeping the first line number
+    seen = set()
+    deduped = []
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            deduped.append((value, line_num))
+
+    return deduped
 
 
 def validate_uiid(uiid: str) -> List[str]:
