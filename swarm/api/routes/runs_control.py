@@ -706,6 +706,9 @@ async def _write_stop_report(
     Returns:
         Relative path to the stop report file.
     """
+    from swarm.runtime.safe_paths import validate_path_component
+
+    run_id = validate_path_component(run_id, "run_id")
     run_dir = runs_root / run_id
     report_path = run_dir / "stop_report.md"
 
