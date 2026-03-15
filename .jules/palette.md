@@ -1,0 +1,3 @@
+## 2024-05-24 - Missing Focus-Visible on Custom Interactive Elements
+**Learning:** Custom interactive elements (like `.filter-btn`, `.copy-btn`, `.view-toggle button`, `.mode-toggle button`, and `.collapse-toggle`) may lack explicit `:focus-visible` CSS rules despite acting as buttons or even being semantic `<button>`s. This is a critical accessibility issue, as it impairs keyboard navigation and visibility, violating WCAG guidelines for focus visibility.
+**Action:** When auditing or creating custom UI elements, ensure explicit `:focus-visible` rules (e.g., `outline: 2px solid var(--fs-color-accent, #3b82f6); outline-offset: 2px;`) are added to maintain consistent keyboard accessibility across the UI.
