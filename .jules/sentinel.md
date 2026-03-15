@@ -1,0 +1,4 @@
+## 2026-03-15 - Prevent Path Traversal in Run Service Handlers
+**Vulnerability:** `run_id` parameters were being passed directly to `run_service` methods without proper validation, opening the door to path traversal via methods like `get_events`, `cancel_run`, `stop_run`, and `mark_exemplar`.
+**Learning:** Even internal service handlers must explicitly validate string arguments used in paths or external service queries, as upstream layers may only do type checks rather than full security sanitization (i.e. `validate_path_component`).
+**Prevention:** Apply `validate_path_component` at the earliest point for all arguments deriving from URL parameters or user inputs prior to executing core logic or file system operations.

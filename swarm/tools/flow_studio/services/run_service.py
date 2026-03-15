@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from swarm.runtime.safe_paths import validate_path_component
+
 
 def create_run_service(repo_root: Path) -> Optional[Any]:
     try:
@@ -90,6 +92,7 @@ def start_run(run_service: Any, flows: List[str], profile_id: Optional[str], bac
 
 
 def get_events(run_service: Any, run_id: str) -> List[Dict[str, Any]]:
+    validate_path_component(run_id, "run_id")
     events = run_service.get_events(run_id)
     return [
         {
@@ -106,6 +109,7 @@ def get_events(run_service: Any, run_id: str) -> List[Dict[str, Any]]:
 
 
 def cancel_run(run_service: Any, run_id: str) -> bool:
+    validate_path_component(run_id, "run_id")
     return bool(run_service.cancel_run(run_id))
 
 
@@ -119,6 +123,8 @@ def stop_run(run_service: Any, run_id: str, reason: str = "user_requested") -> D
         Dict with stop_report_path and stop_info forensics.
     """
     from datetime import datetime, timezone
+
+    validate_path_component(run_id, "run_id")
 
     # Use the underlying cancel mechanism
     cancelled = bool(run_service.cancel_run(run_id))
@@ -155,6 +161,7 @@ def stop_run(run_service: Any, run_id: str, reason: str = "user_requested") -> D
 
 
 def mark_exemplar(run_service: Any, run_id: str, is_exemplar: bool) -> bool:
+    validate_path_component(run_id, "run_id")
     return bool(run_service.mark_exemplar(run_id, is_exemplar))
 
 
