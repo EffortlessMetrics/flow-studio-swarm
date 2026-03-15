@@ -73,12 +73,17 @@ class RunInfo:
 
 def get_dir_size(path: Path) -> int:
     """Get total size of a directory in bytes."""
+    import os
+
     total = 0
     try:
-        for entry in path.rglob("*"):
-            if entry.is_file():
+        with os.scandir(path) as it:
+            for entry in it:
                 try:
-                    total += entry.stat().st_size
+                    if entry.is_file():
+                        total += entry.stat().st_size
+                    elif entry.is_dir(follow_symlinks=False):
+                        total += get_dir_size(Path(entry.path))
                 except OSError:
                     pass
     except OSError:
