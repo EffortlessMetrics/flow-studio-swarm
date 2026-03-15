@@ -1,0 +1,8 @@
+<<<<<<< SEARCH
+    <button class="selftest-modal-close" id="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
+    <div id="run-detail-modal-content">
+=======
+    <button class="selftest-modal-close" id="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
+    <button id="run-detail-rerun" class="fs-button-small" style="position: absolute; right: 40px; top: 10px; display: none;" aria-label="Re-run this run" data-uiid="flow_studio.modal.run_detail.rerun">Re-run</button>
+    <div id="run-detail-modal-content">
+>>>>>>> REPLACE
