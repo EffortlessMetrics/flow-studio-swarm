@@ -204,3 +204,43 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_autopilot_routes_path_validation():
+    """Test that autopilot routes validate run_id against path traversal."""
+    from fastapi.testclient import TestClient
+    from fastapi import FastAPI
+    from swarm.api.routes.autopilot_routes import router
+
+    app = FastAPI()
+    app.include_router(router, prefix="/autopilot")
+    client = TestClient(app)
+
+    # Test get status
+    response = client.get("/autopilot/..%5Cetc%5Cpasswd")
+    assert response.status_code == 400
+    assert "invalid_run_id" in response.json()["detail"]["error"]
+
+    # Test tick
+    response = client.post("/autopilot/..%5Cetc%5Cpasswd/tick")
+    assert response.status_code == 400
+    assert "invalid_run_id" in response.json()["detail"]["error"]
+
+    # Test cancel
+    response = client.delete("/autopilot/..%5Cetc%5Cpasswd")
+    assert response.status_code == 400
+    assert "invalid_run_id" in response.json()["detail"]["error"]
+
+    # Test stop
+    response = client.post("/autopilot/..%5Cetc%5Cpasswd/stop", json={"reason": "test"})
+    assert response.status_code == 400
+    assert "invalid_run_id" in response.json()["detail"]["error"]
+
+    # Test pause
+    response = client.post("/autopilot/..%5Cetc%5Cpasswd/pause")
+    assert response.status_code == 400
+    assert "invalid_run_id" in response.json()["detail"]["error"]
+
+    # Test resume
+    response = client.post("/autopilot/..%5Cetc%5Cpasswd/resume")
+    assert response.status_code == 400
+    assert "invalid_run_id" in response.json()["detail"]["error"]

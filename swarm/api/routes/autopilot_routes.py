@@ -17,6 +17,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["autopilot"])
@@ -181,6 +183,18 @@ async def get_autopilot_status(run_id: str):
         AutopilotStatusResponse with current status, progress, and wisdom apply results.
     """
     try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_run_id",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
+    try:
         controller = _get_autopilot_controller()
         result = controller.get_result(run_id)
 
@@ -231,6 +245,18 @@ async def tick_autopilot(run_id: str):
     Returns:
         AutopilotStatusResponse with updated status and wisdom apply results.
     """
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_run_id",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
     try:
         controller = _get_autopilot_controller()
         controller.tick(run_id)
@@ -292,6 +318,18 @@ async def cancel_autopilot(run_id: str):
         Action response confirming cancellation.
     """
     try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_run_id",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
+    try:
         controller = _get_autopilot_controller()
         canceled = controller.cancel(run_id)
 
@@ -341,6 +379,18 @@ async def stop_autopilot(run_id: str, request: AutopilotStopRequest):
         Action response confirming stop initiation.
     """
     try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_run_id",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
+    try:
         controller = _get_autopilot_controller()
         stopped = controller.stop(run_id, reason=request.reason)
 
@@ -389,6 +439,18 @@ async def pause_autopilot(run_id: str):
         Action response confirming pause initiation.
     """
     try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_run_id",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
+    try:
         controller = _get_autopilot_controller()
         paused = controller.pause(run_id)
 
@@ -435,6 +497,18 @@ async def resume_autopilot(run_id: str):
     Returns:
         Action response confirming resume.
     """
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_run_id",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
     try:
         controller = _get_autopilot_controller()
         resumed = controller.resume(run_id)
