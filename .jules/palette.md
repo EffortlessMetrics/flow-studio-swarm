@@ -1,0 +1,3 @@
+## 2024-03-15 - [Accessibility] Add missing focus visible styles for custom UI buttons
+**Learning:** In `swarm/tools/flow_studio_ui/css/flow-studio.base.css` and its associated HTML files, custom interactive elements (like `.filter-btn`, `.run-control-btn`, and modal preset/action buttons) may lack explicit `:focus-visible` CSS rules despite being semantic `<button>`s, leading to poor keyboard navigation visibility.
+**Action:** When auditing or creating custom UI elements without standard framework styles, ensure explicit `:focus-visible` rules (e.g., `outline: 2px solid var(--fs-color-accent, #3b82f6); outline-offset: 2px;`) are added to maintain consistent and visible keyboard accessibility.
