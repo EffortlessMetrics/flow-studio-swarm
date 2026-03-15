@@ -58,18 +58,11 @@ class RunInfo:
     run_id: str
     path: Path
     run_type: str  # "active", "example", "legacy"
+    size_bytes: int
     mtime: datetime
     has_meta: bool
     is_corrupt: bool
     tags: List[str]
-    _size_bytes: int | None = None
-
-    @property
-    def size_bytes(self) -> int:
-        """Total size of the run directory in bytes, evaluated lazily."""
-        if self._size_bytes is None:
-            self._size_bytes = get_dir_size(self.path)
-        return self._size_bytes
 
     @property
     def age_days(self) -> float:
@@ -121,10 +114,14 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     except OSError:
         mtime = datetime.now(timezone.utc)
 
+    # Get size
+    size_bytes = get_dir_size(run_path)
+
     return RunInfo(
         run_id=run_id,
         path=run_path,
         run_type=run_type,
+        size_bytes=size_bytes,
         mtime=mtime,
         has_meta=has_meta,
         is_corrupt=is_corrupt,
