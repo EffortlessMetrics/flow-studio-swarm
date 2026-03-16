@@ -1,3 +1,6 @@
 ## 2026-01-23 - Defer File Existence Checks
 **Learning:** When listing items from a large directory (e.g. 50k runs), checking file existence (`os.path.exists`) for every item is a significant bottleneck, even if the check is fast.
 **Action:** Sort candidates by cached metadata (e.g. mtime from `os.scandir`) first, then only perform expensive checks (like file existence or loading content) on the top N results that will actually be returned.
+## 2026-02-13 - Avoid Path.rglob and Eager Size Calculations for Large Directories
+**Learning:** `Path.rglob("*")` is slow for computing recursive directory sizes because it yields generator objects and makes redundant `stat` and object instantiation calls. Furthermore, eagerly calculating directory sizes for large collections of items (like runs in GC) slows down initial discovery significantly when the size isn't immediately required.
+**Action:** Use a recursive function backed by `os.scandir` for efficient size calculation (passing `follow_symlinks=False` to `is_dir()` to avoid loops, and keeping `try...except` inside the loop). Also, convert properties like `size_bytes` into lazily-evaluated properties backed by a cached field (e.g. using dataclass `field(init=False)`) so the expensive check is only paid when actually accessed.
