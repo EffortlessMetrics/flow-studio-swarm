@@ -1020,6 +1020,12 @@
     .view-toggle button:hover {
       background: #e5e7eb;
     }
+    .view-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -1px;
+      position: relative;
+      z-index: 1;
+    }
     .view-toggle button.active {
       background: #0f766e;
       color: white;
@@ -1915,6 +1921,13 @@
 
     .run-history-filter .filter-btn:hover {
       border-color: var(--fs-color-accent);
+    }
+
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -1px;
+      position: relative;
+      z-index: 1;
     }
 
     .run-history-filter .filter-btn.active {
