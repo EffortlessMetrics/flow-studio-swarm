@@ -18,9 +18,10 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import shutil
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
@@ -58,11 +59,12 @@ class RunInfo:
     run_id: str
     path: Path
     run_type: str  # "active", "example", "legacy"
-    size_bytes: int
     mtime: datetime
     has_meta: bool
     is_corrupt: bool
     tags: List[str]
+
+    _size_bytes: int | None = field(default=None, init=False, repr=False)
 
     @property
     def age_days(self) -> float:
@@ -70,15 +72,25 @@ class RunInfo:
         now = datetime.now(timezone.utc)
         return (now - self.mtime).total_seconds() / 86400
 
+    @property
+    def size_bytes(self) -> int:
+        """Lazy evaluate size using optimized os.scandir to reduce I/O on run discovery."""
+        if self._size_bytes is None:
+            self._size_bytes = get_dir_size(self.path)
+        return self._size_bytes
 
-def get_dir_size(path: Path) -> int:
-    """Get total size of a directory in bytes."""
+
+def get_dir_size(path: Path | str) -> int:
+    """Get total size of a directory in bytes efficiently using os.scandir."""
     total = 0
     try:
-        for entry in path.rglob("*"):
-            if entry.is_file():
+        with os.scandir(path) as it:
+            for entry in it:
                 try:
-                    total += entry.stat().st_size
+                    if entry.is_dir(follow_symlinks=False):
+                        total += get_dir_size(entry.path)
+                    elif entry.is_file():
+                        total += entry.stat().st_size
                 except OSError:
                     pass
     except OSError:
@@ -109,14 +121,10 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     except OSError:
         mtime = datetime.now(timezone.utc)
 
-    # Get size
-    size_bytes = get_dir_size(run_path)
-
     return RunInfo(
         run_id=run_id,
         path=run_path,
         run_type=run_type,
-        size_bytes=size_bytes,
         mtime=mtime,
         has_meta=has_meta,
         is_corrupt=is_corrupt,
