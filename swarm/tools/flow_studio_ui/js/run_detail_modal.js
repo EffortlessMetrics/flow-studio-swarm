@@ -47,7 +47,6 @@ function getOrCreateModal() {
     modal.innerHTML = `
     <div class="selftest-step-content" data-uiid="flow_studio.modal.run_detail.body">
       <button class="selftest-modal-close" data-uiid="flow_studio.modal.run_detail.close" aria-label="Close modal">&times;</button>
-      <button id="run-detail-rerun-btn-hidden" aria-label="Re-run hidden" data-uiid="flow_studio.modal.run_detail.rerun" style="display: none;"></button>
       <div id="run-detail-modal-content">
         <div class="muted">Loading...</div>
       </div>

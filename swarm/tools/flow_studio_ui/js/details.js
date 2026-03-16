@@ -202,9 +202,16 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
     list.className = "fs-text-body";
     list.style.lineHeight = "1.8";
     usage.forEach(u => {
-        const item = document.createElement("div");
+        const item = document.createElement("button");
         item.style.cursor = "pointer";
         item.style.padding = "2px 0";
+        item.style.background = "none";
+        item.style.border = "none";
+        item.style.textAlign = "left";
+        item.style.width = "100%";
+        item.style.fontFamily = "inherit";
+        item.style.fontSize = "inherit";
+        item.style.color = "inherit";
         item.innerHTML = renderAgentUsageItem(u.flow_title, u.step_title);
         item.title = `Click to navigate to ${u.flow}:${u.step}`;
         item.addEventListener("click", async () => {
@@ -228,6 +235,8 @@ export function renderAgentUsage(container, usage, callbacks = {}) {
         });
         item.addEventListener("mouseenter", () => { item.style.background = "#f3f4f6"; });
         item.addEventListener("mouseleave", () => { item.style.background = "transparent"; });
+        item.addEventListener("focus", () => { item.style.background = "#f3f4f6"; });
+        item.addEventListener("blur", () => { item.style.background = "transparent"; });
         list.appendChild(item);
     });
     container.appendChild(list);
@@ -655,10 +664,16 @@ export async function showStepDetails(data, callbacks = {}) {
         }
         else {
             stepAgents.forEach(agentKey => {
-                const agentLink = document.createElement("div");
+                const agentLink = document.createElement("button");
                 agentLink.style.cursor = "pointer";
                 agentLink.style.padding = "2px 0";
-                agentLink.style.color = "#3b82f6"; // var(--fs-color-accent)
+                agentLink.style.color = "#3b82f6";
+                agentLink.style.background = "none";
+                agentLink.style.border = "none";
+                agentLink.style.textAlign = "left";
+                agentLink.style.width = "100%";
+                agentLink.style.fontFamily = "inherit";
+                agentLink.style.fontSize = "inherit";
                 agentLink.innerHTML = `<span class="mono">${escapeHtml(agentKey)}</span>`;
                 agentLink.title = `Click to view agent: ${agentKey}`;
                 agentLink.addEventListener("click", async () => {
@@ -671,6 +686,14 @@ export async function showStepDetails(data, callbacks = {}) {
                     agentLink.style.textDecoration = "underline";
                 });
                 agentLink.addEventListener("mouseleave", () => {
+                    agentLink.style.background = "transparent";
+                    agentLink.style.textDecoration = "none";
+                });
+                agentLink.addEventListener("focus", () => {
+                    agentLink.style.background = "#f3f4f6";
+                    agentLink.style.textDecoration = "underline";
+                });
+                agentLink.addEventListener("blur", () => {
                     agentLink.style.background = "transparent";
                     agentLink.style.textDecoration = "none";
                 });
