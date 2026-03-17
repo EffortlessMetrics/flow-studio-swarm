@@ -204,3 +204,11 @@ def test_run_tailer_path_validation(tmp_path):
 
     with pytest.raises(ValueError, match="run_id"):
         tailer.tail_run("..")
+
+def test_wisdom_summarizer_get_run_path_validation():
+    from swarm.tools.wisdom_summarizer import WisdomSummarizer
+
+    summarizer = WisdomSummarizer()
+
+    with pytest.raises(ValueError, match="run_id"):
+        summarizer.get_run_path("../etc")
