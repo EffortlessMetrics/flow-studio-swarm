@@ -1,0 +1,4 @@
+## 2025-02-18 - Path Traversal in Run Path Resolution
+**Vulnerability:** Path traversal vulnerabilities in `get_run_path` variants across different modules (like `WisdomSummarizer.get_run_path`) caused by not validating the `run_id` parameter against path traversal characters before resolving paths.
+**Learning:** `run_id` inputs must always be validated prior to path resolution. Framework-level protections (like FastAPI `../` normalization) are insufficient since traversal patterns can be passed in POST bodies, query parameters, or internal method calls downstream.
+**Prevention:** Always apply `validate_path_component(run_id, "run_id")` from `swarm.runtime.safe_paths` at the absolute top of any `get_run_path` implementations, before joining paths or interacting with the file system. Check all `get_run_path` and similar path-constructing utility functions uniformly.
