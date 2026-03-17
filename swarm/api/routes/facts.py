@@ -20,6 +20,7 @@ from swarm.runtime.fact_extraction import (
     MARKER_TYPES,
     extract_facts_from_run,
 )
+from swarm.runtime.safe_paths import validate_path_component
 from swarm.runtime.storage import find_run_path
 
 logger = logging.getLogger(__name__)
@@ -124,6 +125,18 @@ async def get_facts_summary(run_id: str):
     Raises:
         404: Run not found.
     """
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_path",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
     # Find run path (checks both runs/ and examples/)
     run_base = find_run_path(run_id)
     if run_base is None:
@@ -257,6 +270,18 @@ async def list_facts(
     Raises:
         404: Run not found.
     """
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_path",
+                "message": str(e),
+                "details": {"run_id": run_id},
+            },
+        )
+
     # Find run path
     run_base = find_run_path(run_id)
     if run_base is None:
