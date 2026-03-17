@@ -88,12 +88,21 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     # Track whether we're inside a script tag
     in_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
+    json_script_start = re.compile(
+        r'<script\b[^>]*type=["\']application/json["\'][^>]*data-inline-source=["\']flowstudio-js-bundle["\']',
+        re.IGNORECASE,
+    )
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
-        if script_start.search(line):
+        if json_script_start.search(line):
+            # If it's our special JSON script block containing inlined templates,
+            # we want to parse it, so we don't set in_script=True.
+            in_script = False
+        elif script_start.search(line):
             in_script = True
+
         if script_end.search(line):
             in_script = False
             continue  # Skip the closing script line
@@ -109,7 +118,15 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate UIIDs, keeping the first occurrence (lowest line number)
+    seen = set()
+    deduped_uiids = []
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            deduped_uiids.append((value, line_num))
+
+    return deduped_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
