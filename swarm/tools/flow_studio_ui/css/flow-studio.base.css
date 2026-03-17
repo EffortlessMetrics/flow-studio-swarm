@@ -1017,6 +1017,12 @@
       transition: background 0.15s;
       font-size: 11px;
     }
+    .view-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+      position: relative;
+      z-index: 1;
+    }
     .view-toggle button:hover {
       background: #e5e7eb;
     }
@@ -1911,6 +1917,13 @@
       cursor: pointer;
       color: var(--fs-color-text-muted);
       transition: all 0.15s ease;
+    }
+
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+      position: relative;
+      z-index: 1;
     }
 
     .run-history-filter .filter-btn:hover {
