@@ -1,0 +1,3 @@
+## 2024-05-24 - Overlapping Focus Rings in Toggle Groups
+**Learning:** In `swarm/tools/flow_studio_ui/css/flow-studio.base.css`, custom interactive elements acting as toggle groups (like `.filter-btn`, `.view-toggle button`, and `.mode-toggle button`) lack explicit `:focus-visible` CSS rules despite being semantic buttons, reducing keyboard accessibility.
+**Action:** Always ensure explicit `:focus-visible` rules (e.g., `outline: 2px solid var(--fs-color-accent, #3b82f6);`) are added. To avoid outline overlapping issues between adjacent buttons in toggle groups, use negative `outline-offset` (e.g., `outline-offset: -2px`) and `position: relative; z-index: 1;`.

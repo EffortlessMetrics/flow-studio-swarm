@@ -77,16 +77,20 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     Extract all data-uiid attribute values from HTML DOM elements.
 
     Skips UIIDs found inside <script> tags (which are JavaScript strings,
-    not actual DOM attributes).
+    not actual DOM attributes), except for the <script type="application/json" data-inline-source="flowstudio-js-bundle">
+    block, as esbuild inlines HTML templates containing dynamically injected UIIDs there.
 
     Returns:
-        List of (uiid_value, line_number) tuples
+        List of (uiid_value, line_number) tuples. The list is deduplicated
+        to prevent false duplicate errors in tests.
     """
     uiids = []
+    seen = set()
     pattern = re.compile(r'data-uiid="([^"]+)"')
 
     # Track whether we're inside a script tag
     in_script = False
+    is_bundle_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
@@ -94,12 +98,17 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
         # Handle script tag transitions
         if script_start.search(line):
             in_script = True
+            if 'data-inline-source="flowstudio-js-bundle"' in line:
+                is_bundle_script = True
+            else:
+                is_bundle_script = False
         if script_end.search(line):
             in_script = False
+            is_bundle_script = False
             continue  # Skip the closing script line
 
-        # Skip lines inside script tags
-        if in_script:
+        # Skip lines inside script tags, unless it's the bundle script
+        if in_script and not is_bundle_script:
             continue
 
         for match in pattern.finditer(line):
@@ -107,7 +116,10 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
                 continue
-            uiids.append((value, line_num))
+
+            if value not in seen:
+                seen.add(value)
+                uiids.append((value, line_num))
 
     return uiids
 
