@@ -211,7 +211,7 @@ export function renderRunDetailContent(runId, summary) {
     <div class="kv-section" style="margin-top: 16px;" data-uiid="flow_studio.modal.run_detail.boundary">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Boundary Summary</span>
-        <button id="run-detail-boundary-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.boundary.toggle" style="padding: 2px 8px; font-size: 10px;">Load Review</button>
+        <button id="run-detail-boundary-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.boundary.toggle" style="padding: 2px 8px; font-size: 10px;" aria-label="Load boundary review">Load Review</button>
       </div>
       <div id="run-detail-boundary-container" data-uiid="flow_studio.modal.run_detail.boundary.container" style="display: none; margin-top: 8px;">
         <div class="muted fs-text-xs">Click "Load Review" to view boundary data...</div>
@@ -221,7 +221,7 @@ export function renderRunDetailContent(runId, summary) {
     <div class="kv-section" style="margin-top: 16px;">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Events Timeline</span>
-        <button id="run-detail-events-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.events.toggle" style="padding: 2px 8px; font-size: 10px;">Load Events</button>
+        <button id="run-detail-events-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.events.toggle" style="padding: 2px 8px; font-size: 10px;" aria-label="Load events timeline">Load Events</button>
       </div>
       <div id="run-detail-events-container" data-uiid="flow_studio.modal.run_detail.events.container" style="display: none; margin-top: 8px; max-height: 200px; overflow-y: auto; background: #f9fafb; border-radius: 4px; padding: 8px;">
         <div class="muted fs-text-xs">Click "Load Events" to view execution events...</div>
@@ -231,7 +231,7 @@ export function renderRunDetailContent(runId, summary) {
     <div class="kv-section" style="margin-top: 16px;" data-uiid="flow_studio.modal.run_detail.wisdom">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Wisdom Summary</span>
-        <button id="run-detail-wisdom-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.wisdom.toggle" style="padding: 2px 8px; font-size: 10px;">Load Wisdom</button>
+        <button id="run-detail-wisdom-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.wisdom.toggle" style="padding: 2px 8px; font-size: 10px;" aria-label="Load wisdom summary">Load Wisdom</button>
       </div>
       <div id="run-detail-wisdom-container" data-uiid="flow_studio.modal.run_detail.wisdom.container" style="display: none; margin-top: 8px; background: #f0fdf4; border-radius: 4px; padding: 12px;">
         <div class="muted fs-text-xs">Click "Load Wisdom" to view wisdom metrics...</div>
@@ -250,10 +250,10 @@ export function renderRunDetailContent(runId, summary) {
     <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
       <div id="run-detail-rerun-error" class="fs-text-sm" style="color: #dc2626; min-height: 0;"></div>
       <div style="display: flex; gap: 12px;">
-        <button id="run-detail-rerun-btn" data-uiid="flow_studio.modal.run_detail.rerun" class="fs-button-primary" style="flex: 1;">
+        <button id="run-detail-rerun-btn" data-uiid="flow_studio.modal.run_detail.rerun" class="fs-button-primary" style="flex: 1;" aria-label="Re-run this flow">
           Re-run
         </button>
-        <button id="run-detail-close-btn" class="fs-button-small" style="flex: 1;">
+        <button id="run-detail-close-btn" class="fs-button-small" style="flex: 1;" aria-label="Close details">
           Close
         </button>
       </div>
@@ -278,7 +278,7 @@ function renderRunDetailError(runId, error) {
     </div>
 
     <div style="display: flex; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
-      <button id="run-detail-close-btn" class="fs-button-small" style="flex: 1;">
+      <button id="run-detail-close-btn" class="fs-button-small" style="flex: 1;" aria-label="Close details">
         Close
       </button>
     </div>

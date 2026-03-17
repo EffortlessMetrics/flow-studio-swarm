@@ -289,7 +289,7 @@ export class NodeInspector {
     error.innerHTML = `
       <div class="node-inspector__error-icon">\u26A0</div>
       <div class="node-inspector__error-message">${escapeHtml(this.errorMessage || "Unknown error")}</div>
-      <button class="node-inspector__retry-btn">Retry</button>
+      <button class="node-inspector__retry-btn" aria-label="Retry loading">Retry</button>
     `;
 
     const retryBtn = error.querySelector(".node-inspector__retry-btn");
