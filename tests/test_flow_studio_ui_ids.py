@@ -88,15 +88,23 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     # Track whether we're inside a script tag
     in_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
+    # allow scanning application/json scripts where esbuild puts our bundled html strings
+    app_json_script_start = re.compile(r'<script\s+type="application/json"', re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
+
+    # Use a dictionary to deduplicate while preserving the first seen line number
+    unique_uiids: dict[str, int] = {}
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            if app_json_script_start.search(line):
+                in_script = False
+            else:
+                in_script = True
         if script_end.search(line):
             in_script = False
-            continue  # Skip the closing script line
+            # Don't continue, might have attributes on same line
 
         # Skip lines inside script tags
         if in_script:
@@ -107,7 +115,11 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
                 continue
-            uiids.append((value, line_num))
+            if value not in unique_uiids:
+                unique_uiids[value] = line_num
+
+    for uiid, line_num in unique_uiids.items():
+        uiids.append((uiid, line_num))
 
     return uiids
 
