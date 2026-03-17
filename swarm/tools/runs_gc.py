@@ -58,11 +58,11 @@ class RunInfo:
     run_id: str
     path: Path
     run_type: str  # "active", "example", "legacy"
-    size_bytes: int
     mtime: datetime
     has_meta: bool
     is_corrupt: bool
     tags: List[str]
+    _size_bytes: int | None = None
 
     @property
     def age_days(self) -> float:
@@ -70,20 +70,31 @@ class RunInfo:
         now = datetime.now(timezone.utc)
         return (now - self.mtime).total_seconds() / 86400
 
+    @property
+    def size_bytes(self) -> int:
+        if self._size_bytes is None:
+            import os
 
-def get_dir_size(path: Path) -> int:
-    """Get total size of a directory in bytes."""
-    total = 0
-    try:
-        for entry in path.rglob("*"):
-            if entry.is_file():
+            total = 0
+
+            def _scan(p):
+                nonlocal total
                 try:
-                    total += entry.stat().st_size
+                    with os.scandir(p) as it:
+                        for entry in it:
+                            try:
+                                if entry.is_dir(follow_symlinks=False):
+                                    _scan(entry.path)
+                                elif entry.is_file():
+                                    total += entry.stat().st_size
+                            except OSError:
+                                pass
                 except OSError:
                     pass
-    except OSError:
-        pass
-    return total
+
+            _scan(str(self.path))
+            self._size_bytes = total
+        return self._size_bytes
 
 
 def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
@@ -109,14 +120,10 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     except OSError:
         mtime = datetime.now(timezone.utc)
 
-    # Get size
-    size_bytes = get_dir_size(run_path)
-
     return RunInfo(
         run_id=run_id,
         path=run_path,
         run_type=run_type,
-        size_bytes=size_bytes,
         mtime=mtime,
         has_meta=has_meta,
         is_corrupt=is_corrupt,
