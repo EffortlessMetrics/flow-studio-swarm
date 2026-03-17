@@ -312,7 +312,7 @@ export class TemplatePalette {
         <div class="template-palette__error">
           <span class="template-palette__error-icon">\u26A0</span>
           <span>${this.error}</span>
-          <button class="template-palette__retry" data-action="retry">Retry</button>
+          <button class="template-palette__retry" data-action="retry" aria-label="Retry loading templates">Retry</button>
         </div>
       `;
       listContainer.querySelector('[data-action="retry"]')?.addEventListener("click", () => {

@@ -484,10 +484,10 @@ export class BoundaryReview {
     if (isBlocked || hasBlockingIssues) {
       return `
         <div class="boundary-review__actions">
-          <button class="boundary-review__btn boundary-review__btn--secondary" data-action="cancel">
+          <button class="boundary-review__btn boundary-review__btn--secondary" data-action="cancel" aria-label="Close">
             Close
           </button>
-          <button class="boundary-review__btn boundary-review__btn--warning" data-action="pause" data-uiid="flow_studio.modal.boundary_review.pause">
+          <button class="boundary-review__btn boundary-review__btn--warning" data-action="pause" data-uiid="flow_studio.modal.boundary_review.pause" aria-label="Review and address issues">
             Review & Address Issues
           </button>
         </div>
@@ -500,10 +500,10 @@ export class BoundaryReview {
     // Normal case: show both approve and pause
     return `
       <div class="boundary-review__actions">
-        <button class="boundary-review__btn boundary-review__btn--secondary" data-action="pause" data-uiid="flow_studio.modal.boundary_review.pause">
+        <button class="boundary-review__btn boundary-review__btn--secondary" data-action="pause" data-uiid="flow_studio.modal.boundary_review.pause" aria-label="Review and pause">
           Review & Pause
         </button>
-        <button class="boundary-review__btn boundary-review__btn--primary" data-action="approve" data-uiid="flow_studio.modal.boundary_review.approve">
+        <button class="boundary-review__btn boundary-review__btn--primary" data-action="approve" data-uiid="flow_studio.modal.boundary_review.approve" aria-label="Approve and continue">
           Approve & Continue
         </button>
       </div>

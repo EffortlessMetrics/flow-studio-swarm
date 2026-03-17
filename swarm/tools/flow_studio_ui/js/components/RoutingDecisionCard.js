@@ -288,7 +288,7 @@ export class RoutingDecisionCard {
             .join("");
         return `
       <div class="routing-card__section routing-card__rejected ${expandedClass}">
-        <button class="routing-card__rejected-toggle" data-action="toggle-rejected">
+        <button class="routing-card__rejected-toggle" data-action="toggle-rejected" aria-label="Toggle other candidates">
           <span class="routing-card__rejected-arrow">${arrowIcon}</span>
           <span>Other Candidates (${candidates.length})</span>
         </button>
