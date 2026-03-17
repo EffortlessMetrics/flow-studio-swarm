@@ -1,5 +1,0 @@
-1. Update `swarm/tools/flow_studio_ui/css/flow-studio.base.css` to add `:focus-visible` rules for `.mode-toggle button`, `.view-toggle button`, and `.run-history-filter .filter-btn`.
-2. As these are acting as toggle groups, we should use negative `outline-offset` and `position: relative; z-index: 1;` to avoid outline overlapping issues, exactly as instructed by memory.
-3. Update `.jules/palette.md` to record the critical learning regarding missing `:focus-visible` rules for custom semantic elements and overlapping focus rings.
-4. Run `make gen-index-html` to bundle CSS.
-5. Run the accessibility tests `uv run pytest tests/test_flow_studio_a11y.py`.
