@@ -1,0 +1,3 @@
+## 2026-03-18 - Improve keyboard focus visibility for toggle groups
+**Learning:** Custom interactive elements (like `.filter-btn`, `.view-toggle button`) may lack explicit `:focus-visible` CSS rules despite being semantic `<button>`s. When auditing or creating custom UI elements, explicit `:focus-visible` rules (e.g., `outline: 2px solid var(--fs-color-accent, #3b82f6);`) are required to maintain consistent keyboard accessibility. For elements acting as toggle groups, using negative `outline-offset` and `position: relative; z-index: 1;` is crucial to avoid outline overlapping issues between adjacent buttons.
+**Action:** Always verify keyboard focus states and add explicit `:focus-visible` rules with proper offset and z-index for grouped buttons.
