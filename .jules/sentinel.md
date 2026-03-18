@@ -1,0 +1,4 @@
+## 2026-01-23 - Prevent SQL Injection with f-strings in duckdb/sqlite
+**Vulnerability:** A SQL Injection vulnerability existed in `swarm/api/routes/db.py` where a dynamic table name was injected into a query string using an f-string: `f"SELECT COUNT(*) FROM {table}"`.
+**Learning:** Framework-level protections do not cover deep internal methods or raw query execution. Using string interpolation (`f-strings`) for SQL identifiers (like table names) circumvents parameterized query protections, leaving the application open to SQL injection if the input can be influenced by users.
+**Prevention:** When executing SQL queries with dynamic identifiers (like table names) via `conn.execute`, never use f-strings or string formatting. Instead, validate the input against a strict allowlist (e.g., `if table not in {"runs", "steps", "events"}: return 0`) before constructing the query to prevent SQL injection vulnerabilities.
