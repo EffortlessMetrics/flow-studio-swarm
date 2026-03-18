@@ -1,0 +1,3 @@
+## 2024-05-24 - Interactive Elements Focus States
+**Learning:** Custom interactive elements (like `.filter-btn`, `.view-toggle button`) may lack explicit `:focus-visible` CSS rules despite being semantic `<button>`s, leading to poor keyboard accessibility. Elements acting as toggle groups may need negative `outline-offset` and `position: relative; z-index: 1;` to avoid outline overlapping issues.
+**Action:** Ensure explicit `:focus-visible` rules (e.g., `outline: 2px solid var(--fs-color-accent, #3b82f6);`) are added to maintain consistent keyboard accessibility when creating or auditing custom UI elements.
