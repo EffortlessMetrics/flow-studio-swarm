@@ -1,0 +1,3 @@
+## 2025-05-18 - Accessible Toggle Button Groups
+**Learning:** Custom interactive elements (like `.filter-btn`, `.view-toggle button`) may lack explicit `:focus-visible` CSS rules despite being semantic `<button>`s. When auditing or creating custom UI elements, ensure explicit `:focus-visible` rules are added to maintain consistent keyboard accessibility. For elements acting as toggle groups, the default focus outline can overlap neighboring elements.
+**Action:** When creating custom toggle button groups, use explicit `:focus-visible` rules with a negative `outline-offset` and `position: relative; z-index: 1;` to ensure focus outlines are clearly visible and avoid overlapping issues.
