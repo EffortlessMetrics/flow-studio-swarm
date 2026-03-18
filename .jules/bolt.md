@@ -1,3 +1,7 @@
 ## 2026-01-23 - Defer File Existence Checks
 **Learning:** When listing items from a large directory (e.g. 50k runs), checking file existence (`os.path.exists`) for every item is a significant bottleneck, even if the check is fast.
 **Action:** Sort candidates by cached metadata (e.g. mtime from `os.scandir`) first, then only perform expensive checks (like file existence or loading content) on the top N results that will actually be returned.
+
+## 2025-05-15 - Fast Directory Size Calculation & Lazy Metadata Evaluation
+**Learning:** When calculating the total size of a deep directory tree using `pathlib.Path.rglob`, performance is severely degraded by object instantiation and stat calls. Replacing `rglob` with `os.scandir` yields huge performance gains. Additionally, eagerly calculating directory sizes for large collections of items (like runs in gc) when the metadata is not strictly needed blocks the thread unnecessarily.
+**Action:** Replace `pathlib.Path.rglob` with `os.scandir` for recursive size aggregations. Prevent infinite loops by using `follow_symlinks=False` on `is_dir()` and `is_file()` where appropriate. Furthermore, use lazy evaluation (e.g. a `@property` with a backing cached field) instead of eagerly calculating expensive metrics (like directory size) during object initialization.
