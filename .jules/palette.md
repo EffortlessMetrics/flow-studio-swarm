@@ -1,0 +1,3 @@
+## 2024-05-24 - Missing :focus-visible in Semantic UI Elements
+**Learning:** Custom interactive elements (like `.filter-btn`, `.view-toggle button`, `.teaching-mode-toggle`) in the Flow Studio UI often lack explicit `:focus-visible` CSS rules despite being semantic `<button>`s, leading to poor keyboard accessibility. For elements acting as toggle groups, `outline-offset` can cause overlapping focus rings.
+**Action:** When auditing or creating custom UI elements, ensure explicit `:focus-visible` rules (e.g., `outline: 2px solid var(--fs-color-accent);`) are added to maintain consistent keyboard accessibility. For elements acting as toggle groups, use negative `outline-offset` and `position: relative; z-index: 1;` to avoid outline overlapping issues.
