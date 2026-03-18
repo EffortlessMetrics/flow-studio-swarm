@@ -460,6 +460,12 @@
     .mode-toggle button:first-child {
       border-right: 1px solid #d1d5db;
     }
+    .mode-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+      position: relative;
+      z-index: 1;
+    }
 
     /* Icon Button Utility - semantic circular buttons */
     .fs-icon-button {
@@ -1026,6 +1032,12 @@
     }
     .view-toggle button:first-child {
       border-right: 1px solid #d1d5db;
+    }
+    .view-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+      position: relative;
+      z-index: 1;
     }
     /* Artifact status colors */
     .artifact-present { background-color: #22c55e !important; }
@@ -1923,6 +1935,11 @@
       color: var(--fs-color-accent);
     }
 
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
+
     .run-history-list {
       max-height: 200px;
       overflow-y: auto;
@@ -2237,6 +2254,11 @@
 
     .teaching-mode-label {
       font-weight: 500;
+    }
+
+    .teaching-mode-toggle:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
 
     @keyframes teaching-pulse {
