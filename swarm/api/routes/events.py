@@ -18,6 +18,8 @@ from typing import Any, AsyncGenerator, Dict, Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from swarm.runtime.safe_paths import validate_path_component
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/runs", tags=["events"])
@@ -355,6 +357,8 @@ async def stream_run_events(run_id: str, request: Request):
     """
     # Get runs root from spec manager
     from ..server import get_spec_manager
+
+    validate_path_component(run_id, "run_id")
 
     manager = get_spec_manager()
     runs_root = manager.runs_root
