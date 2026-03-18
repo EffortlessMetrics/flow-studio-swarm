@@ -1,0 +1,4 @@
+## 2024-05-15 - [Critical SQL Injection Vulnerability in DB Stats Endpoint]
+**Vulnerability:** A SQL injection vulnerability was found in the `/db/stats` endpoint (`swarm/api/routes/db.py`). The `safe_count` function executed queries using an f-string: `f"SELECT COUNT(*) FROM {table}"` without validating the `table` variable.
+**Learning:** Using f-strings to construct SQL queries with dynamic identifiers (like table names) exposes the application to SQL injection, even if the parameter originates internally. The vulnerability exists because any string could theoretically be passed and executed as part of the query.
+**Prevention:** Always validate dynamic identifiers against a strict allowlist (e.g., `if table not in {"runs", "steps", "tool_calls", "file_changes", "events", "facts"}: return 0`) before constructing the query to prevent SQL injection vulnerabilities. Do not use f-strings or string formatting for query parameters.
