@@ -397,3 +397,17 @@ class TestUIReadyHandshake:
         assert '"loading"' in all_ts or "'loading'" in all_ts, "UI should have 'loading' state"
         assert '"ready"' in all_ts or "'ready'" in all_ts, "UI should have 'ready' state"
         assert '"error"' in all_ts or "'error'" in all_ts, "UI should have 'error' state"
+
+class TestCustomFocusVisible:
+    def test_interactive_elements_have_focus_visible(self):
+        """Verify that custom interactive elements like .filter-btn and .view-toggle button have explicit focus-visible styles."""
+        import os
+        css_path = os.path.join(
+            os.path.dirname(__file__),
+            "../swarm/tools/flow_studio_ui/css/flow-studio.base.css"
+        )
+        with open(css_path, "r", encoding="utf-8") as f:
+            css_content = f.read()
+
+        assert ".filter-btn:focus-visible" in css_content, "Missing focus-visible style for .filter-btn"
+        assert ".view-toggle button:focus-visible" in css_content, "Missing focus-visible style for .view-toggle button"
