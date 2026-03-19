@@ -1,0 +1,3 @@
+## 2024-05-24 - [Keyboard Focus in Custom Grouped Buttons]
+**Learning:** Custom interactive elements designed as toggle groups (like `.view-toggle button` or `.mode-toggle button`) lack explicit `:focus-visible` outlines by default even if they are semantic `<button>`s, hiding focus for keyboard users.
+**Action:** When adding or auditing grouped interactive elements, ensure explicit `:focus-visible` rules are specified using negative `outline-offset` and `position: relative; z-index: 1;` to avoid visual overlap of focus rings.
