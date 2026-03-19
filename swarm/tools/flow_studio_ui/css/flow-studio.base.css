@@ -1016,9 +1016,15 @@
       cursor: pointer;
       transition: background 0.15s;
       font-size: 11px;
+      position: relative;
     }
     .view-toggle button:hover {
       background: #e5e7eb;
+    }
+    .view-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+      z-index: 1;
     }
     .view-toggle button.active {
       background: #0f766e;
@@ -1911,10 +1917,17 @@
       cursor: pointer;
       color: var(--fs-color-text-muted);
       transition: all 0.15s ease;
+      position: relative;
     }
 
     .run-history-filter .filter-btn:hover {
       border-color: var(--fs-color-accent);
+    }
+
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+      z-index: 1;
     }
 
     .run-history-filter .filter-btn.active {
