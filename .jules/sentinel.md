@@ -1,0 +1,4 @@
+## 2024-03-19 - SQL Injection via f-strings with dynamic identifiers
+**Vulnerability:** Constructing SQL queries using f-strings for dynamic identifiers (like table names), as seen in `conn.execute(f"SELECT COUNT(*) FROM {table}")`.
+**Learning:** Even if the input to a function currently comes from internal hardcoded strings, using string formatting for SQL queries is a vulnerability risk if the function is ever modified to accept user input or if the pattern is copied.
+**Prevention:** Validate dynamic identifiers against a strict allowlist (e.g., `if table not in {"runs", "steps", "tool_calls", "file_changes", "events", "facts"}: return 0`) before constructing the query to prevent SQL injection vulnerabilities.
