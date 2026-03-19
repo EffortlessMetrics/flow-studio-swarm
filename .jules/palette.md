@@ -1,0 +1,3 @@
+## 2024-03-19 - Adding Focus States for Toggle Groups
+**Learning:** Custom interactive elements like semantic buttons within toggle groups (`.filter-btn`, `.view-toggle button`) in `swarm/tools/flow_studio_ui/css/flow-studio.base.css` may lack explicit `:focus-visible` CSS rules for keyboard accessibility.
+**Action:** Always add explicit `:focus-visible` CSS rules (e.g., `outline: 2px solid var(--fs-color-accent, #3b82f6);`) to custom UI elements acting as toggle groups. Use negative `outline-offset` and `position: relative; z-index: 1;` to avoid outline overlapping issues between adjacent buttons.
