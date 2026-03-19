@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import shutil
 import sys
 from dataclasses import dataclass
@@ -58,11 +59,14 @@ class RunInfo:
     run_id: str
     path: Path
     run_type: str  # "active", "example", "legacy"
-    size_bytes: int
     mtime: datetime
     has_meta: bool
     is_corrupt: bool
     tags: List[str]
+
+    # PERFORMANCE OPTIMIZATION (Bolt): Changed size_bytes to a lazy property to avoid eager directory size calculation during run discovery.
+    def __post_init__(self) -> None:
+        self._size_bytes: int | None = None
 
     @property
     def age_days(self) -> float:
@@ -70,15 +74,33 @@ class RunInfo:
         now = datetime.now(timezone.utc)
         return (now - self.mtime).total_seconds() / 86400
 
+    @property
+    def size_bytes(self) -> int:
+        """Lazy calculation of directory size in bytes."""
+        if self._size_bytes is None:
+            self._size_bytes = get_dir_size(self.path)
+        return self._size_bytes
+
 
 def get_dir_size(path: Path) -> int:
     """Get total size of a directory in bytes."""
+    # PERFORMANCE OPTIMIZATION (Bolt): Replaced slow path.rglob('*') with os.scandir for significantly faster directory size calculation.
+    return _get_dir_size_recursive(str(path))
+
+
+def _get_dir_size_recursive(path: str) -> int:
     total = 0
     try:
-        for entry in path.rglob("*"):
-            if entry.is_file():
+        with os.scandir(path) as it:
+            for entry in it:
                 try:
-                    total += entry.stat().st_size
+                    # Do not pass follow_symlinks=False to is_file() or stat()
+                    # to preserve original rglob symlink sizing behavior
+                    if entry.is_file():
+                        total += entry.stat().st_size
+                    # Pass follow_symlinks=False to is_dir() to prevent infinite loops
+                    elif entry.is_dir(follow_symlinks=False):
+                        total += _get_dir_size_recursive(entry.path)
                 except OSError:
                     pass
     except OSError:
@@ -109,14 +131,10 @@ def get_run_info(run_id: str, run_path: Path, run_type: str) -> RunInfo:
     except OSError:
         mtime = datetime.now(timezone.utc)
 
-    # Get size
-    size_bytes = get_dir_size(run_path)
-
     return RunInfo(
         run_id=run_id,
         path=run_path,
         run_type=run_type,
-        size_bytes=size_bytes,
         mtime=mtime,
         has_meta=has_meta,
         is_corrupt=is_corrupt,
