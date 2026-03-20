@@ -265,7 +265,7 @@ export function renderRunDetailContent(runId: string, summary: ExtendedRunSummar
     <div class="kv-section" style="margin-top: 16px;" data-uiid="flow_studio.modal.run_detail.boundary">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Boundary Summary</span>
-        <button id="run-detail-boundary-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.boundary.toggle" style="padding: 2px 8px; font-size: 10px;">Load Review</button>
+        <button id="run-detail-boundary-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.boundary.toggle" aria-expanded="false" aria-controls="run-detail-boundary-container" style="padding: 2px 8px; font-size: 10px;">Load Review</button>
       </div>
       <div id="run-detail-boundary-container" data-uiid="flow_studio.modal.run_detail.boundary.container" style="display: none; margin-top: 8px;">
         <div class="muted fs-text-xs">Click "Load Review" to view boundary data...</div>
@@ -275,7 +275,7 @@ export function renderRunDetailContent(runId: string, summary: ExtendedRunSummar
     <div class="kv-section" style="margin-top: 16px;">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Events Timeline</span>
-        <button id="run-detail-events-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.events.toggle" style="padding: 2px 8px; font-size: 10px;">Load Events</button>
+        <button id="run-detail-events-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.events.toggle" aria-expanded="false" aria-controls="run-detail-events-container" style="padding: 2px 8px; font-size: 10px;">Load Events</button>
       </div>
       <div id="run-detail-events-container" data-uiid="flow_studio.modal.run_detail.events.container" style="display: none; margin-top: 8px; max-height: 200px; overflow-y: auto; background: #f9fafb; border-radius: 4px; padding: 8px;">
         <div class="muted fs-text-xs">Click "Load Events" to view execution events...</div>
@@ -285,7 +285,7 @@ export function renderRunDetailContent(runId: string, summary: ExtendedRunSummar
     <div class="kv-section" style="margin-top: 16px;" data-uiid="flow_studio.modal.run_detail.wisdom">
       <div class="kv-label" style="display: flex; align-items: center; gap: 8px;">
         <span>Wisdom Summary</span>
-        <button id="run-detail-wisdom-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.wisdom.toggle" style="padding: 2px 8px; font-size: 10px;">Load Wisdom</button>
+        <button id="run-detail-wisdom-toggle" class="fs-button-small" data-uiid="flow_studio.modal.run_detail.wisdom.toggle" aria-expanded="false" aria-controls="run-detail-wisdom-container" style="padding: 2px 8px; font-size: 10px;">Load Wisdom</button>
       </div>
       <div id="run-detail-wisdom-container" data-uiid="flow_studio.modal.run_detail.wisdom.container" style="display: none; margin-top: 8px; background: #f0fdf4; border-radius: 4px; padding: 12px;">
         <div class="muted fs-text-xs">Click "Load Wisdom" to view wisdom metrics...</div>
@@ -549,6 +549,7 @@ function attachActionHandlers(modal: HTMLElement, runId: string, summary?: Exten
       // Toggle visibility
       if (container.style.display === "none") {
         container.style.display = "block";
+        btn.setAttribute("aria-expanded", "true");
         btn.textContent = "Loading...";
         btn.disabled = true;
 
@@ -564,6 +565,7 @@ function attachActionHandlers(modal: HTMLElement, runId: string, summary?: Exten
         }
       } else {
         container.style.display = "none";
+        btn.setAttribute("aria-expanded", "false");
         btn.textContent = "Load Review";
       }
     });
@@ -673,6 +675,7 @@ function attachActionHandlers(modal: HTMLElement, runId: string, summary?: Exten
       // Toggle visibility
       if (container.style.display === "none") {
         container.style.display = "block";
+        btn.setAttribute("aria-expanded", "true");
         btn.textContent = "Loading...";
         btn.disabled = true;
 
@@ -689,6 +692,7 @@ function attachActionHandlers(modal: HTMLElement, runId: string, summary?: Exten
         }
       } else {
         container.style.display = "none";
+        btn.setAttribute("aria-expanded", "false");
         btn.textContent = "Load Events";
       }
     });
@@ -705,6 +709,7 @@ function attachActionHandlers(modal: HTMLElement, runId: string, summary?: Exten
       // Toggle visibility
       if (container.style.display === "none") {
         container.style.display = "block";
+        btn.setAttribute("aria-expanded", "true");
         btn.textContent = "Loading...";
         btn.disabled = true;
 
@@ -727,6 +732,7 @@ function attachActionHandlers(modal: HTMLElement, runId: string, summary?: Exten
         }
       } else {
         container.style.display = "none";
+        btn.setAttribute("aria-expanded", "false");
         btn.textContent = "Load Wisdom";
       }
     });
