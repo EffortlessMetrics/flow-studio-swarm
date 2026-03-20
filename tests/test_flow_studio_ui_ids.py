@@ -77,7 +77,7 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     Extract all data-uiid attribute values from HTML DOM elements.
 
     Skips UIIDs found inside <script> tags (which are JavaScript strings,
-    not actual DOM attributes).
+    not actual DOM attributes), UNLESS it is the bundled flowstudio-js-bundle tag.
 
     Returns:
         List of (uiid_value, line_number) tuples
@@ -87,19 +87,24 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
 
     # Track whether we're inside a script tag
     in_script = False
+    is_bundle_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
+    bundle_script_start = re.compile(r'<script[^>]*data-inline-source="flowstudio-js-bundle"[^>]*>', re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
             in_script = True
+            if bundle_script_start.search(line):
+                is_bundle_script = True
         if script_end.search(line):
             in_script = False
+            is_bundle_script = False
             continue  # Skip the closing script line
 
-        # Skip lines inside script tags
-        if in_script:
+        # Skip lines inside script tags, UNLESS it's the bundled JS which contains templates
+        if in_script and not is_bundle_script:
             continue
 
         for match in pattern.finditer(line):
@@ -107,6 +112,14 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
                 continue
+
+            # Deduplicate across static HTML and the bundle, since the static HTML
+            # serves as fallback for components that the JS will later render dynamically.
+            # We don't want the tests to fail just because the bundle also contains
+            # templates that match elements in the initial DOM.
+            if any(value == existing_value for existing_value, _ in uiids):
+                continue
+
             uiids.append((value, line_num))
 
     return uiids

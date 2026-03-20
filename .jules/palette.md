@@ -1,0 +1,3 @@
+## 2024-05-18 - [Add ARIA attributes to run detail toggle buttons]
+**Learning:** Found that the toggle buttons for expanding boundary review, events timeline, and wisdom summary in the run detail modal were missing `aria-expanded` and `aria-controls` attributes, which are essential for screen reader users to understand the state and relationship of collapsible sections.
+**Action:** Added `aria-expanded="false"` and `aria-controls="[container-id]"` to the buttons and updated their click handlers to toggle the `aria-expanded` state dynamically when the sections are expanded or collapsed.
