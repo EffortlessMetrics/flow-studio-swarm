@@ -301,6 +301,7 @@ export function renderAgentUsage(
     item.style.fontSize = "inherit";
     item.style.color = "inherit";
     item.innerHTML = renderAgentUsageItem(u.flow_title, u.step_title);
+    item.setAttribute("aria-label", `Click to navigate to flow ${u.flow}, step ${u.step}`);
     item.title = `Click to navigate to ${u.flow}:${u.step}`;
     item.addEventListener("click", async () => {
       if (setActiveFlow) {
@@ -858,6 +859,7 @@ export async function showStepDetails(
         agentLink.style.fontFamily = "inherit";
         agentLink.style.fontSize = "inherit";
         agentLink.innerHTML = `<span class="mono">${escapeHtml(agentKey)}</span>`;
+          agentLink.setAttribute("aria-label", `Click to view agent ${agentKey}`);
         agentLink.title = `Click to view agent: ${agentKey}`;
         agentLink.addEventListener("click", async () => {
           if (selectAgent) {
