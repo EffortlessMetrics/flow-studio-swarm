@@ -1,0 +1,4 @@
+## 2026-03-22 - [Fix SQL Injection Vulnerability in DB Stats Endpoint]
+**Vulnerability:** SQL injection vulnerability via string interpolation (`f"SELECT COUNT(*) FROM {table}"`) in `swarm/api/routes/db.py` when executing `conn.execute()`. This could allow arbitrary queries or potentially harmful database commands if an attacker could control the `table` input parameter.
+**Learning:** Hardcoded inputs to internal functions can still be a risk over time if the application evolves. Direct SQL string interpolation without validation or parameterized queries leaves the system open to SQL injection if usage changes.
+**Prevention:** Implement a strict allowlist of table names (e.g., `"runs"`, `"steps"`, `"tool_calls"`, `"file_changes"`, `"events"`, `"facts"`) before executing any dynamically constructed queries. When dynamic identifiers are unavoidable in SQL, always validate against an explicit list of allowed values.
