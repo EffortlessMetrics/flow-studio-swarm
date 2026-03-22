@@ -242,6 +242,12 @@ async def get_db_stats():
 
         # Query counts from each table
         def safe_count(table: str) -> int:
+            # Explicit allowlist for dynamic table names to prevent SQL injection risks
+            allowed_tables = ["runs", "steps", "tool_calls", "file_changes", "events", "facts"]
+            if table not in allowed_tables:
+                logger.error(f"Attempted to query unallowed table: {table}")
+                return 0
+
             try:
                 result = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
                 return result[0] if result else 0
