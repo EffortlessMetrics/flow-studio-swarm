@@ -1,8 +1,9 @@
-import pytest
-from pathlib import Path
 from unittest.mock import MagicMock
-from swarm.runtime.boundary_enforcement import BoundaryScanner, WorkspaceState, ViolationType
+
+import pytest
+from swarm.runtime.boundary_enforcement import BoundaryScanner, ViolationType, WorkspaceState
 from swarm.runtime.workspace import Workspace
+
 
 @pytest.fixture
 def mock_workspace(tmp_path):
@@ -10,6 +11,7 @@ def mock_workspace(tmp_path):
     workspace.root.return_value = tmp_path
     workspace.is_shadow.return_value = False
     return workspace
+
 
 def test_detects_secret_in_file_content(mock_workspace, tmp_path):
     """Test that BoundaryScanner detects secrets in file content."""
@@ -19,16 +21,10 @@ def test_detects_secret_in_file_content(mock_workspace, tmp_path):
     secret_file.write_text('api_client = Client(api_key="sk-ant-test-key-12345")')
 
     # State with the changed file
-    state = WorkspaceState(
-        timestamp="2024-01-01T00:00:00Z",
-        changed_files={"my_script.py"}
-    )
+    state = WorkspaceState(timestamp="2024-01-01T00:00:00Z", changed_files={"my_script.py"})
 
     scanner = BoundaryScanner(
-        workspace=mock_workspace,
-        step_id="step-1",
-        repo_root=tmp_path,
-        baseline_state=None
+        workspace=mock_workspace, step_id="step-1", repo_root=tmp_path, baseline_state=None
     )
 
     violations = scanner.scan(current_state=state)
@@ -40,6 +36,7 @@ def test_detects_secret_in_file_content(mock_workspace, tmp_path):
     assert "sk-ant-" in secret_violations[0].detail
     assert "Anthropic API Key" in secret_violations[0].detail
 
+
 def test_skips_binary_files(mock_workspace, tmp_path):
     """Test that BoundaryScanner skips binary files even if they contain pattern."""
     # Create a binary file (invalid utf-8) that happens to have the bytes for a key
@@ -48,16 +45,10 @@ def test_skips_binary_files(mock_workspace, tmp_path):
     content = b"some binary data \xff " + b"sk-ant-test-key"
     binary_file.write_bytes(content)
 
-    state = WorkspaceState(
-        timestamp="2024-01-01T00:00:00Z",
-        changed_files={"data.bin"}
-    )
+    state = WorkspaceState(timestamp="2024-01-01T00:00:00Z", changed_files={"data.bin"})
 
     scanner = BoundaryScanner(
-        workspace=mock_workspace,
-        step_id="step-1",
-        repo_root=tmp_path,
-        baseline_state=None
+        workspace=mock_workspace, step_id="step-1", repo_root=tmp_path, baseline_state=None
     )
 
     violations = scanner.scan(current_state=state)
@@ -66,22 +57,17 @@ def test_skips_binary_files(mock_workspace, tmp_path):
     secret_violations = [v for v in violations if v.type == ViolationType.SECRET_EXPOSURE]
     assert len(secret_violations) == 0
 
+
 def test_skips_large_files(mock_workspace, tmp_path):
     """Test that BoundaryScanner skips files larger than limit."""
     large_file = tmp_path / "large.txt"
     # Create 1.1MB file
     large_file.write_text("a" * (1024 * 1024 + 100) + "sk-ant-test-key")
 
-    state = WorkspaceState(
-        timestamp="2024-01-01T00:00:00Z",
-        changed_files={"large.txt"}
-    )
+    state = WorkspaceState(timestamp="2024-01-01T00:00:00Z", changed_files={"large.txt"})
 
     scanner = BoundaryScanner(
-        workspace=mock_workspace,
-        step_id="step-1",
-        repo_root=tmp_path,
-        baseline_state=None
+        workspace=mock_workspace, step_id="step-1", repo_root=tmp_path, baseline_state=None
     )
 
     violations = scanner.scan(current_state=state)
