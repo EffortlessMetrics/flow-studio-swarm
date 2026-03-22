@@ -1,0 +1,4 @@
+## 2026-03-22 - SQL Injection in Database Stats Endpoint
+**Vulnerability:** The `/db/stats` endpoint in `swarm/api/routes/db.py` executes an unparameterized SQL query `f"SELECT COUNT(*) FROM {table}"` where `table` is dynamically passed via `safe_count(table)`.
+**Learning:** Even internal functions with hardcoded inputs (e.g. `safe_count("runs")`) can be susceptible to SQL injection regressions as APIs evolve. Direct string interpolation into queries is an inherently dangerous pattern.
+**Prevention:** Implement strict allowlists against an expected set of tables (e.g., `{"runs", "steps", "tool_calls", "file_changes", "events", "facts"}`) before passing dynamic table identifiers into the execute method.
