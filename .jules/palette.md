@@ -1,0 +1,3 @@
+## 2024-05-24 - Add aria-label to copy buttons and checkboxes
+**Learning:** Adding aria-labels to elements like copy buttons or inputs that are inside a label block, but also need individual descriptions helps with screen reader accessibility. Although some elements may have a title attribute, explicitly including an aria-label provides better accessibility for screen readers, as the title attribute isn't universally announced in the same way.
+**Action:** Always verify interactive elements such as copy buttons or checkboxes include aria-labels, even if a title attribute or an implicit label exists.
