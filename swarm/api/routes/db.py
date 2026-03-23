@@ -242,6 +242,10 @@ async def get_db_stats():
 
         # Query counts from each table
         def safe_count(table: str) -> int:
+            # SECURITY OPTIMIZATION (Sentinel): Prevent SQL injection via table allowlist
+            allowed_tables = {"runs", "steps", "tool_calls", "file_changes", "events", "facts"}
+            if table not in allowed_tables:
+                return 0
             try:
                 result = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
                 return result[0] if result else 0
