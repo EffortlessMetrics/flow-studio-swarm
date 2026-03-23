@@ -77,14 +77,15 @@ def get_dir_size(path: Path) -> int:
     # PERFORMANCE OPTIMIZATION (Bolt): Replaced Path.rglob("*") with os.scandir() which is significantly faster for large directories because it avoids creating Path objects and returns directory entries directly.
     total = 0
     try:
-        for entry in os.scandir(path):
-            if entry.is_file():
-                try:
-                    total += entry.stat().st_size
-                except OSError:
-                    pass
-            elif entry.is_dir(follow_symlinks=False):
-                total += get_dir_size(Path(entry.path))
+        with os.scandir(path) as it:
+            for entry in it:
+                if entry.is_file():
+                    try:
+                        total += entry.stat().st_size
+                    except OSError:
+                        pass
+                elif entry.is_dir(follow_symlinks=False):
+                    total += get_dir_size(Path(entry.path))
     except OSError:
         pass
     return total
