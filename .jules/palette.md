@@ -1,0 +1,3 @@
+## 2024-05-28 - Consistent ARIA Labels on Interactive Elements
+**Learning:** Found a systemic pattern of missing `aria-label` attributes on dynamically bound UI components (like `.copy-btn` and view toggles) within the Flow Studio layout fragments. This prevents screen readers from understanding the context of generic icon or context-dependent buttons.
+**Action:** When adding new interactive components or standardizing existing ones across multiple layout fragments, enforce a check to ensure `aria-label` is populated, especially for icons without visible accompanying text or elements where text depends heavily on visual context (e.g., active vs inactive toggles).
