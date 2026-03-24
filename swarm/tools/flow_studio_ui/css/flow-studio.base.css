@@ -457,6 +457,11 @@
       background: #3b82f6;
       color: white;
     }
+    .mode-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+      z-index: 1;
+    }
     .mode-toggle button:first-child {
       border-right: 1px solid #d1d5db;
     }
@@ -1023,6 +1028,11 @@
     .view-toggle button.active {
       background: #0f766e;
       color: white;
+    }
+    .view-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+      z-index: 1;
     }
     .view-toggle button:first-child {
       border-right: 1px solid #d1d5db;
@@ -1921,6 +1931,11 @@
       background: var(--fs-color-accent-bg);
       border-color: var(--fs-color-accent);
       color: var(--fs-color-accent);
+    }
+
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent);
+      outline-offset: 1px;
     }
 
     .run-history-list {
