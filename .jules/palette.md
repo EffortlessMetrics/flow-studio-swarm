@@ -1,0 +1,3 @@
+## 2025-03-24 - Missing focus states on custom toggle buttons and modal actions
+**Learning:** Custom styled buttons (like toggle groups and modal actions) often miss keyboard focus styles when default browser outlines are overridden, impacting keyboard accessibility.
+**Action:** Always verify that every interactive element, especially custom toggles and modal buttons, has a visible `:focus-visible` state.
