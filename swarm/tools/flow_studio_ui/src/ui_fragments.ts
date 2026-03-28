@@ -138,7 +138,7 @@ export function renderRunsLoadError(): string {
  */
 export function renderErrorState(title: string, message: string, actionLabel?: string, actionOnClick?: string): string {
   const actionHtml = actionLabel && actionOnClick
-    ? `<button class="fs-error-action" onclick="${escapeHtml(actionOnClick)}" aria-label="${escapeHtml(actionLabel)}">${escapeHtml(actionLabel)}</button>`
+    ? `<button class="fs-error-action" onclick="${escapeHtml(actionOnClick)}">${escapeHtml(actionLabel)}</button>`
     : "";
 
   return `
