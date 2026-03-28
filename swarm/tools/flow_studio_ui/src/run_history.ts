@@ -447,7 +447,7 @@ function renderRunHistoryError(error: string): string {
       <div class="fs-error-icon">\u26A0\uFE0F</div>
       <p class="fs-error-title">Error loading runs</p>
       <p class="fs-error-description">${escapeHtml(error)}</p>
-      <button class="fs-error-action" data-action="retry-load">Retry</button>
+      <button class="fs-error-action" data-action="retry-load" aria-label="Retry loading runs">Retry</button>
     </div>
   `;
 }

@@ -128,7 +128,7 @@ export function renderRunsLoadError(): string {
       <div class="fs-error-icon" aria-hidden="true">\u26A0\uFE0F</div>
       <p class="fs-error-title">Failed to load runs</p>
       <p class="fs-error-description">Check that the Flow Studio server is running.</p>
-      <button class="fs-error-action" onclick="location.reload()">Retry</button>
+      <button class="fs-error-action" onclick="location.reload()" aria-label="Retry loading runs">Retry</button>
     </div>
   `;
 }
@@ -138,7 +138,7 @@ export function renderRunsLoadError(): string {
  */
 export function renderErrorState(title: string, message: string, actionLabel?: string, actionOnClick?: string): string {
   const actionHtml = actionLabel && actionOnClick
-    ? `<button class="fs-error-action" onclick="${escapeHtml(actionOnClick)}">${escapeHtml(actionLabel)}</button>`
+    ? `<button class="fs-error-action" onclick="${escapeHtml(actionOnClick)}" aria-label="${escapeHtml(actionLabel)}">${escapeHtml(actionLabel)}</button>`
     : "";
 
   return `
