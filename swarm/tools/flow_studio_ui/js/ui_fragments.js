@@ -121,7 +121,7 @@ export function renderRunsLoadError() {
       <div class="fs-error-icon" aria-hidden="true">\u26A0\uFE0F</div>
       <p class="fs-error-title">Failed to load runs</p>
       <p class="fs-error-description">Check that the Flow Studio server is running.</p>
-      <button class="fs-error-action" onclick="location.reload()">Retry</button>
+      <button class="fs-error-action" onclick="location.reload()" aria-label="Retry loading runs">Retry</button>
     </div>
   `;
 }
