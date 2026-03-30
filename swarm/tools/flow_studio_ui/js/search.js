@@ -7,6 +7,7 @@
 // - Search result selection and navigation
 import { state } from "./state.js";
 import { Api } from "./api.js";
+import { escapeHtml } from "./utils.js";
 // ============================================================================
 // Module configuration - callbacks set by consumer
 // ============================================================================
@@ -73,8 +74,8 @@ export function renderSearchResults(results) {
             label = r.flow + " / " + (r.file || r.label);
         }
         return '<div class="search-result' + (idx === state.searchSelectedIndex ? ' selected' : '') + '" data-index="' + idx + '">' +
-            '<span class="search-result-type ' + typeClass + '">' + r.type + '</span>' +
-            '<span class="search-result-label">' + label + '</span>' +
+            '<span class="search-result-type ' + escapeHtml(typeClass) + '">' + escapeHtml(r.type) + '</span>' +
+            '<span class="search-result-label">' + escapeHtml(label) + '</span>' +
             '</div>';
     }).join("");
     dropdown.classList.add("open");
