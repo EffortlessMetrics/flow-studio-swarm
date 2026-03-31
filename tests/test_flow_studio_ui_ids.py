@@ -154,6 +154,12 @@ def get_flow_studio_html() -> str:
 
     return get_index_html()
 
+def get_flow_studio_js(filename: str) -> str:
+    """Load the compiled JavaScript file."""
+    import pathlib
+    js_path = pathlib.Path(__file__).parent.parent / "swarm" / "tools" / "flow_studio_ui" / "js" / filename
+    return js_path.read_text(encoding="utf-8")
+
 
 # ============================================================================
 # Tests
@@ -749,34 +755,6 @@ class TestRunDetailModalUIIDs:
             "This UIID is required for test automation to read run details."
         )
 
-    def test_run_detail_rerun_button_has_uiid(self):
-        """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
-
-        uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
-            f"Run detail re-run button missing data-uiid='{uiid}'. "
-            "This UIID is required for test automation to trigger re-runs."
-        )
-
-    def test_run_detail_modal_elements_have_uiids(self):
-        """All key run detail modal elements should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
-
-        # Expected run detail modal UIIDs
-        expected_modal = [
-            "flow_studio.modal.run_detail",
-            "flow_studio.modal.run_detail.close",
-            "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
-        ]
-
-        missing = [e for e in expected_modal if e not in uiids]
-        if missing:
-            pytest.fail(f"Missing expected run detail modal UIIDs: {', '.join(missing)}")
-
     def test_run_detail_modal_is_dialog(self):
         """Run detail modal should have proper dialog role for accessibility."""
         html = get_flow_studio_html()
@@ -897,6 +875,38 @@ class TestDynamicUIIDs:
     rendered dynamically by TypeScript. These tests verify the UIIDs are
     present in the compiled JavaScript code.
     """
+
+    def test_run_detail_rerun_button_has_uiid(self):
+        """Run detail modal re-run button should have data-uiid.
+
+        Dynamically generated in run_detail_modal.js.
+        """
+        js = get_flow_studio_js("run_detail_modal.js")
+
+        uiid = "flow_studio.modal.run_detail.rerun"
+        assert uiid in js, (
+            f"Run detail re-run button missing data-uiid='{uiid}'. "
+            "This UIID is required for test automation to trigger re-runs."
+        )
+
+    def test_run_detail_modal_elements_have_uiids(self):
+        """All key run detail modal elements should have data-uiid.
+
+        Dynamically generated in run_detail_modal.js.
+        """
+        js = get_flow_studio_js("run_detail_modal.js")
+
+        # Expected run detail modal UIIDs
+        expected_modal = [
+            "flow_studio.modal.run_detail",
+            "flow_studio.modal.run_detail.close",
+            "flow_studio.modal.run_detail.body",
+            "flow_studio.modal.run_detail.rerun",
+        ]
+
+        missing = [e for e in expected_modal if e not in js]
+        if missing:
+            pytest.fail(f"Missing expected run detail modal UIIDs: {', '.join(missing)}")
 
     def test_backend_badge_uiid_in_run_history(self):
         """Verify backend badge UIID pattern is in run_history.ts.
