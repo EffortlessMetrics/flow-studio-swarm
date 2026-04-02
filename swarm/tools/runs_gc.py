@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import shutil
 import sys
 from dataclasses import dataclass
@@ -73,16 +74,25 @@ class RunInfo:
 
 def get_dir_size(path: Path) -> int:
     """Get total size of a directory in bytes."""
+    # BOLT OPTIMIZATION: Replaced pathlib.Path.rglob with os.scandir for better performance by reducing object creation overhead.
     total = 0
-    try:
-        for entry in path.rglob("*"):
-            if entry.is_file():
-                try:
-                    total += entry.stat().st_size
-                except OSError:
-                    pass
-    except OSError:
-        pass
+
+    def _get_size(dir_path: str) -> None:
+        nonlocal total
+        try:
+            with os.scandir(dir_path) as it:
+                for entry in it:
+                    if entry.is_file():
+                        try:
+                            total += entry.stat().st_size
+                        except OSError:
+                            pass
+                    elif entry.is_dir(follow_symlinks=False):
+                        _get_size(entry.path)
+        except OSError:
+            pass
+
+    _get_size(str(path))
     return total
 
 
