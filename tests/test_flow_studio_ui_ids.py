@@ -752,11 +752,14 @@ class TestRunDetailModalUIIDs:
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
         html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        # The re-run button is dynamically injected from JS, not in the static DOM.
+        from pathlib import Path
+        js_path = Path(__file__).parent.parent / "swarm" / "tools" / "flow_studio_ui" / "js" / "run_detail_modal.js"
+        js_content = js_path.read_text(encoding="utf-8")
 
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
-            f"Run detail re-run button missing data-uiid='{uiid}'. "
+        assert f'data-uiid="{uiid}"' in js_content, (
+            f"Run detail re-run button missing data-uiid='{uiid}' in run_detail_modal.js. "
             "This UIID is required for test automation to trigger re-runs."
         )
 
@@ -765,17 +768,22 @@ class TestRunDetailModalUIIDs:
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
-        # Expected run detail modal UIIDs
-        expected_modal = [
+        from pathlib import Path
+        js_path = Path(__file__).parent.parent / "swarm" / "tools" / "flow_studio_ui" / "js" / "run_detail_modal.js"
+        js_content = js_path.read_text(encoding="utf-8")
+
+        # Expected static run detail modal UIIDs
+        expected_modal_static = [
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
 
-        missing = [e for e in expected_modal if e not in uiids]
+        missing = [e for e in expected_modal_static if e not in uiids]
         if missing:
             pytest.fail(f"Missing expected run detail modal UIIDs: {', '.join(missing)}")
+
+        assert 'data-uiid="flow_studio.modal.run_detail.rerun"' in js_content, "Missing expected dynamic UIID flow_studio.modal.run_detail.rerun"
 
     def test_run_detail_modal_is_dialog(self):
         """Run detail modal should have proper dialog role for accessibility."""
