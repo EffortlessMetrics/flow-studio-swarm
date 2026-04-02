@@ -199,7 +199,17 @@ async def generate_run_events(
     Yields:
         SSE-formatted event strings.
     """
-    run_dir = runs_root / run_id
+    # 🛡️ Sentinel: Validate run_id to prevent path traversal vulnerabilities
+    run_dir = (runs_root / run_id).resolve()
+    try:
+        run_dir.relative_to(runs_root.resolve())
+    except ValueError:
+        yield format_sse_event(
+            EventType.ERROR,
+            {"error": "invalid_run_id", "message": "Invalid run ID format"},
+        )
+        return
+
     events_file = run_dir / "events.jsonl"
     state_file = run_dir / "run_state.json"
 
@@ -367,8 +377,20 @@ async def stream_run_events(run_id: str, request: Request):
     except Exception as e:
         logger.warning("DB health check failed on SSE connect: %s", e)
 
+    # 🛡️ Sentinel: Validate run_id to prevent path traversal vulnerabilities
+    run_dir = (runs_root / run_id).resolve()
+    try:
+        run_dir.relative_to(runs_root.resolve())
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_run_id",
+                "message": "Invalid run ID format",
+            },
+        )
+
     # Verify run exists
-    run_dir = runs_root / run_id
     if not run_dir.exists():
         raise HTTPException(
             status_code=404,
