@@ -637,16 +637,16 @@ export async function showStepDetails(data, callbacks = {}) {
       <div class="kv-section">
         <div class="kv-label">Spec</div>
         <div class="fs-text-sm">
-          <span class="mono">swarm/flows/flow-${data.flow}.md</span>
+          <span class="mono">swarm/flows/flow-${escapeHtml(data.flow)}.md</span>
         </div>
       </div>
       <div class="kv-section">
         <div class="fs-text-sm fs-text-muted" style="margin-bottom: 4px;">Edit step:</div>
-        <pre class="mono fs-text-xs" style="margin: 0;">$EDITOR swarm/config/flows/${data.flow}.yaml</pre>
+        <pre class="mono fs-text-xs" style="margin: 0;">$EDITOR swarm/config/flows/${escapeHtml(data.flow)}.yaml</pre>
       </div>
       <div class="kv-section">
         <div class="kv-label">Artifacts</div>
-        <div class="mono fs-text-sm">swarm/runs/&lt;run&gt;/${data.flow}/${data.step_id || ""}/</div>
+        <div class="mono fs-text-sm">swarm/runs/&lt;run&gt;/${escapeHtml(data.flow)}/${escapeHtml(data.step_id || "")}/</div>
       </div>
     </div>
     <div class="operator-only">
@@ -755,7 +755,7 @@ export async function showStepDetails(data, callbacks = {}) {
       <tbody>${artifactRows}</tbody>
     </table>
     <div class="kv-label" style="margin-top: 12px;">Artifact Directory</div>
-    <div class="mono fs-text-sm">swarm/runs/${state.currentRunId || "<run>"}/${data.flow}/</div>
+    <div class="mono fs-text-sm">swarm/runs/${escapeHtml(state.currentRunId || "<run>")}/${escapeHtml(data.flow)}/</div>
   `;
     // Load receipt badges asynchronously if we have run context
     if (state.currentRunId && data.flow && data.step_id) {
