@@ -391,18 +391,16 @@ class ResilientStatsDB:
     def get_routing_decision_summary_safe(self, run_id: str) -> Dict[str, Any]:
         """Get routing decision summary safely, returning empty dict on error."""
         return self._safe_operation(
-            lambda: (
-                self._db.get_routing_decision_summary(run_id)
-                if self._db
-                else {
-                    "total_decisions": 0,
-                    "by_decision": {},
-                    "by_routing_mode": {},
-                    "by_routing_source": {},
-                    "needs_human_count": 0,
-                    "terminations": 0,
-                }
-            ),
+            lambda: self._db.get_routing_decision_summary(run_id)
+            if self._db
+            else {
+                "total_decisions": 0,
+                "by_decision": {},
+                "by_routing_mode": {},
+                "by_routing_source": {},
+                "needs_human_count": 0,
+                "terminations": 0,
+            },
             f"get_routing_decision_summary({run_id})",
             {
                 "total_decisions": 0,
@@ -429,11 +427,9 @@ class ResilientStatsDB:
     def rebuild_from_events_safe(self, run_id: str) -> Dict[str, Any]:
         """Rebuild projection for a run safely."""
         return self._safe_operation(
-            lambda: (
-                self._db.rebuild_from_events(run_id, self.config.runs_dir)
-                if self._db
-                else {"success": False, "error": "DB not initialized"}
-            ),
+            lambda: self._db.rebuild_from_events(run_id, self.config.runs_dir)
+            if self._db
+            else {"success": False, "error": "DB not initialized"},
             f"rebuild_from_events({run_id})",
             {"success": False, "error": "Operation failed"},
         )

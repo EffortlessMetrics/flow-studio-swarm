@@ -135,8 +135,8 @@ class PackResolver:
             value, source, path = self._resolve_value(
                 cli_key=f"features.{field}",
                 env_key=f"SWARM_FEATURE_{field.upper()}",
-                repo_getter=lambda p, f=field: getattr(p.features, f, None) if p else None,
-                baseline_getter=lambda p, f=field: getattr(p.features, f, None) if p else None,
+                repo_getter=lambda p, f=field: (getattr(p.features, f, None) if p else None),
+                baseline_getter=lambda p, f=field: (getattr(p.features, f, None) if p else None),
             )
             if value is not None:
                 result[field] = value
@@ -158,8 +158,8 @@ class PackResolver:
             value, source, path = self._resolve_value(
                 cli_key=f"runtime.{field}",
                 env_key=f"SWARM_{field.upper()}",
-                repo_getter=lambda p, f=field: getattr(p.runtime, f, None) if p else None,
-                baseline_getter=lambda p, f=field: getattr(p.runtime, f, None) if p else None,
+                repo_getter=lambda p, f=field: (getattr(p.runtime, f, None) if p else None),
+                baseline_getter=lambda p, f=field: (getattr(p.runtime, f, None) if p else None),
             )
             if value is not None:
                 result[field] = value

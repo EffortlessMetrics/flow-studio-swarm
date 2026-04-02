@@ -149,10 +149,8 @@ NEW_ROUTING_VALIDATION_PATTERNS = [
     (
         r"^\s*[-*]?\s*routing:\s*([A-Z][A-Z_]+)\s*(?:,|$|\()",
         "routing_field_yaml",
-        lambda m: (
-            m.group(1) not in VALID_ROUTING_DECISIONS
-            and m.group(1) not in {"MERGE", "SKIP", "NULL"}
-        ),
+        lambda m: m.group(1) not in VALID_ROUTING_DECISIONS
+        and m.group(1) not in {"MERGE", "SKIP", "NULL"},
         "invalid routing value (must be CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)",
     ),
     # routing field in JSON format
