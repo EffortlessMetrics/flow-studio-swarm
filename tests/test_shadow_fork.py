@@ -79,11 +79,17 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (False, "", ""),  # _ref_exists preferred
+                (False, "", ""),  # _ref_exists origin/preferred
+                (False, "", ""),  # _ref_exists main
+                (False, "", ""),  # _ref_exists origin/main
+                (False, "", ""),  # _ref_exists master
+                (False, "", ""),  # _ref_exists origin/master
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal: not a valid object name: 'HEAD'"),  # Base branch checkout fails
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -93,13 +99,13 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
+                (True, "", ""),  # _ref_exists
+                (True, " M file.txt", ""),  # Check for uncommitted changes
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
             # Create hooks directory for the test
-            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+            (tmp_path / ".git" / "hooks").mkdir(parents=True, exist_ok=True)
 
             fork.create()
 

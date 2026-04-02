@@ -135,8 +135,13 @@ def build_detailed_json_output(
 
         flow_keys = get_flow_keys()
     except ImportError:
-        # Fallback: use canonical 7-flow keys if registry not available
-        flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
+        # Fallback: if registry not available, extract from default macro sequence
+        try:
+            from swarm.runtime.types.macro_types import _get_default_flow_sequence
+
+            flow_keys = _get_default_flow_sequence()
+        except ImportError:
+            flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]
 
     for flow_id in flow_keys:
         flow_file = FLOW_SPECS_DIR / f"flow-{flow_id}.md"
