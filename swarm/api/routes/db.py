@@ -240,8 +240,17 @@ async def get_db_stats():
 
         conn = stats_db.connection
 
+        # Valid tables in the schema
+        valid_tables = {
+            "schema_version", "_projection_meta", "runs", "steps",
+            "tool_calls", "file_changes", "events", "ingestion_state",
+            "facts", "routing_decisions"
+        }
+
         # Query counts from each table
         def safe_count(table: str) -> int:
+            if table not in valid_tables:
+                return 0
             try:
                 result = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
                 return result[0] if result else 0
