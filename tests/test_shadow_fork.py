@@ -77,13 +77,25 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            # We mock _resolve_base_ref directly for missing base branch logic
+            # Or we can just mock _run_git to fail the 'checkout -b' command since
+            # _resolve_base_ref falls back to HEAD.
+            # _resolve_base_ref tries up to 7 options:
+            # 1. nonexistent, 2. origin/nonexistent, 3. main, 4. origin/main, 5. master, 6. origin/master, 7. HEAD
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", ""),  # _ref_exists preferred
+                (False, "", ""),  # _ref_exists origin/preferred
+                (False, "", ""),  # _ref_exists main
+                (False, "", ""),  # _ref_exists origin/main
+                (False, "", ""),  # _ref_exists master
+                (False, "", ""),  # _ref_exists origin/master
+                # 'HEAD' is not checked by _ref_exists
+                (True, "", ""),   # Check for uncommitted changes
+                (False, "", "fatal: not a valid object name: 'HEAD'"),  # git checkout -b shadow HEAD fails
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -93,9 +105,9 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # _ref_exists main (returns True immediately)
+                (True, " M file.txt", ""),  # status --porcelain (uncommitted changes)
+                (True, "", ""),  # checkout -b shadow main
             ]
 
             # Create hooks directory for the test
