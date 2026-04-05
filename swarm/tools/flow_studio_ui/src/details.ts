@@ -291,6 +291,7 @@ export function renderAgentUsage(
 
   usage.forEach(u => {
     const item = document.createElement("button");
+    item.type = "button";
     item.style.cursor = "pointer";
     item.style.padding = "2px 0";
     item.style.background = "none";
@@ -848,6 +849,7 @@ export async function showStepDetails(
     } else {
       stepAgents.forEach(agentKey => {
         const agentLink = document.createElement("button");
+        agentLink.type = "button";
         agentLink.style.cursor = "pointer";
         agentLink.style.padding = "2px 0";
         agentLink.style.color = "#3b82f6";

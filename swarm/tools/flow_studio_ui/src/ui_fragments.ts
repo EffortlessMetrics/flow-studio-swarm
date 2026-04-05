@@ -24,7 +24,7 @@ export function renderNoRuns(): string {
       <p class="fs-empty-description">Generate example data to explore Flow Studio.</p>
       <div class="fs-copy-command">
         <code class="mono fs-empty-command">make demo-run</code>
-        <button class="fs-icon-button copy-button" title="Copy command" onclick="navigator.clipboard.writeText('make demo-run'); this.textContent='\u2713'; setTimeout(() => this.textContent='\uD83D\uDCCB', 2000)">\uD83D\uDCCB</button>
+        <button type="button" class="fs-icon-button copy-button" title="Copy command" aria-label="Copy demo command" onclick="navigator.clipboard.writeText('make demo-run'); this.textContent='\u2713'; setTimeout(() => this.textContent='\uD83D\uDCCB', 2000)">\uD83D\uDCCB</button>
       </div>
     </div>
   `;
