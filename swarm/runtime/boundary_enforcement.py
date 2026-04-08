@@ -379,7 +379,6 @@ class BoundaryScanner:
             file_lower = file_path.lower()
 
             # 1. Check filename patterns
-            filename_match = False
             for pattern in self.SECRET_PATTERNS:
                 if pattern in file_lower:
                     violations.append(
@@ -393,7 +392,6 @@ class BoundaryScanner:
                             remediation="Review file for sensitive data before committing.",
                         )
                     )
-                    filename_match = True
                     break  # Only one warning per file
 
             # 2. Check content for high-confidence secrets
@@ -411,23 +409,28 @@ class BoundaryScanner:
                 if abs_path.stat().st_size > 1024 * 1024:
                     continue
 
-                # Read text (ignore binary files)
-                content = abs_path.read_text(encoding="utf-8")
+                # Read text line by line to prevent memory exhaustion (ignore binary files)
+                secret_found = False
+                with open(abs_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        for pattern, desc in self.SECRET_CONTENT_PATTERNS.items():
+                            if pattern in line:
+                                violations.append(
+                                    Violation(
+                                        type=ViolationType.SECRET_EXPOSURE,
+                                        severity=ViolationSeverity.CRITICAL,
+                                        path=file_path,
+                                        operation="content_scan",
+                                        detail=f"File {file_path} contains potential {desc} ('{pattern}...')",
+                                        step_id=self._step_id,
+                                        remediation="REMOVE THIS SECRET IMMEDIATELY. Use environment variables.",
+                                    )
+                                )
+                                secret_found = True
+                                break  # Stop checking this line
 
-                for pattern, desc in self.SECRET_CONTENT_PATTERNS.items():
-                    if pattern in content:
-                        violations.append(
-                            Violation(
-                                type=ViolationType.SECRET_EXPOSURE,
-                                severity=ViolationSeverity.CRITICAL,
-                                path=file_path,
-                                operation="content_scan",
-                                detail=f"File {file_path} contains potential {desc} ('{pattern}...')",
-                                step_id=self._step_id,
-                                remediation="REMOVE THIS SECRET IMMEDIATELY. Use environment variables.",
-                            )
-                        )
-                        break  # Stop after first secret found in file
+                        if secret_found:
+                            break  # Stop checking this file
 
             except (UnicodeDecodeError, OSError):
                 # Skip binary files or unreadable files
