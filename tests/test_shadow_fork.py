@@ -72,18 +72,26 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_fails_if_checkout_fails(self, tmp_path):
+        """Test that create fails if git checkout fails."""
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            # Setup side effects for all _run_git calls during create()
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "main", ""),          # Get current branch
+                (False, "", "fatal"),        # _ref_exists("nonexistent")
+                (False, "", "fatal"),        # _ref_exists("origin/nonexistent")
+                (False, "", "fatal"),        # _ref_exists("main")
+                (False, "", "fatal"),        # _ref_exists("origin/main")
+                (False, "", "fatal"),        # _ref_exists("master")
+                (False, "", "fatal"),        # _ref_exists("origin/master")
+                # Now base_ref is "HEAD"
+                (True, "", ""),              # Check for uncommitted changes (git status)
+                (False, "", "checkout error"), # Create and switch to shadow branch (fails)
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -92,10 +100,10 @@ class TestShadowForkCreate:
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
+                (True, "main", ""),          # Get current branch
+                (True, "", ""),              # _ref_exists("main")
+                (True, " M file.txt", ""),   # Check for uncommitted changes (git status) returns uncommitted changes
+                (True, "", ""),              # Create and switch to shadow branch
             ]
 
             # Create hooks directory for the test
