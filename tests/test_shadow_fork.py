@@ -77,10 +77,20 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            # We need enough returns for _resolve_base_ref (which tries multiple refs)
+            # plus _get_current_branch and _run_git("status")
+            # If all candidates fail in _ref_exists, it falls back to HEAD.
+            # But the test wants to simulate a failure during checkout.
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "main", ""),  # _get_current_branch
+                (False, "", ""),  # _ref_exists: preferred
+                (False, "", ""),  # _ref_exists: origin/preferred
+                (False, "", ""),  # _ref_exists: main
+                (False, "", ""),  # _ref_exists: origin/main
+                (False, "", ""),  # _ref_exists: master
+                (False, "", ""),  # _ref_exists: origin/master
+                (True, "", ""),  # _run_git(["status", ...])
+                (False, "", "fatal: does not exist"),  # checkout fails
             ]
 
             with pytest.raises(RuntimeError, match="does not exist"):
@@ -93,8 +103,8 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
+                (True, "", ""),  # _ref_exists: main (base_branch)
+                (True, " M file.txt", ""),  # Uncommitted changes exist (git status)
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
