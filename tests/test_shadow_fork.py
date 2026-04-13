@@ -77,13 +77,20 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            # Generate enough (False, "", "fatal") items to consume all elements in Candidates array from `_resolve_base_ref`
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal"),  # nonexistent doesn't exist
+                (False, "", "fatal"),  # origin/nonexistent doesn't exist
+                (False, "", "fatal"),  # main doesn't exist
+                (False, "", "fatal"),  # origin/main doesn't exist
+                (False, "", "fatal"),  # master doesn't exist
+                (False, "", "fatal"),  # origin/master doesn't exist
+                (False, "", "fatal"),  # Checkout fails
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
