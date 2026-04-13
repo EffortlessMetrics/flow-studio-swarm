@@ -77,13 +77,24 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            # We mock the git commands called in `create()`:
+            # 1. rev-parse --abbrev-ref HEAD (get_current_branch)
+            # 2. rev-parse --verify <ref> (_ref_exists loops for resolution)
+            # 3. status --porcelain (uncommitted changes)
+            # 4. checkout -b <shadow> <ref> (create shadow branch)
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "main", ""),  # _get_current_branch
+                (False, "", "fatal"),  # _ref_exists (base_branch "nonexistent")
+                (False, "", "fatal"),  # _ref_exists (origin/nonexistent)
+                (False, "", "fatal"),  # _ref_exists (main)
+                (False, "", "fatal"),  # _ref_exists (origin/main)
+                (False, "", "fatal"),  # _ref_exists (master)
+                (False, "", "fatal"),  # _ref_exists (origin/master)
+                (True, "", ""),  # status --porcelain (no uncommitted changes)
+                (False, "", "fatal: Not a valid object name: 'HEAD'"),  # checkout fails
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -92,16 +103,16 @@ class TestShadowForkCreate:
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
+                (True, "main", ""),  # _get_current_branch
+                (True, "", ""),  # _ref_exists ("main")
+                (True, " M file.txt", ""),  # status --porcelain (uncommitted changes exist)
+                (True, "", ""),  # checkout -b
             ]
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
-            fork.create()
+            fork.create(base_branch="main")
 
             assert "uncommitted changes" in caplog.text.lower()
 
