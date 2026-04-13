@@ -281,6 +281,14 @@ class ShadowFork:
         # In detached HEAD, use "HEAD" as original_branch for restoration
         self.original_branch = current or "HEAD"
 
+        # Check for uncommitted changes that would be lost
+        success, stdout, _ = self._run_git(["status", "--porcelain"])
+        if success and stdout:
+            logger.warning(
+                "Working tree has uncommitted changes. "
+                "These will be carried into the shadow branch."
+            )
+
         # Resolve base branch with fallbacks (handles missing main, detached HEAD, etc.)
         base_ref = self._resolve_base_ref(base_branch)
         self.base_branch = base_ref
@@ -289,14 +297,6 @@ class ShadowFork:
                 "Base branch '%s' not found, using '%s' instead",
                 base_branch,
                 base_ref,
-            )
-
-        # Check for uncommitted changes that would be lost
-        success, stdout, _ = self._run_git(["status", "--porcelain"])
-        if success and stdout:
-            logger.warning(
-                "Working tree has uncommitted changes. "
-                "These will be carried into the shadow branch."
             )
 
         # Generate shadow branch name
