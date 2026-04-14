@@ -8,6 +8,7 @@
 
 import { state } from "./state.js";
 import { Api } from "./api.js";
+import { escapeHtml } from "./utils.js";
 import type {
   FlowKey,
   SearchResult,
@@ -83,9 +84,10 @@ export function renderSearchResults(results: SearchResult[]): void {
     } else if (r.type === "artifact") {
       label = r.flow + " / " + (r.file || r.label);
     }
+    // Security Fix: Escape all dynamic user-provided content before rendering via innerHTML to prevent stored XSS attacks
     return '<div class="search-result' + (idx === state.searchSelectedIndex ? ' selected' : '') + '" data-index="' + idx + '">' +
-      '<span class="search-result-type ' + typeClass + '">' + r.type + '</span>' +
-      '<span class="search-result-label">' + label + '</span>' +
+      '<span class="search-result-type ' + escapeHtml(typeClass) + '">' + escapeHtml(r.type) + '</span>' +
+      '<span class="search-result-label">' + escapeHtml(label) + '</span>' +
     '</div>';
   }).join("");
 
