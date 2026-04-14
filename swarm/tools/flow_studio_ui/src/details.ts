@@ -1009,7 +1009,39 @@ export async function showStepDetails(
   quickCmds.classList.add("author-only");
   nodeTab.appendChild(quickCmds);
 
-  // Tab switching
+  // Tab switching and keyboard navigation
+  tabs.addEventListener("keydown", (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.classList.contains("tab")) return;
+
+    const tabElements = Array.from(tabs.querySelectorAll(".tab")) as HTMLElement[];
+    const index = tabElements.indexOf(target);
+    if (index === -1) return;
+
+    let nextIndex = index;
+    if (e.key === "ArrowRight") {
+      nextIndex = (index + 1) % tabElements.length;
+      e.preventDefault();
+    } else if (e.key === "ArrowLeft") {
+      nextIndex = (index - 1 + tabElements.length) % tabElements.length;
+      e.preventDefault();
+    } else if (e.key === "Home") {
+      nextIndex = 0;
+      e.preventDefault();
+    } else if (e.key === "End") {
+      nextIndex = tabElements.length - 1;
+      e.preventDefault();
+    } else if (e.key === "Enter" || e.key === " ") {
+      target.click();
+      e.preventDefault();
+      return;
+    }
+
+    if (nextIndex !== index) {
+      tabElements[nextIndex].focus();
+    }
+  });
+
   tabs.querySelectorAll(".tab").forEach(tab => {
     tab.addEventListener("click", () => {
       tabs.querySelectorAll(".tab").forEach(t => {
