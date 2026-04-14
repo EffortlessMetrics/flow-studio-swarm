@@ -77,13 +77,25 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+            # We must mock enough calls to satisfy the fallback resolution
+            # which checks multiple candidates (preferred, origin/preferred, main, etc.)
+            # If all fail, it falls back to HEAD. Then it runs status, then checkout.
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            def side_effect(cmd, *args, **kwargs):
+                if cmd == ["branch", "--show-current"]:
+                    return True, "main", ""
+                elif cmd == ["status", "--porcelain"]:
+                    return True, "", ""
+                elif cmd[0] == "rev-parse" and cmd[1] == "--verify":
+                    return False, "", "fatal" # None of the refs exist
+                elif cmd[0] == "checkout" and cmd[1] == "-b":
+                    # the checkout command itself will fail since we want to test creation failure
+                    return False, "", "fatal: does not exist"
+                return True, "", ""
+
+            mock_git.side_effect = side_effect
+
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -91,12 +103,18 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+            def side_effect(cmd, *args, **kwargs):
+                if cmd == ["branch", "--show-current"]:
+                    return True, "main", ""
+                elif cmd == ["status", "--porcelain"]:
+                    return True, " M file.txt", "" # uncommitted changes
+                elif cmd[0] == "rev-parse" and cmd[1] == "--verify":
+                    return True, "123", "" # Base branch exists
+                elif cmd[0] == "checkout" and cmd[1] == "-b":
+                    return True, "", "" # Creation succeeds
+                return True, "", ""
+
+            mock_git.side_effect = side_effect
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)

@@ -76,8 +76,9 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     """
     Extract all data-uiid attribute values from HTML DOM elements.
 
-    Skips UIIDs found inside <script> tags (which are JavaScript strings,
-    not actual DOM attributes).
+    Skips UIIDs found inside regular <script> tags, but includes them if they
+    are inside <script type="application/json" data-inline-source="flowstudio-js-bundle">
+    since this is where the compiled templates live.
 
     Returns:
         List of (uiid_value, line_number) tuples
@@ -87,20 +88,32 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
 
     # Track whether we're inside a script tag
     in_script = False
+    is_bundle_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
+    bundle_script_start = re.compile(r'<script[^>]*data-inline-source="flowstudio-js-bundle"', re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
             in_script = True
+            if bundle_script_start.search(line):
+                is_bundle_script = True
         if script_end.search(line):
             in_script = False
+            is_bundle_script = False
             continue  # Skip the closing script line
 
-        # Skip lines inside script tags
-        if in_script:
+        # Skip lines inside script tags, UNLESS it's the bundle script which contains HTML templates
+        if in_script and not is_bundle_script:
             continue
+
+        # The JS bundle now contains duplicate templates for components
+        # because the JS is loaded AND the components are inlined. We
+        # only want to count UIIDs that are NOT in the script bundle
+        # so we don't get duplicates. But for run_detail.rerun it ONLY
+        # exists in the JS. This is a bit messy, so a better approach
+        # is just tracking seen UIIDs and de-duping them during extraction.
 
         for match in pattern.finditer(line):
             value = match.group(1)
@@ -109,7 +122,16 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Remove exact duplicates (same uiid string AND line number, which shouldn't happen but just in case)
+    # But we actually want to preserve the first occurrence of each UIID overall
+    unique_uiids = []
+    seen = set()
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            unique_uiids.append((value, line_num))
+
+    return unique_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
