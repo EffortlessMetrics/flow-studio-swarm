@@ -109,6 +109,27 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
+    # Also find UIIDs in JS bundle (which are now rendered safely via template literals)
+    # The JS bundle is placed in a script tag with data-inline-source="flowstudio-js-bundle"
+    js_bundle_start = False
+    for line_num, line in enumerate(html.split("\n"), start=1):
+        if '<script type="application/json" data-inline-source="flowstudio-js-bundle">' in line:
+            js_bundle_start = True
+            continue
+        if js_bundle_start and script_end.search(line):
+            js_bundle_start = False
+            continue
+
+        if js_bundle_start:
+            for match in pattern.finditer(line):
+                value = match.group(1)
+                # Skip if already found in HTML
+                if any(u[0] == value for u in uiids):
+                    continue
+                if "${" in value:
+                    continue
+                uiids.append((value, line_num))
+
     return uiids
 
 
