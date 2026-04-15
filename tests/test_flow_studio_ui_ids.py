@@ -72,12 +72,16 @@ BANNED_PATTERNS = [
 ]
 
 
-def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
+def extract_uiids_from_html(html: str, ignore_js_bundle: bool = True) -> List[Tuple[str, int]]:
     """
     Extract all data-uiid attribute values from HTML DOM elements.
 
     Skips UIIDs found inside <script> tags (which are JavaScript strings,
     not actual DOM attributes).
+
+    If `ignore_js_bundle` is False, allows parsing UIIDs from the embedded
+    JS bundle script block. Otherwise ignores it (to avoid duplicates from components
+    that exist both in static HTML and JS templates).
 
     Returns:
         List of (uiid_value, line_number) tuples
@@ -93,7 +97,8 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
-            in_script = True
+            if ignore_js_bundle or "flowstudio-js-bundle" not in line:
+                in_script = True
         if script_end.search(line):
             in_script = False
             continue  # Skip the closing script line
@@ -106,6 +111,9 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             value = match.group(1)
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
+                continue
+            # Skip UIIDs embedded inside querySelector string arguments (e.g. document.querySelector('[data-uiid="..."]') )
+            if "querySelector(" in line or "querySelectorAll(" in line:
                 continue
             uiids.append((value, line_num))
 
@@ -752,7 +760,7 @@ class TestRunDetailModalUIIDs:
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
         html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids = {uiid for uiid, _ in extract_uiids_from_html(html, ignore_js_bundle=False)}
 
         uiid = "flow_studio.modal.run_detail.rerun"
         assert uiid in uiids, (
@@ -763,7 +771,7 @@ class TestRunDetailModalUIIDs:
     def test_run_detail_modal_elements_have_uiids(self):
         """All key run detail modal elements should have data-uiid."""
         html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids = {uiid for uiid, _ in extract_uiids_from_html(html, ignore_js_bundle=False)}
 
         # Expected run detail modal UIIDs
         expected_modal = [
