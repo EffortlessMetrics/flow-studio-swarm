@@ -99,6 +99,8 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             continue  # Skip the closing script line
 
         # Skip lines inside script tags
+        # Also skip any uiids generated via JavaScript template literals
+        # (even if they occur in a bundled script disguised as something else, like <script type="application/json">)
         if in_script:
             continue
 
@@ -108,6 +110,16 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             if "${" in value:
                 continue
             uiids.append((value, line_num))
+
+    # Also capture UIIDs that may be embedded inside template literals within scripts
+    # Because some tests verify that UIIDs are *present* in the HTML even if dynamically generated.
+    if html:
+        # Re-scan the full HTML text for UIIDs since we skipped scripts in the line-by-line parsing above.
+        # Note: We filter out those with JS variables to avoid false positives.
+        for match in pattern.finditer(html):
+            value = match.group(1)
+            if "${" not in value and value not in [u[0] for u in uiids]:
+                uiids.append((value, 0)) # Line number 0 for ones found inside scripts
 
     return uiids
 

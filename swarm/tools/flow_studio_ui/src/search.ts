@@ -8,6 +8,7 @@
 
 import { state } from "./state.js";
 import { Api } from "./api.js";
+import { escapeHtml } from "./utils.js";
 import type {
   FlowKey,
   SearchResult,
@@ -76,16 +77,19 @@ export function renderSearchResults(results: SearchResult[]): void {
   }
 
   dropdown.innerHTML = results.map((r, idx) => {
-    const typeClass = r.type;
-    let label = r.label;
+    // 🛡️ Sentinel mitigation: Escape HTML characters to prevent XSS vulnerabilities
+    // when rendering user-provided or API-sourced data into the DOM.
+    const escapedTypeClass = escapeHtml(r.type);
+    const escapedType = escapeHtml(r.type);
+    let escapedLabel = escapeHtml(r.label);
     if (r.type === "step") {
-      label = r.flow + " / " + r.label;
+      escapedLabel = escapeHtml(r.flow || "") + " / " + escapeHtml(r.label);
     } else if (r.type === "artifact") {
-      label = r.flow + " / " + (r.file || r.label);
+      escapedLabel = escapeHtml(r.flow || "") + " / " + escapeHtml(r.file || r.label);
     }
     return '<div class="search-result' + (idx === state.searchSelectedIndex ? ' selected' : '') + '" data-index="' + idx + '">' +
-      '<span class="search-result-type ' + typeClass + '">' + r.type + '</span>' +
-      '<span class="search-result-label">' + label + '</span>' +
+      '<span class="search-result-type ' + escapedTypeClass + '">' + escapedType + '</span>' +
+      '<span class="search-result-label">' + escapedLabel + '</span>' +
     '</div>';
   }).join("");
 
