@@ -379,7 +379,6 @@ class BoundaryScanner:
             file_lower = file_path.lower()
 
             # 1. Check filename patterns
-            filename_match = False
             for pattern in self.SECRET_PATTERNS:
                 if pattern in file_lower:
                     violations.append(
@@ -393,7 +392,6 @@ class BoundaryScanner:
                             remediation="Review file for sensitive data before committing.",
                         )
                     )
-                    filename_match = True
                     break  # Only one warning per file
 
             # 2. Check content for high-confidence secrets
