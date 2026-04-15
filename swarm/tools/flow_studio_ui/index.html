@@ -12342,7 +12342,7 @@ function attachActionHandlers(modal, runId, summary) {
                         const flowData = summary.flows[key];
                         return flowData && flowData.status !== "not_started";
                     })
-                    : ["signal", "plan", "build", "gate", "deploy", "wisdom"]; // Default: all flows
+                    : [...FLOW_KEYS]; // Default: all flows
                 // Start the new run via API
                 const result = await Api.startRun({
                     flows: flowsToRun,

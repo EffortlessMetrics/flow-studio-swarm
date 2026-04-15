@@ -625,7 +625,7 @@ function attachActionHandlers(modal: HTMLElement, runId: string, summary?: Exten
               const flowData = summary.flows[key as keyof typeof summary.flows];
               return flowData && flowData.status !== "not_started";
             })
-          : ["signal", "plan", "build", "gate", "deploy", "wisdom"]; // Default: all flows
+          : [...FLOW_KEYS]; // Default: all flows
 
         // Start the new run via API
         const result = await Api.startRun({
