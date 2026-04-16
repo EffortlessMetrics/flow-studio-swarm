@@ -96,7 +96,7 @@ Legacy patterns should be rejected.
 
 ```bash
 # This should find only the linter tool and educational references
-grep -r "route_to_flow\|route_to_agent" swarm/
+grep -r "`route_to_flow`\|`route_to_agent`" swarm/
 ```
 
 - [ ] No active uses of `route_to_flow` or `route_to_agent`

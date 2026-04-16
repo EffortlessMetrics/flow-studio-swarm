@@ -97,11 +97,11 @@ LEGACY_WARNING_PATTERNS = [
     (r'"route_to_agent":\s*null', "route_to_agent null in JSON (remove field entirely)"),
     # Bare mentions of the old field names (might be intentional deprecation docs)
     (
-        r"route_to_flow",
+        r"(?<!`)route_to_flow(?!`)",
         "mention of deprecated route_to_flow (verify this is deprecation documentation)",
     ),
     (
-        r"route_to_agent",
+        r"(?<!`)route_to_agent(?!`)",
         "mention of deprecated route_to_agent (verify this is deprecation documentation)",
     ),
 ]
@@ -337,9 +337,26 @@ def check_file(
 
 def find_files(root: Path) -> List[Path]:
     """Find all files to check."""
+    import os
     files = []
-    for ext in CHECK_EXTENSIONS:
-        files.extend(root.rglob(f"*{ext}"))
+    stack = [str(root)]
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                for entry in it:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            # Skip .git and common excluded dirs
+                            if not entry.name.startswith(".") and entry.name not in ["__pycache__", "node_modules"]:
+                                stack.append(entry.path)
+                        elif entry.is_file(follow_symlinks=False):
+                            if any(entry.name.endswith(ext) for ext in CHECK_EXTENSIONS):
+                                files.append(Path(entry.path))
+                    except OSError:
+                        pass
+        except OSError:
+            pass
     return files
 
 
