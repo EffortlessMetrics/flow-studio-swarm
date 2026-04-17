@@ -1,3 +1,4 @@
+cat << 'INNER_EOF' > swarm/tools/flow_studio_ui/fragments/60-modals.html
 <div id="selftest-modal-backdrop" class="selftest-modal-backdrop" style="display: none;"></div>
 
 <!-- Shortcuts Modal -->
@@ -35,6 +36,8 @@
       <div class="muted">Loading...</div>
     </div>
     <!-- Dummy button to pass HTML validation for UIIDs; true DOM is built by TS -->
-    <div style="display: none;"><button data-uiid="flow_studio.modal.run_detail.rerun">Re-run</button></div>
+    <div style="display: none;"><button data-uiid="flow_studio.modal.run_detail.rerun"></button></div>
   </div>
 </div>
+INNER_EOF
+uv run swarm/tools/gen_index_html.py
