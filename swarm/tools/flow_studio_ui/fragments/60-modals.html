@@ -1,23 +1,59 @@
-<div id="selftest-modal-backdrop" class="selftest-modal-backdrop" style="display: none;"></div>
-
-<!-- Shortcuts Modal -->
-<div id="shortcuts-modal" class="selftest-modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title" data-uiid="flow_studio.modal.shortcuts">
+<!-- Selftest step explanation modal -->
+<div id="selftest-modal" class="selftest-modal" role="dialog" aria-modal="true" aria-labelledby="selftest-modal-title" data-uiid="flow_studio.modal.selftest">
   <div class="selftest-step-content">
-    <button class="selftest-modal-close" id="shortcuts-close" aria-label="Close shortcuts modal" data-uiid="flow_studio.modal.shortcuts.close">×</button>
-    <h3 id="shortcuts-modal-title" class="selftest-step-title">Keyboard Shortcuts</h3>
+    <button class="selftest-modal-close" onclick="toggleSelftestModal(false)" aria-label="Close selftest modal" data-uiid="flow_studio.modal.selftest.close">×</button>
+    <h3 id="selftest-modal-title" class="visually-hidden">Selftest Step Details</h3>
+    <div id="selftest-modal-body" data-uiid="flow_studio.modal.selftest.body">Loading...</div>
+  </div>
+</div>
 
-    <div class="fs-shortcut-row" style="margin-top: 16px;">
-      <span>Close any modal</span>
-      <kbd class="fs-kbd">Esc</kbd>
-    </div>
-
-    <div class="fs-shortcut-row">
-      <span>Focus run filter</span>
+<!-- Keyboard shortcuts modal -->
+<div id="shortcuts-modal" class="shortcuts-modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title" data-uiid="flow_studio.modal.shortcuts">
+  <div class="shortcuts-content">
+    <button id="shortcuts-modal-close" class="selftest-modal-close" aria-label="Close shortcuts modal" data-uiid="flow_studio.modal.shortcuts.close">×</button>
+    <h3 id="shortcuts-modal-title">Keyboard Shortcuts</h3>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Focus search</span>
       <kbd class="fs-kbd">/</kbd>
     </div>
-
-    <div class="fs-shortcut-row">
-      <span>Show shortcuts</span>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Close dropdown / modal</span>
+      <kbd class="fs-kbd">Esc</kbd>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Previous step</span>
+      <kbd class="fs-kbd">&#8592;</kbd>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Next step</span>
+      <kbd class="fs-kbd">&#8594;</kbd>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Jump to Flow 1</span>
+      <kbd class="fs-kbd">1</kbd>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Jump to Flow 2</span>
+      <kbd class="fs-kbd">2</kbd>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Jump to Flow 3</span>
+      <kbd class="fs-kbd">3</kbd>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Jump to Flow 4</span>
+      <kbd class="fs-kbd">4</kbd>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Jump to Flow 5</span>
+      <kbd class="fs-kbd">5</kbd>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Jump to Flow 6</span>
+      <kbd class="fs-kbd">6</kbd>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-desc">Show this help</span>
       <kbd class="fs-kbd">?</kbd>
     </div>
     <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
@@ -34,7 +70,5 @@
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
     </div>
-    <!-- Dummy button to pass HTML validation for UIIDs; true DOM is built by TS -->
-    <div style="display: none;"><button data-uiid="flow_studio.modal.run_detail.rerun">Re-run</button></div>
   </div>
 </div>
