@@ -204,6 +204,8 @@ SKIP_PATTERNS = [
     "**/lint_routing_fields.py",  # Don't lint ourselves
     "**/swarm/runs/**",  # Run artifacts use different state machine vocabulary
     "**/run_state.json",  # Stepwise state machine uses advance/terminate/error/loop
+    "**/self-reviewer.md",  # Educational references to old routing
+    "**/RELEASE_CHECKLIST.md",  # Documentation of old routing checks
 ]
 
 # File extensions to check
