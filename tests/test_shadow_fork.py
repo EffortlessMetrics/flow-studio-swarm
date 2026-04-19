@@ -5,7 +5,7 @@ These tests verify the Shadow Fork isolation layer for safe speculative
 execution, including branch creation, checkpointing, rollback, and cleanup.
 """
 
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 from swarm.runtime.shadow_fork import (
@@ -79,12 +79,35 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal"),  # preferred branch fallback check
+                (False, "", "fatal"),  # origin/preferred fallback check
+                (False, "", "fatal"),  # main fallback check
+                (False, "", "fatal"),  # origin/main fallback check
+                (False, "", "fatal"),  # master fallback check
+                (False, "", "fatal"),  # origin/master fallback check
+                (True, "", ""),  # status check for uncommitted changes
+                (True, "", ""),  # checkout -b shadow_branch HEAD
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+            # Create hooks directory for the test so it doesn't fail there
+            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+            fork.create(base_branch="nonexistent")
+
+            # Check that it tried the fallbacks and finally ran the checkout command using HEAD
+            expected_calls = [
+                call(["rev-parse", "--abbrev-ref", "HEAD"], check=False),
+                call(["rev-parse", "--verify", "nonexistent"], check=False),
+                call(["rev-parse", "--verify", "origin/nonexistent"], check=False),
+                call(["rev-parse", "--verify", "main"], check=False),
+                call(["rev-parse", "--verify", "origin/main"], check=False),
+                call(["rev-parse", "--verify", "master"], check=False),
+                call(["rev-parse", "--verify", "origin/master"], check=False),
+                call(["status", "--porcelain"]),
+                call(["checkout", "-b", fork.shadow_branch, "HEAD"])
+            ]
+            mock_git.assert_has_calls(expected_calls, any_order=False)
+
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
@@ -93,8 +116,8 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # Verify base branch exists (preferred branch fallback check)
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
