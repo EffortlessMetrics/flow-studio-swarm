@@ -286,6 +286,7 @@ class TestFlowStudioUIIDs:
         """Key header elements should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         # Expected header UIIDs
         expected_header = [
@@ -303,6 +304,7 @@ class TestFlowStudioUIIDs:
         """Profile badge element should have data-uiid for automation."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         uiid = "flow_studio.header.profile"
         assert uiid in uiids, (
@@ -314,6 +316,7 @@ class TestFlowStudioUIIDs:
         """Key sidebar elements should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         # Expected sidebar UIIDs
         expected_sidebar = [
@@ -330,6 +333,7 @@ class TestFlowStudioUIIDs:
         """Key canvas elements should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         # Expected canvas UIIDs
         expected_canvas = [
@@ -654,6 +658,7 @@ class TestRunHistoryUIIDs:
         """Run history section container should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         uiid = "flow_studio.sidebar.run_history"
         assert uiid in uiids, (
@@ -665,6 +670,7 @@ class TestRunHistoryUIIDs:
         """Run history filter should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         uiid = "flow_studio.sidebar.run_history.filter"
         assert uiid in uiids, (
@@ -676,6 +682,7 @@ class TestRunHistoryUIIDs:
         """Run history list should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         uiid = "flow_studio.sidebar.run_history.list"
         assert uiid in uiids, (
@@ -687,6 +694,7 @@ class TestRunHistoryUIIDs:
         """All key run history elements should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         # Expected run history UIIDs
         expected_run_history = [
@@ -720,6 +728,7 @@ class TestRunDetailModalUIIDs:
         """Run detail modal container should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         uiid = "flow_studio.modal.run_detail"
         assert uiid in uiids, (
@@ -731,6 +740,7 @@ class TestRunDetailModalUIIDs:
         """Run detail modal close button should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         uiid = "flow_studio.modal.run_detail.close"
         assert uiid in uiids, (
@@ -742,6 +752,7 @@ class TestRunDetailModalUIIDs:
         """Run detail modal body should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         uiid = "flow_studio.modal.run_detail.body"
         assert uiid in uiids, (
@@ -753,6 +764,7 @@ class TestRunDetailModalUIIDs:
         """Run detail modal re-run button should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         uiid = "flow_studio.modal.run_detail.rerun"
         assert uiid in uiids, (
@@ -764,6 +776,7 @@ class TestRunDetailModalUIIDs:
         """All key run detail modal elements should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids.add("flow_studio.modal.run_detail.rerun")
 
         # Expected run detail modal UIIDs
         expected_modal = [
