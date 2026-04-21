@@ -459,9 +459,15 @@ class TestAccessibilityIDs:
         labelledby_pattern = re.compile(r'aria-labelledby="([^"]+)"')
         matches = labelledby_pattern.findall(html)
 
-        # Find all IDs in the document
+        # Find all IDs in the document (include JS components since HTML is stripped of JS bundle now)
         id_pattern = re.compile(r'\bid="([^"]+)"')
         all_ids = set(id_pattern.findall(html))
+
+        # Also need to read JS components since the UI relies on them being injected dynamically
+        from pathlib import Path
+        for js_file in Path("swarm/tools/flow_studio_ui/js").glob("*.js"):
+            js_content = js_file.read_text(encoding="utf-8")
+            all_ids.update(id_pattern.findall(js_content))
 
         missing = []
         for ref in matches:
@@ -750,12 +756,19 @@ class TestRunDetailModalUIIDs:
         )
 
     def test_run_detail_rerun_button_has_uiid(self):
-        """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        """Run detail modal re-run button should have data-uiid.
+        (Dynamically rendered, verified via component source)"""
+        from pathlib import Path
+
+        js_file = Path("swarm/tools/flow_studio_ui/js/run_detail_modal.js")
+        if js_file.exists():
+            content = js_file.read_text(encoding="utf-8")
+        else:
+            ts_file = Path("swarm/tools/flow_studio_ui/src/run_detail_modal.ts")
+            content = ts_file.read_text(encoding="utf-8")
 
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
+        assert f'data-uiid="{uiid}"' in content, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
             "This UIID is required for test automation to trigger re-runs."
         )
@@ -765,12 +778,11 @@ class TestRunDetailModalUIIDs:
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
-        # Expected run detail modal UIIDs
+        # Expected run detail modal UIIDs in static HTML
         expected_modal = [
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
 
         missing = [e for e in expected_modal if e not in uiids]
@@ -843,11 +855,18 @@ class TestRunDetailModalIntegration:
 
         Playwright selector: [data-uiid="flow_studio.modal.run_detail.rerun"]
         """
-        html = get_flow_studio_html()
+        from pathlib import Path
 
-        # Extract the rerun button element
+        js_file = Path("swarm/tools/flow_studio_ui/js/run_detail_modal.js")
+        if js_file.exists():
+            content = js_file.read_text(encoding="utf-8")
+        else:
+            ts_file = Path("swarm/tools/flow_studio_ui/src/run_detail_modal.ts")
+            content = ts_file.read_text(encoding="utf-8")
+
+        # Extract the rerun button element from JS component
         pattern = re.compile(r'<button[^>]*data-uiid="flow_studio\.modal\.run_detail\.rerun"[^>]*>')
-        match = pattern.search(html)
+        match = pattern.search(content)
         assert match, "Run detail rerun button should exist"
 
 
