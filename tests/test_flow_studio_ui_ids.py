@@ -752,6 +752,21 @@ class TestRunDetailModalUIIDs:
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
         html = get_flow_studio_html()
+        # Read the component JS directly, as the rerun button is rendered dynamically
+        from pathlib import Path
+
+        js_file = (
+            Path(__file__).resolve().parents[1]
+            / "swarm"
+            / "tools"
+            / "flow_studio_ui"
+            / "js"
+            / "run_detail_modal.js"
+        )
+        if js_file.exists():
+            js_content = js_file.read_text(encoding="utf-8")
+            html += f"\n{js_content}"
+
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
         uiid = "flow_studio.modal.run_detail.rerun"
@@ -763,6 +778,20 @@ class TestRunDetailModalUIIDs:
     def test_run_detail_modal_elements_have_uiids(self):
         """All key run detail modal elements should have data-uiid."""
         html = get_flow_studio_html()
+        from pathlib import Path
+
+        js_file = (
+            Path(__file__).resolve().parents[1]
+            / "swarm"
+            / "tools"
+            / "flow_studio_ui"
+            / "js"
+            / "run_detail_modal.js"
+        )
+        if js_file.exists():
+            js_content = js_file.read_text(encoding="utf-8")
+            html += f"\n{js_content}"
+
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
         # Expected run detail modal UIIDs

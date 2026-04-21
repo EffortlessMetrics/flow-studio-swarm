@@ -80,21 +80,33 @@ class TestShadowForkCreate:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal"),  # Base branch preferred doesn't exist
+                (False, "", "fatal"),  # origin/preferred doesn't exist
+                (False, "", "fatal"),  # main doesn't exist
+                (False, "", "fatal"),  # origin/main doesn't exist
+                (False, "", "fatal"),  # master doesn't exist
+                (False, "", "fatal"),  # origin/master doesn't exist
+                # Next fallback is HEAD which is hardcoded and returned directly
+                # It will then try to checkout -b shadow/123 HEAD which fails:
+                (False, "", "fatal: not a git repository"),
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
+        import logging
+        logger = logging.getLogger("swarm.runtime.shadow_fork")
+        logger.setLevel(logging.WARNING)
+
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # Check for base branch preferred
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 

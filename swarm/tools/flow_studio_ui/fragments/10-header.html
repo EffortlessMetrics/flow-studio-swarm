@@ -11,15 +11,15 @@
     </div>
     <nav style="display: flex; align-items: center; gap: 16px;" role="navigation" aria-label="Flow Studio controls" data-uiid="flow_studio.header.controls">
       <div class="tour-dropdown" id="tour-dropdown" data-uiid="flow_studio.header.tour">
-        <button id="tour-btn" class="tour-dropdown-btn" title="Start a guided tour" aria-haspopup="true" aria-expanded="false" data-uiid="flow_studio.header.tour.trigger">
+        <button id="tour-btn" class="tour-dropdown-btn" title="Start a guided tour" aria-haspopup="true" aria-expanded="false" aria-label="Start a guided tour" data-uiid="flow_studio.header.tour.trigger">
           <span>Tour</span>
           <span style="font-size: 10px;" aria-hidden="true">▼</span>
         </button>
         <div id="tour-menu" class="tour-dropdown-menu" role="menu" aria-label="Available tours" data-uiid="flow_studio.header.tour.menu"></div>
       </div>
       <div class="mode-toggle" role="group" aria-label="View mode" data-uiid="flow_studio.header.mode">
-        <button id="mode-author" class="active" title="Show all paths, CLI commands, and technical details" aria-pressed="true" data-uiid="flow_studio.header.mode.author">Author</button>
-        <button id="mode-operator" title="Simplified view focused on run status and decisions" aria-pressed="false" data-uiid="flow_studio.header.mode.operator">Operator</button>
+        <button id="mode-author" class="active" title="Show all paths, CLI commands, and technical details" aria-pressed="true" aria-label="Author mode" data-uiid="flow_studio.header.mode.author">Author</button>
+        <button id="mode-operator" title="Simplified view focused on run status and decisions" aria-pressed="false" aria-label="Operator mode" data-uiid="flow_studio.header.mode.operator">Operator</button>
       </div>
       <button id="profile-badge" class="muted fs-status-button fs-profile-badge" title="Current swarm profile" data-uiid="flow_studio.header.profile">
         <span id="profile-icon" aria-hidden="true">&#128230;</span>
