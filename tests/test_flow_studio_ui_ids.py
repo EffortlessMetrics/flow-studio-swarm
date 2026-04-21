@@ -751,11 +751,13 @@ class TestRunDetailModalUIIDs:
 
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        # Read from JS file since this button is dynamically generated
+        from pathlib import Path
+        js_file = Path("swarm/tools/flow_studio_ui/js/run_detail_modal.js")
+        js_content = js_file.read_text(encoding="utf-8")
 
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
+        assert f'data-uiid="{uiid}"' in js_content, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
             "This UIID is required for test automation to trigger re-runs."
         )
@@ -765,12 +767,11 @@ class TestRunDetailModalUIIDs:
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
-        # Expected run detail modal UIIDs
+        # Expected static run detail modal UIIDs
         expected_modal = [
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
 
         missing = [e for e in expected_modal if e not in uiids]
@@ -843,11 +844,14 @@ class TestRunDetailModalIntegration:
 
         Playwright selector: [data-uiid="flow_studio.modal.run_detail.rerun"]
         """
-        html = get_flow_studio_html()
+        # Read from JS file since this button is dynamically generated
+        from pathlib import Path
+        js_file = Path("swarm/tools/flow_studio_ui/js/run_detail_modal.js")
+        js_content = js_file.read_text(encoding="utf-8")
 
         # Extract the rerun button element
         pattern = re.compile(r'<button[^>]*data-uiid="flow_studio\.modal\.run_detail\.rerun"[^>]*>')
-        match = pattern.search(html)
+        match = pattern.search(js_content)
         assert match, "Run detail rerun button should exist"
 
 
