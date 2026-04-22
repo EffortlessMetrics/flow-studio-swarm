@@ -751,11 +751,15 @@ class TestRunDetailModalUIIDs:
 
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        # This element is dynamically rendered via JS, so it won't appear in the static index.html.
+        # We parse the source file instead.
+        source_path = Path("swarm/tools/flow_studio_ui/src/run_detail_modal.ts")
+        if not source_path.exists():
+            pytest.skip("Flow Studio UI source not available")
 
+        content = source_path.read_text()
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
+        assert f'data-uiid="{uiid}"' in content, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
             "This UIID is required for test automation to trigger re-runs."
         )
@@ -766,11 +770,12 @@ class TestRunDetailModalUIIDs:
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
         # Expected run detail modal UIIDs
+        # flow_studio.modal.run_detail.rerun is rendered dynamically, so we check it
+        # via the source file (in test_run_detail_rerun_button_has_uiid) and omit it here.
         expected_modal = [
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
 
         missing = [e for e in expected_modal if e not in uiids]
