@@ -751,11 +751,12 @@ class TestRunDetailModalUIIDs:
 
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        # Dynamically rendered elements won't be in the static HTML
+        js_file = Path(__file__).parent.parent / "swarm" / "tools" / "flow_studio_ui" / "src" / "run_detail_modal.ts"
+        js_content = js_file.read_text(encoding="utf-8")
 
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
+        assert f'data-uiid="{uiid}"' in js_content, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
             "This UIID is required for test automation to trigger re-runs."
         )
@@ -765,15 +766,19 @@ class TestRunDetailModalUIIDs:
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
+        js_file = Path(__file__).parent.parent / "swarm" / "tools" / "flow_studio_ui" / "src" / "run_detail_modal.ts"
+        js_content = js_file.read_text(encoding="utf-8")
+
         # Expected run detail modal UIIDs
         expected_modal = [
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
+        expected_js_modal = ["flow_studio.modal.run_detail.rerun"]
 
         missing = [e for e in expected_modal if e not in uiids]
+        missing.extend([e for e in expected_js_modal if f'data-uiid="{e}"' not in js_content])
         if missing:
             pytest.fail(f"Missing expected run detail modal UIIDs: {', '.join(missing)}")
 
