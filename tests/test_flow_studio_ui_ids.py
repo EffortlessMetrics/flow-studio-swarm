@@ -751,11 +751,24 @@ class TestRunDetailModalUIIDs:
 
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        # The rerun button is dynamically rendered in run_detail_modal.ts/js,
+        # so we need to check the source file directly, as extract_uiids_from_html
+        # skips <script> tags and the dynamic element won't be in the base HTML.
+        from pathlib import Path
+        ui_dir = Path("swarm/tools/flow_studio_ui")
+        ts_file = ui_dir / "src" / "run_detail_modal.ts"
+
+        # Read the file content if it exists
+        content = ""
+        if ts_file.exists():
+            content = ts_file.read_text(encoding="utf-8")
+        else:
+            js_file = ui_dir / "js" / "run_detail_modal.js"
+            if js_file.exists():
+                content = js_file.read_text(encoding="utf-8")
 
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
+        assert f'data-uiid="{uiid}"' in content or f"data-uiid='{uiid}'" in content, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
             "This UIID is required for test automation to trigger re-runs."
         )
@@ -765,12 +778,11 @@ class TestRunDetailModalUIIDs:
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
-        # Expected run detail modal UIIDs
+        # Expected run detail modal UIIDs that are statically present in the HTML
         expected_modal = [
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
 
         missing = [e for e in expected_modal if e not in uiids]
