@@ -749,17 +749,6 @@ class TestRunDetailModalUIIDs:
             "This UIID is required for test automation to read run details."
         )
 
-    def test_run_detail_rerun_button_has_uiid(self):
-        """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
-
-        uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
-            f"Run detail re-run button missing data-uiid='{uiid}'. "
-            "This UIID is required for test automation to trigger re-runs."
-        )
-
     def test_run_detail_modal_elements_have_uiids(self):
         """All key run detail modal elements should have data-uiid."""
         html = get_flow_studio_html()
@@ -770,7 +759,6 @@ class TestRunDetailModalUIIDs:
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
 
         missing = [e for e in expected_modal if e not in uiids]
@@ -953,6 +941,20 @@ class TestDynamicUIIDs:
         # Should contain the events container UIID
         assert "flow_studio.modal.run_detail.events.container" in content, (
             "run_detail_modal.js should render events container with data-uiid"
+        )
+
+    def test_run_detail_rerun_button_has_uiid(self):
+        """Run detail modal re-run button should have data-uiid.
+
+        This element is dynamically rendered in run_detail_modal.ts.
+        """
+        js_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "js" / "run_detail_modal.js"
+        assert js_file.exists(), "run_detail_modal.js should exist"
+
+        content = js_file.read_text(encoding="utf-8")
+
+        assert "flow_studio.modal.run_detail.rerun" in content, (
+            "run_detail_modal.js should render rerun button with data-uiid='flow_studio.modal.run_detail.rerun'"
         )
 
     def test_exemplar_checkbox_uiid_in_run_detail_modal(self):

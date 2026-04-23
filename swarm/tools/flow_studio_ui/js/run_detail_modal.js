@@ -253,7 +253,7 @@ export function renderRunDetailContent(runId, summary) {
         <button id="run-detail-rerun-btn" data-uiid="flow_studio.modal.run_detail.rerun" class="fs-button-primary" style="flex: 1;">
           Re-run
         </button>
-        <button id="run-detail-close-btn" class="fs-button-small" style="flex: 1;">
+        <button id="run-detail-close-btn" data-uiid="flow_studio.modal.run_detail.close" class="fs-button-small" style="flex: 1;">
           Close
         </button>
       </div>
@@ -278,7 +278,7 @@ function renderRunDetailError(runId, error) {
     </div>
 
     <div style="display: flex; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
-      <button id="run-detail-close-btn" class="fs-button-small" style="flex: 1;">
+      <button id="run-detail-close-btn" data-uiid="flow_studio.modal.run_detail.close" class="fs-button-small" style="flex: 1;">
         Close
       </button>
     </div>
