@@ -178,10 +178,11 @@ class ShadowFork:
             "HEAD",
         ]
         for ref in candidates:
-            if ref == "HEAD" or self._ref_exists(ref):
+            if self._ref_exists(ref):
                 return ref
-        # Should never reach here since HEAD is always valid, but just in case
-        return "HEAD"
+
+        # If even HEAD fails (e.g. empty repo), we can't create a branch
+        raise RuntimeError("Could not resolve any valid base ref")
 
     def _get_marker_path(self) -> Path:
         """Get the path to the shadow fork marker file."""
