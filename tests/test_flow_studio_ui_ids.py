@@ -752,7 +752,13 @@ class TestRunDetailModalUIIDs:
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
         html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        # Parse from the actual TS/JS file because dynamically rendered HTML fragments
+        # inside the JS bundle script tag are stripped by extract_uiids_from_html
+        import re
+        uiids = set()
+        pattern = re.compile(r'data-uiid="([^"]+)"')
+        for match in pattern.finditer(html):
+            uiids.add(match.group(1))
 
         uiid = "flow_studio.modal.run_detail.rerun"
         assert uiid in uiids, (
@@ -763,7 +769,11 @@ class TestRunDetailModalUIIDs:
     def test_run_detail_modal_elements_have_uiids(self):
         """All key run detail modal elements should have data-uiid."""
         html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        import re
+        uiids = set()
+        pattern = re.compile(r'data-uiid="([^"]+)"')
+        for match in pattern.finditer(html):
+            uiids.add(match.group(1))
 
         # Expected run detail modal UIIDs
         expected_modal = [
