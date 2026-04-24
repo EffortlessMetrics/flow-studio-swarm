@@ -70,7 +70,7 @@ export function renderSearchResults(results: SearchResult[]): void {
   if (!dropdown) return;
 
   if (!results.length) {
-    dropdown.innerHTML = '<div class="search-no-results">No results found</div>';
+    dropdown.innerHTML = '<div class="search-no-results" role="status">No results found</div>';
     dropdown.classList.add("open");
     return;
   }
@@ -83,7 +83,7 @@ export function renderSearchResults(results: SearchResult[]): void {
     } else if (r.type === "artifact") {
       label = r.flow + " / " + (r.file || r.label);
     }
-    return '<div class="search-result' + (idx === state.searchSelectedIndex ? ' selected' : '') + '" data-index="' + idx + '">' +
+    return '<div class="search-result' + (idx === state.searchSelectedIndex ? ' selected' : '') + '" data-index="' + idx + '" role="option" aria-selected="' + (idx === state.searchSelectedIndex ? 'true' : 'false') + '">' +
       '<span class="search-result-type ' + typeClass + '">' + r.type + '</span>' +
       '<span class="search-result-label">' + label + '</span>' +
     '</div>';
