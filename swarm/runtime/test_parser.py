@@ -35,7 +35,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -430,6 +430,7 @@ def parse_junit_xml(xml_path: Path) -> TestSummary:
         return summary
 
     try:
+        # SECURITY: Use defusedxml to prevent XXE vulnerabilities.
         tree = ET.parse(xml_path)
         root = tree.getroot()
     except ET.ParseError:
