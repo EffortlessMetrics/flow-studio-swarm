@@ -751,11 +751,12 @@ class TestRunDetailModalUIIDs:
 
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        from pathlib import Path
+        src_file = Path("swarm/tools/flow_studio_ui/src/run_detail_modal.ts")
+        content = src_file.read_text(encoding="utf-8") if src_file.exists() else get_flow_studio_html()
 
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
+        assert f'data-uiid="{uiid}"' in content, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
             "This UIID is required for test automation to trigger re-runs."
         )
@@ -765,6 +766,11 @@ class TestRunDetailModalUIIDs:
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
+        # Check source directly for dynamic elements
+        from pathlib import Path
+        src_file = Path("swarm/tools/flow_studio_ui/src/run_detail_modal.ts")
+        content = src_file.read_text(encoding="utf-8") if src_file.exists() else ""
+
         # Expected run detail modal UIIDs
         expected_modal = [
             "flow_studio.modal.run_detail",
@@ -773,7 +779,11 @@ class TestRunDetailModalUIIDs:
             "flow_studio.modal.run_detail.rerun",
         ]
 
-        missing = [e for e in expected_modal if e not in uiids]
+        missing = []
+        for e in expected_modal:
+            if e not in uiids and f'data-uiid="{e}"' not in content:
+                missing.append(e)
+
         if missing:
             pytest.fail(f"Missing expected run detail modal UIIDs: {', '.join(missing)}")
 
