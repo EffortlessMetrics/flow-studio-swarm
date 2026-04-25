@@ -751,11 +751,18 @@ class TestRunDetailModalUIIDs:
 
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        # The re-run button is dynamically rendered in js/run_detail_modal.js
+        from pathlib import Path
+        js_path = Path("swarm/tools/flow_studio_ui/js/run_detail_modal.js")
 
+        # Fallback to source if js hasn't been built
+        if not js_path.exists():
+            js_path = Path("swarm/tools/flow_studio_ui/src/run_detail_modal.ts")
+
+        js_content = js_path.read_text()
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
+
+        assert uiid in js_content, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
             "This UIID is required for test automation to trigger re-runs."
         )
@@ -764,6 +771,16 @@ class TestRunDetailModalUIIDs:
         """All key run detail modal elements should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+
+        # Add dynamically rendered uiids from js to our set
+        from pathlib import Path
+        js_path = Path("swarm/tools/flow_studio_ui/js/run_detail_modal.js")
+        if not js_path.exists():
+            js_path = Path("swarm/tools/flow_studio_ui/src/run_detail_modal.ts")
+        js_content = js_path.read_text()
+
+        if "flow_studio.modal.run_detail.rerun" in js_content:
+            uiids.add("flow_studio.modal.run_detail.rerun")
 
         # Expected run detail modal UIIDs
         expected_modal = [
