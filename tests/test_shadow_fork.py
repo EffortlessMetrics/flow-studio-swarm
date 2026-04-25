@@ -79,8 +79,14 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (False, "", "fatal"),  # preferred
+                (False, "", "fatal"),  # origin/preferred
+                (False, "", "fatal"),  # main
+                (False, "", "fatal"),  # origin/main
+                (False, "", "fatal"),  # master
+                (False, "", "fatal"),  # origin/master
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal branch 'HEAD' does not exist"),  # create branch fails
             ]
 
             with pytest.raises(RuntimeError, match="does not exist"):
@@ -93,8 +99,8 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # preferred exists
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
