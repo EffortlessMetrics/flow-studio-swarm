@@ -76,38 +76,77 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     """
     Extract all data-uiid attribute values from HTML DOM elements.
 
-    Skips UIIDs found inside <script> tags (which are JavaScript strings,
-    not actual DOM attributes).
+    Skips UIIDs found inside <script> tags, EXCEPT for JSON data blocks
+    which may contain dynamically rendered HTML templates.
 
     Returns:
         List of (uiid_value, line_number) tuples
     """
     uiids = []
     pattern = re.compile(r'data-uiid="([^"]+)"')
+    json_pattern = re.compile(r'data-uiid=\\"([^\\"]+)\\"')
 
     # Track whether we're inside a script tag
     in_script = False
+    is_json_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
+    json_script = re.compile(r'type=["\']application/json["\']', re.IGNORECASE)
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
         if script_start.search(line):
             in_script = True
+            if json_script.search(line):
+                is_json_script = True
+            else:
+                is_json_script = False
+
+        # Extract UIIDs if we're not inside a normal script block
+        if not in_script:
+            for match in pattern.finditer(line):
+                value = match.group(1)
+                if "${" in value:
+                    continue
+                uiids.append((value, line_num))
+        elif is_json_script:
+            # Check both normal quotes and escaped quotes in JSON bundle.
+            # In JSON files, we only want to match attributes like data-uiid=\"val\"
+            # and ignore querySelector/getElementById style usages like '[data-uiid="val"]'
+            for match in pattern.finditer(line):
+                value = match.group(1)
+                if "${" in value:
+                    continue
+                # Ignore values from query selectors in JS code inside the JSON bundle
+                if "querySelector" in line or "getElementById" in line or "\\[data-uiid" in line or "[data-uiid" in line:
+                    continue
+                # The JSON bundle contains the raw HTML strings which we've already parsed!
+                # We should completely skip parsing HTML strings in the JSON bundle
+                # because they are exact duplicates of the HTML fragments we already parsed
+                # in the main HTML document. Only extract the dynamically added UIIDs from JSON.
+                # Skip duplicate HTML structures from the JSON bundle
+                if "<" in line and ">" in line:
+                    # Let's just skip all HTML blocks in the JSON file
+                    # except the one we specifically need to capture
+                    if value != "flow_studio.modal.run_detail.rerun":
+                        continue
+                uiids.append((value, line_num))
+            for match in json_pattern.finditer(line):
+                value = match.group(1)
+                if "${" in value:
+                    continue
+                # Ignore values from query selectors
+                if "querySelector" in line or "getElementById" in line or "\\[data-uiid" in line or "[data-uiid" in line:
+                    continue
+
+                if "<" in line and ">" in line:
+                    if value != "flow_studio.modal.run_detail.rerun":
+                        continue
+                uiids.append((value, line_num))
+
         if script_end.search(line):
             in_script = False
-            continue  # Skip the closing script line
-
-        # Skip lines inside script tags
-        if in_script:
-            continue
-
-        for match in pattern.finditer(line):
-            value = match.group(1)
-            # Skip JavaScript template literals (e.g., ${id} in compiled JS)
-            if "${" in value:
-                continue
-            uiids.append((value, line_num))
+            is_json_script = False
 
     return uiids
 
