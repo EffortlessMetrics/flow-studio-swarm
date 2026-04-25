@@ -77,6 +77,18 @@ class MacroRoutingRule:
     uses: int = 0
     description: str = ""
 
+    def clone(self) -> "MacroRoutingRule":
+        """Create a fast shallow copy."""
+        return MacroRoutingRule(
+            rule_id=self.rule_id,
+            condition=self.condition,
+            action=self.action,
+            target_flow=self.target_flow,
+            max_uses=self.max_uses,
+            uses=self.uses,
+            description=self.description,
+        )
+
     def matches(self, flow_result: "FlowResult") -> bool:
         """Evaluate if this rule matches the flow result."""
         ctx = {
@@ -130,6 +142,16 @@ class MacroPolicy:
     routing_rules: List[MacroRoutingRule] = field(default_factory=list)
     default_action: MacroAction = MacroAction.ADVANCE
     strict_gate: bool = True
+
+    def clone(self) -> "MacroPolicy":
+        """Create a fast shallow copy."""
+        return MacroPolicy(
+            allow_flow_repeat=self.allow_flow_repeat,
+            max_repeats_per_flow=self.max_repeats_per_flow,
+            routing_rules=[r.clone() for r in self.routing_rules],
+            default_action=self.default_action,
+            strict_gate=self.strict_gate,
+        )
 
     @classmethod
     def default(cls) -> "MacroPolicy":
@@ -188,6 +210,16 @@ class HumanPolicy:
     end_boundary: str = "run_end"
     require_approval_flows: List[str] = field(default_factory=list)
 
+    def clone(self) -> "HumanPolicy":
+        """Create a fast shallow copy."""
+        return HumanPolicy(
+            mode=self.mode,
+            allow_pause_mid_flow=self.allow_pause_mid_flow,
+            allow_pause_between_flows=self.allow_pause_between_flows,
+            end_boundary=self.end_boundary,
+            require_approval_flows=list(self.require_approval_flows),
+        )
+
     @classmethod
     def autopilot(cls) -> "HumanPolicy":
         """Autopilot mode: no human intervention until run end."""
@@ -220,6 +252,16 @@ class RunPlanSpec:
     human_policy: HumanPolicy = field(default_factory=HumanPolicy.autopilot)
     constraints: List[str] = field(default_factory=list)
     max_total_flows: int = 20
+
+    def clone(self) -> "RunPlanSpec":
+        """Create a fast shallow copy."""
+        return RunPlanSpec(
+            flow_sequence=list(self.flow_sequence),
+            macro_policy=self.macro_policy.clone(),
+            human_policy=self.human_policy.clone(),
+            constraints=list(self.constraints),
+            max_total_flows=self.max_total_flows,
+        )
 
     @classmethod
     def default(cls) -> "RunPlanSpec":
