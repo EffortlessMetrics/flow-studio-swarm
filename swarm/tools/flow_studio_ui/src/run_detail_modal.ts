@@ -304,7 +304,7 @@ export function renderRunDetailContent(runId: string, summary: ExtendedRunSummar
     <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
       <div id="run-detail-rerun-error" class="fs-text-sm" style="color: #dc2626; min-height: 0;"></div>
       <div style="display: flex; gap: 12px;">
-        <button id="run-detail-rerun-btn" data-uiid="flow_studio.modal.run_detail.rerun" class="fs-button-primary" style="flex: 1;">
+        <button id="run-detail-rerun-btn" class="fs-button-small fs-button-primary" style="flex: 1;" data-uiid="flow_studio.modal.run_detail.rerun" ${!summary ? 'disabled' : ''}>
           Re-run
         </button>
         <button id="run-detail-close-btn" class="fs-button-small" style="flex: 1;">
