@@ -750,12 +750,19 @@ class TestRunDetailModalUIIDs:
         )
 
     def test_run_detail_rerun_button_has_uiid(self):
-        """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        """Run detail modal re-run button should have data-uiid.
+
+        This element is dynamically rendered in JavaScript, so we test
+        that the JS file contains the UIID string.
+        """
+        repo_root = Path(__file__).parent.parent
+        js_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "js" / "run_detail_modal.js"
+        assert js_file.exists(), "run_detail_modal.js should exist"
+
+        content = js_file.read_text(encoding="utf-8")
 
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
+        assert uiid in content, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
             "This UIID is required for test automation to trigger re-runs."
         )
@@ -770,7 +777,6 @@ class TestRunDetailModalUIIDs:
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
 
         missing = [e for e in expected_modal if e not in uiids]
@@ -843,12 +849,17 @@ class TestRunDetailModalIntegration:
 
         Playwright selector: [data-uiid="flow_studio.modal.run_detail.rerun"]
         """
-        html = get_flow_studio_html()
+        # This element is dynamically rendered in JavaScript
+        repo_root = Path(__file__).parent.parent
+        js_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "js" / "run_detail_modal.js"
+        assert js_file.exists(), "run_detail_modal.js should exist"
+
+        content = js_file.read_text(encoding="utf-8")
 
         # Extract the rerun button element
         pattern = re.compile(r'<button[^>]*data-uiid="flow_studio\.modal\.run_detail\.rerun"[^>]*>')
-        match = pattern.search(html)
-        assert match, "Run detail rerun button should exist"
+        match = pattern.search(content)
+        assert match, "Run detail rerun button should exist in template"
 
 
 class TestRunHistoryIntegration:
