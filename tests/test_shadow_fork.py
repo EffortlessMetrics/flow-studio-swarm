@@ -79,11 +79,17 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (False, "", "fatal"),  # _resolve_base_ref: preferred
+                (False, "", "fatal"),  # _resolve_base_ref: origin/preferred
+                (False, "", "fatal"),  # _resolve_base_ref: main
+                (False, "", "fatal"),  # _resolve_base_ref: origin/main
+                (False, "", "fatal"),  # _resolve_base_ref: master
+                (False, "", "fatal"),  # _resolve_base_ref: origin/master
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal"),  # Create and switch to shadow branch
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -93,15 +99,18 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
+                (False, "", "fatal"),  # _resolve_base_ref: preferred
+                (False, "", "fatal"),  # _resolve_base_ref: origin/preferred
+                (True, "", ""),  # _resolve_base_ref: main
+                (True, " M file.txt", ""),  # Check for uncommitted changes
                 (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # Install push guard (rev-parse in block_upstream_push)
             ]
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
-            fork.create()
+            fork.create(base_branch="main")
 
             assert "uncommitted changes" in caplog.text.lower()
 
