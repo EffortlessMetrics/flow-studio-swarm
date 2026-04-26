@@ -166,7 +166,7 @@ def generate_html() -> str:
 
     # 5. Inline JS bundle
     js_bundle = bundle_js()
-    parts.append('  <script type="application/json" data-inline-source="flowstudio-js-bundle">')
+    parts.append('  <script type="module" data-inline-source="flowstudio-js-bundle">')
     parts.append(js_bundle)
     parts.append("  </script>")
     parts.append("")
