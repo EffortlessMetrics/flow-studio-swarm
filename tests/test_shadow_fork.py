@@ -79,21 +79,11 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (False, "", "fatal"),  # Base branch doesn't exist (nonexistent)
-                (False, "", "fatal"),  # Base branch doesn't exist (origin/nonexistent)
-                (False, "", "fatal"),  # Base branch doesn't exist (main)
-                (False, "", "fatal"),  # Base branch doesn't exist (origin/main)
-                (False, "", "fatal"),  # Base branch doesn't exist (master)
-                (False, "", "fatal"),  # Base branch doesn't exist (origin/master)
-                # HEAD is always chosen as last fallback, so it will actually create branch from HEAD.
-                # Since HEAD is valid, `create` will succeed (but warn), NOT fail.
-                # However, this test is explicitly asserting that `create` fails when checkout fails.
-                # Let's adjust the side effect to make checkout fail.
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Checkout fails
+                (False, "", "fatal"),  # Base branch doesn't exist
             ]
 
-            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
+            with pytest.raises(RuntimeError, match="does not exist"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -103,10 +93,9 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Verify base branch exists (main)
-                (True, " M file.txt", ""),  # Check for uncommitted changes
+                (True, " M file.txt", ""),  # Uncommitted changes exist
+                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
-                (True, "", ""),  # Install push guard
             ]
 
             # Create hooks directory for the test
