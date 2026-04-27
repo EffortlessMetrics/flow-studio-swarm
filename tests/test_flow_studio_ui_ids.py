@@ -751,19 +751,34 @@ class TestRunDetailModalUIIDs:
 
     def test_run_detail_rerun_button_has_uiid(self):
         """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        import re
+        from pathlib import Path
 
+        # UIIDs for dynamically rendered elements (like flow_studio.modal.run_detail.rerun)
+        # must be verified by reading the source component files directly.
+        project_root = Path(__file__).resolve().parent.parent
+        component_file = project_root / "swarm/tools/flow_studio_ui/src/run_detail_modal.ts"
+
+        content = component_file.read_text(encoding="utf-8")
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
-            f"Run detail re-run button missing data-uiid='{uiid}'. "
+        assert f'data-uiid="{uiid}"' in content, (
+            f"Run detail re-run button missing data-uiid='{uiid}' in run_detail_modal.ts. "
             "This UIID is required for test automation to trigger re-runs."
         )
 
     def test_run_detail_modal_elements_have_uiids(self):
         """All key run detail modal elements should have data-uiid."""
+        import re
+        from pathlib import Path
+
+        # Some elements are static in HTML, some are dynamic in JS.
+        # We will check the source JS file directly for dynamic ones.
+        project_root = Path(__file__).resolve().parent.parent
+        component_file = project_root / "swarm/tools/flow_studio_ui/src/run_detail_modal.ts"
+
+        content = component_file.read_text(encoding="utf-8")
         html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        uiids_from_html = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
         # Expected run detail modal UIIDs
         expected_modal = [
@@ -773,7 +788,12 @@ class TestRunDetailModalUIIDs:
             "flow_studio.modal.run_detail.rerun",
         ]
 
-        missing = [e for e in expected_modal if e not in uiids]
+        missing = []
+        for e in expected_modal:
+            # Check if it's in the HTML extracted UIIDs OR in the dynamic TS component
+            if e not in uiids_from_html and f'data-uiid="{e}"' not in content:
+                missing.append(e)
+
         if missing:
             pytest.fail(f"Missing expected run detail modal UIIDs: {', '.join(missing)}")
 
