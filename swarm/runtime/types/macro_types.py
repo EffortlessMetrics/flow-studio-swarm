@@ -120,18 +120,6 @@ class MacroRoutingRule:
         """Record that this rule was used."""
         self.uses += 1
 
-    def clone(self) -> "MacroRoutingRule":
-        """Optimization: Custom clone to avoid slow copy.deepcopy."""
-        return MacroRoutingRule(
-            rule_id=self.rule_id,
-            condition=self.condition,
-            action=self.action,
-            target_flow=self.target_flow,
-            max_uses=self.max_uses,
-            uses=self.uses,
-            description=self.description,
-        )
-
 
 @dataclass
 class MacroPolicy:
@@ -189,16 +177,6 @@ class MacroPolicy:
             strict_gate=True,
         )
 
-    def clone(self) -> "MacroPolicy":
-        """Optimization: Custom clone to avoid slow copy.deepcopy."""
-        return MacroPolicy(
-            allow_flow_repeat=self.allow_flow_repeat,
-            max_repeats_per_flow=self.max_repeats_per_flow,
-            routing_rules=[rule.clone() for rule in self.routing_rules],
-            default_action=self.default_action,
-            strict_gate=self.strict_gate,
-        )
-
 
 @dataclass
 class HumanPolicy:
@@ -219,16 +197,6 @@ class HumanPolicy:
             allow_pause_between_flows=False,
             end_boundary="run_end",
             require_approval_flows=[],
-        )
-
-    def clone(self) -> "HumanPolicy":
-        """Optimization: Custom clone to avoid slow copy.deepcopy."""
-        return HumanPolicy(
-            mode=self.mode,
-            allow_pause_mid_flow=self.allow_pause_mid_flow,
-            allow_pause_between_flows=self.allow_pause_between_flows,
-            end_boundary=self.end_boundary,
-            require_approval_flows=list(self.require_approval_flows),
         )
 
     @classmethod
@@ -266,16 +234,6 @@ class RunPlanSpec:
                 "max 3 bounces between gate and build",
             ],
             max_total_flows=20,
-        )
-
-    def clone(self) -> "RunPlanSpec":
-        """Optimization: Custom clone to avoid slow copy.deepcopy."""
-        return RunPlanSpec(
-            flow_sequence=list(self.flow_sequence),
-            macro_policy=self.macro_policy.clone(),
-            human_policy=self.human_policy.clone(),
-            constraints=list(self.constraints),
-            max_total_flows=self.max_total_flows,
         )
 
 

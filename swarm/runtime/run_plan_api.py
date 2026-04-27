@@ -518,8 +518,10 @@ class RunPlanAPI:
         if self._plan_path(new_id).exists():
             raise ValueError(f"Plan already exists: {new_id}")
 
-        # Optimization: use custom clone() which is ~10x faster than copy.deepcopy
-        new_spec = source.spec.clone()
+        # Deep copy the spec
+        import copy
+
+        new_spec = copy.deepcopy(source.spec)
 
         new_plan = StoredPlan(
             metadata=PlanMetadata(
