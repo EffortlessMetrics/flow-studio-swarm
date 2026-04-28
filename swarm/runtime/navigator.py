@@ -166,6 +166,15 @@ class ProposedNode:
         """Get the target station/template ID."""
         return self.station_id or self.template_id
 
+    def clone(self) -> "ProposedNode":
+        return ProposedNode(
+            template_id=self.template_id,
+            station_id=self.station_id,
+            node_id=self.node_id,
+            objective=self.objective,
+            params=dict(self.params)
+        )
+
 
 @dataclass
 class ProposedEdge:
@@ -196,6 +205,17 @@ class ProposedEdge:
     priority: int = 70
     is_return: bool = True  # Default: return after executing
     proposed_node: Optional[ProposedNode] = None
+
+    def clone(self) -> "ProposedEdge":
+        return ProposedEdge(
+            from_node=self.from_node,
+            to_node=self.to_node,
+            why=self.why,
+            edge_type=self.edge_type,
+            priority=self.priority,
+            is_return=self.is_return,
+            proposed_node=self.proposed_node.clone() if self.proposed_node and hasattr(self.proposed_node, 'clone') else self.proposed_node
+        )
 
 
 @dataclass
@@ -257,6 +277,14 @@ class RouteProposal:
     reasoning: str = ""  # Why this route (stored in audit, not sent to worker)
     confidence: float = 1.0
 
+    def clone(self) -> "RouteProposal":
+        return RouteProposal(
+            intent=self.intent,
+            target_node=self.target_node,
+            reasoning=self.reasoning,
+            confidence=self.confidence
+        )
+
 
 @dataclass
 class DetourRequest:
@@ -266,6 +294,14 @@ class DetourRequest:
     objective: str  # Specific objective for this detour
     priority: int = 50
     resume_at: Optional[str] = None  # Node to resume at after detour
+
+    def clone(self) -> "DetourRequest":
+        return DetourRequest(
+            sidequest_id=self.sidequest_id,
+            objective=self.objective,
+            priority=self.priority,
+            resume_at=self.resume_at
+        )
 
 
 @dataclass
@@ -290,6 +326,15 @@ class UtilityFlowRequest:
     resume_at: Optional[str] = None
     pass_artifacts: List[str] = field(default_factory=list)
 
+    def clone(self) -> "UtilityFlowRequest":
+        return UtilityFlowRequest(
+            flow_id=self.flow_id,
+            reason=self.reason,
+            priority=self.priority,
+            resume_at=self.resume_at,
+            pass_artifacts=list(self.pass_artifacts)
+        )
+
 
 @dataclass
 class NavigatorSignals:
@@ -299,6 +344,14 @@ class NavigatorSignals:
     risk: SignalLevel = SignalLevel.NONE
     uncertainty: SignalLevel = SignalLevel.NONE
     needs_human: bool = False
+
+    def clone(self) -> "NavigatorSignals":
+        return NavigatorSignals(
+            stall=self.stall,
+            risk=self.risk,
+            uncertainty=self.uncertainty,
+            needs_human=self.needs_human
+        )
 
 
 @dataclass
@@ -314,6 +367,15 @@ class NextStepBrief:
     context_pointers: List[str] = field(default_factory=list)  # File paths to read
     warnings: List[str] = field(default_factory=list)  # Things to watch out for
     constraints: List[str] = field(default_factory=list)  # Boundaries to respect
+
+    def clone(self) -> "NextStepBrief":
+        return NextStepBrief(
+            objective=self.objective,
+            focus_areas=list(self.focus_areas),
+            context_pointers=list(self.context_pointers),
+            warnings=list(self.warnings),
+            constraints=list(self.constraints)
+        )
 
 
 @dataclass
@@ -334,6 +396,29 @@ class NavigatorOutput:
     # Audit trail (not sent to next worker)
     elimination_log: List[Dict[str, str]] = field(default_factory=list)
     factors_considered: List[Dict[str, Any]] = field(default_factory=list)
+
+    def clone(self) -> "NavigatorOutput":
+        """Optimization: Shallow copy inner structures to avoid deepcopy overhead on heavy dataclasses."""
+        new_route = self.route.clone() if hasattr(self.route, 'clone') else self.route
+        new_brief = self.next_step_brief.clone() if hasattr(self.next_step_brief, 'clone') else self.next_step_brief
+        new_signals = self.signals.clone() if hasattr(self.signals, 'clone') else self.signals
+
+        new_detour = self.detour_request.clone() if self.detour_request and hasattr(self.detour_request, 'clone') else self.detour_request
+        new_utility = self.utility_flow_request.clone() if self.utility_flow_request and hasattr(self.utility_flow_request, 'clone') else self.utility_flow_request
+        new_edge = self.proposed_edge.clone() if self.proposed_edge and hasattr(self.proposed_edge, 'clone') else self.proposed_edge
+
+        return NavigatorOutput(
+            route=new_route,
+            next_step_brief=new_brief,
+            signals=new_signals,
+            detour_request=new_detour,
+            utility_flow_request=new_utility,
+            proposed_edge=new_edge,
+            timestamp=self.timestamp,
+            chosen_candidate_id=self.chosen_candidate_id,
+            elimination_log=list(self.elimination_log),
+            factors_considered=list(self.factors_considered)
+        )
 
 
 # =============================================================================
