@@ -754,6 +754,12 @@ class TestRunDetailModalUIIDs:
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
+        # Check if the UIID is present in the bundled JS string since it's rendered dynamically
+        js_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "js" / "run_detail_modal.js"
+        if js_file.exists():
+            js_content = js_file.read_text(encoding="utf-8")
+            uiids.update(re.findall(r'data-uiid="([^"]+)"', js_content))
+
         uiid = "flow_studio.modal.run_detail.rerun"
         assert uiid in uiids, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
@@ -764,6 +770,12 @@ class TestRunDetailModalUIIDs:
         """All key run detail modal elements should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+
+        # Check if the UIID is present in the bundled JS string since it's rendered dynamically
+        js_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "js" / "run_detail_modal.js"
+        if js_file.exists():
+            js_content = js_file.read_text(encoding="utf-8")
+            uiids.update(re.findall(r'data-uiid="([^"]+)"', js_content))
 
         # Expected run detail modal UIIDs
         expected_modal = [
