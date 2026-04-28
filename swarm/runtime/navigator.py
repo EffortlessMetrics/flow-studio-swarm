@@ -162,6 +162,16 @@ class ProposedNode:
     objective: str = ""
     params: Dict[str, Any] = field(default_factory=dict)
 
+    def clone(self) -> "ProposedNode":
+        """Create a shallow copy of this node."""
+        return ProposedNode(
+            template_id=self.template_id,
+            station_id=self.station_id,
+            node_id=self.node_id,
+            objective=self.objective,
+            params=dict(self.params),
+        )
+
     def get_target_id(self) -> Optional[str]:
         """Get the target station/template ID."""
         return self.station_id or self.template_id
@@ -334,6 +344,56 @@ class NavigatorOutput:
     # Audit trail (not sent to next worker)
     elimination_log: List[Dict[str, str]] = field(default_factory=list)
     factors_considered: List[Dict[str, Any]] = field(default_factory=list)
+
+    def clone(self) -> "NavigatorOutput":
+        """Create a fast, nested copy without using copy.deepcopy."""
+        return NavigatorOutput(
+            route=RouteProposal(
+                intent=self.route.intent,
+                target_node=self.route.target_node,
+                reasoning=self.route.reasoning,
+                confidence=self.route.confidence,
+            ),
+            next_step_brief=NextStepBrief(
+                objective=self.next_step_brief.objective,
+                focus_areas=list(self.next_step_brief.focus_areas),
+                context_pointers=list(self.next_step_brief.context_pointers),
+                warnings=list(self.next_step_brief.warnings),
+                constraints=list(self.next_step_brief.constraints),
+            ),
+            signals=NavigatorSignals(
+                stall=self.signals.stall,
+                risk=self.signals.risk,
+                uncertainty=self.signals.uncertainty,
+                needs_human=self.signals.needs_human,
+            ),
+            detour_request=DetourRequest(
+                sidequest_id=self.detour_request.sidequest_id,
+                objective=self.detour_request.objective,
+                priority=self.detour_request.priority,
+                resume_at=self.detour_request.resume_at,
+            ) if self.detour_request else None,
+            utility_flow_request=UtilityFlowRequest(
+                flow_id=self.utility_flow_request.flow_id,
+                reason=self.utility_flow_request.reason,
+                priority=self.utility_flow_request.priority,
+                resume_at=self.utility_flow_request.resume_at,
+                pass_artifacts=list(self.utility_flow_request.pass_artifacts),
+            ) if self.utility_flow_request else None,
+            proposed_edge=ProposedEdge(
+                from_node=self.proposed_edge.from_node,
+                to_node=self.proposed_edge.to_node,
+                why=self.proposed_edge.why,
+                edge_type=self.proposed_edge.edge_type,
+                priority=self.proposed_edge.priority,
+                is_return=self.proposed_edge.is_return,
+                proposed_node=self.proposed_edge.proposed_node.clone() if self.proposed_edge.proposed_node else None,
+            ) if self.proposed_edge else None,
+            timestamp=self.timestamp,
+            chosen_candidate_id=self.chosen_candidate_id,
+            elimination_log=[dict(d) for d in self.elimination_log],
+            factors_considered=[dict(d) for d in self.factors_considered],
+        )
 
 
 # =============================================================================
