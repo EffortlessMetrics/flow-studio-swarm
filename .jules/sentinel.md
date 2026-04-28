@@ -1,0 +1,4 @@
+## 2024-05-23 - XML External Entity (XXE) Vulnerability in Test Parser
+**Vulnerability:** The codebase was using the standard xml.etree.ElementTree library to parse JUnit XML files and in documentation snippets. This standard library is vulnerable to XML External Entity (XXE) processing, which can lead to local file disclosure or denial of service when parsing untrusted XML data.
+**Learning:** Even internal tooling or test parsers can be vulnerable to XXE if they process externally generated or untrusted XML files (like those from a compromised CI environment or user-uploaded artifacts). The standard library's default parser does not disable external entity resolution.
+**Prevention:** Always use the defusedxml package as a secure drop-in replacement when parsing XML data from untrusted sources, and ensure documentation snippets also promote secure practices.
