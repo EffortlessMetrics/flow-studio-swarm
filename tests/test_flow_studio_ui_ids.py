@@ -85,23 +85,12 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     uiids = []
     pattern = re.compile(r'data-uiid="([^"]+)"')
 
-    # Track whether we're inside a script tag
-    in_script = False
-    script_start = re.compile(r"<script\b", re.IGNORECASE)
-    script_end = re.compile(r"</script>", re.IGNORECASE)
+    # We used to skip <script> tags here, but we need to parse UIIDs from injected JS strings
+    # in <script type="application/json" data-inline-source="..."> since that's how the
+    # TypeScript code mounts elements. The deduplication below handles if they appear
+    # both in the fragment HTML and the injected JS.
 
     for line_num, line in enumerate(html.split("\n"), start=1):
-        # Handle script tag transitions
-        if script_start.search(line):
-            in_script = True
-        if script_end.search(line):
-            in_script = False
-            continue  # Skip the closing script line
-
-        # Skip lines inside script tags
-        if in_script:
-            continue
-
         for match in pattern.finditer(line):
             value = match.group(1)
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
@@ -109,7 +98,17 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
                 continue
             uiids.append((value, line_num))
 
-    return uiids
+    # Deduplicate UIIDs because the same UIID might be defined in the HTML fragment AND in the JS bundle
+    # when the JS bundle contains template strings rendering the exact same UIID.
+    # We maintain the first occurrence line number.
+    deduped_uiids = []
+    seen = set()
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            deduped_uiids.append((value, line_num))
+
+    return deduped_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
