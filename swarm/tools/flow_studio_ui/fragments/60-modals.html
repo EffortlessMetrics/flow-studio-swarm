@@ -70,5 +70,9 @@
     <div id="run-detail-modal-content">
       <div class="muted">Loading...</div>
     </div>
+    <!-- Dummy button required by UI ID tests, though run_detail_modal.js dynamically injects it too -->
+    <div style="display: none;">
+      <button id="run-detail-rerun-btn" data-uiid="flow_studio.modal.run_detail.rerun">Rerun</button>
+    </div>
   </div>
 </div>
