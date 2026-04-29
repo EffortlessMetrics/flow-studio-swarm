@@ -1,0 +1,7 @@
+🛡️ Sentinel: [CRITICAL] Fix XXE vulnerability in JUnit XML parsing
+
+🚨 Severity: CRITICAL
+💡 Vulnerability: The standard `xml.etree.ElementTree` library is vulnerable to XML External Entity (XXE) attacks. Malicious JUnit XML files could exploit this.
+🎯 Impact: An attacker could potentially read arbitrary files on the system or execute denial of service attacks by causing recursive entity expansion when parsing untrusted test output.
+🔧 Fix: Replaced standard `xml.etree.ElementTree` import with the safe `defusedxml.ElementTree` drop-in replacement.
+✅ Verification: Code visually inspected. Tests were omitted due to a lack of relevant tests for this module.
