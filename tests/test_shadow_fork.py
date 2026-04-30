@@ -79,8 +79,14 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", ""),  # _ref_exists("nonexistent")
+                (False, "", ""),  # _ref_exists("origin/nonexistent")
+                (False, "", ""),  # _ref_exists("main")
+                (False, "", ""),  # _ref_exists("origin/main")
+                (False, "", ""),  # _ref_exists("master")
+                (False, "", ""),  # _ref_exists("origin/master")
+                (True, "", ""),  # status --porcelain
+                (False, "", "fatal: a branch named 'nonexistent' does not exist"),  # checkout -b
             ]
 
             with pytest.raises(RuntimeError, match="does not exist"):
@@ -93,15 +99,16 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # _ref_exists("main") (base branch)
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # rev-parse git dir inside block_upstream_push
             ]
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
-            fork.create()
+            fork.create(base_branch="main")
 
             assert "uncommitted changes" in caplog.text.lower()
 

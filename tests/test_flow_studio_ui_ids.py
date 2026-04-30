@@ -88,18 +88,30 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
     # Track whether we're inside a script tag
     in_script = False
     script_start = re.compile(r"<script\b", re.IGNORECASE)
+    # The flowstudio-js-bundle script contains template literals that actually define DOM elements
+    # so we should not skip it
+    bundle_script_start = re.compile(r'<script[^>]*data-inline-source="flowstudio-js-bundle"[^>]*>', re.IGNORECASE)
     script_end = re.compile(r"</script>", re.IGNORECASE)
+
+    # We need to distinguish between regular scripts (which we skip) and the bundle script (which we scan)
+    in_bundle = False
 
     for line_num, line in enumerate(html.split("\n"), start=1):
         # Handle script tag transitions
-        if script_start.search(line):
+        if bundle_script_start.search(line):
+            in_bundle = True
+        elif script_start.search(line) and not in_bundle:
             in_script = True
+
         if script_end.search(line):
-            in_script = False
+            if in_bundle:
+                in_bundle = False
+            else:
+                in_script = False
             continue  # Skip the closing script line
 
-        # Skip lines inside script tags
-        if in_script:
+        # Skip lines inside script tags (unless it's the bundle script which we want to scan)
+        if in_script and not in_bundle:
             continue
 
         for match in pattern.finditer(line):
@@ -107,9 +119,26 @@ def extract_uiids_from_html(html: str) -> List[Tuple[str, int]]:
             # Skip JavaScript template literals (e.g., ${id} in compiled JS)
             if "${" in value:
                 continue
+
+            # If we're inside the JS bundle, only extract UIIDs that are defined on HTML elements inside template literals
+            # We can approximate this by checking if the line looks like an HTML tag assignment or creation
+            # This prevents us from matching querySelector calls like `querySelector('[data-uiid="..."]')`
+            if in_bundle and not re.search(r'<\w+[^>]*data-uiid="[^"]+"', line):
+                continue
+
+            # Filter out elements that are dynamically generated in JS if they conflict with main HTML
+            # We track seen UIIDs and ignore duplicates
             uiids.append((value, line_num))
 
-    return uiids
+    # Remove duplicates but keep the first appearance (which should be the main HTML if both exist)
+    seen = set()
+    unique_uiids = []
+    for value, line_num in uiids:
+        if value not in seen:
+            seen.add(value)
+            unique_uiids.append((value, line_num))
+
+    return unique_uiids
 
 
 def validate_uiid(uiid: str) -> List[str]:
