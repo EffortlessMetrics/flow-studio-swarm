@@ -851,6 +851,33 @@ def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     return sorted(run_ids)
 
 
+def list_all_run_ids(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """List all potential run IDs without checking contents.
+
+    Returns all directory names in the runs directory to defer expensive
+    file checks until pagination slicing.
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of all directory names, sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    run_ids: List[RunId] = []
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    run_ids.append(entry.name)
+    except OSError:
+        pass
+
+    return sorted(run_ids)
+
+
 def scan_runs(runs_dir: Path = RUNS_DIR) -> Tuple[List[RunId], List[RunId]]:
     """Scan runs directory and classify runs as active (with meta.json) or legacy.
 
