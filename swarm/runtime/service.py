@@ -311,43 +311,57 @@ class RunService:
                     seen_ids.add(rid)
                     all_ids.append(rid)
 
-        if include_legacy:
-            active_ids, legacy_ids = storage.scan_runs()
-        else:
-            active_ids = storage.list_runs()
-            legacy_ids = []
+        # Defer expensive checks: list all directory names first
+        all_potential_ids = storage.list_all_run_ids()
 
-        # Combine active and legacy, sort by ID descending
         # Assumption: run_id lexicographical order ~= chronological order
-        other_ids = sorted(active_ids + legacy_ids, reverse=True)
-
-        for rid in other_ids:
-            if rid not in seen_ids:
-                seen_ids.add(rid)
-                all_ids.append(rid)
-
-        total = len(all_ids)
-        sliced_ids = all_ids[offset : offset + limit]
+        all_potential_ids.sort(reverse=True)
 
         summaries = []
-        # Create sets for fast lookups during summary creation
         example_set = set(storage.discover_example_runs()) if include_examples else set()
-        legacy_set = set(legacy_ids)
 
-        for rid in sliced_ids:
+        valid_count = 0
+        skipped = 0
+
+        # We first count all_ids that we already processed (examples)
+        valid_count = len(all_ids)
+
+        for rid in all_potential_ids:
+            if rid in seen_ids:
+                continue
+
             summary = None
-
             if rid in example_set:
                 summary = self._create_legacy_summary(rid, is_example=True)
             else:
                 summary = storage.read_summary(rid)
-                if not summary and rid in legacy_set:
-                    summary = self._create_legacy_summary(rid, is_example=False)
+                if not summary and include_legacy:
+                    # Only check if it's a legacy run when actually needed
+                    import os
+
+                    from swarm.runtime.storage import LEGACY_FLOW_KEYS, get_run_path
+                    run_path = get_run_path(rid)
+                    is_legacy = False
+                    for flow_key in LEGACY_FLOW_KEYS:
+                        if os.path.isdir(os.path.join(run_path, flow_key)):
+                            is_legacy = True
+                            break
+                    if is_legacy:
+                        summary = self._create_legacy_summary(rid, is_example=False)
 
             if summary:
-                summaries.append(summary)
+                seen_ids.add(rid)
+                valid_count += 1
 
-        return summaries, total
+                # Apply pagination
+                if skipped < offset:
+                    skipped += 1
+                    continue
+
+                if len(summaries) < limit:
+                    summaries.append(summary)
+
+        return summaries, valid_count
 
     def _create_legacy_summary(
         self,
