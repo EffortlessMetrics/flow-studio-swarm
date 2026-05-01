@@ -34,6 +34,7 @@ Usage:
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 from dataclasses import dataclass
@@ -155,25 +156,27 @@ def rewrite_pause_to_detour(
         )
         return nav_output
 
-    # Deep copy to avoid mutating the original
-    from copy import deepcopy
-
-    rewritten = deepcopy(nav_output)
-
-    # Rewrite intent to DETOUR
-    rewritten.route.intent = RouteIntent.DETOUR
     original_reason = nav_output.route.reasoning
-    rewritten.route.reasoning = f"Auto-clarify (no_human_mid_flow): {original_reason}"
 
-    # Create detour request for clarifier sidequest
-    rewritten.detour_request = DetourRequest(
-        sidequest_id="clarifier",
-        objective=f"Clarify: {original_reason}",
-        priority=80,  # High priority - clarification is blocking
+    # Optimization: Use dataclasses.replace to selectively clone mutated paths
+    # instead of doing an expensive deepcopy on the entire object.
+    rewritten = dataclasses.replace(
+        nav_output,
+        route=dataclasses.replace(
+            nav_output.route,
+            intent=RouteIntent.DETOUR,
+            reasoning=f"Auto-clarify (no_human_mid_flow): {original_reason}"
+        ),
+        detour_request=DetourRequest(
+            sidequest_id="clarifier",
+            objective=f"Clarify: {original_reason}",
+            priority=80,  # High priority - clarification is blocking
+        ),
+        signals=dataclasses.replace(
+            nav_output.signals,
+            needs_human=False
+        )
     )
-
-    # Clear needs_human since we're handling it via sidequest
-    rewritten.signals.needs_human = False
 
     logger.info(
         "Rewrote PAUSE → DETOUR (clarifier) for no_human_mid_flow policy: %s",
