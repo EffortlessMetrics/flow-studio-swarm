@@ -441,8 +441,8 @@ export class RoutingDecisionCard {
 
     return `
       <div class="routing-card__section routing-card__rejected ${expandedClass}">
-        <button class="routing-card__rejected-toggle" data-action="toggle-rejected">
-          <span class="routing-card__rejected-arrow">${arrowIcon}</span>
+        <button class="routing-card__rejected-toggle" data-action="toggle-rejected" aria-expanded="${this.isExpanded ? 'true' : 'false'}">
+          <span class="routing-card__rejected-arrow" aria-hidden="true">${arrowIcon}</span>
           <span>Other Candidates (${candidates.length})</span>
         </button>
         <div class="routing-card__rejected-content">
