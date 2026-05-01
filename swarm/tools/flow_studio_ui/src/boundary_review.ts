@@ -265,7 +265,7 @@ export function renderBoundaryReviewPanel(data: BoundaryReviewResponse): string 
       <div class="panel-header">
         <h3>Boundary Review</h3>
         ${data.current_flow ? `<span class="current-flow">Flow: ${data.current_flow}</span>` : ""}
-        <button class="toggle-expand" title="Toggle expand">
+        <button class="toggle-expand" title="Toggle expand" aria-expanded="${isExpanded}" aria-controls="boundary-sections-content">
           ${isExpanded ? "▼" : "▶"}
         </button>
       </div>
@@ -273,7 +273,7 @@ export function renderBoundaryReviewPanel(data: BoundaryReviewResponse): string 
       ${renderSummaryBar(data)}
       ${renderUncertaintyNotes(data.uncertainty_notes)}
 
-      <div class="boundary-sections ${isExpanded ? "expanded" : "collapsed"}">
+      <div id="boundary-sections-content" class="boundary-sections ${isExpanded ? "expanded" : "collapsed"}">
         ${renderSection("Assumptions", assumptionCards, assumptionCards.length > 5)}
         ${renderSection("Decisions", decisionCards, decisionCards.length > 5)}
         ${renderSection("Detours", detourCards)}
@@ -345,6 +345,7 @@ export function setupBoundaryReviewHandlers(container: HTMLElement): void {
         sections.classList.toggle("collapsed", !isExpanded);
       }
       target.textContent = isExpanded ? "▼" : "▶";
+      target.setAttribute("aria-expanded", isExpanded.toString());
     }
   });
 }
