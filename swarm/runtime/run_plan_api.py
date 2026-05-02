@@ -519,9 +519,7 @@ class RunPlanAPI:
             raise ValueError(f"Plan already exists: {new_id}")
 
         # Deep copy the spec
-        import copy
-
-        new_spec = copy.deepcopy(source.spec)
+        new_spec = run_plan_spec_from_dict(run_plan_spec_to_dict(source.spec))
 
         new_plan = StoredPlan(
             metadata=PlanMetadata(
