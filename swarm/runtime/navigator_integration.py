@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -155,13 +155,16 @@ def rewrite_pause_to_detour(
         )
         return nav_output
 
-    # Deep copy to avoid mutating the original
-    from copy import deepcopy
-
-    rewritten = deepcopy(nav_output)
+    # Avoid deepcopy for performance; update route with replace
+    rewritten = replace(
+        nav_output,
+        route=replace(
+            nav_output.route,
+            intent=RouteIntent.DETOUR
+        )
+    )
 
     # Rewrite intent to DETOUR
-    rewritten.route.intent = RouteIntent.DETOUR
     original_reason = nav_output.route.reasoning
     rewritten.route.reasoning = f"Auto-clarify (no_human_mid_flow): {original_reason}"
 
