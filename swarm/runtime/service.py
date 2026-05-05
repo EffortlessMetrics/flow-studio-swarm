@@ -293,12 +293,7 @@ class RunService:
             - List of run summaries for the requested page.
             - Total count of matching runs (may slightly overestimate).
         """
-        # Slow path if filtering by flow_key (cannot optimize without index)
-        if flow_key is not None:
-            all_runs = self.list_runs(flow_key, include_legacy, include_examples)
-            return all_runs[offset : offset + limit], len(all_runs)
-
-        # Fast path: Work with IDs first, using set for deduplication
+        # Work with IDs first, using set for deduplication
         seen_ids: set[str] = set()
         all_ids: List[str] = []
 
@@ -326,15 +321,41 @@ class RunService:
                 seen_ids.add(rid)
                 all_ids.append(rid)
 
-        total = len(all_ids)
-        sliced_ids = all_ids[offset : offset + limit]
+        # Fast path if no flow_key filtering
+        if flow_key is None:
+            total = len(all_ids)
+            sliced_ids = all_ids[offset : offset + limit]
 
+            summaries = []
+            # Create sets for fast lookups during summary creation
+            example_set = set(storage.discover_example_runs()) if include_examples else set()
+            legacy_set = set(legacy_ids)
+
+            for rid in sliced_ids:
+                summary = None
+
+                if rid in example_set:
+                    summary = self._create_legacy_summary(rid, is_example=True)
+                else:
+                    summary = storage.read_summary(rid)
+                    if not summary and rid in legacy_set:
+                        summary = self._create_legacy_summary(rid, is_example=False)
+
+                if summary:
+                    summaries.append(summary)
+
+            return summaries, total
+
+        # Path with flow_key filtering
         summaries = []
+        skipped = 0
+        total = 0
+
         # Create sets for fast lookups during summary creation
         example_set = set(storage.discover_example_runs()) if include_examples else set()
         legacy_set = set(legacy_ids)
 
-        for rid in sliced_ids:
+        for rid in all_ids:
             summary = None
 
             if rid in example_set:
@@ -345,7 +366,14 @@ class RunService:
                     summary = self._create_legacy_summary(rid, is_example=False)
 
             if summary:
-                summaries.append(summary)
+                # Evaluate filter condition
+                if flow_key in summary.spec.flow_keys:
+                    total += 1
+                    if len(summaries) < limit:
+                        if skipped < offset:
+                            skipped += 1
+                        else:
+                            summaries.append(summary)
 
         return summaries, total
 

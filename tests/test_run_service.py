@@ -535,6 +535,7 @@ class TestRunService:
         monkeypatch.setattr(storage, "list_runs", lambda runs_dir=None: run_ids)
         monkeypatch.setattr(storage, "discover_example_runs", lambda: [])
         monkeypatch.setattr(storage, "discover_legacy_runs", lambda runs_dir=None: [])
+        monkeypatch.setattr(storage, "scan_runs", lambda runs_dir=None: (run_ids, []))
         orig_read_summary = storage.read_summary
         monkeypatch.setattr(
             storage,
