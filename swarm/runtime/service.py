@@ -293,11 +293,6 @@ class RunService:
             - List of run summaries for the requested page.
             - Total count of matching runs (may slightly overestimate).
         """
-        # Slow path if filtering by flow_key (cannot optimize without index)
-        if flow_key is not None:
-            all_runs = self.list_runs(flow_key, include_legacy, include_examples)
-            return all_runs[offset : offset + limit], len(all_runs)
-
         # Fast path: Work with IDs first, using set for deduplication
         seen_ids: set[str] = set()
         all_ids: List[str] = []
@@ -326,26 +321,56 @@ class RunService:
                 seen_ids.add(rid)
                 all_ids.append(rid)
 
-        total = len(all_ids)
-        sliced_ids = all_ids[offset : offset + limit]
-
         summaries = []
         # Create sets for fast lookups during summary creation
         example_set = set(storage.discover_example_runs()) if include_examples else set()
         legacy_set = set(legacy_ids)
 
-        for rid in sliced_ids:
-            summary = None
+        if flow_key is None:
+            total = len(all_ids)
+            sliced_ids = all_ids[offset : offset + limit]
 
-            if rid in example_set:
-                summary = self._create_legacy_summary(rid, is_example=True)
-            else:
-                summary = storage.read_summary(rid)
-                if not summary and rid in legacy_set:
-                    summary = self._create_legacy_summary(rid, is_example=False)
+            for rid in sliced_ids:
+                summary = None
 
-            if summary:
-                summaries.append(summary)
+                if rid in example_set:
+                    summary = self._create_legacy_summary(rid, is_example=True)
+                else:
+                    summary = storage.read_summary(rid)
+                    if not summary and rid in legacy_set:
+                        summary = self._create_legacy_summary(rid, is_example=False)
+
+                if summary:
+                    summaries.append(summary)
+        else:
+            # Optimized filtering path avoiding large memory allocations and full sorting
+            total = 0
+            skipped = 0
+
+            for rid in all_ids:
+                summary = None
+
+                if rid in example_set:
+                    summary = self._create_legacy_summary(rid, is_example=True)
+                else:
+                    summary = storage.read_summary(rid)
+                    if not summary and rid in legacy_set:
+                        summary = self._create_legacy_summary(rid, is_example=False)
+
+                if summary is None:
+                    continue
+
+                if flow_key not in summary.spec.flow_keys:
+                    continue
+
+                total += 1
+
+                if skipped < offset:
+                    skipped += 1
+                    continue
+
+                if len(summaries) < limit:
+                    summaries.append(summary)
 
         return summaries, total
 
