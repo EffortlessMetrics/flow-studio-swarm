@@ -311,41 +311,49 @@ class RunService:
                     seen_ids.add(rid)
                     all_ids.append(rid)
 
-        if include_legacy:
-            active_ids, legacy_ids = storage.scan_runs()
-        else:
-            active_ids = storage.list_runs()
-            legacy_ids = []
+        # To avoid expensive os.path.exists checks for all runs,
+        # we list all directories first, then slice, then check validity.
+        # This matches the insight: sort candidates by cached metadata first,
+        # then only perform expensive checks on the top N results.
 
-        # Combine active and legacy, sort by ID descending
-        # Assumption: run_id lexicographical order ~= chronological order
-        other_ids = sorted(active_ids + legacy_ids, reverse=True)
+        dir_ids = storage.list_run_directories()
+        other_ids = sorted(dir_ids, reverse=True)
 
         for rid in other_ids:
             if rid not in seen_ids:
                 seen_ids.add(rid)
                 all_ids.append(rid)
 
+        # The total might slightly overestimate since it includes directories
+        # that might not be valid runs, but this aligns with the docstring caveats.
         total = len(all_ids)
-        sliced_ids = all_ids[offset : offset + limit]
 
         summaries = []
-        # Create sets for fast lookups during summary creation
         example_set = set(storage.discover_example_runs()) if include_examples else set()
-        legacy_set = set(legacy_ids)
 
-        for rid in sliced_ids:
+        # Since we listed directories without checking validity, some might not be runs.
+        # So we can't just slice all_ids blindly because we might drop valid runs.
+        # We need to iterate until we find `offset` valid runs, and then grab `limit`.
+        skipped = 0
+
+        for rid in all_ids:
+            if len(summaries) >= limit:
+                break
+
             summary = None
 
             if rid in example_set:
                 summary = self._create_legacy_summary(rid, is_example=True)
             else:
                 summary = storage.read_summary(rid)
-                if not summary and rid in legacy_set:
+                if not summary and include_legacy and storage.is_legacy_run(rid):
                     summary = self._create_legacy_summary(rid, is_example=False)
 
             if summary:
-                summaries.append(summary)
+                if skipped < offset:
+                    skipped += 1
+                else:
+                    summaries.append(summary)
 
         return summaries, total
 

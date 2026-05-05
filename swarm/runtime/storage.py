@@ -820,6 +820,58 @@ def summarize_navigator_events(
 # -----------------------------------------------------------------------------
 
 
+def list_run_directories(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """List all subdirectories in runs_dir without checking for valid run artifacts.
+
+    This is significantly faster than list_runs() or scan_runs() as it avoids
+    os.path.exists checks. Useful when you plan to sort and slice before
+    verifying run validity (e.g. in pagination).
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of subdirectory names, sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    run_ids: List[RunId] = []
+    try:
+        with os.scandir(runs_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    run_ids.append(entry.name)
+    except OSError:
+        pass
+
+    return sorted(run_ids)
+
+
+def is_legacy_run(run_id: RunId, runs_dir: Path = RUNS_DIR) -> bool:
+    """Check if a directory contains legacy run artifacts.
+
+    Args:
+        run_id: The run identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        True if it has legacy flow directories but no meta.json.
+    """
+    run_path = runs_dir / run_id
+    if not run_path.is_dir():
+        return False
+
+    if (run_path / META_FILE).exists():
+        return False
+
+    for flow_key in LEGACY_FLOW_KEYS:
+        if (run_path / flow_key).is_dir():
+            return True
+
+    return False
+
+
 def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
     """List all run IDs that have meta.json files.
 
