@@ -288,7 +288,7 @@ export class RoutingDecisionCard {
             .join("");
         return `
       <div class="routing-card__section routing-card__rejected ${expandedClass}">
-        <button class="routing-card__rejected-toggle" data-action="toggle-rejected">
+        <button class="routing-card__rejected-toggle" data-action="toggle-rejected" aria-expanded="${this.isExpanded}">
           <span class="routing-card__rejected-arrow">${arrowIcon}</span>
           <span>Other Candidates (${candidates.length})</span>
         </button>
@@ -686,6 +686,10 @@ export class RoutingDecisionCard {
         const arrow = section.querySelector(".routing-card__rejected-arrow");
         if (arrow) {
             arrow.textContent = this.isExpanded ? "\u25bc" : "\u25b6";
+        }
+        const toggleBtn = this.card.querySelector(".routing-card__rejected-toggle");
+        if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", String(this.isExpanded));
         }
     }
 }
