@@ -1254,7 +1254,8 @@ Create custom output formats:
 
 ```python
 from selftest_core.reporter import ReportGenerator
-import xml.etree.ElementTree as ET
+# SECURITY: Mitigating XML External Entity (XXE) vulnerabilities using defusedxml
+import defusedxml.ElementTree as ET
 
 class JUnitReporter:
     """Generate JUnit XML reports for CI systems."""
