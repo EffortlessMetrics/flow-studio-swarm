@@ -1,0 +1,7 @@
+🛡️ Sentinel: [CRITICAL] Fix XML External Entity (XXE) Vulnerability
+
+🚨 Severity: CRITICAL
+💡 Vulnerability: The test parser component (`swarm/runtime/test_parser.py`) and documentation used the standard `xml.etree.ElementTree` parser. This parser is vulnerable to XML External Entity (XXE) attacks when parsing untrusted XML files (such as test output from external sources), potentially allowing local file disclosure or SSRF.
+🎯 Impact: An attacker providing malicious test output files could read sensitive files on the server or conduct Server-Side Request Forgery.
+🔧 Fix: Replaced `xml.etree.ElementTree` with `defusedxml.ElementTree` to safely parse XML data. The `defusedxml` package mitigates XXE attacks by disabling entity expansion. Added security comments for clarity.
+✅ Verification: Verified that `defusedxml` is imported correctly and the codebase lints successfully. Note that no targeted tests exist for `test_parser.py`, so verification is limited to linting and manual inspection.
