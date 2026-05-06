@@ -319,12 +319,15 @@ class RunService:
 
         # Combine active and legacy, sort by ID descending
         # Assumption: run_id lexicographical order ~= chronological order
-        other_ids = sorted(active_ids + legacy_ids, reverse=True)
+        active_ids.extend(legacy_ids)
+        active_ids.sort(reverse=True)
 
-        for rid in other_ids:
+        seen_add = seen_ids.add
+        all_append = all_ids.append
+        for rid in active_ids:
             if rid not in seen_ids:
-                seen_ids.add(rid)
-                all_ids.append(rid)
+                seen_add(rid)
+                all_append(rid)
 
         total = len(all_ids)
         sliced_ids = all_ids[offset : offset + limit]
