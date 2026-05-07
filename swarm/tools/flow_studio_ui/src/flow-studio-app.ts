@@ -402,8 +402,8 @@ function setMode(mode: UIMode): void {
   // Update toggle buttons
   const authorBtn = document.getElementById("mode-author");
   const operatorBtn = document.getElementById("mode-operator");
-  if (authorBtn) authorBtn.classList.toggle("active", mode === "author");
-  if (operatorBtn) operatorBtn.classList.toggle("active", mode === "operator");
+  if (authorBtn) { authorBtn.classList.toggle("active", mode === "author"); authorBtn.setAttribute("aria-pressed", mode === "author" ? "true" : "false"); }
+  if (operatorBtn) { operatorBtn.classList.toggle("active", mode === "operator"); operatorBtn.setAttribute("aria-pressed", mode === "operator" ? "true" : "false"); }
 
   // Update URL
   updateURL();
@@ -427,8 +427,8 @@ async function setViewMode(viewMode: ViewMode): Promise<void> {
   // Update toggle buttons
   const agentsBtn = document.getElementById("view-agents");
   const artifactsBtn = document.getElementById("view-artifacts");
-  if (agentsBtn) agentsBtn.classList.toggle("active", viewMode === "agents");
-  if (artifactsBtn) artifactsBtn.classList.toggle("active", viewMode === "artifacts");
+  if (agentsBtn) { agentsBtn.classList.toggle("active", viewMode === "agents"); agentsBtn.setAttribute("aria-pressed", viewMode === "agents" ? "true" : "false"); }
+  if (artifactsBtn) { artifactsBtn.classList.toggle("active", viewMode === "artifacts"); artifactsBtn.setAttribute("aria-pressed", viewMode === "artifacts" ? "true" : "false"); }
 
   // Update URL
   updateURL();
@@ -542,8 +542,8 @@ function initMode(): void {
     state.currentViewMode = "artifacts";
     const agentsBtn = document.getElementById("view-agents");
     const artifactsBtn = document.getElementById("view-artifacts");
-    if (agentsBtn) agentsBtn.classList.remove("active");
-    if (artifactsBtn) artifactsBtn.classList.add("active");
+    if (agentsBtn) { agentsBtn.classList.remove("active"); agentsBtn.setAttribute("aria-pressed", "false"); }
+    if (artifactsBtn) { artifactsBtn.classList.add("active"); artifactsBtn.setAttribute("aria-pressed", "true"); }
   }
 }
 
