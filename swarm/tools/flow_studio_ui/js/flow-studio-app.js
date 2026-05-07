@@ -252,10 +252,14 @@ function setMode(mode) {
     // Update toggle buttons
     const authorBtn = document.getElementById("mode-author");
     const operatorBtn = document.getElementById("mode-operator");
-    if (authorBtn)
+    if (authorBtn) {
         authorBtn.classList.toggle("active", mode === "author");
-    if (operatorBtn)
+        authorBtn.setAttribute("aria-pressed", mode === "author" ? "true" : "false");
+    }
+    if (operatorBtn) {
         operatorBtn.classList.toggle("active", mode === "operator");
+        operatorBtn.setAttribute("aria-pressed", mode === "operator" ? "true" : "false");
+    }
     // Update URL
     updateURL();
     // Refresh timeline display when switching to operator mode
@@ -275,10 +279,14 @@ async function setViewMode(viewMode) {
     // Update toggle buttons
     const agentsBtn = document.getElementById("view-agents");
     const artifactsBtn = document.getElementById("view-artifacts");
-    if (agentsBtn)
+    if (agentsBtn) {
         agentsBtn.classList.toggle("active", viewMode === "agents");
-    if (artifactsBtn)
+        agentsBtn.setAttribute("aria-pressed", viewMode === "agents" ? "true" : "false");
+    }
+    if (artifactsBtn) {
         artifactsBtn.classList.toggle("active", viewMode === "artifacts");
+        artifactsBtn.setAttribute("aria-pressed", viewMode === "artifacts" ? "true" : "false");
+    }
     // Update URL
     updateURL();
     // Reload graph with new view mode if we have a flow selected
@@ -371,10 +379,14 @@ function initMode() {
         state.currentViewMode = "artifacts";
         const agentsBtn = document.getElementById("view-agents");
         const artifactsBtn = document.getElementById("view-artifacts");
-        if (agentsBtn)
+        if (agentsBtn) {
             agentsBtn.classList.remove("active");
-        if (artifactsBtn)
+            agentsBtn.setAttribute("aria-pressed", "false");
+        }
+        if (artifactsBtn) {
             artifactsBtn.classList.add("active");
+            artifactsBtn.setAttribute("aria-pressed", "true");
+        }
     }
 }
 /**
