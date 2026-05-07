@@ -256,12 +256,10 @@ class RunService:
                         summaries.append(summary)
                         seen_ids.add(rid)
 
-        # Sort: examples first (by created_at), then others by created_at desc
-        def sort_key(s: RunSummary) -> tuple:
-            is_example = "example" in s.tags
-            return (0 if is_example else 1, -s.created_at.timestamp())
-
-        summaries.sort(key=sort_key)
+        # Sort: examples first, then others by ID descending
+        # Assumption: run_id lexicographical order ~= chronological order
+        summaries.sort(key=lambda s: s.id, reverse=True)
+        summaries.sort(key=lambda s: 0 if "example" in s.tags else 1)
         return summaries
 
     def list_runs_paginated(
