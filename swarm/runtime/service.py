@@ -311,41 +311,49 @@ class RunService:
                     seen_ids.add(rid)
                     all_ids.append(rid)
 
-        if include_legacy:
-            active_ids, legacy_ids = storage.scan_runs()
-        else:
-            active_ids = storage.list_runs()
-            legacy_ids = []
+        # PERFORMANCE OPTIMIZATION: List all directory names without checking file existence yet.
+        # This converts a slow O(N) filesystem check block to a fast O(N) directory scan.
+        # Active/legacy distinction is only checked for the requested slice below.
+        run_dirs = storage.list_run_directories()
 
-        # Combine active and legacy, sort by ID descending
         # Assumption: run_id lexicographical order ~= chronological order
-        other_ids = sorted(active_ids + legacy_ids, reverse=True)
+        other_ids = sorted(run_dirs, reverse=True)
 
         for rid in other_ids:
             if rid not in seen_ids:
                 seen_ids.add(rid)
                 all_ids.append(rid)
 
-        total = len(all_ids)
-        sliced_ids = all_ids[offset : offset + limit]
-
+        # We cannot just do len(all_ids) anymore because some directories might be invalid
+        # or legacy runs that should be skipped if include_legacy is False.
         summaries = []
         # Create sets for fast lookups during summary creation
         example_set = set(storage.discover_example_runs()) if include_examples else set()
-        legacy_set = set(legacy_ids)
 
-        for rid in sliced_ids:
+        valid_count = 0
+        collected_count = 0
+
+        for rid in all_ids:
+            if collected_count >= limit:
+                break
+
             summary = None
-
             if rid in example_set:
                 summary = self._create_legacy_summary(rid, is_example=True)
             else:
                 summary = storage.read_summary(rid)
-                if not summary and rid in legacy_set:
+                if not summary and include_legacy:
                     summary = self._create_legacy_summary(rid, is_example=False)
 
             if summary:
-                summaries.append(summary)
+                if valid_count >= offset:
+                    summaries.append(summary)
+                    collected_count += 1
+                valid_count += 1
+
+        # Calculate a more accurate total based on the fact that we can't efficiently count them all
+        # To avoid scanning all, we overestimate total as len(all_ids). The docstring allows this.
+        total = len(all_ids)
 
         return summaries, total
 
