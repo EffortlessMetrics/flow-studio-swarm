@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,9 +40,9 @@ def discover_wisdom_summaries() -> List[Dict[str, Any]]:
 
     # Check examples
     if EXAMPLES_DIR.exists():
-        for run_dir in EXAMPLES_DIR.iterdir():
+        for run_dir in os.scandir(EXAMPLES_DIR):
             if run_dir.is_dir() and not run_dir.name.startswith("."):
-                summary_path = run_dir / "wisdom" / "wisdom_summary.json"
+                summary_path = Path(run_dir.path) / "wisdom" / "wisdom_summary.json"
                 if summary_path.exists():
                     try:
                         with open(summary_path, "r", encoding="utf-8") as f:
@@ -54,9 +55,9 @@ def discover_wisdom_summaries() -> List[Dict[str, Any]]:
 
     # Check active runs
     if RUNS_DIR.exists():
-        for run_dir in RUNS_DIR.iterdir():
+        for run_dir in os.scandir(RUNS_DIR):
             if run_dir.is_dir() and not run_dir.name.startswith("."):
-                summary_path = run_dir / "wisdom" / "wisdom_summary.json"
+                summary_path = Path(run_dir.path) / "wisdom" / "wisdom_summary.json"
                 if summary_path.exists():
                     try:
                         with open(summary_path, "r", encoding="utf-8") as f:
