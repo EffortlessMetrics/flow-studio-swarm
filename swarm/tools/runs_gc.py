@@ -28,6 +28,8 @@ from typing import List
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+import os
+
 from swarm.config.runs_retention_config import (
     get_max_count,
     get_preserved_named_runs,
@@ -131,26 +133,29 @@ def discover_all_runs() -> List[RunInfo]:
 
     # Examples (always preserved)
     if EXAMPLES_DIR.exists():
-        for entry in EXAMPLES_DIR.iterdir():
-            if entry.is_dir() and not entry.name.startswith("."):
-                if entry.name not in seen:
-                    seen.add(entry.name)
-                    runs.append(get_run_info(entry.name, entry, "example"))
+        with os.scandir(EXAMPLES_DIR) as it:
+            for e in it:
+                if e.is_dir() and not e.name.startswith("."):
+                    if e.name not in seen:
+                        seen.add(e.name)
+                        runs.append(get_run_info(e.name, EXAMPLES_DIR / e.name, "example"))
 
     # Active runs with meta.json
     if RUNS_DIR.exists():
-        for entry in RUNS_DIR.iterdir():
-            if entry.is_dir() and not entry.name.startswith("."):
-                if entry.name in seen:
-                    continue
-                seen.add(entry.name)
+        with os.scandir(RUNS_DIR) as it:
+            for e in it:
+                if e.is_dir() and not e.name.startswith("."):
+                    if e.name in seen:
+                        continue
+                    seen.add(e.name)
 
-                meta_path = entry / META_FILE
-                if meta_path.exists():
-                    runs.append(get_run_info(entry.name, entry, "active"))
-                else:
-                    # Legacy run (no meta.json)
-                    runs.append(get_run_info(entry.name, entry, "legacy"))
+                    entry = RUNS_DIR / e.name
+                    meta_path = entry / META_FILE
+                    if meta_path.exists():
+                        runs.append(get_run_info(e.name, entry, "active"))
+                    else:
+                        # Legacy run (no meta.json)
+                        runs.append(get_run_info(entry.name, entry, "legacy"))
 
     return runs
 
