@@ -23,6 +23,8 @@ from typing import Any, Dict, List
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+import os
+
 from swarm.config.flow_registry import get_flow_order
 from swarm.runtime.storage import EXAMPLES_DIR, RUNS_DIR
 
@@ -39,9 +41,11 @@ def discover_wisdom_summaries() -> List[Dict[str, Any]]:
 
     # Check examples
     if EXAMPLES_DIR.exists():
-        for run_dir in EXAMPLES_DIR.iterdir():
-            if run_dir.is_dir() and not run_dir.name.startswith("."):
-                summary_path = run_dir / "wisdom" / "wisdom_summary.json"
+        with os.scandir(EXAMPLES_DIR) as it:
+            for e in it:
+                if e.is_dir() and not e.name.startswith("."):
+                    run_dir = EXAMPLES_DIR / e.name
+                    summary_path = run_dir / "wisdom" / "wisdom_summary.json"
                 if summary_path.exists():
                     try:
                         with open(summary_path, "r", encoding="utf-8") as f:
@@ -54,9 +58,11 @@ def discover_wisdom_summaries() -> List[Dict[str, Any]]:
 
     # Check active runs
     if RUNS_DIR.exists():
-        for run_dir in RUNS_DIR.iterdir():
-            if run_dir.is_dir() and not run_dir.name.startswith("."):
-                summary_path = run_dir / "wisdom" / "wisdom_summary.json"
+        with os.scandir(RUNS_DIR) as it:
+            for e in it:
+                if e.is_dir() and not e.name.startswith("."):
+                    run_dir = RUNS_DIR / e.name
+                    summary_path = run_dir / "wisdom" / "wisdom_summary.json"
                 if summary_path.exists():
                     try:
                         with open(summary_path, "r", encoding="utf-8") as f:

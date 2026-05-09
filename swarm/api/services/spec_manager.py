@@ -20,6 +20,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -503,9 +504,14 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        valid_entries = []
+        with os.scandir(self.runs_root) as it:
+            for e in it:
+                if e.is_dir() and not e.name.startswith("."):
+                    valid_entries.append(e.name)
+
+        for run_name in sorted(valid_entries, reverse=True):
+            run_dir = self.runs_root / run_name
 
             state_file = run_dir / "run_state.json"
             if state_file.exists():
