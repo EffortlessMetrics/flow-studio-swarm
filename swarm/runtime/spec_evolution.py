@@ -1119,8 +1119,12 @@ def load_routing_proposals(
         flow_dirs = [run_base / flow_key]
     else:
         # Scan all flow directories
+        import os
+
         flow_dirs = [
-            d for d in run_base.iterdir() if d.is_dir() and (d / "routing" / "proposals").exists()
+            Path(entry.path)
+            for entry in os.scandir(run_base)
+            if entry.is_dir() and (Path(entry.path) / "routing" / "proposals").exists()
         ]
 
     for flow_dir in flow_dirs:

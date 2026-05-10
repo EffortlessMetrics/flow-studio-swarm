@@ -131,16 +131,24 @@ class FlowStudioConfig:
         """List all active runs."""
         if not self.runs_dir.exists():
             return []
+        import os
+
         return sorted(
-            p for p in self.runs_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
+            Path(entry.path)
+            for entry in os.scandir(self.runs_dir)
+            if entry.is_dir() and not entry.name.startswith(".")
         )
 
     def list_examples(self) -> list[Path]:
         """List all example runs."""
         if not self.examples_dir.exists():
             return []
+        import os
+
         return sorted(
-            p for p in self.examples_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
+            Path(entry.path)
+            for entry in os.scandir(self.examples_dir)
+            if entry.is_dir() and not entry.name.startswith(".")
         )
 
 
