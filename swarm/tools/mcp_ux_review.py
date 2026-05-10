@@ -27,6 +27,7 @@ Depends on:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -112,7 +113,7 @@ def list_review_runs() -> List[str]:
     if not UI_REVIEW_DIR.exists():
         return []
     return sorted(
-        [d.name for d in UI_REVIEW_DIR.iterdir() if d.is_dir()],
+        [d.name for d in os.scandir(UI_REVIEW_DIR) if d.is_dir()],
         reverse=True,  # Most recent first
     )
 
