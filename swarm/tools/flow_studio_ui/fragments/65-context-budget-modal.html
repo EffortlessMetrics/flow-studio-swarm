@@ -34,8 +34,9 @@
           <input type="number" id="budget-total"
                  min="10000" max="1000000" step="10000"
                  placeholder="200000"
-                 data-uiid="flow_studio.modal.context_budget.input.total">
-          <span class="input-hint">~<span id="budget-total-tokens">50</span>k tokens</span>
+                 data-uiid="flow_studio.modal.context_budget.input.total"
+                 aria-describedby="budget-total-hint">
+          <span id="budget-total-hint" class="input-hint">~<span id="budget-total-tokens">50</span>k tokens</span>
         </div>
 
         <div class="input-group">
@@ -43,8 +44,9 @@
           <input type="number" id="budget-recent"
                  min="1000" max="500000" step="5000"
                  placeholder="60000"
-                 data-uiid="flow_studio.modal.context_budget.input.recent">
-          <span class="input-hint">~<span id="budget-recent-tokens">15</span>k tokens</span>
+                 data-uiid="flow_studio.modal.context_budget.input.recent"
+                 aria-describedby="budget-recent-hint">
+          <span id="budget-recent-hint" class="input-hint">~<span id="budget-recent-tokens">15</span>k tokens</span>
         </div>
 
         <div class="input-group">
@@ -52,8 +54,9 @@
           <input type="number" id="budget-older"
                  min="500" max="100000" step="1000"
                  placeholder="10000"
-                 data-uiid="flow_studio.modal.context_budget.input.older">
-          <span class="input-hint">~<span id="budget-older-tokens">2.5</span>k tokens each</span>
+                 data-uiid="flow_studio.modal.context_budget.input.older"
+                 aria-describedby="budget-older-hint">
+          <span id="budget-older-hint" class="input-hint">~<span id="budget-older-tokens">2.5</span>k tokens each</span>
         </div>
       </div>
     </div>
