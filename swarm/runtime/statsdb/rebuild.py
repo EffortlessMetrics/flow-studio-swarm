@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -130,7 +131,7 @@ class StatsDBRebuildMixin:
                 return stats
 
             run_ids = [
-                d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")
+                d.name for d in os.scandir(runs_dir) if d.is_dir() and not d.name.startswith(".")
             ]
 
         logger.info("Rebuilding projections for %d runs", len(run_ids))
@@ -236,7 +237,7 @@ def rebuild_stats_db(
             logger.warning("Runs directory does not exist: %s", runs_dir)
             return stats
 
-        run_ids = [d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
+        run_ids = [d.name for d in os.scandir(runs_dir) if d.is_dir() and not d.name.startswith(".")]
 
     logger.info("Rebuilding stats DB from %d runs", len(run_ids))
 

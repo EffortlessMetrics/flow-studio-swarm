@@ -6,6 +6,7 @@ This creates a seam for future extraction into a standalone package
 while keeping the current single-repo structure.
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -132,7 +133,7 @@ class FlowStudioConfig:
         if not self.runs_dir.exists():
             return []
         return sorted(
-            p for p in self.runs_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
+            Path(p.path) for p in os.scandir(self.runs_dir) if p.is_dir() and not p.name.startswith(".")
         )
 
     def list_examples(self) -> list[Path]:
@@ -140,7 +141,7 @@ class FlowStudioConfig:
         if not self.examples_dir.exists():
             return []
         return sorted(
-            p for p in self.examples_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
+            Path(p.path) for p in os.scandir(self.examples_dir) if p.is_dir() and not p.name.startswith(".")
         )
 
 
