@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -263,31 +264,33 @@ class RunInspector:
 
         # Active runs (gitignored)
         if self.runs_dir.exists():
-            for entry in self.runs_dir.iterdir():
-                if entry.is_dir() and not entry.name.startswith("."):
-                    run_data = {
-                        "run_id": entry.name,
-                        "run_type": "active",
-                        "path": str(entry),
-                    }
-                    # Load optional metadata
-                    metadata = self._load_run_metadata(entry)
-                    run_data.update(metadata)
-                    runs.append(run_data)
+            with os.scandir(self.runs_dir) as it:
+                for entry in it:
+                    if entry.is_dir() and not entry.name.startswith("."):
+                        run_data = {
+                            "run_id": entry.name,
+                            "run_type": "active",
+                            "path": entry.path,
+                        }
+                        # Load optional metadata
+                        metadata = self._load_run_metadata(Path(entry.path))
+                        run_data.update(metadata)
+                        runs.append(run_data)
 
         # Example runs (committed)
         if self.examples_dir.exists():
-            for entry in self.examples_dir.iterdir():
-                if entry.is_dir() and not entry.name.startswith("."):
-                    run_data = {
-                        "run_id": entry.name,
-                        "run_type": "example",
-                        "path": str(entry),
-                    }
-                    # Load optional metadata
-                    metadata = self._load_run_metadata(entry)
-                    run_data.update(metadata)
-                    runs.append(run_data)
+            with os.scandir(self.examples_dir) as it:
+                for entry in it:
+                    if entry.is_dir() and not entry.name.startswith("."):
+                        run_data = {
+                            "run_id": entry.name,
+                            "run_type": "example",
+                            "path": entry.path,
+                        }
+                        # Load optional metadata
+                        metadata = self._load_run_metadata(Path(entry.path))
+                        run_data.update(metadata)
+                        runs.append(run_data)
 
         # Sort: examples first, then active by name
         runs.sort(key=lambda r: (0 if r["run_type"] == "example" else 1, r["run_id"]))
