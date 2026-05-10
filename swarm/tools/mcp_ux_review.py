@@ -111,8 +111,10 @@ def list_review_runs() -> List[str]:
     """List all available review run IDs (timestamps)."""
     if not UI_REVIEW_DIR.exists():
         return []
+    import os
+
     return sorted(
-        [d.name for d in UI_REVIEW_DIR.iterdir() if d.is_dir()],
+        [entry.name for entry in os.scandir(UI_REVIEW_DIR) if entry.is_dir()],
         reverse=True,  # Most recent first
     )
 
