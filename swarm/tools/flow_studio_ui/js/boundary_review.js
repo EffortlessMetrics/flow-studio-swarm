@@ -236,7 +236,7 @@ export function renderBoundaryReviewPanel(data) {
       <div class="panel-header">
         <h3>Boundary Review</h3>
         ${data.current_flow ? `<span class="current-flow">Flow: ${data.current_flow}</span>` : ""}
-        <button class="toggle-expand" title="Toggle expand">
+        <button class="toggle-expand" title="Toggle expand" aria-expanded="${isExpanded}" aria-label="${isExpanded ? 'Collapse review section' : 'Expand review section'}">
           ${isExpanded ? "▼" : "▶"}
         </button>
       </div>
@@ -309,6 +309,8 @@ export function setupBoundaryReviewHandlers(container) {
                 sections.classList.toggle("collapsed", !isExpanded);
             }
             target.textContent = isExpanded ? "▼" : "▶";
+            target.setAttribute("aria-expanded", String(isExpanded));
+            target.setAttribute("aria-label", isExpanded ? "Collapse review section" : "Expand review section");
         }
     });
 }
