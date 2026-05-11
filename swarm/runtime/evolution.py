@@ -33,6 +33,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -965,12 +966,13 @@ def list_pending_patches(
     if not runs_root.exists():
         return results
 
-    run_dirs = sorted(runs_root.iterdir(), reverse=True)[:limit]
+    with os.scandir(runs_root) as entries:
+        dir_names = [e.name for e in entries if e.is_dir() and not e.name.startswith(".")]
 
-    for run_dir in run_dirs:
-        if not run_dir.is_dir():
-            continue
+    sorted_dirs = sorted(dir_names, reverse=True)[:limit]
 
+    for dir_name in sorted_dirs:
+        run_dir = runs_root / dir_name
         wisdom_dir = run_dir / "wisdom"
         if not wisdom_dir.exists():
             continue
