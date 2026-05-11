@@ -42,6 +42,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -1119,8 +1120,12 @@ def load_routing_proposals(
         flow_dirs = [run_base / flow_key]
     else:
         # Scan all flow directories
+        # PERFORMANCE: Use os.scandir() instead of Path.iterdir() to avoid expensive stat() calls
+        # and leverage cached OS metadata for directory traversal
         flow_dirs = [
-            d for d in run_base.iterdir() if d.is_dir() and (d / "routing" / "proposals").exists()
+            Path(entry.path)
+            for entry in os.scandir(run_base)
+            if entry.is_dir() and (Path(entry.path) / "routing" / "proposals").exists()
         ]
 
     for flow_dir in flow_dirs:
