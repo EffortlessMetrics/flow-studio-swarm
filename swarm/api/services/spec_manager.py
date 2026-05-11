@@ -20,6 +20,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -503,10 +504,17 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # Using os.scandir avoids instantiating Path objects for thousands of directories
+        # and allows efficient access to metadata for chronological sorting.
+        # SECURITY: Sorting by st_mtime avoids brittle ID-based string sorting heuristics.
+        entries = sorted(
+            [e for e in os.scandir(self.runs_root) if e.is_dir()],
+            key=lambda e: e.stat().st_mtime,
+            reverse=True
+        )
 
+        for entry in entries:
+            run_dir = self.runs_root / entry.name
             state_file = run_dir / "run_state.json"
             if state_file.exists():
                 try:
