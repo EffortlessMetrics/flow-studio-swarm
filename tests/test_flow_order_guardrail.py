@@ -54,14 +54,15 @@ EXCLUDE_PATTERNS = [
 # NOTE: Line numbers must match exactly. If code changes, update the line numbers
 # or the test_allowlist_lines_still_have_violations test will fail.
 ALLOWED_VIOLATIONS: Dict[str, Dict[int, str]] = {
+    "swarm/tools/validation/reporting/json_output.py": {
+        140: "Fallback constant when flow_registry import fails",
+    },
     # Fallback in _get_default_flow_sequence() when registry import fails
     "swarm/runtime/types/macro_types.py": {
         17: "Fallback constant when flow_registry import fails in _get_default_flow_sequence()",
     },
     # Fallback when registry import fails - acceptable since it tries registry first
-    "swarm/tools/validation/reporting/json_output.py": {
-        126: "Fallback constant when flow_registry import fails",
-    },
+
     # Run plan defaults - defines example configurations
     "swarm/runtime/run_plan_api.py": {
         27: "Example default configuration for gated mode",
