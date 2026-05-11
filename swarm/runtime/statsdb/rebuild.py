@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -129,8 +130,11 @@ class StatsDBRebuildMixin:
                 logger.warning("Runs directory does not exist: %s", runs_dir)
                 return stats
 
+            # Optimization: os.scandir avoids instantiating Path objects and reduces stat calls
             run_ids = [
-                d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")
+                entry.name
+                for entry in os.scandir(runs_dir)
+                if entry.is_dir() and not entry.name.startswith(".")
             ]
 
         logger.info("Rebuilding projections for %d runs", len(run_ids))
@@ -236,7 +240,12 @@ def rebuild_stats_db(
             logger.warning("Runs directory does not exist: %s", runs_dir)
             return stats
 
-        run_ids = [d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
+        # Optimization: os.scandir avoids instantiating Path objects and reduces stat calls
+        run_ids = [
+            entry.name
+            for entry in os.scandir(runs_dir)
+            if entry.is_dir() and not entry.name.startswith(".")
+        ]
 
     logger.info("Rebuilding stats DB from %d runs", len(run_ids))
 
@@ -278,11 +287,12 @@ def rebuild_stats_db(
             # Set ingestion context to allow record_* calls (projection-only mode)
             _ingestion_context.active = True
             try:
-                for flow_dir in run_path.iterdir():
-                    if not flow_dir.is_dir() or flow_dir.name.startswith("."):
+                # Optimization: os.scandir avoids instantiating Path objects and reduces stat calls
+                for flow_entry in os.scandir(run_path):
+                    if not flow_entry.is_dir() or flow_entry.name.startswith("."):
                         continue
 
-                    handoff_dir = flow_dir / "handoff"
+                    handoff_dir = Path(flow_entry.path) / "handoff"
                     if not handoff_dir.exists():
                         continue
 
