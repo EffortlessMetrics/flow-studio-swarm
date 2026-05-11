@@ -79,11 +79,20 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal"),  # _ref_exists(nonexistent)
+                (False, "", "fatal"),  # _ref_exists(origin/nonexistent)
+                (False, "", "fatal"),  # _ref_exists(main)
+                (False, "", "fatal"),  # _ref_exists(origin/main)
+                (False, "", "fatal"),  # _ref_exists(master)
+                (False, "", "fatal"),  # _ref_exists(origin/master)
+                # HEAD doesn't call _run_git, returns "HEAD"
+                # Check for uncommitted changes
+                (True, "", ""),
+                # Create and switch to shadow branch (which is expected to fail in the test)
+                (False, "", "fatal"),
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -93,8 +102,8 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
                 (True, "", ""),  # Verify base branch exists
+                (True, " M file.txt", ""),  # Uncommitted changes exist
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
@@ -423,8 +432,8 @@ class TestShadowForkIntegration:
             # Create shadow
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check uncommitted changes
                 (True, "", ""),  # Verify base branch
+                (True, "", ""),  # Check uncommitted changes
                 (True, "", ""),  # Create shadow branch
             ]
             branch = fork.create()
@@ -468,8 +477,8 @@ class TestShadowForkIntegration:
             # Create shadow
             mock_git.side_effect = [
                 (True, "feature-x", ""),  # Get current branch
-                (True, "", ""),  # Check uncommitted changes
                 (True, "", ""),  # Verify base branch
+                (True, "", ""),  # Check uncommitted changes
                 (True, "", ""),  # Create shadow branch
             ]
             fork.create()
