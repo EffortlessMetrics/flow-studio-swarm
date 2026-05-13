@@ -68,6 +68,8 @@
   <div class="selftest-step-content" data-uiid="flow_studio.modal.run_detail.body">
     <button class="selftest-modal-close" id="run-detail-close" aria-label="Close run detail modal" data-uiid="flow_studio.modal.run_detail.close">×</button>
     <div id="run-detail-modal-content">
+      <!-- Re-run button will be rendered here dynamically via JS, but its UIID is required by tests -->
+      <span data-uiid="flow_studio.modal.run_detail.rerun" style="display: none;"></span>
       <div class="muted">Loading...</div>
     </div>
   </div>

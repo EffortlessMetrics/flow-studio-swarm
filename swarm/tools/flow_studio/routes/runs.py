@@ -241,7 +241,10 @@ async def api_stop_run(run_id: str, state: FlowStudioState = Depends(get_state))
 
         if not result.get("success", False):
             return JSONResponse(
-                {"error": result.get("message", "Run not found or already completed"), "run_id": run_id},
+                {
+                    "error": result.get("message", "Run not found or already completed"),
+                    "run_id": run_id,
+                },
                 status_code=404,
             )
 
