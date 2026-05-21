@@ -1,0 +1,16 @@
+schema_version = "1.0"
+
+repo = "flow-studio-swarm"
+namespace = ".flow-studio-swarm-spec"
+
+[conventions]
+proposal_prefix = "FSS-PROP"
+spec_prefix = "FSS-SPEC"
+adr_prefix = "FSS-ADR"
+lane_prefix = "FSS-LANE"
+
+[external_namespaces]
+codex = ".codex"
+speckit = ".spec"
+claude = ".claude"
+jules = ".jules"
