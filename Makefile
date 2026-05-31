@@ -88,6 +88,10 @@ lint-routing:
 	@echo "Checking for deprecated routing field patterns..."
 	uv run python swarm/tools/lint_routing_fields.py
 
+.PHONY: runner-routing-guard
+runner-routing-guard:
+	@./swarm/tools/check_runner_routing_guard.sh
+
 .PHONY: lint-routing-strict
 lint-routing-strict:
 	@echo "Checking for deprecated routing field patterns (strict mode)..."
