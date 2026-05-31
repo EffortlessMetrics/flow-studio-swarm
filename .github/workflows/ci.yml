@@ -66,6 +66,9 @@ jobs:
         if: github.event_name == 'pull_request'
         run: make complexity-check
 
+      - name: Check runner routing guard
+        run: make runner-routing-guard
+
       - name: Lint routing fields (strict)
         run: make lint-routing-strict
 
