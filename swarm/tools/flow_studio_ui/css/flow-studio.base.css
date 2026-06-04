@@ -457,6 +457,10 @@
       background: #3b82f6;
       color: white;
     }
+    .mode-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+    }
     .mode-toggle button:first-child {
       border-right: 1px solid #d1d5db;
     }
@@ -1023,6 +1027,10 @@
     .view-toggle button.active {
       background: #0f766e;
       color: white;
+    }
+    .view-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
     }
     .view-toggle button:first-child {
       border-right: 1px solid #d1d5db;
@@ -1896,6 +1904,12 @@
       transform: rotate(-90deg);
     }
 
+    .run-history-header .collapse-toggle:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
     .run-history-filter {
       display: flex;
       gap: var(--fs-spacing-xs);
@@ -1915,6 +1929,11 @@
 
     .run-history-filter .filter-btn:hover {
       border-color: var(--fs-color-accent);
+    }
+
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
 
     .run-history-filter .filter-btn.active {
@@ -2225,6 +2244,11 @@
       background: #fef3c7;
       border-color: #f59e0b;
       color: #92400e;
+    }
+
+    .teaching-mode-toggle:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
 
     .teaching-mode-toggle.active .teaching-mode-icon {
