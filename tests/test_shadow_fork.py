@@ -77,31 +77,36 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+            # We mock the internal functions directly to avoid mocking _run_git which gets messy
+            with patch.object(fork, "_is_shadow_active", return_value=False), \
+                 patch.object(fork, "_get_current_branch", return_value="main"), \
+                 patch.object(fork, "_resolve_base_ref", return_value="nonexistent"):
+                mock_git.side_effect = [
+                    (True, "", ""),  # Check for uncommitted changes
+                    (False, "", "fatal: does not exist"),  # checkout fails
+                ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+                with pytest.raises(RuntimeError, match="does not exist"):
+                    fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+            with patch.object(fork, "_is_shadow_active", return_value=False), \
+                 patch.object(fork, "_get_current_branch", return_value="main"), \
+                 patch.object(fork, "_resolve_base_ref", return_value="main"), \
+                 patch.object(fork, "block_upstream_push"):
+                mock_git.side_effect = [
+                    (True, " M file.txt", ""),  # Uncommitted changes exist
+                    (True, "", ""),  # Create and switch to shadow branch
+                ]
 
-            # Create hooks directory for the test
-            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+                # Create hooks directory for the test
+                (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
-            fork.create()
+                fork.create()
 
             assert "uncommitted changes" in caplog.text.lower()
 

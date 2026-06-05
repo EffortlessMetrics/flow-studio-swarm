@@ -20,6 +20,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -503,10 +504,17 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # Extract run IDs using os.scandir for efficiency and sort lexicographically (reverse)
+        run_ids = []
+        with os.scandir(self.runs_root) as it:
+            for entry in it:
+                if entry.is_dir() and not entry.name.startswith("."):
+                    run_ids.append(entry.name)
 
+        run_ids.sort(reverse=True)
+
+        for run_id in run_ids:
+            run_dir = self.runs_root / run_id
             state_file = run_dir / "run_state.json"
             if state_file.exists():
                 try:
@@ -526,6 +534,8 @@ class SpecManager:
                 break
 
         return runs
+
+
 
     # -------------------------------------------------------------------------
     # SSE Event Stream
