@@ -192,12 +192,15 @@ class TestCreateWorkspace:
 
     def test_explicit_shadow_mode_true(self, temp_repo: Path):
         """Test explicit shadow_mode=True creates shadow workspace."""
-        workspace = create_workspace(
-            repo_root=temp_repo,
-            run_id="test-run",
-            flow_key="deploy",
-            shadow_mode=True,
-        )
+        from unittest.mock import patch
+
+        with patch('swarm.runtime.shadow_fork.ShadowFork.create'):
+            workspace = create_workspace(
+                repo_root=temp_repo,
+                run_id="test-run",
+                flow_key="deploy",
+                shadow_mode=True,
+            )
         assert isinstance(workspace, ShadowForkWorkspace)
 
 

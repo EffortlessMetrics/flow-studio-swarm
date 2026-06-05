@@ -79,7 +79,6 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
                 (False, "", "fatal"),  # Base branch doesn't exist
             ]
 
@@ -93,8 +92,9 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
                 (True, "", ""),  # Verify base branch exists
+                (True, "main", ""),  # Get base ref
+                (True, " M file.txt", ""),  # Uncommitted changes exist
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
@@ -423,6 +423,7 @@ class TestShadowForkIntegration:
             # Create shadow
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "main", ""),  # Get base ref
                 (True, "", ""),  # Check uncommitted changes
                 (True, "", ""),  # Verify base branch
                 (True, "", ""),  # Create shadow branch
@@ -468,6 +469,7 @@ class TestShadowForkIntegration:
             # Create shadow
             mock_git.side_effect = [
                 (True, "feature-x", ""),  # Get current branch
+                (True, "main", ""),  # Get base ref
                 (True, "", ""),  # Check uncommitted changes
                 (True, "", ""),  # Verify base branch
                 (True, "", ""),  # Create shadow branch

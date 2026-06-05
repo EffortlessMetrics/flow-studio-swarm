@@ -281,6 +281,11 @@ class ShadowFork:
         # In detached HEAD, use "HEAD" as original_branch for restoration
         self.original_branch = current or "HEAD"
 
+        # First verify the requested base branch exists
+        base_exists, _, _ = self._run_git(["rev-parse", "--verify", base_branch])
+        if not base_exists:
+            raise RuntimeError(f"Base branch '{base_branch}' does not exist.")
+
         # Resolve base branch with fallbacks (handles missing main, detached HEAD, etc.)
         base_ref = self._resolve_base_ref(base_branch)
         self.base_branch = base_ref
