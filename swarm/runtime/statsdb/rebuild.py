@@ -129,9 +129,14 @@ class StatsDBRebuildMixin:
                 logger.warning("Runs directory does not exist: %s", runs_dir)
                 return stats
 
-            run_ids = [
-                d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")
-            ]
+            import os
+            try:
+                with os.scandir(runs_dir) as it:
+                    run_ids = [
+                        entry.name for entry in it if entry.is_dir() and not entry.name.startswith(".")
+                    ]
+            except OSError:
+                run_ids = []
 
         logger.info("Rebuilding projections for %d runs", len(run_ids))
 
@@ -236,7 +241,12 @@ def rebuild_stats_db(
             logger.warning("Runs directory does not exist: %s", runs_dir)
             return stats
 
-        run_ids = [d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
+        import os
+        try:
+            with os.scandir(runs_dir) as it:
+                run_ids = [entry.name for entry in it if entry.is_dir() and not entry.name.startswith(".")]
+        except OSError:
+            run_ids = []
 
     logger.info("Rebuilding stats DB from %d runs", len(run_ids))
 

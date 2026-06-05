@@ -20,6 +20,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -503,10 +504,22 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # Use os.scandir to avoid creating Path objects and stat calls for every item
+        try:
+            with os.scandir(self.runs_root) as it:
+                # We need reverse=True to get the most recent runs first
+                # os.scandir entries don't have a reliable chronological sort natively,
+                # but run IDs are lexicographically chronological based on how they're generated.
+                run_entries = sorted(
+                    (entry for entry in it if entry.is_dir()),
+                    key=lambda e: e.name,
+                    reverse=True
+                )
+        except OSError:
+            run_entries = []
 
+        for entry in run_entries:
+            run_dir = Path(entry.path)
             state_file = run_dir / "run_state.json"
             if state_file.exists():
                 try:
