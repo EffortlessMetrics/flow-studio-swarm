@@ -1254,6 +1254,10 @@
       background: #e5e7eb;
       border-color: #9ca3af;
     }
+    .copy-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
     .copy-btn.copied {
       background: #d1fae5;
       border-color: #10b981;
