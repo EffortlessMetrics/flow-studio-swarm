@@ -60,7 +60,7 @@ ALLOWED_VIOLATIONS: Dict[str, Dict[int, str]] = {
     },
     # Fallback when registry import fails - acceptable since it tries registry first
     "swarm/tools/validation/reporting/json_output.py": {
-        126: "Fallback constant when flow_registry import fails",
+        138: "Fallback constant when flow_registry import fails",
     },
     # Run plan defaults - defines example configurations
     "swarm/runtime/run_plan_api.py": {
