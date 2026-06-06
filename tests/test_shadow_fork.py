@@ -77,13 +77,27 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+            # First call is to get current branch
+            # Then we need _resolve_base_ref to fall back to HEAD, so we need _ref_exists to return False
+            # meaning we return (False, "", "fatal") for all rev-parse checks until HEAD
+            # We can use a side effect function instead of a list to handle it cleanly
+            def side_effect_func(args, **kwargs):
+                if args[0] == "branch" and "--show-current" in args:
+                    return (True, "main", "")
+                elif args[0] == "rev-parse":
+                    ref = args[-1]
+                    if ref == "HEAD":
+                        return (True, "head-sha", "")
+                    return (False, "", "fatal")
+                elif args[0] == "status":
+                    return (True, "", "")
+                elif args[0] == "checkout" and "-b" in args:
+                    return (False, "", "fatal: cannot create branch")
+                return (True, "", "")
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            mock_git.side_effect = side_effect_func
+
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -91,11 +105,13 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            mock_git.return_value = (True, "", "")
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
+                (True, "HEAD", ""),  # Verify base branch exists inside _resolve_base_ref
+                (True, " M file.txt", ""),  # Uncommitted changes exist (status --porcelain)
                 (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # Install push guard
             ]
 
             # Create hooks directory for the test
