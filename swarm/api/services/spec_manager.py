@@ -20,6 +20,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -503,27 +504,38 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # Use os.scandir for faster directory iteration, deferring expensive Path creation
+        # and file existence checks until after sorting the candidates
+        candidates = []
+        try:
+            with os.scandir(self.runs_root) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        candidates.append((entry.name, entry.path))
+        except OSError:
+            pass
 
-            state_file = run_dir / "run_state.json"
+        # Sort lexicographically by directory name (matches original behavior)
+        candidates.sort(key=lambda x: x[0], reverse=True)
+
+        for name, path in candidates:
+            if len(runs) >= limit:
+                break
+
+            state_file = Path(path) / "run_state.json"
             if state_file.exists():
                 try:
                     state = json.loads(state_file.read_text(encoding="utf-8"))
                     runs.append(
                         {
-                            "run_id": state.get("run_id", run_dir.name),
+                            "run_id": state.get("run_id", name),
                             "flow_key": state.get("flow_key"),
                             "status": state.get("status"),
                             "timestamp": state.get("timestamp"),
                         }
                     )
                 except Exception as e:
-                    logger.warning("Failed to load run state %s: %s", run_dir, e)
-
-            if len(runs) >= limit:
-                break
+                    logger.warning("Failed to load run state %s: %s", path, e)
 
         return runs
 
