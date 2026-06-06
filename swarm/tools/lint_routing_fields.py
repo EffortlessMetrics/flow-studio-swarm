@@ -236,9 +236,21 @@ class RoutingUsage:
 
 def should_skip_file(file_path: Path) -> bool:
     """Check if file should be skipped based on skip patterns."""
-    path_str = str(file_path)
+    path_str = str(file_path).replace("\\", "/")
+
+    # Check exact suffixes first
+    for exact_skip in ["docs/RELEASE_CHECKLIST.md", "swarm/prompts/agentic_steps/self-reviewer.md", "swarm/tools/lint_routing_fields.py"]:
+        if path_str.endswith(exact_skip):
+            return True
+
     for pattern in SKIP_PATTERNS:
-        if pattern.replace("**/", "").replace("/**", "") in path_str:
+        clean_pattern = pattern.replace("**/", "").replace("/**", "")
+        if clean_pattern in path_str:
+            return True
+        if path_str.endswith(clean_pattern):
+            return True
+        import fnmatch
+        if fnmatch.fnmatch(path_str, f"*{pattern}") or fnmatch.fnmatch(path_str, pattern):
             return True
     return False
 
