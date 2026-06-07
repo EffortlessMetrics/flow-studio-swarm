@@ -33,6 +33,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -965,11 +966,17 @@ def list_pending_patches(
     if not runs_root.exists():
         return results
 
-    run_dirs = sorted(runs_root.iterdir(), reverse=True)[:limit]
+    try:
+        # ⚡ Bolt Optimization: Use os.scandir instead of Path.iterdir for much faster
+        # directory iteration, avoiding Path object instantiation for each item.
+        with os.scandir(runs_root) as it:
+            run_names = [e.name for e in it if e.is_dir()]
+    except OSError:
+        run_names = []
+    run_names.sort(reverse=True)
 
-    for run_dir in run_dirs:
-        if not run_dir.is_dir():
-            continue
+    for run_name in run_names[:limit]:
+        run_dir = runs_root / run_name
 
         wisdom_dir = run_dir / "wisdom"
         if not wisdom_dir.exists():
