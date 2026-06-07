@@ -77,13 +77,21 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            def mock_run_git_impl(cmd, *args, **kwargs):
+                if cmd[0] == "rev-parse":
+                    return True, "main", ""
+                if cmd[0] == "status":
+                    return True, "", ""
+                if cmd[0] == "checkout" and "-b" in cmd:
+                    return False, "", "fatal: git checkout: branch nonexistent not found"
+                if cmd[0] == "show-ref":
+                    return False, "", "fatal: not a valid ref"
+                return True, "", ""
+
+            mock_git.side_effect = mock_run_git_impl
+
+            with pytest.raises(RuntimeError, match="fatal: git checkout"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -91,12 +99,15 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+
+            def mock_run_git_warn(cmd, *args, **kwargs):
+                if cmd[0] == "rev-parse":
+                    return True, "main", ""
+                if cmd[0] == "status":
+                    return True, " M file.txt", ""
+                return True, "", ""
+
+            mock_git.side_effect = mock_run_git_warn
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
