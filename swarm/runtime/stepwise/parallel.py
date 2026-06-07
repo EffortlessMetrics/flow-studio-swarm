@@ -252,7 +252,17 @@ class ParallelExecutor:
             ForkResult with aggregated results.
         """
         # Use asyncio.run() to execute the async version
-        return asyncio.get_event_loop().run_until_complete(
+        try:
+            loop = asyncio.get_running_loop()
+            if loop.is_running():
+                # If we are already in an event loop, we shouldn't use execute_fork_sync.
+                # But if we must, we'd need nest_asyncio or another thread.
+                # For our use cases, this is typically called synchronously.
+                pass
+        except RuntimeError:
+            pass
+
+        return asyncio.run(
             self.execute_fork(run_id, fork_config, contexts, join_config)
         )
 
