@@ -1020,6 +1020,10 @@
     .view-toggle button:hover {
       background: #e5e7eb;
     }
+    .view-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+    }
     .view-toggle button.active {
       background: #0f766e;
       color: white;
@@ -1253,6 +1257,10 @@
     .copy-btn:hover {
       background: #e5e7eb;
       border-color: #9ca3af;
+    }
+    .copy-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
     .copy-btn.copied {
       background: #d1fae5;
@@ -1896,6 +1904,12 @@
       transform: rotate(-90deg);
     }
 
+    .run-history-header .collapse-toggle:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
     .run-history-filter {
       display: flex;
       gap: var(--fs-spacing-xs);
@@ -1921,6 +1935,11 @@
       background: var(--fs-color-accent-bg);
       border-color: var(--fs-color-accent);
       color: var(--fs-color-accent);
+    }
+
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 1px;
     }
 
     .run-history-list {
@@ -2648,7 +2667,7 @@
       cursor: not-allowed;
     }
 
-    .run-control-btn:focus {
+    .run-control-btn:focus-visible {
       outline: none;
       box-shadow: 0 0 0 2px var(--fs-color-accent-bg, #dbeafe);
     }
