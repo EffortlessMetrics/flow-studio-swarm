@@ -3652,3 +3652,29 @@
       outline: none;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
+
+/* --- Palette: Focus Visible Enhancements --- */
+.run-history-filter .filter-btn:focus-visible,
+.teaching-mode-toggle:focus-visible,
+.run-history-header .collapse-toggle:focus-visible,
+.governance-toggle:focus-visible,
+.run-selector:focus-visible {
+  outline: 2px solid var(--fs-color-accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+.mode-toggle button:focus-visible,
+.view-toggle button:focus-visible {
+  outline: 2px solid var(--fs-color-accent, #3b82f6);
+  outline-offset: -2px;
+}
+
+.run-control-btn:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
+.run-control-btn:focus-visible {
+  outline: 2px solid var(--fs-color-accent, #3b82f6);
+  outline-offset: 2px;
+  box-shadow: none;
+}
