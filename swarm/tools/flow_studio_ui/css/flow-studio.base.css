@@ -2648,7 +2648,7 @@
       cursor: not-allowed;
     }
 
-    .run-control-btn:focus {
+    .run-control-btn:focus-visible {
       outline: none;
       box-shadow: 0 0 0 2px var(--fs-color-accent-bg, #dbeafe);
     }
@@ -3651,4 +3651,15 @@
       top: 0;
       outline: none;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Accessibility focus styles for custom buttons */
+    .filter-btn:focus-visible,
+    .view-toggle button:focus-visible,
+    .mode-toggle button:focus-visible,
+    .tour-dropdown-btn:focus-visible,
+    .copy-btn:focus-visible,
+    .collapse-toggle:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
