@@ -500,12 +500,20 @@ class SpecManager:
         """
         runs = []
 
+        import os
+
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        try:
+            with os.scandir(self.runs_root) as entries:
+                # Efficiently filter directories and sort their names using cached metadata
+                candidate_names = sorted([e.name for e in entries if e.is_dir()], reverse=True)
+        except OSError:
+            return runs
+
+        for name in candidate_names:
+            run_dir = self.runs_root / name
 
             state_file = run_dir / "run_state.json"
             if state_file.exists():
