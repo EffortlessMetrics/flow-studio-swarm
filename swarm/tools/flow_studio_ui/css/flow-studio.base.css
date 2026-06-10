@@ -1520,6 +1520,11 @@
     .selftest-modal-close:hover {
       color: #111827;
     }
+    .selftest-modal-close:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
     /* AC (Acceptance Criteria) badges */
     .selftest-ac-container {
       margin-bottom: 16px;
