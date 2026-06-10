@@ -77,13 +77,22 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+            # We patch _run_git to fail on the checkout step
+            # We need a custom side_effect function because of the multiple calls with different args
+            def mock_run_git_fn(cmd, **kwargs):
+                if cmd[0] == "rev-parse":
+                    return True, "main", ""
+                elif cmd[0] == "show-ref":
+                    return False, "", "fatal"
+                elif cmd[0] == "status":
+                    return True, "", ""
+                elif cmd[0] == "checkout":
+                    return False, "", "fatal: not a valid object name: 'nonexistent'"
+                return True, "", ""
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            mock_git.side_effect = mock_run_git_fn
+
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -91,12 +100,21 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+            def mock_run_git_fn(cmd, **kwargs):
+                if cmd[0] == "rev-parse":
+                    return True, "main", ""
+                elif cmd[0] == "show-ref":
+                    return True, "", ""
+                elif cmd[0] == "status":
+                    return True, " M file.txt", "" # Uncommitted changes exist
+                elif cmd[0] == "checkout":
+                    return True, "", ""
+                return True, "", ""
+
+            mock_git.side_effect = mock_run_git_fn
+
+            import logging
+            caplog.set_level(logging.WARNING)
 
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
