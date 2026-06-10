@@ -962,14 +962,20 @@ def list_pending_patches(
     """
     results: List[Tuple[str, List[EvolutionPatch]]] = []
 
+    import os
+
     if not runs_root.exists():
         return results
 
-    run_dirs = sorted(runs_root.iterdir(), reverse=True)[:limit]
+    try:
+        with os.scandir(runs_root) as entries:
+            # Efficiently filter directories and sort their names using cached metadata
+            candidate_names = sorted([e.name for e in entries if e.is_dir()], reverse=True)[:limit]
+    except OSError:
+        return results
 
-    for run_dir in run_dirs:
-        if not run_dir.is_dir():
-            continue
+    for name in candidate_names:
+        run_dir = runs_root / name
 
         wisdom_dir = run_dir / "wisdom"
         if not wisdom_dir.exists():
