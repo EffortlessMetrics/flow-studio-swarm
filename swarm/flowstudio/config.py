@@ -6,6 +6,7 @@ This creates a seam for future extraction into a standalone package
 while keeping the current single-repo structure.
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -128,20 +129,32 @@ class FlowStudioConfig:
         return sorted(self.agents_dir.glob("*.yaml"))
 
     def list_runs(self) -> list[Path]:
-        """List all active runs."""
+        """List all active runs. Uses os.scandir to avoid Path.is_dir() stat calls."""
         if not self.runs_dir.exists():
             return []
-        return sorted(
-            p for p in self.runs_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
-        )
+        try:
+            with os.scandir(self.runs_dir) as entries:
+                return sorted(
+                    self.runs_dir / e.name
+                    for e in entries
+                    if e.is_dir() and not e.name.startswith(".")
+                )
+        except OSError:
+            return []
 
     def list_examples(self) -> list[Path]:
-        """List all example runs."""
+        """List all example runs. Uses os.scandir to avoid Path.is_dir() stat calls."""
         if not self.examples_dir.exists():
             return []
-        return sorted(
-            p for p in self.examples_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
-        )
+        try:
+            with os.scandir(self.examples_dir) as entries:
+                return sorted(
+                    self.examples_dir / e.name
+                    for e in entries
+                    if e.is_dir() and not e.name.startswith(".")
+                )
+        except OSError:
+            return []
 
 
 # Default config instance (lazily constructed)
