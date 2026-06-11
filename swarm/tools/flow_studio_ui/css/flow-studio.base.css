@@ -453,6 +453,10 @@
     .mode-toggle button:hover {
       background: #e5e7eb;
     }
+    .mode-toggle button:focus-visible {
+      outline: 2px solid #3b82f6;
+      outline-offset: -2px;
+    }
     .mode-toggle button.active {
       background: #3b82f6;
       color: white;
@@ -587,6 +591,10 @@
     }
     .tour-dropdown-btn:hover {
       background: #e5e7eb;
+    }
+    .tour-dropdown-btn:focus-visible {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
     }
     .tour-dropdown-btn.active {
       background: #dbeafe;
@@ -1020,6 +1028,10 @@
     .view-toggle button:hover {
       background: #e5e7eb;
     }
+    .view-toggle button:focus-visible {
+      outline: 2px solid #0f766e;
+      outline-offset: -2px;
+    }
     .view-toggle button.active {
       background: #0f766e;
       color: white;
@@ -1253,6 +1265,10 @@
     .copy-btn:hover {
       background: #e5e7eb;
       border-color: #9ca3af;
+    }
+    .copy-btn:focus-visible {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
     }
     .copy-btn.copied {
       background: #d1fae5;
@@ -1882,6 +1898,12 @@
       margin-bottom: var(--fs-spacing-sm);
     }
 
+    .run-history-header .collapse-toggle:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
     .run-history-header .collapse-toggle {
       background: none;
       border: none;
@@ -1915,6 +1937,11 @@
 
     .run-history-filter .filter-btn:hover {
       border-color: var(--fs-color-accent);
+    }
+
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent);
+      outline-offset: 2px;
     }
 
     .run-history-filter .filter-btn.active {
@@ -2219,6 +2246,10 @@
     .teaching-mode-toggle:hover {
       background: var(--fs-color-bg-subtle, #f3f4f6);
       border-color: var(--fs-color-accent, #3b82f6);
+    }
+    .teaching-mode-toggle:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
 
     .teaching-mode-toggle.active {
