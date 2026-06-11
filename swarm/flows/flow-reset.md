@@ -146,12 +146,10 @@ graph TD
   reset_prune_branches["6. prune_branches\n(reset-prune-branches)"]
   reset_archive_run["7. archive_run\n(reset-archive-run)"]
   reset_verify_clean["8. verify_clean\n(reset-verify-clean)"]
-
   reset_diagnose --> reset_stash_wip
   reset_stash_wip --> reset_sync_upstream
   reset_sync_upstream --> reset_resolve_conflicts
-  reset_resolve_conflicts -->|VERIFIED| reset_restore_wip
-  reset_resolve_conflicts -->|UNVERIFIED| reset_resolve_conflicts
+  reset_resolve_conflicts --> reset_restore_wip
   reset_restore_wip --> reset_prune_branches
   reset_prune_branches --> reset_archive_run
   reset_archive_run --> reset_verify_clean
@@ -161,14 +159,14 @@ graph TD
 
 | # | Step | Agents | Role |
 | - | ---- | ------ | ---- |
-| 1 | `diagnose` | `reset-diagnose` — Analyze divergence | Analyze upstream divergence, identify conflicts, assess severity. |
-| 2 | `stash_wip` | `reset-stash-wip` — Stash WIP changes | Stash uncommitted changes before sync operations. |
-| 3 | `sync_upstream` | `reset-sync-upstream` — Fetch upstream | Fetch upstream changes without merging. |
-| 4 | `resolve_conflicts` | `reset-resolve-conflicts` — Resolve conflicts | Resolve merge conflicts (microloop, max 3 iterations). |
-| 5 | `restore_wip` | `reset-restore-wip` — Restore WIP | Restore stashed changes after sync. |
-| 6 | `prune_branches` | `reset-prune-branches` — Prune stale branches | Clean up stale/deleted branches. |
-| 7 | `archive_run` | `reset-archive-run` — Archive artifacts | Archive run artifacts before cleanup. |
-| 8 | `verify_clean` | `reset-verify-clean` — Verify clean state | Final verification of repository integrity. |
+| 1 | `diagnose` | `reset-diagnose` — Analyze upstream divergence, identify conflicts, assess severity. | Analyze upstream divergence, identify conflicts, assess severity. |
+| 2 | `stash_wip` | `reset-stash-wip` — Stash work-in-progress changes safely before reset operations. | Stash WIP changes before sync/rebase operations. |
+| 3 | `sync_upstream` | `reset-sync-upstream` — Fetch upstream changes without merging. Update remote tracking refs. | Fetch upstream changes without merging. Update remote tracking refs. |
+| 4 | `resolve_conflicts` | `reset-resolve-conflicts` — Resolve merge/rebase conflicts. Apply safe resolution strategies. | Resolve merge conflicts. May require multiple passes. |
+| 5 | `restore_wip` | `reset-restore-wip` — Restore stashed work-in-progress after successful reset. | Restore stashed WIP after sync completes. |
+| 6 | `prune_branches` | `reset-prune-branches` — Clean up old shadow branches and stale remote tracking refs. | Clean up stale/deleted branches from tracking. |
+| 7 | `archive_run` | `reset-archive-run` — Archive current run state before reset. Preserve audit trail. | Archive run artifacts before cleanup. |
+| 8 | `verify_clean` | `reset-verify-clean` — Verify clean state after reset. Validate repo integrity. | Verify clean state after reset. Validate repo integrity. |
 <!-- FLOW AUTOGEN END -->
 
 ---

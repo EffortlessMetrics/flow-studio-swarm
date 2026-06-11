@@ -613,14 +613,16 @@ class SelfTestRunner:
         try:
             # Use Popen with start_new_session=True to create a new process group.
             # This ensures we can kill all child processes on timeout, not just the shell.
-            # Parse command string into list for safe execution (avoids shell injection)
-            cmd_args = shlex.split(step.full_command())
+            cmd = step.full_command()
+            env = os.environ.copy()
+            env["PYTHONPATH"] = "."
             proc = subprocess.Popen(
-                cmd_args,
+                ["bash", "-c", cmd],
                 shell=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                env=env,
                 start_new_session=True,  # Create new process group for proper cleanup
             )
             try:
