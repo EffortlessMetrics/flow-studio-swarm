@@ -335,6 +335,10 @@
       background: #fff;
       cursor: pointer;
     }
+    .run-selector:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 1px;
+    }
     .flow-item {
       padding: 6px 8px;
       border-radius: 4px;
@@ -449,6 +453,11 @@
       background: #f9fafb;
       cursor: pointer;
       transition: background 0.15s;
+    }
+    .mode-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+      z-index: 1;
     }
     .mode-toggle button:hover {
       background: #e5e7eb;
@@ -584,6 +593,10 @@
       display: flex;
       align-items: center;
       gap: 4px;
+    }
+    .tour-dropdown-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
     .tour-dropdown-btn:hover {
       background: #e5e7eb;
@@ -1017,6 +1030,11 @@
       transition: background 0.15s;
       font-size: 11px;
     }
+    .view-toggle button:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: -2px;
+      z-index: 1;
+    }
     .view-toggle button:hover {
       background: #e5e7eb;
     }
@@ -1249,6 +1267,10 @@
       cursor: pointer;
       margin-left: 6px;
       transition: all 0.15s;
+    }
+    .copy-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
     .copy-btn:hover {
       background: #e5e7eb;
@@ -1503,6 +1525,10 @@
       padding: 0;
       flex-shrink: 0;
     }
+    .selftest-command-copy-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
     .selftest-command-copy-btn:hover {
       color: #1e40af;
     }
@@ -1516,6 +1542,10 @@
       padding: 0;
       line-height: 1;
       margin-top: -8px;
+    }
+    .selftest-modal-close:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
     .selftest-modal-close:hover {
       color: #111827;
@@ -1913,6 +1943,11 @@
       transition: all 0.15s ease;
     }
 
+    .run-history-filter .filter-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
+
     .run-history-filter .filter-btn:hover {
       border-color: var(--fs-color-accent);
     }
@@ -2214,6 +2249,11 @@
       cursor: pointer;
       transition: all var(--fs-transition-fast, 0.15s ease);
       color: var(--fs-color-text-muted, #6b7280);
+    }
+
+    .teaching-mode-toggle:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
 
     .teaching-mode-toggle:hover {
