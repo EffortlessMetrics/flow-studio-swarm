@@ -42,6 +42,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -1119,9 +1120,16 @@ def load_routing_proposals(
         flow_dirs = [run_base / flow_key]
     else:
         # Scan all flow directories
-        flow_dirs = [
-            d for d in run_base.iterdir() if d.is_dir() and (d / "routing" / "proposals").exists()
-        ]
+        flow_dirs = []
+        try:
+            with os.scandir(run_base) as entries:
+                for entry in entries:
+                    if entry.is_dir():
+                        d = run_base / entry.name
+                        if (d / "routing" / "proposals").exists():
+                            flow_dirs.append(d)
+        except OSError:
+            pass
 
     for flow_dir in flow_dirs:
         proposals_dir = flow_dir / "routing" / "proposals"

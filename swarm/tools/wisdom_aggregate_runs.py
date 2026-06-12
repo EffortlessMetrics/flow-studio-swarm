@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,33 +40,41 @@ def discover_wisdom_summaries() -> List[Dict[str, Any]]:
 
     # Check examples
     if EXAMPLES_DIR.exists():
-        for run_dir in EXAMPLES_DIR.iterdir():
-            if run_dir.is_dir() and not run_dir.name.startswith("."):
-                summary_path = run_dir / "wisdom" / "wisdom_summary.json"
-                if summary_path.exists():
-                    try:
-                        with open(summary_path, "r", encoding="utf-8") as f:
-                            data = json.load(f)
-                            data["_source"] = "example"
-                            data["_path"] = str(summary_path)
-                            summaries.append(data)
-                    except (json.JSONDecodeError, OSError) as e:
-                        logger.warning(f"Failed to read {summary_path}: {e}")
+        try:
+            with os.scandir(EXAMPLES_DIR) as entries:
+                for entry in entries:
+                    if entry.is_dir() and not entry.name.startswith("."):
+                        summary_path = EXAMPLES_DIR / entry.name / "wisdom" / "wisdom_summary.json"
+                        if summary_path.exists():
+                            try:
+                                with open(summary_path, "r", encoding="utf-8") as f:
+                                    data = json.load(f)
+                                    data["_source"] = "example"
+                                    data["_path"] = str(summary_path)
+                                    summaries.append(data)
+                            except (json.JSONDecodeError, OSError) as e:
+                                logger.warning(f"Failed to read {summary_path}: {e}")
+        except OSError:
+            pass
 
     # Check active runs
     if RUNS_DIR.exists():
-        for run_dir in RUNS_DIR.iterdir():
-            if run_dir.is_dir() and not run_dir.name.startswith("."):
-                summary_path = run_dir / "wisdom" / "wisdom_summary.json"
-                if summary_path.exists():
-                    try:
-                        with open(summary_path, "r", encoding="utf-8") as f:
-                            data = json.load(f)
-                            data["_source"] = "active"
-                            data["_path"] = str(summary_path)
-                            summaries.append(data)
-                    except (json.JSONDecodeError, OSError) as e:
-                        logger.warning(f"Failed to read {summary_path}: {e}")
+        try:
+            with os.scandir(RUNS_DIR) as entries:
+                for entry in entries:
+                    if entry.is_dir() and not entry.name.startswith("."):
+                        summary_path = RUNS_DIR / entry.name / "wisdom" / "wisdom_summary.json"
+                        if summary_path.exists():
+                            try:
+                                with open(summary_path, "r", encoding="utf-8") as f:
+                                    data = json.load(f)
+                                    data["_source"] = "active"
+                                    data["_path"] = str(summary_path)
+                                    summaries.append(data)
+                            except (json.JSONDecodeError, OSError) as e:
+                                logger.warning(f"Failed to read {summary_path}: {e}")
+        except OSError:
+            pass
 
     return summaries
 

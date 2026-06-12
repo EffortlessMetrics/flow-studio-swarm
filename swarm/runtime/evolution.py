@@ -33,6 +33,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -962,10 +963,11 @@ def list_pending_patches(
     """
     results: List[Tuple[str, List[EvolutionPatch]]] = []
 
-    if not runs_root.exists():
+    try:
+        with os.scandir(runs_root) as entries:
+            run_dirs = sorted((runs_root / e.name for e in entries if e.is_dir()), reverse=True)[:limit]
+    except OSError:
         return results
-
-    run_dirs = sorted(runs_root.iterdir(), reverse=True)[:limit]
 
     for run_dir in run_dirs:
         if not run_dir.is_dir():
