@@ -503,27 +503,41 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # PERFORMANCE OPTIMIZATION:
+        # Use os.scandir instead of Path.iterdir() to avoid the overhead of creating Path objects
+        # and to defer expensive file existence checks (os.path.exists) until after we've
+        # collected and sorted the candidates. By leveraging the cached st_mtime or names
+        # from DirEntry, we only check existence for the top `limit` entries.
+        try:
+            candidates = []
+            with os.scandir(self.runs_root) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        candidates.append((entry.name, entry.path))
 
-            state_file = run_dir / "run_state.json"
-            if state_file.exists():
-                try:
-                    state = json.loads(state_file.read_text(encoding="utf-8"))
-                    runs.append(
-                        {
-                            "run_id": state.get("run_id", run_dir.name),
-                            "flow_key": state.get("flow_key"),
-                            "status": state.get("status"),
-                            "timestamp": state.get("timestamp"),
-                        }
-                    )
-                except Exception as e:
-                    logger.warning("Failed to load run state %s: %s", run_dir, e)
+            candidates.sort(key=lambda x: x[0], reverse=True)
 
-            if len(runs) >= limit:
-                break
+            for run_name, run_path in candidates:
+                state_file = os.path.join(run_path, "run_state.json")
+                if os.path.exists(state_file):
+                    try:
+                        with open(state_file, "r", encoding="utf-8") as f:
+                            state = json.load(f)
+                        runs.append(
+                            {
+                                "run_id": state.get("run_id", run_name),
+                                "flow_key": state.get("flow_key"),
+                                "status": state.get("status"),
+                                "timestamp": state.get("timestamp"),
+                            }
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to load run state %s: %s", run_path, e)
+
+                if len(runs) >= limit:
+                    break
+        except OSError:
+            pass
 
         return runs
 
