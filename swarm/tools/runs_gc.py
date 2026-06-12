@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import shutil
 import sys
 from dataclasses import dataclass
@@ -131,26 +132,35 @@ def discover_all_runs() -> List[RunInfo]:
 
     # Examples (always preserved)
     if EXAMPLES_DIR.exists():
-        for entry in EXAMPLES_DIR.iterdir():
-            if entry.is_dir() and not entry.name.startswith("."):
-                if entry.name not in seen:
-                    seen.add(entry.name)
-                    runs.append(get_run_info(entry.name, entry, "example"))
+        try:
+            with os.scandir(EXAMPLES_DIR) as entries:
+                for entry in entries:
+                    if entry.is_dir() and not entry.name.startswith("."):
+                        if entry.name not in seen:
+                            seen.add(entry.name)
+                            runs.append(get_run_info(entry.name, EXAMPLES_DIR / entry.name, "example"))
+        except OSError:
+            pass
 
     # Active runs with meta.json
     if RUNS_DIR.exists():
-        for entry in RUNS_DIR.iterdir():
-            if entry.is_dir() and not entry.name.startswith("."):
-                if entry.name in seen:
-                    continue
-                seen.add(entry.name)
+        try:
+            with os.scandir(RUNS_DIR) as entries:
+                for entry in entries:
+                    if entry.is_dir() and not entry.name.startswith("."):
+                        if entry.name in seen:
+                            continue
+                        seen.add(entry.name)
 
-                meta_path = entry / META_FILE
-                if meta_path.exists():
-                    runs.append(get_run_info(entry.name, entry, "active"))
-                else:
-                    # Legacy run (no meta.json)
-                    runs.append(get_run_info(entry.name, entry, "legacy"))
+                        entry_path = RUNS_DIR / entry.name
+                        meta_path = entry_path / META_FILE
+                        if meta_path.exists():
+                            runs.append(get_run_info(entry.name, entry_path, "active"))
+                        else:
+                            # Legacy run (no meta.json)
+                            runs.append(get_run_info(entry.name, entry_path, "legacy"))
+        except OSError:
+            pass
 
     return runs
 
