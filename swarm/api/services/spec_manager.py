@@ -503,11 +503,22 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # Optimize by listing names via os.scandir and deferring file existence checks
+        import os
 
+        try:
+            with os.scandir(self.runs_root) as it:
+                run_names = [e.name for e in it if e.is_dir() and not e.name.startswith(".")]
+        except OSError:
+            run_names = []
+
+        run_names.sort(reverse=True)
+
+        for run_name in run_names:
+            run_dir = self.runs_root / run_name
             state_file = run_dir / "run_state.json"
+
+            # Defer file existence check until after sorting
             if state_file.exists():
                 try:
                     state = json.loads(state_file.read_text(encoding="utf-8"))
