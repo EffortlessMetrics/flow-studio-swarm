@@ -503,27 +503,44 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # OPTIMIZATION: Use os.scandir instead of Path.iterdir to iterate through
+        # the runs root. os.scandir caches file attributes, allowing us to check
+        # .is_dir() without triggering additional expensive system stat() calls
+        # on every item. We collect the directory names, sort them in memory,
+        # and only construct heavy Path objects and do file existence checks
+        # on the top N items we actually need to process, skipping the rest.
+        import os
 
-            state_file = run_dir / "run_state.json"
+        candidates = []
+        try:
+            with os.scandir(self.runs_root) as entries:
+                for entry in entries:
+                    if entry.is_dir():
+                        candidates.append(entry.name)
+        except OSError as e:
+            logger.warning("Failed to scan runs root: %s", e)
+            return runs
+
+        candidates.sort(reverse=True)
+
+        for run_dir_name in candidates:
+            if len(runs) >= limit:
+                break
+
+            state_file = self.runs_root / run_dir_name / "run_state.json"
             if state_file.exists():
                 try:
                     state = json.loads(state_file.read_text(encoding="utf-8"))
                     runs.append(
                         {
-                            "run_id": state.get("run_id", run_dir.name),
+                            "run_id": state.get("run_id", run_dir_name),
                             "flow_key": state.get("flow_key"),
                             "status": state.get("status"),
                             "timestamp": state.get("timestamp"),
                         }
                     )
                 except Exception as e:
-                    logger.warning("Failed to load run state %s: %s", run_dir, e)
-
-            if len(runs) >= limit:
-                break
+                    logger.warning("Failed to load run state %s: %s", run_dir_name, e)
 
         return runs
 
