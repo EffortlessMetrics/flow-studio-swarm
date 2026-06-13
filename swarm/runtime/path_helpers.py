@@ -312,19 +312,24 @@ def list_transcripts(run_base: Path, engine: Optional[str] = None) -> List[Path]
         return []
 
     transcripts: List[Path] = []
-    for entry in llm_dir.iterdir():
-        if not entry.is_file():
-            continue
-        if not entry.name.endswith(TRANSCRIPT_EXT):
-            continue
+    import os
+    try:
+        with os.scandir(llm_dir) as it:
+            for entry in it:
+                if not entry.is_file():
+                    continue
+                if not entry.name.endswith(TRANSCRIPT_EXT):
+                    continue
 
-        # Optionally filter by engine
-        if engine is not None:
-            parsed = parse_transcript_filename(entry.name)
-            if parsed is None or parsed[2] != engine:
-                continue
+                # Optionally filter by engine
+                if engine is not None:
+                    parsed = parse_transcript_filename(entry.name)
+                    if parsed is None or parsed[2] != engine:
+                        continue
 
-        transcripts.append(entry)
+                transcripts.append(Path(entry.path))
+    except OSError:
+        pass
 
     return sorted(transcripts, key=lambda p: p.name)
 
@@ -348,12 +353,17 @@ def list_receipts(run_base: Path) -> List[Path]:
         return []
 
     receipts: List[Path] = []
-    for entry in receipts_dir.iterdir():
-        if not entry.is_file():
-            continue
-        if not entry.name.endswith(RECEIPT_EXT):
-            continue
+    import os
+    try:
+        with os.scandir(receipts_dir) as it:
+            for entry in it:
+                if not entry.is_file():
+                    continue
+                if not entry.name.endswith(RECEIPT_EXT):
+                    continue
 
-        receipts.append(entry)
+                receipts.append(Path(entry.path))
+    except OSError:
+        pass
 
     return sorted(receipts, key=lambda p: p.name)

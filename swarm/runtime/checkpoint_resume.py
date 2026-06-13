@@ -288,11 +288,16 @@ class CheckpointManager:
         # Check for partial transcript
         llm_dir = flow_base / LLM_DIR
         if llm_dir.exists():
-            for entry in llm_dir.iterdir():
-                if entry.is_file() and entry.name.startswith(f"{step_id}-"):
-                    partial_transcript = entry
-                    artifacts_found.append(entry)
-                    break
+            import os
+            try:
+                with os.scandir(llm_dir) as it:
+                    for entry in it:
+                        if entry.is_file() and entry.name.startswith(f"{step_id}-"):
+                            partial_transcript = Path(entry.path)
+                            artifacts_found.append(Path(entry.path))
+                            break
+            except OSError:
+                pass
 
         # Check for handoff envelope (even draft)
         handoff_path = handoff_envelope_path(flow_base, step_id)
@@ -761,21 +766,36 @@ def capture_interrupt_state(run_base: Path, flow_key: str, step_id: str) -> Inte
     # Check what artifacts exist
     receipts_dir = flow_base / RECEIPTS_DIR
     if receipts_dir.exists():
-        for entry in receipts_dir.iterdir():
-            if entry.is_file() and entry.name.endswith(".json"):
-                artifacts_flushed.append(str(entry))
+        import os
+        try:
+            with os.scandir(receipts_dir) as it:
+                for entry in it:
+                    if entry.is_file() and entry.name.endswith(".json"):
+                        artifacts_flushed.append(entry.path)
+        except OSError:
+            pass
 
     llm_dir = flow_base / LLM_DIR
     if llm_dir.exists():
-        for entry in llm_dir.iterdir():
-            if entry.is_file():
-                artifacts_flushed.append(str(entry))
+        import os
+        try:
+            with os.scandir(llm_dir) as it:
+                for entry in it:
+                    if entry.is_file():
+                        artifacts_flushed.append(entry.path)
+        except OSError:
+            pass
 
     handoff_dir = flow_base / HANDOFF_DIR
     if handoff_dir.exists():
-        for entry in handoff_dir.iterdir():
-            if entry.is_file():
-                artifacts_flushed.append(str(entry))
+        import os
+        try:
+            with os.scandir(handoff_dir) as it:
+                for entry in it:
+                    if entry.is_file():
+                        artifacts_flushed.append(entry.path)
+        except OSError:
+            pass
 
     # Determine if clean resume is possible
     can_resume = len(artifacts_flushed) > 0

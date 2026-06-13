@@ -1245,14 +1245,19 @@ def list_envelopes(
         return {}
 
     envelopes: Dict[str, HandoffEnvelope] = {}
-    for entry in handoff_dir.iterdir():
-        if not entry.is_file() or not entry.suffix == ".json":
-            continue
+    import os
+    try:
+        with os.scandir(handoff_dir) as it:
+            for entry in it:
+                if not entry.is_file() or not entry.name.endswith(".json"):
+                    continue
 
-        step_id = entry.stem
-        envelope = read_envelope(run_id, flow_key, step_id, runs_dir)
-        if envelope:
-            envelopes[step_id] = envelope
+                step_id = entry.name[:-5]  # remove .json
+                envelope = read_envelope(run_id, flow_key, step_id, runs_dir)
+                if envelope:
+                    envelopes[step_id] = envelope
+    except OSError:
+        pass
 
     return envelopes
 
