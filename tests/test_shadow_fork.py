@@ -79,8 +79,14 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", ""),  # Check preferred base (base_branch)
+                (False, "", ""),  # Check origin/preferred
+                (False, "", ""),  # Check main
+                (False, "", ""),  # Check origin/main
+                (False, "", ""),  # Check master
+                (False, "", ""),  # Check origin/master
+                (True, "", ""),  # Check uncommitted changes
+                (False, "", "fatal: does not exist"),  # Create shadow branch fails
             ]
 
             with pytest.raises(RuntimeError, match="does not exist"):
@@ -93,6 +99,7 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # Verify hooks exist
                 (True, " M file.txt", ""),  # Uncommitted changes exist
                 (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
@@ -425,6 +432,7 @@ class TestShadowForkIntegration:
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check uncommitted changes
                 (True, "", ""),  # Verify base branch
+                (True, "", ""),  # Verify hooks exist
                 (True, "", ""),  # Create shadow branch
             ]
             branch = fork.create()
@@ -470,6 +478,7 @@ class TestShadowForkIntegration:
                 (True, "feature-x", ""),  # Get current branch
                 (True, "", ""),  # Check uncommitted changes
                 (True, "", ""),  # Verify base branch
+                (True, "", ""),  # Verify hooks exist
                 (True, "", ""),  # Create shadow branch
             ]
             fork.create()
