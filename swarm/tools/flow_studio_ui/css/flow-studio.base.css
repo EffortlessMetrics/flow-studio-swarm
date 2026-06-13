@@ -450,6 +450,7 @@
       cursor: pointer;
       transition: background 0.15s;
     }
+    .mode-toggle button:focus-visible,
     .mode-toggle button:hover {
       background: #e5e7eb;
     }
@@ -585,6 +586,7 @@
       align-items: center;
       gap: 4px;
     }
+    .tour-dropdown-btn:focus-visible,
     .tour-dropdown-btn:hover {
       background: #e5e7eb;
     }
@@ -1017,6 +1019,7 @@
       transition: background 0.15s;
       font-size: 11px;
     }
+    .view-toggle button:focus-visible,
     .view-toggle button:hover {
       background: #e5e7eb;
     }
@@ -1167,7 +1170,7 @@
       padding: 2px 0;
       user-select: none;
     }
-    .legend-header:focus {
+    .legend-header:focus-visible {
       outline: 2px solid var(--fs-color-accent, #3b82f6);
       outline-offset: 2px;
     }
@@ -1250,6 +1253,7 @@
       margin-left: 6px;
       transition: all 0.15s;
     }
+    .copy-btn:focus-visible,
     .copy-btn:hover {
       background: #e5e7eb;
       border-color: #9ca3af;
@@ -1517,6 +1521,7 @@
       line-height: 1;
       margin-top: -8px;
     }
+    .selftest-modal-close:focus-visible,
     .selftest-modal-close:hover {
       color: #111827;
     }
@@ -1892,6 +1897,11 @@
       transition: transform 0.2s ease;
     }
 
+    .run-history-header .collapse-toggle:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
+    }
+
     .run-history-header .collapse-toggle[aria-expanded="false"] {
       transform: rotate(-90deg);
     }
@@ -1913,6 +1923,7 @@
       transition: all 0.15s ease;
     }
 
+    .run-history-filter .filter-btn:focus-visible,
     .run-history-filter .filter-btn:hover {
       border-color: var(--fs-color-accent);
     }
@@ -2214,6 +2225,11 @@
       cursor: pointer;
       transition: all var(--fs-transition-fast, 0.15s ease);
       color: var(--fs-color-text-muted, #6b7280);
+    }
+
+    .teaching-mode-toggle:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
 
     .teaching-mode-toggle:hover {
@@ -2648,7 +2664,7 @@
       cursor: not-allowed;
     }
 
-    .run-control-btn:focus {
+    .run-control-btn:focus-visible {
       outline: none;
       box-shadow: 0 0 0 2px var(--fs-color-accent-bg, #dbeafe);
     }
