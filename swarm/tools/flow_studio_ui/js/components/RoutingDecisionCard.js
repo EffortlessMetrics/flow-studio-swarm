@@ -283,13 +283,14 @@ export class RoutingDecisionCard {
             return "";
         const expandedClass = this.isExpanded ? "routing-card__rejected--expanded" : "";
         const arrowIcon = this.isExpanded ? "\u25bc" : "\u25b6";
+        const isExpandedStr = this.isExpanded ? "true" : "false";
         const candidateCards = candidates
             .map((c) => this.buildCandidateCard(c, false))
             .join("");
         return `
       <div class="routing-card__section routing-card__rejected ${expandedClass}">
-        <button class="routing-card__rejected-toggle" data-action="toggle-rejected">
-          <span class="routing-card__rejected-arrow">${arrowIcon}</span>
+        <button class="routing-card__rejected-toggle" data-action="toggle-rejected" aria-expanded="${isExpandedStr}">
+          <span class="routing-card__rejected-arrow" aria-hidden="true">${arrowIcon}</span>
           <span>Other Candidates (${candidates.length})</span>
         </button>
         <div class="routing-card__rejected-content">
