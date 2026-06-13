@@ -6,6 +6,7 @@ This creates a seam for future extraction into a standalone package
 while keeping the current single-repo structure.
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -129,19 +130,27 @@ class FlowStudioConfig:
 
     def list_runs(self) -> list[Path]:
         """List all active runs."""
-        if not self.runs_dir.exists():
+        # Performance: Use os.scandir() instead of Path.iterdir() to avoid instantiating
+        # full Path objects and use cached .is_dir() stats for faster directory traversal.
+        try:
+            with os.scandir(self.runs_dir) as entries:
+                return sorted(
+                    Path(e.path) for e in entries if e.is_dir() and not e.name.startswith(".")
+                )
+        except OSError:
             return []
-        return sorted(
-            p for p in self.runs_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
-        )
 
     def list_examples(self) -> list[Path]:
         """List all example runs."""
-        if not self.examples_dir.exists():
+        # Performance: Use os.scandir() instead of Path.iterdir() to avoid instantiating
+        # full Path objects and use cached .is_dir() stats for faster directory traversal.
+        try:
+            with os.scandir(self.examples_dir) as entries:
+                return sorted(
+                    Path(e.path) for e in entries if e.is_dir() and not e.name.startswith(".")
+                )
+        except OSError:
             return []
-        return sorted(
-            p for p in self.examples_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
-        )
 
 
 # Default config instance (lazily constructed)
