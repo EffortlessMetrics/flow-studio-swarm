@@ -263,31 +263,43 @@ class RunInspector:
 
         # Active runs (gitignored)
         if self.runs_dir.exists():
-            for entry in self.runs_dir.iterdir():
-                if entry.is_dir() and not entry.name.startswith("."):
-                    run_data = {
-                        "run_id": entry.name,
-                        "run_type": "active",
-                        "path": str(entry),
-                    }
-                    # Load optional metadata
-                    metadata = self._load_run_metadata(entry)
-                    run_data.update(metadata)
-                    runs.append(run_data)
+            import os
+            try:
+                with os.scandir(self.runs_dir) as entries:
+                    for entry in entries:
+                        if entry.is_dir() and not entry.name.startswith("."):
+                            p = self.runs_dir / entry.name
+                            run_data = {
+                                "run_id": entry.name,
+                                "run_type": "active",
+                                "path": str(p),
+                            }
+                            # Load optional metadata
+                            metadata = self._load_run_metadata(p)
+                            run_data.update(metadata)
+                            runs.append(run_data)
+            except OSError:
+                pass
 
         # Example runs (committed)
         if self.examples_dir.exists():
-            for entry in self.examples_dir.iterdir():
-                if entry.is_dir() and not entry.name.startswith("."):
-                    run_data = {
-                        "run_id": entry.name,
-                        "run_type": "example",
-                        "path": str(entry),
-                    }
-                    # Load optional metadata
-                    metadata = self._load_run_metadata(entry)
-                    run_data.update(metadata)
-                    runs.append(run_data)
+            import os
+            try:
+                with os.scandir(self.examples_dir) as entries:
+                    for entry in entries:
+                        if entry.is_dir() and not entry.name.startswith("."):
+                            p = self.examples_dir / entry.name
+                            run_data = {
+                                "run_id": entry.name,
+                                "run_type": "example",
+                                "path": str(p),
+                            }
+                            # Load optional metadata
+                            metadata = self._load_run_metadata(p)
+                            run_data.update(metadata)
+                            runs.append(run_data)
+            except OSError:
+                pass
 
         # Sort: examples first, then active by name
         runs.sort(key=lambda r: (0 if r["run_type"] == "example" else 1, r["run_id"]))

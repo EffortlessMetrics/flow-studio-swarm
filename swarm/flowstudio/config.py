@@ -131,17 +131,31 @@ class FlowStudioConfig:
         """List all active runs."""
         if not self.runs_dir.exists():
             return []
-        return sorted(
-            p for p in self.runs_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
-        )
+        import os
+        runs = []
+        try:
+            with os.scandir(self.runs_dir) as entries:
+                for e in entries:
+                    if e.is_dir() and not e.name.startswith("."):
+                        runs.append(Path(e.path))
+        except OSError:
+            pass
+        return sorted(runs)
 
     def list_examples(self) -> list[Path]:
         """List all example runs."""
         if not self.examples_dir.exists():
             return []
-        return sorted(
-            p for p in self.examples_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
-        )
+        import os
+        examples = []
+        try:
+            with os.scandir(self.examples_dir) as entries:
+                for e in entries:
+                    if e.is_dir() and not e.name.startswith("."):
+                        examples.append(Path(e.path))
+        except OSError:
+            pass
+        return sorted(examples)
 
 
 # Default config instance (lazily constructed)

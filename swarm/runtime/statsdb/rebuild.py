@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -129,9 +130,14 @@ class StatsDBRebuildMixin:
                 logger.warning("Runs directory does not exist: %s", runs_dir)
                 return stats
 
-            run_ids = [
-                d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")
-            ]
+            run_ids = []
+            try:
+                with os.scandir(runs_dir) as entries:
+                    run_ids = [
+                        e.name for e in entries if e.is_dir() and not e.name.startswith(".")
+                    ]
+            except OSError:
+                pass
 
         logger.info("Rebuilding projections for %d runs", len(run_ids))
 
@@ -236,7 +242,12 @@ def rebuild_stats_db(
             logger.warning("Runs directory does not exist: %s", runs_dir)
             return stats
 
-        run_ids = [d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
+        run_ids = []
+        try:
+            with os.scandir(runs_dir) as entries:
+                run_ids = [e.name for e in entries if e.is_dir() and not e.name.startswith(".")]
+        except OSError:
+            pass
 
     logger.info("Rebuilding stats DB from %d runs", len(run_ids))
 
@@ -278,9 +289,15 @@ def rebuild_stats_db(
             # Set ingestion context to allow record_* calls (projection-only mode)
             _ingestion_context.active = True
             try:
-                for flow_dir in run_path.iterdir():
-                    if not flow_dir.is_dir() or flow_dir.name.startswith("."):
-                        continue
+                flow_entries = []
+                try:
+                    with os.scandir(run_path) as entries:
+                        flow_entries = [e for e in entries if e.is_dir() and not e.name.startswith(".")]
+                except OSError:
+                    pass
+
+                for entry in flow_entries:
+                    flow_dir = Path(entry.path)
 
                     handoff_dir = flow_dir / "handoff"
                     if not handoff_dir.exists():
