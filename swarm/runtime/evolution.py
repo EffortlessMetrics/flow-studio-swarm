@@ -33,6 +33,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -965,20 +966,22 @@ def list_pending_patches(
     if not runs_root.exists():
         return results
 
-    import os as _os
-    candidates = []
+    # Use os.scandir to avoid Path object instantiation overhead for large directories
     try:
-        with _os.scandir(runs_root) as it:
-            for entry in it:
-                if entry.is_dir():
-                    candidates.append(entry)
+        with os.scandir(runs_root) as entries:
+            # We must preserve original logic: get all entries, sort them, slice them,
+            # and then filter by is_dir(). Sorting by entry.name is equivalent to sorting Path objects.
+            candidates = sorted([e.name for e in entries], reverse=True)[:limit]
     except OSError:
-        pass
+        return results
 
-    candidates.sort(key=lambda x: x.name, reverse=True)
-    run_dirs = [Path(entry.path) for entry in candidates[:limit]]
+    # Only instantiate Path objects for the sliced subset
+    run_dirs = [runs_root / name for name in candidates]
 
     for run_dir in run_dirs:
+        if not run_dir.is_dir():
+            continue
+
         wisdom_dir = run_dir / "wisdom"
         if not wisdom_dir.exists():
             continue
