@@ -20,6 +20,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -503,10 +504,15 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # Use os.scandir to avoid Path object instantiation overhead for large directories
+        try:
+            with os.scandir(self.runs_root) as entries:
+                run_dirs = [self.runs_root / e.name for e in entries if e.is_dir()]
+        except OSError as e:
+            logger.warning("Failed to scan runs directory: %s", e)
+            return runs
 
+        for run_dir in sorted(run_dirs, reverse=True):
             state_file = run_dir / "run_state.json"
             if state_file.exists():
                 try:
