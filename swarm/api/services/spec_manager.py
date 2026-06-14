@@ -503,12 +503,26 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        import os as _os
+        # Use os.scandir for efficient directory traversal
+        candidates = []
+        try:
+            with _os.scandir(self.runs_root) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        candidates.append(entry)
+        except OSError:
+            pass
 
-            state_file = run_dir / "run_state.json"
-            if state_file.exists():
+        # Sort by run ID (name) descending to preserve original behavior
+        candidates.sort(key=lambda x: x.name, reverse=True)
+
+        for entry in candidates:
+            # Quick check for run_state.json
+            state_file_path = _os.path.join(entry.path, "run_state.json")
+            if _os.path.exists(state_file_path):
+                run_dir = Path(entry.path)
+                state_file = Path(state_file_path)
                 try:
                     state = json.loads(state_file.read_text(encoding="utf-8"))
                     runs.append(

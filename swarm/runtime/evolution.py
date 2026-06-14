@@ -965,12 +965,20 @@ def list_pending_patches(
     if not runs_root.exists():
         return results
 
-    run_dirs = sorted(runs_root.iterdir(), reverse=True)[:limit]
+    import os as _os
+    candidates = []
+    try:
+        with _os.scandir(runs_root) as it:
+            for entry in it:
+                if entry.is_dir():
+                    candidates.append(entry)
+    except OSError:
+        pass
+
+    candidates.sort(key=lambda x: x.name, reverse=True)
+    run_dirs = [Path(entry.path) for entry in candidates[:limit]]
 
     for run_dir in run_dirs:
-        if not run_dir.is_dir():
-            continue
-
         wisdom_dir = run_dir / "wisdom"
         if not wisdom_dir.exists():
             continue
