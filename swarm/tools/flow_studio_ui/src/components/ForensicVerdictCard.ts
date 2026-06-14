@@ -453,6 +453,7 @@ export class ForensicVerdictCard {
     const expandBtn = document.createElement("button");
     expandBtn.className = "forensic-verdict-card__expand-btn";
     expandBtn.setAttribute("aria-expanded", String(this.isExpanded));
+    expandBtn.setAttribute("aria-label", this.isExpanded ? "Collapse section" : "Expand section");
     expandBtn.innerHTML = this.isExpanded ? "\u25B2" : "\u25BC";
     expandBtn.title = this.isExpanded ? "Collapse" : "Expand";
     expandBtn.addEventListener("click", () => {

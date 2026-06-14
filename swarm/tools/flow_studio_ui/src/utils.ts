@@ -81,6 +81,7 @@ export function createCopyButton(text: string, label = "Copy"): HTMLButtonElemen
   btn.className = "copy-btn";
   btn.textContent = label;
   btn.title = "Copy to clipboard";
+  btn.setAttribute("aria-label", "Copy to clipboard");
   btn.addEventListener("click", () => {
     void copyToClipboard(text);
     btn.textContent = "Copied!";
