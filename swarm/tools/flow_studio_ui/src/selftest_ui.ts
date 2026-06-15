@@ -257,7 +257,7 @@ export function renderSelftestStepModal(step: SelftestStep): void {
       ${commands.map(cmd => `
         <div class="selftest-command">
           <span class="fs-text-xs" style="flex: 1;">${escapeHtml(cmd)}</span>
-          <button class="selftest-command-copy-btn" onclick="window.copyToClipboard && window.copyToClipboard('${escapeHtml(cmd).replace(/'/g, "\\'")}')" title="Copy">\ud83d\udccb</button>
+          <button class="selftest-command-copy-btn" onclick="window.copyToClipboard && window.copyToClipboard(\'${escapeHtml(cmd).replace(/\'/g, "\\\'")}\')" title="Copy" aria-label="Copy command">\ud83d\udccb</button>
         </div>
       `).join("")}
     </div>
