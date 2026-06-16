@@ -58,7 +58,7 @@
       </button>
       <div class="muted author-only" style="display: flex; align-items: center; gap: 8px;" data-uiid="flow_studio.header.reload">
         <span class="mono">make dev-check</span>
-        <button id="copy-dev-check-btn" class="copy-btn" title="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
+        <button id="copy-dev-check-btn" class="copy-btn" title="Copy command to clipboard" aria-label="Copy make dev-check command" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
         <button id="reload-btn" class="fs-button-small" data-uiid="flow_studio.header.reload.btn">Reload</button>
       </div>
       <button id="help-btn" class="fs-icon-button" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
@@ -214,11 +214,11 @@
         </div>
         <div class="command-line">
            <span class="command-text">uv run swarm/tools/gen_flows.py</span>
-           <button class="copy-btn" onclick="navigator.clipboard.writeText('uv run swarm/tools/gen_flows.py').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard">Copy</button>
+           <button class="copy-btn" onclick="navigator.clipboard.writeText('uv run swarm/tools/gen_flows.py').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard" aria-label="Copy uv run swarm/tools/gen_flows.py command">Copy</button>
         </div>
         <div class="command-line">
            <span class="command-text">make validate-swarm</span>
-           <button class="copy-btn" onclick="navigator.clipboard.writeText('make validate-swarm').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard">Copy</button>
+           <button class="copy-btn" onclick="navigator.clipboard.writeText('make validate-swarm').then(() => { this.textContent = 'Copied!'; this.classList.add('copied'); setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500); })" title="Copy to clipboard" aria-label="Copy make validate-swarm command">Copy</button>
         </div>
       </div>
       <p style="margin-top: 12px; font-size: 12px; color: #6b7280;">
@@ -1890,6 +1890,10 @@
     .copy-btn:hover {
       background: #e5e7eb;
       border-color: #9ca3af;
+    }
+    .copy-btn:focus-visible {
+      outline: 2px solid var(--fs-color-accent, #3b82f6);
+      outline-offset: 2px;
     }
     .copy-btn.copied {
       background: #d1fae5;
