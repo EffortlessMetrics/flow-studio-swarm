@@ -503,27 +503,31 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        import os
+        with os.scandir(self.runs_root) as entries:
+            # Sort all candidate names (fast, as it only uses metadata)
+            sorted_entries = sorted(entries, key=lambda e: e.name, reverse=True)
+            for entry in sorted_entries:
+                if not entry.is_dir():
+                    continue
 
-            state_file = run_dir / "run_state.json"
-            if state_file.exists():
-                try:
-                    state = json.loads(state_file.read_text(encoding="utf-8"))
-                    runs.append(
-                        {
-                            "run_id": state.get("run_id", run_dir.name),
-                            "flow_key": state.get("flow_key"),
-                            "status": state.get("status"),
-                            "timestamp": state.get("timestamp"),
-                        }
-                    )
-                except Exception as e:
-                    logger.warning("Failed to load run state %s: %s", run_dir, e)
+                state_file = Path(entry.path) / "run_state.json"
+                if state_file.exists():
+                    try:
+                        state = json.loads(state_file.read_text(encoding="utf-8"))
+                        runs.append(
+                            {
+                                "run_id": state.get("run_id", entry.name),
+                                "flow_key": state.get("flow_key"),
+                                "status": state.get("status"),
+                                "timestamp": state.get("timestamp"),
+                            }
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to load run state %s: %s", entry.path, e)
 
-            if len(runs) >= limit:
-                break
+                if len(runs) >= limit:
+                    break
 
         return runs
 
