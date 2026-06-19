@@ -503,9 +503,14 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # PERF: Use os.scandir to avoid instantiating Path objects for every entry before sorting
+        import os
+        with os.scandir(self.runs_root) as entries:
+            # Sort raw names directly and instantiate Path only for directories
+            run_names = sorted((e.name for e in entries if e.is_dir()), reverse=True)
+
+        for run_name in run_names:
+            run_dir = self.runs_root / run_name
 
             state_file = run_dir / "run_state.json"
             if state_file.exists():
