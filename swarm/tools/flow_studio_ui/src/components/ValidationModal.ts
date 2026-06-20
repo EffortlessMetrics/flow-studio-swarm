@@ -404,7 +404,7 @@ export class ValidationModal {
           <h2 class="validation-modal-title" id="validation-modal-title">
             ${hasCritical ? "Cannot Save - Critical Errors" : "Validation Warnings"}
           </h2>
-          <button class="validation-modal-close" data-action="close" aria-label="Close">\u00d7</button>
+          <button class="validation-modal-close" data-action="close" aria-label="Close"><span aria-hidden="true">\u00d7</span></button>
         </div>
 
         <div class="validation-modal-body">
