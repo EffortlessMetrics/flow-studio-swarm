@@ -29,21 +29,21 @@
     </div>
     <nav style="display: flex; align-items: center; gap: 16px;" role="navigation" aria-label="Flow Studio controls" data-uiid="flow_studio.header.controls">
       <div class="tour-dropdown" id="tour-dropdown" data-uiid="flow_studio.header.tour">
-        <button id="tour-btn" class="tour-dropdown-btn" title="Start a guided tour" aria-haspopup="true" aria-expanded="false" data-uiid="flow_studio.header.tour.trigger">
+        <button id="tour-btn" class="tour-dropdown-btn" title="Start a guided tour" aria-label="Start a guided tour" aria-haspopup="true" aria-expanded="false" data-uiid="flow_studio.header.tour.trigger">
           <span>Tour</span>
           <span style="font-size: 10px;" aria-hidden="true">▼</span>
         </button>
         <div id="tour-menu" class="tour-dropdown-menu" role="menu" aria-label="Available tours" data-uiid="flow_studio.header.tour.menu"></div>
       </div>
       <div class="mode-toggle" role="group" aria-label="View mode" data-uiid="flow_studio.header.mode">
-        <button id="mode-author" class="active" title="Show all paths, CLI commands, and technical details" aria-pressed="true" data-uiid="flow_studio.header.mode.author">Author</button>
-        <button id="mode-operator" title="Simplified view focused on run status and decisions" aria-pressed="false" data-uiid="flow_studio.header.mode.operator">Operator</button>
+        <button id="mode-author" class="active" title="Show all paths, CLI commands, and technical details" aria-label="Show all paths, CLI commands, and technical details" aria-pressed="true" data-uiid="flow_studio.header.mode.author">Author</button>
+        <button id="mode-operator" title="Simplified view focused on run status and decisions" aria-label="Simplified view focused on run status and decisions" aria-pressed="false" data-uiid="flow_studio.header.mode.operator">Operator</button>
       </div>
-      <button id="profile-badge" class="muted fs-status-button fs-profile-badge" title="Current swarm profile" data-uiid="flow_studio.header.profile">
+      <button id="profile-badge" class="muted fs-status-button fs-profile-badge" title="Current swarm profile" aria-label="Current swarm profile" data-uiid="flow_studio.header.profile">
         <span id="profile-icon" aria-hidden="true">&#128230;</span>
         <span id="profile-text" aria-live="polite">Profile: Loading...</span>
       </button>
-      <button id="governance-badge" class="muted fs-status-button" title="Click to view governance status" data-uiid="flow_studio.header.governance">
+      <button id="governance-badge" class="muted fs-status-button" title="Click to view governance status" aria-label="Click to view governance status" data-uiid="flow_studio.header.governance">
         <span id="governance-icon" aria-hidden="true">⏳</span>
         <span id="governance-text" aria-live="polite">Checking...</span>
         <span id="governance-issues-count" class="governance-issues-badge" style="display: none;" aria-live="polite">0</span>
@@ -52,13 +52,13 @@
         <input type="checkbox" id="governance-overlay-checkbox" />
         <span>Show Issues</span>
       </label>
-      <button id="teaching-mode-toggle" class="teaching-mode-toggle" title="Enable Teaching Mode for learning-focused features" aria-pressed="false" data-uiid="flow_studio.header.teaching_mode.toggle">
+      <button id="teaching-mode-toggle" class="teaching-mode-toggle" title="Enable Teaching Mode for learning-focused features" aria-label="Enable Teaching Mode for learning-focused features" aria-pressed="false" data-uiid="flow_studio.header.teaching_mode.toggle">
         <span class="teaching-mode-icon" aria-hidden="true">&#127891;</span>
         <span class="teaching-mode-label">Teach</span>
       </button>
       <div class="muted author-only" style="display: flex; align-items: center; gap: 8px;" data-uiid="flow_studio.header.reload">
         <span class="mono">make dev-check</span>
-        <button id="copy-dev-check-btn" class="copy-btn" title="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
+        <button id="copy-dev-check-btn" class="copy-btn" title="Copy command to clipboard" aria-label="Copy command to clipboard" data-uiid="flow_studio.header.reload.copy_btn">Copy</button>
         <button id="reload-btn" class="fs-button-small" data-uiid="flow_studio.header.reload.btn">Reload</button>
       </div>
       <button id="help-btn" class="fs-icon-button" title="Flow Studio help" aria-label="Show keyboard shortcuts" data-uiid="flow_studio.header.help">?</button>
@@ -112,8 +112,8 @@
     <div style="margin-bottom: 12px;" data-uiid="flow_studio.sidebar.view_toggle">
       <label class="muted" style="font-size: 10px; display: block; margin-bottom: 4px;">VIEW</label>
       <div class="view-toggle" role="group" aria-label="Graph view mode">
-        <button id="view-agents" class="active" title="Show steps and agents" aria-pressed="true" data-uiid="flow_studio.sidebar.view_toggle.agents">Steps/Agents</button>
-        <button id="view-artifacts" title="Show steps and artifacts" aria-pressed="false" data-uiid="flow_studio.sidebar.view_toggle.artifacts">Artifacts</button>
+        <button id="view-agents" class="active" title="Show steps and agents" aria-label="Show steps and agents" aria-pressed="true" data-uiid="flow_studio.sidebar.view_toggle.agents">Steps/Agents</button>
+        <button id="view-artifacts" title="Show steps and artifacts" aria-label="Show steps and artifacts" aria-pressed="false" data-uiid="flow_studio.sidebar.view_toggle.artifacts">Artifacts</button>
       </div>
     </div>
     <div style="margin-bottom: 12px;" data-uiid="flow_studio.sidebar.backend_selector">
@@ -391,13 +391,13 @@
     <div class="settings-presets">
       <h4>Quick Presets</h4>
       <div class="preset-buttons">
-        <button class="btn-preset" data-preset="lean" title="Minimal history for fast execution">
+        <button class="btn-preset" data-preset="lean" title="Minimal history for fast execution" aria-label="Minimal history for fast execution">
           Lean (25k tokens)
         </button>
-        <button class="btn-preset" data-preset="balanced" title="Default balanced settings">
+        <button class="btn-preset" data-preset="balanced" title="Default balanced settings" aria-label="Default balanced settings">
           Balanced (50k tokens)
         </button>
-        <button class="btn-preset" data-preset="heavy" title="Maximum context for complex flows">
+        <button class="btn-preset" data-preset="heavy" title="Maximum context for complex flows" aria-label="Maximum context for complex flows">
           Heavy (100k tokens)
         </button>
       </div>
@@ -9305,7 +9305,7 @@ export function renderSelftestStepModal(step) {
       ${commands.map(cmd => `
         <div class="selftest-command">
           <span class="fs-text-xs" style="flex: 1;">${escapeHtml(cmd)}</span>
-          <button class="selftest-command-copy-btn" onclick="window.copyToClipboard && window.copyToClipboard('${escapeHtml(cmd).replace(/'/g, "\\'")}')" title="Copy">\ud83d\udccb</button>
+          <button class="selftest-command-copy-btn" onclick="window.copyToClipboard && window.copyToClipboard('${escapeHtml(cmd).replace(/'/g, "\\'")}')" title="Copy" aria-label="Copy">\ud83d\udccb</button>
         </div>
       `).join("")}
     </div>
@@ -12812,7 +12812,7 @@ export function renderBoundaryReviewPanel(data) {
       <div class="panel-header">
         <h3>Boundary Review</h3>
         ${data.current_flow ? `<span class="current-flow">Flow: ${data.current_flow}</span>` : ""}
-        <button class="toggle-expand" title="Toggle expand">
+        <button class="toggle-expand" title="Toggle expand" aria-label="Toggle expand">
           ${isExpanded ? "▼" : "▶"}
         </button>
       </div>
