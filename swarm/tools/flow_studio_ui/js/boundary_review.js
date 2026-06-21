@@ -236,8 +236,8 @@ export function renderBoundaryReviewPanel(data) {
       <div class="panel-header">
         <h3>Boundary Review</h3>
         ${data.current_flow ? `<span class="current-flow">Flow: ${data.current_flow}</span>` : ""}
-        <button class="toggle-expand" title="Toggle expand">
-          ${isExpanded ? "▼" : "▶"}
+        <button class="toggle-expand" aria-label="Toggle expand" title="Toggle expand">
+          <span aria-hidden="true">${isExpanded ? "▼" : "▶"}</span>
         </button>
       </div>
 
