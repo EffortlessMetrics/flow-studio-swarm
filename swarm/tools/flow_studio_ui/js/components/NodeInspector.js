@@ -315,7 +315,7 @@ export class NodeInspector {
             tagsContainer.innerHTML = values.map(v => `
         <span class="node-inspector__tag">
           ${escapeHtml(v)}
-          <button type="button" class="node-inspector__tag-remove" data-value="${escapeHtml(v)}" aria-label="Remove agent" title="Remove agent">\u00D7</button>
+          <button type="button" class="node-inspector__tag-remove" data-value="${escapeHtml(v)}" aria-label="Remove agent" title="Remove agent"><span aria-hidden="true">\u00D7</span></button>
         </span>
       `).join("");
             // Add remove handlers
@@ -366,7 +366,7 @@ export class NodeInspector {
         <div class="node-inspector__list-items"></div>
         <div class="node-inspector__list-add">
           <input type="text" class="node-inspector__list-add-input" placeholder="${escapeHtml(placeholder)}" />
-          <button type="button" class="node-inspector__list-add-btn" aria-label="Add item" title="Add item">+</button>
+          <button type="button" class="node-inspector__list-add-btn" aria-label="Add item" title="Add item"><span aria-hidden="true">+</span></button>
         </div>
       </div>
     `;
@@ -378,7 +378,7 @@ export class NodeInspector {
             itemsContainer.innerHTML = values.map((v, i) => `
         <div class="node-inspector__list-item">
           <span class="node-inspector__list-item-text mono">${escapeHtml(v)}</span>
-          <button type="button" class="node-inspector__list-item-remove" data-index="${i}" aria-label="Remove item" title="Remove item">\u00D7</button>
+          <button type="button" class="node-inspector__list-item-remove" data-index="${i}" aria-label="Remove item" title="Remove item"><span aria-hidden="true">\u00D7</span></button>
         </div>
       `).join("");
             // Add remove handlers

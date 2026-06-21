@@ -171,7 +171,7 @@ export class BoundaryReview {
               </div>
             </div>
           </div>
-          <button class="boundary-review__close" data-action="close" aria-label="Close">\u00d7</button>
+          <button class="boundary-review__close" data-action="close" aria-label="Close"><span aria-hidden="true">\u00d7</span></button>
         </div>
 
         <div class="boundary-review__body">

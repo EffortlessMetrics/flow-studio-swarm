@@ -83,7 +83,7 @@ function getOrCreateModal(): HTMLElement {
 
   modal.innerHTML = `
     <div class="selftest-step-content" data-uiid="flow_studio.modal.run_detail.body">
-      <button class="selftest-modal-close" data-uiid="flow_studio.modal.run_detail.close" aria-label="Close modal">&times;</button>
+      <button class="selftest-modal-close" data-uiid="flow_studio.modal.run_detail.close" aria-label="Close modal"><span aria-hidden="true">&times;</span></button>
       <div id="run-detail-modal-content">
         <div class="muted">Loading...</div>
       </div>
