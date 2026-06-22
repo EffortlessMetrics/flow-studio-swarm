@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -236,7 +237,8 @@ def rebuild_stats_db(
             logger.warning("Runs directory does not exist: %s", runs_dir)
             return stats
 
-        run_ids = [d.name for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
+        with os.scandir(runs_dir) as it:
+            run_ids = [d.name for d in it if d.is_dir() and not d.name.startswith(".")]
 
     logger.info("Rebuilding stats DB from %d runs", len(run_ids))
 
@@ -278,10 +280,12 @@ def rebuild_stats_db(
             # Set ingestion context to allow record_* calls (projection-only mode)
             _ingestion_context.active = True
             try:
-                for flow_dir in run_path.iterdir():
-                    if not flow_dir.is_dir() or flow_dir.name.startswith("."):
-                        continue
-
+                with os.scandir(run_path) as it:
+                    flow_dirs = [
+                        entry for entry in it if entry.is_dir() and not entry.name.startswith(".")
+                    ]
+                for flow_entry in flow_dirs:
+                    flow_dir = Path(flow_entry.path)
                     handoff_dir = flow_dir / "handoff"
                     if not handoff_dir.exists():
                         continue
