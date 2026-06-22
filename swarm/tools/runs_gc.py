@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import shutil
 import sys
 from dataclasses import dataclass
@@ -131,26 +132,28 @@ def discover_all_runs() -> List[RunInfo]:
 
     # Examples (always preserved)
     if EXAMPLES_DIR.exists():
-        for entry in EXAMPLES_DIR.iterdir():
-            if entry.is_dir() and not entry.name.startswith("."):
-                if entry.name not in seen:
-                    seen.add(entry.name)
-                    runs.append(get_run_info(entry.name, entry, "example"))
+        with os.scandir(EXAMPLES_DIR) as it:
+            for entry in it:
+                if entry.is_dir() and not entry.name.startswith("."):
+                    if entry.name not in seen:
+                        seen.add(entry.name)
+                        runs.append(get_run_info(entry.name, Path(entry.path), "example"))
 
     # Active runs with meta.json
     if RUNS_DIR.exists():
-        for entry in RUNS_DIR.iterdir():
-            if entry.is_dir() and not entry.name.startswith("."):
-                if entry.name in seen:
-                    continue
-                seen.add(entry.name)
+        with os.scandir(RUNS_DIR) as it:
+            for entry in it:
+                if entry.is_dir() and not entry.name.startswith("."):
+                    if entry.name in seen:
+                        continue
+                    seen.add(entry.name)
 
-                meta_path = entry / META_FILE
-                if meta_path.exists():
-                    runs.append(get_run_info(entry.name, entry, "active"))
-                else:
-                    # Legacy run (no meta.json)
-                    runs.append(get_run_info(entry.name, entry, "legacy"))
+                    meta_path = Path(entry.path) / META_FILE
+                    if meta_path.exists():
+                        runs.append(get_run_info(entry.name, Path(entry.path), "active"))
+                    else:
+                        # Legacy run (no meta.json)
+                        runs.append(get_run_info(entry.name, Path(entry.path), "legacy"))
 
     return runs
 
