@@ -20,6 +20,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -503,10 +504,16 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # ⚡ Bolt Optimization: Use os.scandir for faster directory iteration
+        # pathlib.Path.iterdir() followed by sorting instantiates Path objects
+        # for every entry, which is slow for directories with many runs.
+        # os.scandir extracts lightweight string names much faster.
+        with os.scandir(self.runs_root) as entries:
+            # Sort raw names first to avoid Path instantiation overhead
+            run_names = sorted((e.name for e in entries if e.is_dir()), reverse=True)
 
+        for name in run_names:
+            run_dir = self.runs_root / name
             state_file = run_dir / "run_state.json"
             if state_file.exists():
                 try:
