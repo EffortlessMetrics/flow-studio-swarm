@@ -503,17 +503,21 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        import os
 
+        # Use os.scandir for faster directory iteration - avoids Path object overhead
+        with os.scandir(self.runs_root) as it:
+            run_names = sorted((e.name for e in it if e.is_dir()), reverse=True)
+
+        for name in run_names:
+            run_dir = self.runs_root / name
             state_file = run_dir / "run_state.json"
             if state_file.exists():
                 try:
                     state = json.loads(state_file.read_text(encoding="utf-8"))
                     runs.append(
                         {
-                            "run_id": state.get("run_id", run_dir.name),
+                            "run_id": state.get("run_id", name),
                             "flow_key": state.get("flow_key"),
                             "status": state.get("status"),
                             "timestamp": state.get("timestamp"),
