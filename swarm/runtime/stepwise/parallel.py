@@ -252,7 +252,7 @@ class ParallelExecutor:
             ForkResult with aggregated results.
         """
         # Use asyncio.run() to execute the async version
-        return asyncio.get_event_loop().run_until_complete(
+        return asyncio.run(
             self.execute_fork(run_id, fork_config, contexts, join_config)
         )
 
@@ -351,7 +351,7 @@ class ParallelExecutor:
         parallel_contexts: List[ParallelContext],
     ) -> List[BranchResult]:
         """Execute all branches concurrently."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         # Create tasks for each branch
         tasks = []
@@ -427,7 +427,7 @@ class ParallelExecutor:
                 len(contexts),
             )
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             tasks = [
                 loop.run_in_executor(
                     self._executor,
