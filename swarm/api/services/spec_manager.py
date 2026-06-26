@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -503,10 +504,16 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # ⚡ Bolt: Optimize directory listing for large run histories
+        # os.scandir is much faster than Path.iterdir() as it doesn't instantiate Path objects for every entry
+        try:
+            with os.scandir(self.runs_root) as it:
+                run_names = sorted([entry.name for entry in it if entry.is_dir()], reverse=True)
+        except OSError:
+            return runs
 
+        for run_name in run_names:
+            run_dir = self.runs_root / run_name
             state_file = run_dir / "run_state.json"
             if state_file.exists():
                 try:
