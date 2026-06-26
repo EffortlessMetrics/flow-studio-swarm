@@ -178,10 +178,11 @@ class ShadowFork:
             "HEAD",
         ]
         for ref in candidates:
+            if ref == "HEAD" and not self._ref_exists(ref):
+                continue
             if ref == "HEAD" or self._ref_exists(ref):
                 return ref
-        # Should never reach here since HEAD is always valid, but just in case
-        return "HEAD"
+        raise RuntimeError("Could not resolve a valid base branch. None of the fallback branches exist.")
 
     def _get_marker_path(self) -> Path:
         """Get the path to the shadow fork marker file."""
