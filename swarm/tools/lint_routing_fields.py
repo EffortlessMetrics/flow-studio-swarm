@@ -197,6 +197,8 @@ WARNING_PATTERNS = LEGACY_WARNING_PATTERNS
 
 # Files/directories to skip
 SKIP_PATTERNS = [
+    "**/swarm/prompts/agentic_steps/self-reviewer.md",
+    "**/docs/RELEASE_CHECKLIST.md",
     "**/node_modules/**",
     "**/.git/**",
     "**/dist/**",
