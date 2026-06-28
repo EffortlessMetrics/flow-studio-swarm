@@ -201,6 +201,7 @@ SKIP_PATTERNS = [
     "**/.git/**",
     "**/dist/**",
     "**/__pycache__/**",
+    "**/docs/RELEASE_CHECKLIST.md", # Don't lint release checklist
     "**/lint_routing_fields.py",  # Don't lint ourselves
     "**/swarm/runs/**",  # Run artifacts use different state machine vocabulary
     "**/run_state.json",  # Stepwise state machine uses advance/terminate/error/loop
