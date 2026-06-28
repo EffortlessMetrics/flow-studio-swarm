@@ -35,11 +35,12 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+from defusedxml.ElementTree import parse
 
 from swarm.runtime.forensic_types import (
     FailureType,
@@ -430,9 +431,9 @@ def parse_junit_xml(xml_path: Path) -> TestSummary:
         return summary
 
     try:
-        tree = ET.parse(xml_path)
+        tree = parse(xml_path)
         root = tree.getroot()
-    except ET.ParseError:
+    except Exception:
         return summary
 
     # Handle both <testsuites> and <testsuite> root elements
