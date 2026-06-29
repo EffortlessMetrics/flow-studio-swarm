@@ -305,6 +305,8 @@ class ShadowFork:
         # Create and switch to shadow branch
         success, _, stderr = self._run_git(["checkout", "-b", self.shadow_branch, base_ref])
         if not success:
+            raise RuntimeError(f"Failed to create shadow fork from {base_ref}: {stderr}")
+        if not success:
             raise RuntimeError(f"Failed to create shadow branch '{self.shadow_branch}': {stderr}")
 
         # Install push guard

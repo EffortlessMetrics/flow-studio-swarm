@@ -77,13 +77,30 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            # We want to hit the fallback to HEAD. Then git checkout -b should fail.
+            # _run_git calls:
+            # 1. rev-parse --abbrev-ref HEAD (get current)
+            # 2. show-ref --verify refs/heads/nonexistent (_ref_exists)
+            # 3. show-ref --verify refs/heads/origin/nonexistent (_ref_exists)
+            # 4. show-ref --verify refs/heads/main (_ref_exists)
+            # 5. show-ref --verify refs/heads/origin/main (_ref_exists)
+            # 6. show-ref --verify refs/heads/master (_ref_exists)
+            # 7. show-ref --verify refs/heads/origin/master (_ref_exists)
+            # 8. status --porcelain
+            # 9. checkout -b shadow_xyz HEAD
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "main", ""),    # rev-parse
+                (False, "", ""),       # nonexistent
+                (False, "", ""),       # origin/nonexistent
+                (False, "", ""),       # main
+                (False, "", ""),       # origin/main
+                (False, "", ""),       # master
+                (False, "", ""),       # origin/master
+                (True, "", ""),        # status
+                (False, "", "fatal"),  # checkout -b
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow fork"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -93,8 +110,8 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
+                (True, "", ""),      # Verify base branch exists (show-ref main)
+                (True, " M file.txt", ""),  # Uncommitted changes exist (status)
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 

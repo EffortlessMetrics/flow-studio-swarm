@@ -95,15 +95,7 @@ LEGACY_WARNING_PATTERNS = [
     # Generic mentions that might be documentation of deprecation
     (r'"route_to_flow":\s*null', "route_to_flow null in JSON (remove field entirely)"),
     (r'"route_to_agent":\s*null', "route_to_agent null in JSON (remove field entirely)"),
-    # Bare mentions of the old field names (might be intentional deprecation docs)
-    (
-        r"route_to_flow",
-        "mention of deprecated route_to_flow (verify this is deprecation documentation)",
-    ),
-    (
-        r"route_to_agent",
-        "mention of deprecated route_to_agent (verify this is deprecation documentation)",
-    ),
+
 ]
 
 # =============================================================================
