@@ -155,10 +155,10 @@ def rewrite_pause_to_detour(
         )
         return nav_output
 
-    # Deep copy to avoid mutating the original
-    from copy import deepcopy
+    # Optimization: dict serialization is faster than deepcopy
+    from swarm.runtime.navigator import navigator_output_to_dict, navigator_output_from_dict
 
-    rewritten = deepcopy(nav_output)
+    rewritten = navigator_output_from_dict(navigator_output_to_dict(nav_output))
 
     # Rewrite intent to DETOUR
     rewritten.route.intent = RouteIntent.DETOUR
