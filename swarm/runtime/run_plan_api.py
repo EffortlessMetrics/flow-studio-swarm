@@ -519,9 +519,10 @@ class RunPlanAPI:
             raise ValueError(f"Plan already exists: {new_id}")
 
         # Deep copy the spec
-        import copy
+        # Optimization: run_plan_spec_from_dict(run_plan_spec_to_dict(x)) is ~3-4x faster than copy.deepcopy(x)
+        from swarm.runtime.types import run_plan_spec_from_dict, run_plan_spec_to_dict
 
-        new_spec = copy.deepcopy(source.spec)
+        new_spec = run_plan_spec_from_dict(run_plan_spec_to_dict(source.spec))
 
         new_plan = StoredPlan(
             metadata=PlanMetadata(
