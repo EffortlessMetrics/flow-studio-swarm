@@ -1,3 +1,6 @@
 ## 2026-01-23 - Defer File Existence Checks
 **Learning:** When listing items from a large directory (e.g. 50k runs), checking file existence (`os.path.exists`) for every item is a significant bottleneck, even if the check is fast.
 **Action:** Sort candidates by cached metadata (e.g. mtime from `os.scandir`) first, then only perform expensive checks (like file existence or loading content) on the top N results that will actually be returned.
+## 2024-06-11 - Fast RunPlanSpec Serialization
+**Learning:** In this Python codebase, for complex dataclasses (like `RunPlanSpec`), using native dict serialization (`run_plan_spec_from_dict(run_plan_spec_to_dict(x))`) is a preferred performance optimization over `copy.deepcopy()` because it avoids reflection overhead and is significantly faster (~3-4x).
+**Action:** Use native dictionary serialization methods instead of `copy.deepcopy` when copying complex dataclasses.
