@@ -1,0 +1,74 @@
+metadata:
+  plan_id: default-supervised
+  name: Default Supervised
+  description: Full SDLC flow with human review after each flow
+  created_at: '2026-06-30T07:12:09.482767+00:00'
+  updated_at: '2026-06-30T07:12:09.482772+00:00'
+  created_by: system
+  tags:
+  - default
+  - supervised
+  - full-sdlc
+  is_default: true
+spec:
+  flow_sequence:
+  - signal
+  - plan
+  - build
+  - review
+  - gate
+  - deploy
+  - wisdom
+  macro_policy:
+    allow_flow_repeat: true
+    max_repeats_per_flow: 3
+    routing_rules:
+    - rule_id: gate-bounce-build
+      condition: gate.verdict == 'BOUNCE_BUILD'
+      action: goto
+      target_flow: build
+      max_uses: 2
+      uses: 0
+      description: Gate bounced to build for fixable issues
+    - rule_id: gate-bounce-plan
+      condition: gate.verdict == 'BOUNCE_PLAN'
+      action: goto
+      target_flow: plan
+      max_uses: 1
+      uses: 0
+      description: Gate bounced to plan for design issues
+    - rule_id: gate-escalate
+      condition: gate.verdict == 'ESCALATE'
+      action: pause
+      target_flow: null
+      max_uses: 3
+      uses: 0
+      description: Gate escalated to human for decision
+    - rule_id: gate-block
+      condition: gate.verdict == 'BLOCK'
+      action: terminate
+      target_flow: null
+      max_uses: 3
+      uses: 0
+      description: Gate blocked - cannot proceed
+    - rule_id: flow-failed
+      condition: outcome == 'failed'
+      action: terminate
+      target_flow: null
+      max_uses: 3
+      uses: 0
+      description: Flow failed with error
+    default_action: advance
+    strict_gate: true
+  human_policy:
+    mode: per_flow
+    allow_pause_mid_flow: false
+    allow_pause_between_flows: true
+    end_boundary: flow_end
+    require_approval_flows:
+    - gate
+    - deploy
+  constraints:
+  - never deploy unless gate verdict is MERGE or MERGE_WITH_CONDITIONS
+  - never skip gate flow
+  max_total_flows: 20

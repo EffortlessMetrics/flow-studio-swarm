@@ -1,0 +1,29 @@
+metadata:
+  plan_id: build-only
+  name: Build Only
+  description: Run only the build flow (for incremental development)
+  created_at: '2026-06-30T07:12:09.486120+00:00'
+  updated_at: '2026-06-30T07:12:09.486123+00:00'
+  created_by: system
+  tags:
+  - default
+  - build
+  - incremental
+  is_default: true
+spec:
+  flow_sequence:
+  - build
+  macro_policy:
+    allow_flow_repeat: true
+    max_repeats_per_flow: 5
+    routing_rules: []
+    default_action: terminate
+    strict_gate: true
+  human_policy:
+    mode: run_end
+    allow_pause_mid_flow: false
+    allow_pause_between_flows: false
+    end_boundary: run_end
+    require_approval_flows: []
+  constraints: []
+  max_total_flows: 10
