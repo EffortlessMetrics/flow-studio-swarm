@@ -261,6 +261,7 @@ class TestRunPlanAPI:
         # Spec should match source
         original = api.load_plan("default-autopilot")
         assert cloned.spec.flow_sequence == original.spec.flow_sequence
+        assert cloned.spec is not original.spec
 
     def test_clone_nonexistent_plan(self, tmp_path: Path):
         """Test cloning a plan that doesn't exist."""
