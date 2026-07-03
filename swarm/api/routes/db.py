@@ -240,8 +240,13 @@ async def get_db_stats():
 
         conn = stats_db.connection
 
+        ALLOWED_TABLES = {"runs", "steps", "tool_calls", "file_changes", "events", "facts"}
+
         # Query counts from each table
         def safe_count(table: str) -> int:
+            if table not in ALLOWED_TABLES:
+                logger.warning(f"Attempted to query unapproved table: {table}")
+                return 0
             try:
                 result = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
                 return result[0] if result else 0
