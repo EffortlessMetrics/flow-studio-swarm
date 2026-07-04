@@ -879,11 +879,18 @@ def scan_runs(runs_dir: Path = RUNS_DIR) -> Tuple[List[RunId], List[RunId]]:
                 if os.path.exists(os.path.join(entry.path, META_FILE)):
                     active_runs.append(entry.name)
                 else:
-                    # Check for legacy flow artifacts
-                    for flow_key in LEGACY_FLOW_KEYS:
-                        if os.path.isdir(os.path.join(entry.path, flow_key)):
-                            legacy_runs.append(entry.name)
-                            break
+                    try:
+                        # Avoid multiple stat calls by listing contents once
+                        contents = set(os.listdir(entry.path))
+                        matches = LEGACY_FLOW_KEYS.intersection(contents)
+                        if matches:
+                            # Verify if any match is actually a directory
+                            for match in matches:
+                                if os.path.isdir(os.path.join(entry.path, match)):
+                                    legacy_runs.append(entry.name)
+                                    break
+                    except OSError:
+                        pass
     except OSError:
         pass
 
@@ -919,11 +926,17 @@ def discover_legacy_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
                     continue
 
                 # Check if any flow subdirectory exists
-                # Use os.path.isdir with early exit for efficiency
-                for flow_key in LEGACY_FLOW_KEYS:
-                    if os.path.isdir(os.path.join(entry.path, flow_key)):
-                        legacy_runs.append(entry.name)
-                        break
+                # Use os.listdir to avoid multiple stat calls
+                try:
+                    contents = set(os.listdir(entry.path))
+                    matches = LEGACY_FLOW_KEYS.intersection(contents)
+                    if matches:
+                        for match in matches:
+                            if os.path.isdir(os.path.join(entry.path, match)):
+                                legacy_runs.append(entry.name)
+                                break
+                except OSError:
+                    pass
     except OSError:
         pass
 
@@ -951,11 +964,17 @@ def discover_example_runs() -> List[RunId]:
                     continue
 
                 # Check if any flow subdirectory exists
-                # Use os.path.isdir with early exit for efficiency
-                for flow_key in LEGACY_FLOW_KEYS:
-                    if os.path.isdir(os.path.join(entry.path, flow_key)):
-                        example_runs.append(entry.name)
-                        break
+                # Use os.listdir to avoid multiple stat calls
+                try:
+                    contents = set(os.listdir(entry.path))
+                    matches = LEGACY_FLOW_KEYS.intersection(contents)
+                    if matches:
+                        for match in matches:
+                            if os.path.isdir(os.path.join(entry.path, match)):
+                                example_runs.append(entry.name)
+                                break
+                except OSError:
+                    pass
     except OSError:
         pass
 
