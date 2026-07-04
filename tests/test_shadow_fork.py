@@ -46,6 +46,7 @@ class TestShadowForkCreate:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
+                (True, "main", ""),  # Get latest main commit
                 (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
                 (True, "", ""),  # Install push guard (rev-parse in block_upstream_push)
@@ -80,10 +81,11 @@ class TestShadowForkCreate:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "main", ""),  # Get latest main commit
+                (False, "", "fatal: Not a valid object name: \'nonexistent\'"),  # Base branch doesn\'t exist
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Not a valid object name"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -94,6 +96,7 @@ class TestShadowForkCreate:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, " M file.txt", ""),  # Uncommitted changes exist
+                (True, "main", ""),  # Get latest main commit
                 (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
             ]
