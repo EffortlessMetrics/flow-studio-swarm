@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -503,17 +504,32 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # Sort directory names lexically in descending order (e.g., run_2, run_1)
+        # We avoid iterdir() because it yields Path objects that require stat() internally
+        # on some systems during sorting/is_dir. scandir is faster for just getting names.
+        candidates = []
+        try:
+            with os.scandir(self.runs_root) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        candidates.append(entry.name)
+        except OSError:
+            return runs
 
+        candidates.sort(reverse=True)
+
+        for name in candidates:
+            if len(runs) >= limit:
+                break
+
+            run_dir = self.runs_root / name
             state_file = run_dir / "run_state.json"
             if state_file.exists():
                 try:
                     state = json.loads(state_file.read_text(encoding="utf-8"))
                     runs.append(
                         {
-                            "run_id": state.get("run_id", run_dir.name),
+                            "run_id": state.get("run_id", name),
                             "flow_key": state.get("flow_key"),
                             "status": state.get("status"),
                             "timestamp": state.get("timestamp"),
@@ -521,9 +537,6 @@ class SpecManager:
                     )
                 except Exception as e:
                     logger.warning("Failed to load run state %s: %s", run_dir, e)
-
-            if len(runs) >= limit:
-                break
 
         return runs
 
