@@ -1,7 +1,7 @@
 """Canonical API-facing autopilot controller.
 
 The legacy controller owns useful macro-flow behavior but initialized only an
-in-memory cursor plus a partial run directory.  This subclass preserves that
+in-memory cursor plus a partial run directory. This subclass preserves that
 behavior while routing creation through the constitutional run initializer and
 allowing callers such as issue intake to supply the one run identity.
 """
@@ -9,6 +9,7 @@ allowing callers such as issue intake to supply the one run identity.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import storage
@@ -19,6 +20,28 @@ from .types import RunEvent, RunId, RunSpec, generate_run_id
 
 class CanonicalAutopilotController(AutopilotController):
     """Autopilot whose start boundary creates one complete durable run."""
+
+    def __init__(
+        self,
+        repo_root: Optional[Path] = None,
+        orchestrator: Optional[Any] = None,
+        default_config: Optional[AutopilotConfig] = None,
+    ) -> None:
+        """Bind API autopilot to the server's configured repository root."""
+        if repo_root is None:
+            try:
+                from swarm.api.server import get_spec_manager
+
+                repo_root = get_spec_manager().repo_root
+            except (ImportError, RuntimeError):
+                # Standalone and unit-test use can still rely on the legacy
+                # controller's deterministic repository-root detection.
+                repo_root = None
+        super().__init__(
+            repo_root=repo_root,
+            orchestrator=orchestrator,
+            default_config=default_config,
+        )
 
     def start(
         self,
