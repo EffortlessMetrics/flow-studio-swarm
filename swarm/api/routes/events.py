@@ -1,10 +1,4 @@
-"""
-SSE event streaming endpoints for Flow Studio API.
-
-Provides Server-Sent Events (SSE) streaming for:
-- Run events (step progress, status changes, logs)
-- Real-time updates during flow execution
-"""
+"""Server-Sent Events as a transport projection of canonical RunEvent rows."""
 
 from __future__ import annotations
 
@@ -18,70 +12,108 @@ from typing import Any, AsyncGenerator, Dict, Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-logger = logging.getLogger(__name__)
+from swarm.runtime import storage
+from swarm.runtime.safe_paths import validate_path_component
+from swarm.runtime.types import RunEvent
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/runs", tags=["events"])
 
 
-# =============================================================================
-# Event Types
-# =============================================================================
-
-
 class EventType:
-    """Standard event types for SSE streaming."""
-
-    # Connection events
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"
     HEARTBEAT = "heartbeat"
 
-    # Run lifecycle events
     RUN_STARTED = "run:started"
     RUN_PAUSED = "run:paused"
-    RUN_PAUSING = "run:pausing"  # Graceful pause initiated (waiting for step)
+    RUN_PAUSING = "run:pausing"
     RUN_RESUMED = "run:resumed"
     RUN_COMPLETED = "run:completed"
     RUN_FAILED = "run:failed"
     RUN_CANCELED = "run:canceled"
     RUN_INTERRUPTED = "run:interrupted"
-    RUN_STOPPING = "run:stopping"  # Graceful stop initiated
-    RUN_STOPPED = "run:stopped"  # Clean stop with savepoint
+    RUN_STOPPING = "run:stopping"
+    RUN_STOPPED = "run:stopped"
 
-    # Flow lifecycle events (for autopilot runs with multiple flows)
-    FLOW_COMPLETED = "flow:completed"  # Individual flow in a multi-flow run
-    PLAN_COMPLETED = "plan:completed"  # Entire plan completed (autopilot run)
+    FLOW_COMPLETED = "flow:completed"
+    PLAN_COMPLETED = "plan:completed"
 
-    # Step events
     STEP_STARTED = "step:started"
     STEP_PROGRESS = "step:progress"
     STEP_COMPLETED = "step:completed"
     STEP_FAILED = "step:failed"
     STEP_SKIPPED = "step:skipped"
 
-    # Artifact events
     ARTIFACT_CREATED = "artifact:created"
     ARTIFACT_UPDATED = "artifact:updated"
 
-    # LLM events
     LLM_STARTED = "llm:started"
     LLM_TOKEN = "llm:token"
     LLM_COMPLETED = "llm:completed"
 
-    # Wisdom events
     WISDOM_PATCH_APPLIED = "wisdom:patch_applied"
     WISDOM_PATCH_REJECTED = "wisdom:patch_rejected"
     WISDOM_PATCH_VALIDATED = "wisdom:patch_validated"
     WISDOM_AUTO_APPLY_STARTED = "wisdom:auto_apply_started"
     WISDOM_AUTO_APPLY_COMPLETED = "wisdom:auto_apply_completed"
 
-    # Error events
     ERROR = "error"
 
 
-# =============================================================================
-# Event Formatting
-# =============================================================================
+_KIND_TO_SSE = {
+    "run_started": EventType.RUN_STARTED,
+    "run_pausing": EventType.RUN_PAUSING,
+    "flow_paused": EventType.RUN_PAUSED,
+    "run_paused": EventType.RUN_PAUSED,
+    "run_resumed": EventType.RUN_RESUMED,
+    "run_completed": EventType.RUN_COMPLETED,
+    "run_failed": EventType.RUN_FAILED,
+    "run_canceled": EventType.RUN_CANCELED,
+    "run_cancelled": EventType.RUN_CANCELED,
+    "run_interrupted": EventType.RUN_INTERRUPTED,
+    "run_stopping": EventType.RUN_STOPPING,
+    "run_stopped": EventType.RUN_STOPPED,
+    "step_start": EventType.STEP_STARTED,
+    "step_started": EventType.STEP_STARTED,
+    "step_progress": EventType.STEP_PROGRESS,
+    "step_end": EventType.STEP_COMPLETED,
+    "step_completed": EventType.STEP_COMPLETED,
+    "step_failed": EventType.STEP_FAILED,
+    "step_skipped": EventType.STEP_SKIPPED,
+    "flow_completed": EventType.FLOW_COMPLETED,
+    "autopilot_flow_completed": EventType.FLOW_COMPLETED,
+    "autopilot_completed": EventType.PLAN_COMPLETED,
+}
+_SSE_TO_KIND = {
+    EventType.RUN_STARTED: "run_started",
+    EventType.RUN_PAUSING: "run_pausing",
+    EventType.RUN_PAUSED: "run_paused",
+    EventType.RUN_RESUMED: "run_resumed",
+    EventType.RUN_COMPLETED: "run_completed",
+    EventType.RUN_FAILED: "run_failed",
+    EventType.RUN_CANCELED: "run_canceled",
+    EventType.RUN_INTERRUPTED: "run_interrupted",
+    EventType.RUN_STOPPING: "run_stopping",
+    EventType.RUN_STOPPED: "run_stopped",
+    EventType.FLOW_COMPLETED: "flow_completed",
+    EventType.PLAN_COMPLETED: "autopilot_completed",
+    EventType.STEP_STARTED: "step_start",
+    EventType.STEP_PROGRESS: "step_progress",
+    EventType.STEP_COMPLETED: "step_end",
+    EventType.STEP_FAILED: "step_failed",
+    EventType.STEP_SKIPPED: "step_skipped",
+}
+_TERMINAL_EVENT_TYPES = frozenset(
+    {
+        EventType.RUN_COMPLETED,
+        EventType.RUN_FAILED,
+        EventType.RUN_CANCELED,
+        EventType.RUN_STOPPED,
+        EventType.PLAN_COMPLETED,
+    }
+)
+_TERMINAL_STATUSES = frozenset({"succeeded", "failed", "canceled", "stopped"})
 
 
 def format_sse_event(
@@ -90,89 +122,62 @@ def format_sse_event(
     event_id: Optional[str] = None,
     retry: Optional[int] = None,
 ) -> str:
-    """Format an SSE event according to the spec.
+    """Format one transport event without mutating its durable source row."""
+    payload = dict(data)
+    payload.setdefault(
+        "timestamp",
+        payload.get("ts") or datetime.now(timezone.utc).isoformat(),
+    )
+    payload.setdefault("type", event_type.replace(":", "_"))
 
-    SSE format:
-        id: <event_id>
-        event: <event_type>
-        retry: <milliseconds>
-        data: <json_data>
-
-    Args:
-        event_type: Event type name.
-        data: Event data (will be JSON serialized).
-        event_id: Optional event ID for resumption.
-        retry: Optional retry interval in milliseconds.
-
-    Returns:
-        Formatted SSE event string.
-    """
     lines = []
-
     if event_id:
         lines.append(f"id: {event_id}")
-
     if event_type:
         lines.append(f"event: {event_type}")
-
     if retry:
         lines.append(f"retry: {retry}")
-
-    # Add timestamp if not present
-    if "timestamp" not in data:
-        data["timestamp"] = datetime.now(timezone.utc).isoformat()
-
-    # Include event type in data for client-side type dispatch
-    # Convert colon-separated format (flow:completed) to underscore format (flow_completed)
-    # for TypeScript compatibility
-    if "type" not in data:
-        data["type"] = event_type.replace(":", "_")
-
-    lines.append(f"data: {json.dumps(data)}")
-    lines.append("")  # Empty line terminates event
-
+    lines.append(f"data: {json.dumps(payload)}")
+    lines.append("")
     return "\n".join(lines) + "\n"
 
 
-# =============================================================================
-# Event Generation
-# =============================================================================
+def _transport_event_type(record: Dict[str, Any]) -> str:
+    kind = record.get("kind")
+    if isinstance(kind, str) and kind:
+        return _KIND_TO_SSE.get(kind, kind)
+
+    legacy_event = record.get("event")
+    if isinstance(legacy_event, str) and legacy_event:
+        return _KIND_TO_SSE.get(legacy_event, legacy_event)
+
+    return "message"
 
 
 async def read_events_file(
     events_file: Path,
     last_position: int = 0,
 ) -> tuple[list[Dict[str, Any]], int]:
-    """Read new events from the events file.
-
-    Args:
-        events_file: Path to events.jsonl file.
-        last_position: Last read position in file.
-
-    Returns:
-        Tuple of (events list, new position).
-    """
-    events = []
-
+    """Read complete JSONL rows after ``last_position``."""
     if not events_file.exists():
-        return events, last_position
+        return [], last_position
 
+    events: list[Dict[str, Any]] = []
+    new_position = last_position
     try:
-        with open(events_file, "r", encoding="utf-8") as f:
-            f.seek(last_position)
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        event = json.loads(line)
-                        events.append(event)
-                    except json.JSONDecodeError:
-                        logger.warning("Invalid JSON in events file: %s", line)
-            new_position = f.tell()
-    except Exception as e:
-        logger.warning("Error reading events file: %s", e)
-        new_position = last_position
-
+        with events_file.open("r", encoding="utf-8") as stream:
+            stream.seek(last_position)
+            for line in stream:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    events.append(json.loads(stripped))
+                except json.JSONDecodeError:
+                    logger.warning("Invalid JSON in events file: %s", stripped)
+            new_position = stream.tell()
+    except OSError as exc:
+        logger.warning("Error reading events file %s: %s", events_file, exc)
     return events, new_position
 
 
@@ -182,34 +187,17 @@ async def generate_run_events(
     poll_interval: float = 1.0,
     heartbeat_interval: float = 15.0,
 ) -> AsyncGenerator[str, None]:
-    """Generate SSE events for a run.
-
-    Yields SSE-formatted events as they occur:
-    1. Initial connection event
-    2. Events from events.jsonl file (incrementally)
-    3. Heartbeat events (every heartbeat_interval seconds)
-    4. Completion event when run ends
-
-    Args:
-        run_id: Run identifier.
-        runs_root: Root directory for runs.
-        poll_interval: How often to poll for new events.
-        heartbeat_interval: How often to send heartbeat.
-
-    Yields:
-        SSE-formatted event strings.
-    """
+    """Stream canonical journal rows and state-derived heartbeats."""
+    validate_path_component(run_id, "run_id")
     run_dir = runs_root / run_id
     events_file = run_dir / "events.jsonl"
     state_file = run_dir / "run_state.json"
 
-    # Track file position for incremental reading
     last_position = 0
     last_heartbeat = datetime.now(timezone.utc)
-    event_counter = 0
+    event_counter = 1
+    terminal_emitted = False
 
-    # Send connection event
-    event_counter += 1
     yield format_sse_event(
         EventType.CONNECTED,
         {"run_id": run_id, "message": "Connected to event stream"},
@@ -218,158 +206,98 @@ async def generate_run_events(
 
     while True:
         try:
-            # Check if run exists
             if not state_file.exists():
                 yield format_sse_event(
                     EventType.ERROR,
                     {"error": "run_not_found", "message": f"Run '{run_id}' not found"},
                 )
-                break
+                return
 
-            # Read current state
             state = json.loads(state_file.read_text(encoding="utf-8"))
             status = state.get("status", "pending")
+            records, last_position = await read_events_file(events_file, last_position)
 
-            # Read new events from file
-            events, last_position = await read_events_file(events_file, last_position)
-
-            for event in events:
+            for record in records:
                 event_counter += 1
-                event_type = event.pop("event", "message")
+                event_type = _transport_event_type(record)
+                terminal_emitted = terminal_emitted or event_type in _TERMINAL_EVENT_TYPES
+                durable_id = record.get("event_id")
+                yield format_sse_event(
+                    event_type,
+                    record,
+                    event_id=str(durable_id or event_counter),
+                )
 
-                # Transform autopilot events to flow boundary events for frontend
-                if event_type == "autopilot_flow_completed":
-                    # Emit flow:completed for individual flow completion in autopilot
-                    yield format_sse_event(
-                        EventType.FLOW_COMPLETED,
-                        event,
-                        event_id=str(event_counter),
-                    )
-                elif event_type == "autopilot_completed":
-                    # Emit plan:completed when entire autopilot run finishes
-                    yield format_sse_event(
-                        EventType.PLAN_COMPLETED,
-                        event,
-                        event_id=str(event_counter),
-                    )
-                else:
-                    yield format_sse_event(
-                        event_type,
-                        event,
-                        event_id=str(event_counter),
-                    )
-
-            # Send heartbeat if interval elapsed
             now = datetime.now(timezone.utc)
             if (now - last_heartbeat).total_seconds() >= heartbeat_interval:
                 event_counter += 1
+                current_step = (
+                    state.get("current_step_id")
+                    or state.get("current_node")
+                    or state.get("current_step")
+                )
                 yield format_sse_event(
                     EventType.HEARTBEAT,
-                    {
-                        "run_id": run_id,
-                        "status": status,
-                        "current_step": state.get("current_step"),
-                    },
+                    {"run_id": run_id, "status": status, "current_step": current_step},
                     event_id=str(event_counter),
                 )
                 last_heartbeat = now
 
-            # Check for terminal states
-            if status in ("succeeded", "failed", "canceled", "stopped"):
-                event_counter += 1
+            if status in _TERMINAL_STATUSES:
+                if not terminal_emitted:
+                    event_counter += 1
+                    status_to_event = {
+                        "succeeded": EventType.RUN_COMPLETED,
+                        "failed": EventType.RUN_FAILED,
+                        "canceled": EventType.RUN_CANCELED,
+                        "stopped": EventType.RUN_STOPPED,
+                    }
+                    yield format_sse_event(
+                        status_to_event[status],
+                        {
+                            "run_id": run_id,
+                            "status": status,
+                            "completed_at": state.get("completed_at"),
+                            "stopped_at": state.get("stopped_at"),
+                            "error": state.get("error"),
+                            "stop_reason": state.get("stop_reason"),
+                        },
+                        event_id=str(event_counter),
+                    )
+                return
 
-                # Map status to event type
-                status_to_event = {
-                    "succeeded": EventType.RUN_COMPLETED,
-                    "failed": EventType.RUN_FAILED,
-                    "canceled": EventType.RUN_CANCELED,
-                    "stopped": EventType.RUN_STOPPED,
-                }
-
-                yield format_sse_event(
-                    status_to_event[status],
-                    {
-                        "run_id": run_id,
-                        "status": status,
-                        "completed_at": state.get("completed_at"),
-                        "stopped_at": state.get("stopped_at"),
-                        "error": state.get("error"),
-                        "stop_reason": state.get("stop_reason"),
-                    },
-                    event_id=str(event_counter),
-                )
-                break
-
-            # Wait before next poll
             await asyncio.sleep(poll_interval)
-
         except asyncio.CancelledError:
-            # Client disconnected
             logger.debug("SSE client disconnected for run %s", run_id)
-            break
-        except Exception as e:
-            logger.error("Error in event stream for run %s: %s", run_id, e)
+            return
+        except Exception as exc:
+            logger.exception("Error in event stream for run %s", run_id)
             yield format_sse_event(
                 EventType.ERROR,
-                {"error": "stream_error", "message": str(e)},
+                {"error": "stream_error", "message": str(exc)},
             )
-            await asyncio.sleep(5)  # Back off on error
-
-
-# =============================================================================
-# SSE Endpoint
-# =============================================================================
+            await asyncio.sleep(5)
 
 
 @router.get("/{run_id}/events")
 async def stream_run_events(run_id: str, request: Request):
-    """Stream Server-Sent Events for a run.
+    """Stream one run's canonical journal as SSE."""
+    try:
+        validate_path_component(run_id, "run_id")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    Provides a real-time event stream for monitoring run progress.
-    Events include step progress, status changes, and artifacts.
-
-    Performs a health tick on SSE connect to keep database status coherent.
-
-    Args:
-        run_id: Run identifier.
-        request: FastAPI request object for disconnect detection.
-
-    Returns:
-        StreamingResponse with SSE content type.
-
-    Example events:
-        event: connected
-        data: {"run_id": "abc123", "message": "Connected to event stream"}
-
-        event: step:started
-        data: {"step_id": "init", "station_id": "repo-operator"}
-
-        event: step:completed
-        data: {"step_id": "init", "status": "VERIFIED"}
-
-        event: heartbeat
-        data: {"run_id": "abc123", "status": "running"}
-
-        event: run:completed
-        data: {"run_id": "abc123", "status": "succeeded"}
-    """
-    # Get runs root from spec manager
     from ..server import get_spec_manager
 
-    manager = get_spec_manager()
-    runs_root = manager.runs_root
-
-    # Health tick on SSE connect to keep DB status coherent
+    runs_root = get_spec_manager().runs_root
     try:
         from swarm.runtime.resilient_db import check_db_health
 
         check_db_health()
-    except Exception as e:
-        logger.warning("DB health check failed on SSE connect: %s", e)
+    except Exception as exc:
+        logger.warning("DB health check failed on SSE connect: %s", exc)
 
-    # Verify run exists
-    run_dir = runs_root / run_id
-    if not run_dir.exists():
+    if not (runs_root / run_id).is_dir():
         raise HTTPException(
             status_code=404,
             detail={
@@ -381,9 +309,8 @@ async def stream_run_events(run_id: str, request: Request):
 
     async def event_stream():
         async for event in generate_run_events(run_id, runs_root):
-            # Check if client disconnected
             if await request.is_disconnected():
-                break
+                return
             yield event
 
     return StreamingResponse(
@@ -392,14 +319,39 @@ async def stream_run_events(run_id: str, request: Request):
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
+            "X-Accel-Buffering": "no",
         },
     )
 
 
-# =============================================================================
-# Event Writing Utilities
-# =============================================================================
+def _canonical_event_from_transport(
+    run_id: str,
+    event_type: str,
+    data: Dict[str, Any],
+) -> RunEvent:
+    payload = dict(data)
+    payload.pop("run_id", None)
+    flow_key = str(payload.pop("flow_key", ""))
+    step_id = payload.pop("step_id", None)
+    agent_key = payload.pop("agent_key", None)
+    payload.pop("event", None)
+    payload.pop("kind", None)
+    payload.pop("event_id", None)
+    payload.pop("seq", None)
+    payload.pop("ts", None)
+    payload.pop("timestamp", None)
+    payload.pop("type", None)
+
+    kind = _SSE_TO_KIND.get(event_type, event_type.replace(":", "_"))
+    return RunEvent(
+        run_id=run_id,
+        ts=datetime.now(timezone.utc),
+        kind=kind,
+        flow_key=flow_key,
+        step_id=step_id,
+        agent_key=agent_key,
+        payload=payload,
+    )
 
 
 async def write_event(
@@ -408,25 +360,13 @@ async def write_event(
     event_type: str,
     data: Dict[str, Any],
 ) -> None:
-    """Write an event to a run's events file.
-
-    Args:
-        run_id: Run identifier.
-        runs_root: Root directory for runs.
-        event_type: Event type name.
-        data: Event data.
-    """
-    events_file = runs_root / run_id / "events.jsonl"
-    events_file.parent.mkdir(parents=True, exist_ok=True)
-
-    event = {
-        "event": event_type,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        **data,
-    }
-
-    with open(events_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event) + "\n")
+    """Compatibility writer that persists a canonical RunEvent row."""
+    validate_path_component(run_id, "run_id")
+    storage.append_event(
+        run_id,
+        _canonical_event_from_transport(run_id, event_type, data),
+        runs_root,
+    )
 
 
 def write_event_sync(
@@ -435,22 +375,10 @@ def write_event_sync(
     event_type: str,
     data: Dict[str, Any],
 ) -> None:
-    """Synchronous version of write_event.
-
-    Args:
-        run_id: Run identifier.
-        runs_root: Root directory for runs.
-        event_type: Event type name.
-        data: Event data.
-    """
-    events_file = runs_root / run_id / "events.jsonl"
-    events_file.parent.mkdir(parents=True, exist_ok=True)
-
-    event = {
-        "event": event_type,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        **data,
-    }
-
-    with open(events_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event) + "\n")
+    """Synchronous compatibility writer for control endpoints."""
+    validate_path_component(run_id, "run_id")
+    storage.append_event(
+        run_id,
+        _canonical_event_from_transport(run_id, event_type, data),
+        runs_root,
+    )
