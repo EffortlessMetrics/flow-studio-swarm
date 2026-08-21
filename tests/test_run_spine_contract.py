@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 import swarm.api.routes.issue_routes as issue_routes
 import swarm.api.routes.runs_control as runs_control
 import swarm.api.routes.runs_crud as runs_crud
-from swarm.api.routes.events import generate_run_events
+from swarm.api.routes.events import EventType, generate_run_events, write_event_sync
 from swarm.api.routes.runs import router as runs_router
 from swarm.api.services.run_state import RunStateManager
 
@@ -84,7 +84,10 @@ def test_execute_start_returns_after_canonical_run_initialization(run_api) -> No
     state = _read_json(run_dir / "run_state.json")
     events = _read_jsonl(run_dir / "events.jsonl")
 
-    assert _record_run_id(spec) == run_id
+    # RunSpec remains reusable intent scoped by its containing run directory;
+    # identity is repeated only where it is semantically part of the record.
+    assert spec["flow_keys"] == ["signal"]
+    assert spec["backend"] == "claude-step-orchestrator"
     assert _record_run_id(meta) == run_id
     assert _record_run_id(state) == run_id
 
@@ -153,13 +156,33 @@ def test_sse_preserves_runtime_event_kind(tmp_path: Path) -> None:
     assert '"event_id": "evt-step-start-1"' in runtime_event
 
 
-def test_issue_ingestion_reuses_started_autopilot_run_identity(
+def test_control_event_writer_uses_canonical_journal(run_api) -> None:
+    """Compatibility control writers may translate names, never schemas."""
+    client, manager = run_api
+    response = client.post("/api/runs", json={"flow_id": "signal"})
+    assert response.status_code == 201
+    run_id = response.json()["run_id"]
+
+    write_event_sync(
+        run_id,
+        manager.runs_root,
+        EventType.RUN_STOPPING,
+        {"run_id": run_id, "flow_key": "signal", "reason": "contract_test"},
+    )
+
+    events = _read_jsonl(manager.runs_root / run_id / "events.jsonl")
+    assert events[-1]["kind"] == "run_stopping"
+    assert events[-1]["run_id"] == run_id
+    assert "event" not in events[-1]
+    assert events[-1]["payload"]["reason"] == "contract_test"
+
+
+def test_issue_ingestion_supplies_one_identity_to_autopilot(
     run_api,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Issue intake and its requested autopilot execution are the same run."""
+    """Issue intake selects the ID and autopilot must preserve it."""
     client, manager = run_api
-    canonical_run_id = "run-issue-autopilot-contract"
 
     class FakeAutopilotController:
         def __init__(self) -> None:
@@ -167,14 +190,10 @@ def test_issue_ingestion_reuses_started_autopilot_run_identity(
 
         def start(self, **kwargs) -> str:
             self.start_calls.append(kwargs)
-            return canonical_run_id
+            return kwargs["run_id"]
 
     controller = FakeAutopilotController()
-    monkeypatch.setattr(
-        issue_routes,
-        "_get_autopilot_controller",
-        lambda: controller,
-    )
+    monkeypatch.setattr(issue_routes, "_get_autopilot_controller", lambda: controller)
 
     response = client.post(
         "/api/runs/from-issue",
@@ -189,10 +208,16 @@ def test_issue_ingestion_reuses_started_autopilot_run_identity(
     assert response.status_code == 201
     payload = response.json()
     assert payload["autopilot_started"] is True
-    assert payload["run_id"] == canonical_run_id
-    assert payload["events_url"] == f"/api/runs/{canonical_run_id}/events"
-
-    snapshot_path = manager.runs_root / canonical_run_id / payload["issue_snapshot_path"]
-    assert snapshot_path.is_file()
-    assert {path.name for path in manager.runs_root.iterdir()} == {canonical_run_id}
     assert len(controller.start_calls) == 1
+
+    supplied_run_id = controller.start_calls[0]["run_id"]
+    assert payload["run_id"] == supplied_run_id
+    assert payload["events_url"] == f"/api/runs/{supplied_run_id}/events"
+
+    run_dir = manager.runs_root / supplied_run_id
+    snapshot_path = run_dir / payload["issue_snapshot_path"]
+    assert snapshot_path.is_file()
+    assert {path.name for path in manager.runs_root.iterdir()} == {supplied_run_id}
+    assert {"spec.json", "meta.json", "run_state.json", "events.jsonl"} <= {
+        path.name for path in run_dir.iterdir()
+    }
