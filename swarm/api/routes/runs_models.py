@@ -1,8 +1,4 @@
-"""
-Pydantic models for run control endpoints.
-
-Shared models used across runs_crud, runs_control, and runs_stack modules.
-"""
+"""Pydantic models for run creation, control, and inspection endpoints."""
 
 from __future__ import annotations
 
@@ -10,24 +6,22 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-# =============================================================================
-# Request Models
-# =============================================================================
-
 
 class RunStartRequest(BaseModel):
-    """Request to start a new run."""
+    """Request to create a run and, in execute mode, schedule its backend."""
 
     flow_id: str = Field(..., description="Flow to execute")
-    run_id: Optional[str] = Field(None, description="Custom run ID (generated if not provided)")
+    run_id: Optional[str] = Field(None, description="Custom run ID (generated if omitted)")
     context: Optional[Dict[str, Any]] = Field(None, description="Initial context for the run")
-    start_step: Optional[str] = Field(None, description="Step to start from (defaults to first)")
+    start_step: Optional[str] = Field(None, description="Initial node (defaults to graph entry)")
     mode: str = Field("execute", description="Execution mode: execute, preview, validate")
+    backend: str = Field(
+        "claude-step-orchestrator",
+        description="Backend selected for execution",
+    )
 
 
 class InjectRequest(BaseModel):
-    """Request to inject a node into a run."""
-
     step_id: str = Field(..., description="ID for the injected step")
     station_id: str = Field(..., description="Station to use for the step")
     position: str = Field(
@@ -37,45 +31,30 @@ class InjectRequest(BaseModel):
 
 
 class InterruptRequest(BaseModel):
-    """Request to interrupt a run with a detour."""
-
     detour_flow: Optional[str] = Field(None, description="Flow to execute as detour")
     detour_steps: Optional[List[str]] = Field(
         None, description="Specific steps to execute as detour"
     )
     reason: str = Field(..., description="Reason for the interrupt")
-    resume_after: bool = Field(True, description="Whether to resume original flow after detour")
+    resume_after: bool = Field(True, description="Resume the original graph after detour")
 
 
 class PauseRequest(BaseModel):
-    """Request to pause a run."""
-
     wait_for_step: bool = Field(
-        True, description="Wait for current step to complete before pausing"
+        True, description="Wait for the current step transaction before pausing"
     )
 
 
 class ResumeRequest(BaseModel):
-    """Request to resume a paused or stopped run."""
-
-    from_step: Optional[str] = Field(None, description="Step to resume from (defaults to saved PC)")
+    from_step: Optional[str] = Field(None, description="Optional explicit resume node")
 
 
 class StopRequest(BaseModel):
-    """Request to stop a run gracefully."""
-
     reason: str = Field("user_initiated", description="Reason for stopping")
-    drain_timeout_ms: int = Field(30000, description="Timeout for draining messages in ms")
-
-
-# =============================================================================
-# Response Models
-# =============================================================================
+    drain_timeout_ms: int = Field(30000, description="Message-drain timeout in milliseconds")
 
 
 class RunStartResponse(BaseModel):
-    """Response when starting a new run."""
-
     run_id: str
     flow_id: str
     status: str
@@ -84,8 +63,6 @@ class RunStartResponse(BaseModel):
 
 
 class RunSummary(BaseModel):
-    """Run summary for list endpoint."""
-
     run_id: str
     flow_key: Optional[str] = None
     status: Optional[str] = None
@@ -93,13 +70,11 @@ class RunSummary(BaseModel):
 
 
 class RunListResponse(BaseModel):
-    """Response for list runs endpoint."""
-
     runs: List[RunSummary]
 
 
 class RunState(BaseModel):
-    """Full run state."""
+    """Compatibility projection of the canonical runtime RunState."""
 
     run_id: str
     flow_id: str
@@ -116,8 +91,6 @@ class RunState(BaseModel):
 
 
 class RunActionResponse(BaseModel):
-    """Generic response for run actions."""
-
     run_id: str
     status: str
     message: str
@@ -125,8 +98,6 @@ class RunActionResponse(BaseModel):
 
 
 class StopReportInfo(BaseModel):
-    """Information included in stop report."""
-
     last_step_id: Optional[str] = None
     last_routing_intent: Optional[str] = None
     last_tool_calls: List[str] = Field(default_factory=list)
@@ -136,8 +107,6 @@ class StopReportInfo(BaseModel):
 
 
 class StopResponse(BaseModel):
-    """Response when stopping a run."""
-
     run_id: str
     status: str
     message: str
@@ -147,8 +116,6 @@ class StopResponse(BaseModel):
 
 
 class InterruptionFrameResponse(BaseModel):
-    """A single frame in the interruption stack."""
-
     frame_id: str
     interrupted_flow: Optional[str] = None
     interrupted_step: Optional[str] = None
@@ -162,8 +129,6 @@ class InterruptionFrameResponse(BaseModel):
 
 
 class InterruptionStackResponse(BaseModel):
-    """Response for the interruption stack endpoint."""
-
     run_id: str
     stack_depth: int
     frames: List[InterruptionFrameResponse]
