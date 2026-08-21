@@ -44,10 +44,12 @@ def run_api(
 
 
 def _read_json(path: Path) -> dict:
+    """Read one UTF-8 JSON object from ``path``."""
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _read_jsonl(path: Path) -> list[dict]:
+    """Read all non-empty JSONL rows from ``path``."""
     return [
         json.loads(line)
         for line in path.read_text(encoding="utf-8").splitlines()
@@ -56,6 +58,7 @@ def _read_jsonl(path: Path) -> list[dict]:
 
 
 def _record_run_id(record: dict) -> str | None:
+    """Return the canonical identity from runtime or summary-shaped data."""
     return record.get("run_id") or record.get("id")
 
 
@@ -96,6 +99,8 @@ def test_execute_start_returns_after_canonical_run_initialization(run_api) -> No
     assert first_event["run_id"] == run_id
     assert first_event["kind"] == "run_created"
     assert {"event_id", "seq", "run_id", "kind"} <= first_event.keys()
+    assert isinstance(first_event["seq"], int) and first_event["seq"] > 0
+    assert isinstance(first_event["event_id"], str) and first_event["event_id"]
 
 
 def test_sse_preserves_runtime_event_kind(tmp_path: Path) -> None:
@@ -135,6 +140,7 @@ def test_sse_preserves_runtime_event_kind(tmp_path: Path) -> None:
     )
 
     async def collect_first_runtime_event() -> tuple[str, str]:
+        """Collect the connection event and first canonical journal event."""
         stream = generate_run_events(
             run_id=run_id,
             runs_root=runs_root,
@@ -185,10 +191,14 @@ def test_issue_ingestion_supplies_one_identity_to_autopilot(
     client, manager = run_api
 
     class FakeAutopilotController:
+        """Record the supplied identity without performing real execution."""
+
         def __init__(self) -> None:
+            """Create an empty invocation ledger."""
             self.start_calls: list[dict] = []
 
         def start(self, **kwargs) -> str:
+            """Return exactly the identity selected by issue intake."""
             self.start_calls.append(kwargs)
             return kwargs["run_id"]
 
