@@ -1,9 +1,4 @@
-"""
-Issue ingestion endpoints for Flow Studio API.
-
-Provides REST endpoints for:
-- Creating runs from issue references (GitHub, GitLab, etc.)
-"""
+"""Create one canonical Flow Studio run from an issue snapshot."""
 
 from __future__ import annotations
 
@@ -11,6 +6,7 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
@@ -21,34 +17,22 @@ from swarm.runtime.safe_paths import validate_path_component
 from ..services.run_state import get_state_manager
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter(tags=["issues"])
 
 
-# =============================================================================
-# Pydantic Models
-# =============================================================================
-
-
 class IssueIngestionRequest(BaseModel):
-    """Request to start a run from an issue."""
-
-    provider: str = Field("github", description="Issue provider (github, gitlab, etc.)")
-    repo: Optional[str] = Field(None, description="Repository in 'owner/repo' format")
-    issue_number: Optional[int] = Field(None, description="Issue number")
-    issue_url: Optional[str] = Field(
-        None, description="Full issue URL (alternative to repo+number)"
-    )
-    title: Optional[str] = Field(None, description="Issue title (if not fetching)")
-    body: Optional[str] = Field(None, description="Issue body (if not fetching)")
-    labels: Optional[List[str]] = Field(None, description="Issue labels")
-    start_autopilot: bool = Field(False, description="Start autopilot run after ingestion")
-    flow_keys: Optional[List[str]] = Field(None, description="Flows to execute (defaults to all)")
+    provider: str = Field("github", description="Issue provider")
+    repo: Optional[str] = Field(None, description="Repository as owner/repo")
+    issue_number: Optional[int] = None
+    issue_url: Optional[str] = None
+    title: Optional[str] = None
+    body: Optional[str] = None
+    labels: Optional[List[str]] = None
+    start_autopilot: bool = False
+    flow_keys: Optional[List[str]] = None
 
 
 class IssueIngestionResponse(BaseModel):
-    """Response from issue ingestion."""
-
     run_id: str
     status: str
     issue_snapshot_path: str
@@ -58,8 +42,6 @@ class IssueIngestionResponse(BaseModel):
 
 
 class IssueSnapshot(BaseModel):
-    """Snapshot of an issue for Flow 1 input."""
-
     provider: str
     repo: str
     issue_number: int
@@ -71,74 +53,33 @@ class IssueSnapshot(BaseModel):
     source_metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
-# =============================================================================
-# Helpers
-# =============================================================================
-
-
 def _parse_issue_url(url: str) -> tuple[str, str, int]:
-    """Parse an issue URL into provider, repo, and number.
+    github_match = re.match(r"https?://github\.com/([^/]+/[^/]+)/issues/(\d+)", url)
+    if github_match:
+        return "github", github_match.group(1), int(github_match.group(2))
 
-    Args:
-        url: Issue URL (e.g., 'https://github.com/owner/repo/issues/123')
-
-    Returns:
-        Tuple of (provider, repo, issue_number)
-
-    Raises:
-        ValueError: If URL format is not recognized.
-    """
-    # GitHub: https://github.com/owner/repo/issues/123
-    gh_match = re.match(r"https?://github\.com/([^/]+/[^/]+)/issues/(\d+)", url)
-    if gh_match:
-        return "github", gh_match.group(1), int(gh_match.group(2))
-
-    # GitLab: https://gitlab.com/owner/repo/-/issues/123
-    gl_match = re.match(r"https?://gitlab\.com/([^/]+/[^/]+)/-/issues/(\d+)", url)
-    if gl_match:
-        return "gitlab", gl_match.group(1), int(gl_match.group(2))
+    gitlab_match = re.match(r"https?://gitlab\.com/([^/]+/[^/]+)/-/issues/(\d+)", url)
+    if gitlab_match:
+        return "gitlab", gitlab_match.group(1), int(gitlab_match.group(2))
 
     raise ValueError(f"Unrecognized issue URL format: {url}")
 
 
 def _get_autopilot_controller():
-    """Get or create the global autopilot controller."""
-
-    # Import from autopilot_routes to share the same controller instance
     from .autopilot_routes import _get_autopilot_controller as get_controller
 
     return get_controller()
 
 
-# =============================================================================
-# Issue Ingestion Endpoints
-# =============================================================================
+def _issue_run_id(repo: Optional[str], issue_number: Optional[int], now: datetime) -> str:
+    repo_component = (repo or "local/manual").replace("/", "-")
+    return f"issue-{repo_component}-{issue_number or 0}-{now.strftime('%Y%m%d%H%M%S')}"
 
 
 @router.post("/from-issue", response_model=IssueIngestionResponse, status_code=201)
 async def ingest_issue(request: IssueIngestionRequest):
-    """Create a run from an issue reference.
-
-    Writes an issue snapshot to the run's signal/ directory as the canonical
-    input artifact for Flow 1 (Signal). Optionally starts an autopilot run.
-
-    The issue can be specified by:
-    - repo + issue_number: e.g., "owner/repo" and 123
-    - issue_url: e.g., "https://github.com/owner/repo/issues/123"
-    - title + body: Manual issue data (no fetching)
-
-    Args:
-        request: Issue ingestion request.
-
-    Returns:
-        IssueIngestionResponse with run_id and snapshot path.
-
-    Raises:
-        400: Invalid issue reference.
-        500: Ingestion failed.
-    """
+    """Snapshot an issue and optionally start autopilot under the same run ID."""
     try:
-        # Determine issue details
         provider = request.provider
         repo = request.repo
         issue_number = request.issue_number
@@ -146,29 +87,32 @@ async def ingest_issue(request: IssueIngestionRequest):
         if request.issue_url:
             try:
                 provider, repo, issue_number = _parse_issue_url(request.issue_url)
-            except ValueError as e:
+            except ValueError as exc:
                 raise HTTPException(
                     status_code=400,
                     detail={
                         "error": "invalid_url",
-                        "message": str(e),
+                        "message": str(exc),
                         "details": {"url": request.issue_url},
                     },
-                )
+                ) from exc
 
-        if not repo or issue_number is None:
-            if not request.title:
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error": "missing_reference",
-                        "message": "Must provide repo+issue_number, issue_url, or title+body",
-                        "details": {},
-                    },
-                )
+        if (not repo or issue_number is None) and not request.title:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "missing_reference",
+                    "message": "Provide repo+issue_number, issue_url, or title+body",
+                    "details": {},
+                },
+            )
 
-        # Create issue snapshot
         now = datetime.now(timezone.utc)
+        issue_ref = f"{repo}#{issue_number}" if repo and issue_number is not None else None
+        issue_url = request.issue_url
+        if not issue_url and provider == "github" and repo and issue_number is not None:
+            issue_url = f"https://github.com/{repo}/issues/{issue_number}"
+
         snapshot = IssueSnapshot(
             provider=provider,
             repo=repo or "local/manual",
@@ -176,97 +120,100 @@ async def ingest_issue(request: IssueIngestionRequest):
             title=request.title or f"Issue #{issue_number}",
             body=request.body or "",
             labels=request.labels or [],
-            url=request.issue_url
-            or (
-                f"https://github.com/{repo}/issues/{issue_number}"
-                if provider == "github" and repo and issue_number
-                else None
-            ),
+            url=issue_url,
             fetched_at=now.isoformat(),
-            source_metadata={
-                "ingested_via": "api",
-                "provider": provider,
-            },
+            source_metadata={"ingested_via": "api", "provider": provider},
         )
 
-        # Generate run ID
-        run_id = f"issue-{repo.replace('/', '-') if repo else 'manual'}-{issue_number or 0}-{now.strftime('%Y%m%d%H%M%S')}"
-
-        # Validate run_id before file system operations
+        run_id = _issue_run_id(repo, issue_number, now)
         try:
             validate_path_component(run_id, "generated run_id")
-        except ValueError as e:
+        except ValueError as exc:
             raise HTTPException(
                 status_code=400,
                 detail={
                     "error": "invalid_run_id",
-                    "message": f"Generated run ID is invalid: {str(e)}",
+                    "message": f"Generated run ID is invalid: {exc}",
                     "details": {"run_id": run_id},
                 },
+            ) from exc
+
+        state_manager = get_state_manager()
+        snapshot_relative = Path("signal") / "issue_snapshot.json"
+        context = {
+            "issue_ref": issue_ref or "manual",
+            "issue_snapshot_path": snapshot_relative.as_posix(),
+        }
+
+        autopilot_started = False
+        if request.start_autopilot:
+            controller = _get_autopilot_controller()
+            started_run_id = controller.start(
+                run_id=run_id,
+                issue_ref=issue_ref,
+                flow_keys=request.flow_keys,
+                initiator="api:issue",
+                params={"issue_snapshot_path": snapshot_relative.as_posix()},
+            )
+            if started_run_id != run_id:
+                raise RuntimeError(
+                    f"Autopilot changed canonical run identity: {run_id} -> {started_run_id}"
+                )
+            autopilot_started = True
+
+            # Test doubles and compatibility controllers may not yet initialize
+            # the durable state. Real canonical autopilot already has.
+            try:
+                await state_manager.get_run(run_id)
+            except FileNotFoundError:
+                await state_manager.create_run(
+                    flow_id=(request.flow_keys or ["signal"])[0],
+                    run_id=run_id,
+                    context=context,
+                    mode="execute",
+                    initiator="api:issue",
+                )
+        else:
+            await state_manager.create_run(
+                flow_id="signal",
+                run_id=run_id,
+                context=context,
+                mode="execute",
+                initiator="api:issue",
             )
 
-        # Create run directory structure
-        state_manager = get_state_manager()
         run_dir = state_manager.runs_root / run_id
         signal_dir = run_dir / "signal"
         signal_dir.mkdir(parents=True, exist_ok=True)
 
-        # Write issue snapshot
         snapshot_path = signal_dir / "issue_snapshot.json"
         snapshot_path.write_text(
             json.dumps(snapshot.model_dump(), indent=2),
             encoding="utf-8",
         )
-
-        # Also write as markdown for human readability
-        issue_md_path = signal_dir / "issue.md"
-        issue_md_path.write_text(
+        (signal_dir / "issue.md").write_text(
             f"# {snapshot.title}\n\n"
             f"**Source:** {snapshot.url or 'Manual input'}\n"
             f"**Labels:** {', '.join(snapshot.labels) if snapshot.labels else 'None'}\n\n"
-            f"---\n\n"
-            f"{snapshot.body}\n",
+            f"---\n\n{snapshot.body}\n",
             encoding="utf-8",
         )
-
-        # Create initial run state
-        await state_manager.create_run(
-            flow_id="signal",
-            run_id=run_id,
-            context={
-                "issue_ref": f"{repo}#{issue_number}" if repo else "manual",
-                "issue_snapshot_path": str(snapshot_path.relative_to(run_dir)),
-            },
-        )
-
-        # Optionally start autopilot
-        autopilot_started = False
-        if request.start_autopilot:
-            controller = _get_autopilot_controller()
-            controller.start(
-                issue_ref=f"{repo}#{issue_number}" if repo else None,
-                flow_keys=request.flow_keys,
-            )
-            autopilot_started = True
 
         return IssueIngestionResponse(
             run_id=run_id,
             status="created",
-            issue_snapshot_path=str(snapshot_path.relative_to(run_dir)),
+            issue_snapshot_path=snapshot_relative.as_posix(),
             autopilot_started=autopilot_started,
             events_url=f"/api/runs/{run_id}/events",
             created_at=now.isoformat(),
         )
-
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error("Failed to ingest issue: %s", e)
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to ingest issue")
         raise HTTPException(
             status_code=500,
-            detail={
-                "error": "ingestion_failed",
-                "message": str(e),
-                "details": {},
-            },
-        )
+            detail={"error": "ingestion_failed", "message": str(exc), "details": {}},
+        ) from exc
