@@ -45,10 +45,9 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # Resolve preferred base branch
                 (True, "", ""),  # Check for uncommitted changes
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
-                (True, "", ""),  # Install push guard (rev-parse in block_upstream_push)
             ]
 
             # Create hooks directory for the test
@@ -59,6 +58,7 @@ class TestShadowForkCreate:
             assert branch.startswith(SHADOW_BRANCH_PREFIX)
             assert fork.shadow_branch == branch
             assert fork.original_branch == "main"
+            assert fork.base_branch == "main"
             assert (tmp_path / MARKER_FILE).exists()
 
     def test_create_fails_if_already_active(self, tmp_path):
@@ -72,19 +72,29 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_falls_back_if_preferred_base_branch_is_missing(self, tmp_path):
+        """Missing preferred bases should resolve to the first available fallback."""
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (True, "feature-x", ""),  # Get current branch
+                (False, "", "fatal"),  # nonexistent
+                (False, "", "fatal"),  # origin/nonexistent
+                (True, "", ""),  # main exists
+                (True, "", ""),  # Clean working tree
+                (True, "", ""),  # Create and switch to shadow branch
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+            branch = fork.create(base_branch="nonexistent")
+
+            assert branch.startswith(SHADOW_BRANCH_PREFIX)
+            assert fork.base_branch == "main"
+            mock_git.assert_any_call(["rev-parse", "--verify", "nonexistent"], check=False)
+            mock_git.assert_any_call(["rev-parse", "--verify", "origin/nonexistent"], check=False)
+            mock_git.assert_any_call(["rev-parse", "--verify", "main"], check=False)
+            mock_git.assert_any_call(["checkout", "-b", branch, "main"])
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
@@ -93,8 +103,8 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # Resolve preferred base branch
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
                 (True, "", ""),  # Create and switch to shadow branch
             ]
 
@@ -423,8 +433,8 @@ class TestShadowForkIntegration:
             # Create shadow
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (True, "", ""),  # Resolve preferred base branch
                 (True, "", ""),  # Check uncommitted changes
-                (True, "", ""),  # Verify base branch
                 (True, "", ""),  # Create shadow branch
             ]
             branch = fork.create()
@@ -468,8 +478,8 @@ class TestShadowForkIntegration:
             # Create shadow
             mock_git.side_effect = [
                 (True, "feature-x", ""),  # Get current branch
+                (True, "", ""),  # Resolve preferred base branch
                 (True, "", ""),  # Check uncommitted changes
-                (True, "", ""),  # Verify base branch
                 (True, "", ""),  # Create shadow branch
             ]
             fork.create()
