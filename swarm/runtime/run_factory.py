@@ -1,9 +1,9 @@
 """Canonical run initialization for every Flow Studio entry point.
 
-A run is externally visible only after its durable launch record exists:
+The initializer returns only after its durable launch record exists:
 ``spec.json``, ``meta.json``, ``run_state.json``, and the initial
-``run_created`` event.  Individual files are atomically replaced by the
-storage layer; this module owns the cross-file fail-closed boundary.
+``run_created`` event. Individual files are atomically replaced by the
+storage layer; directory publication across the four files is not atomic.
 """
 
 from __future__ import annotations
@@ -46,11 +46,13 @@ def initialize_run(
     mode: str = "execute",
     runs_dir: Path = storage.RUNS_DIR,
 ) -> InitializedRun:
-    """Create one complete durable launch record or fail without publishing it.
+    """Create one complete durable launch record or raise before returning it.
 
-    The per-run ``spec.json`` is scoped by its containing run directory; the
-    run identity is repeated in metadata, runtime state, and every event where
-    it is semantically part of the record.
+    Individual files may be visible while initialization is in progress;
+    callers must treat successful return as the publication boundary. The
+    per-run ``spec.json`` is scoped by its containing run directory; the run
+    identity is repeated in metadata, runtime state, and every event where it
+    is semantically part of the record.
 
     Args:
         run_id: Stable identity selected by the caller.
