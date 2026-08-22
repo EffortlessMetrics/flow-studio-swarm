@@ -8,16 +8,21 @@ from pydantic import BaseModel, Field
 
 
 class RunStartRequest(BaseModel):
-    """Request to create a run and, in execute mode, schedule its backend."""
+    """Request to initialize one durable run record.
 
-    flow_id: str = Field(..., description="Flow to execute")
+    For execute mode, ``backend`` records the requested executor. Dispatch
+    happens at the executor boundary and is not part of this initialization
+    endpoint.
+    """
+
+    flow_id: str = Field(..., description="Flow selected for the run")
     run_id: Optional[str] = Field(None, description="Custom run ID (generated if omitted)")
     context: Optional[Dict[str, Any]] = Field(None, description="Initial context for the run")
     start_step: Optional[str] = Field(None, description="Initial node (defaults to graph entry)")
-    mode: str = Field("execute", description="Execution mode: execute, preview, validate")
+    mode: str = Field("execute", description="Requested mode: execute, preview, validate")
     backend: str = Field(
         "claude-step-orchestrator",
-        description="Backend selected for execution",
+        description="Requested execution backend; recorded here and dispatched at the executor boundary",
     )
 
 
