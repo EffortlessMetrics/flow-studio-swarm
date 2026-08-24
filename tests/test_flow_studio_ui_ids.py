@@ -703,11 +703,9 @@ class TestRunHistoryUIIDs:
 class TestRunDetailModalUIIDs:
     """Tests for Run Detail modal data-uiid attributes.
 
-    The Run Detail modal displays detailed information about a selected run.
-    These UIIDs enable test automation to:
-    - Open and close the modal
-    - Read run details
-    - Trigger re-run actions
+    The modal shell is static. Run-specific actions, including Re-run, are
+    rendered dynamically after the summary loads and are tested against the
+    compiled UI module below.
 
     Playwright selectors:
     - Modal: [data-uiid="flow_studio.modal.run_detail"]
@@ -750,27 +748,25 @@ class TestRunDetailModalUIIDs:
         )
 
     def test_run_detail_rerun_button_has_uiid(self):
-        """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        """Dynamically rendered Re-run action should keep its stable UIID."""
+        js_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "js" / "run_detail_modal.js"
+        assert js_file.exists(), "run_detail_modal.js should exist"
 
-        uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
-            f"Run detail re-run button missing data-uiid='{uiid}'. "
-            "This UIID is required for test automation to trigger re-runs."
+        content = js_file.read_text(encoding="utf-8")
+        assert "flow_studio.modal.run_detail.rerun" in content, (
+            "run_detail_modal.js should render the Re-run action with data-uiid"
         )
 
     def test_run_detail_modal_elements_have_uiids(self):
-        """All key run detail modal elements should have data-uiid."""
+        """All static run-detail modal elements should have data-uiid."""
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
-        # Expected run detail modal UIIDs
+        # Run-specific actions are dynamic and covered separately.
         expected_modal = [
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
 
         missing = [e for e in expected_modal if e not in uiids]
@@ -839,16 +835,16 @@ class TestRunDetailModalIntegration:
         )
 
     def test_run_detail_rerun_is_button(self):
-        """Verify run detail re-run is a button element.
+        """Verify dynamically rendered run detail re-run is a button element.
 
         Playwright selector: [data-uiid="flow_studio.modal.run_detail.rerun"]
         """
         html = get_flow_studio_html()
 
-        # Extract the rerun button element
+        # The compiled script contains the template that creates this button.
         pattern = re.compile(r'<button[^>]*data-uiid="flow_studio\.modal\.run_detail\.rerun"[^>]*>')
         match = pattern.search(html)
-        assert match, "Run detail rerun button should exist"
+        assert match, "Run detail rerun button template should exist"
 
 
 class TestRunHistoryIntegration:
