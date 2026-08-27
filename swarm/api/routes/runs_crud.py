@@ -82,7 +82,7 @@ async def list_runs(limit: int = 20):
         List of run summaries.
     """
     state_manager = get_state_manager()
-    runs = state_manager.list_runs(limit=limit)
+    runs = await state_manager.list_runs(limit=limit)
     return RunListResponse(runs=[RunSummary(**r) for r in runs])
 
 
