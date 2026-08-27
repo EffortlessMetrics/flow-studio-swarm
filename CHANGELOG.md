@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deprecated
+
+- **`swarm.runtime.stepwise.routing.route_step_unified`**: Deprecated in favour
+  of the canonical `route_step`. Touching the alias now emits a `FutureWarning`
+  naming its replacement; the alias keeps working and is scheduled for removal
+  in v4.0. Migration: replace
+  `from swarm.runtime.stepwise.routing import route_step_unified` with
+  `from swarm.runtime.stepwise.routing import route_step`. The two are the same
+  function object, so no call sites need to change.
+
 ### Added
 
 #### Flow Studio UX

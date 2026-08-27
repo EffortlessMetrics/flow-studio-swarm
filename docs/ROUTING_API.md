@@ -16,7 +16,9 @@ from swarm.runtime.types import RoutingMode, RoutingDecision, RoutingCandidate
 ```
 
 **Deprecated aliases** (for backwards compatibility only):
-- `route_step_unified` → Use `route_step` instead
+- `route_step_unified` → Use `route_step` instead. Emits a `FutureWarning` on
+  use; **removed in v4.0**. It is the same function object as `route_step`, so
+  migrating is an import change only.
 - `route_step_legacy` → Legacy signature, avoid in new code
 
 ---
