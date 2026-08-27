@@ -209,6 +209,22 @@ SKIP_PATTERNS = [
 # File extensions to check
 CHECK_EXTENSIONS = {".md", ".yaml", ".yml", ".json", ".py", ".ts", ".tsx"}
 
+# Inline suppression marker.
+#
+# Warning patterns fire on any *mention* of a deprecated routing field, which
+# legitimately occurs in deprecation notes, migration guides, and release
+# checklists. Those mentions are the documentation working as intended, so they
+# would otherwise make --strict permanently red.
+#
+# Put the marker on the offending line or the line immediately above it:
+#
+#   <!-- lint-routing-ignore: documents the deprecated vocabulary -->
+#   ... text mentioning route_to_flow ...
+#
+# The marker suppresses warnings only. Hard violations (actual use of a legacy
+# field) are always reported, so this cannot be used to hide a real regression.
+IGNORE_MARKER = "lint-routing-ignore"
+
 
 @dataclass
 class Violation:
@@ -289,7 +305,11 @@ def check_file(
         # Check legacy warning patterns (only if not already matched as violation)
         # Skip warnings if the line already has a violation to avoid duplicates
         line_has_violation = any(v.line_num == line_num for v in violations)
-        if not line_has_violation:
+        # Deprecation documentation opts out via an inline marker on the line
+        # itself or the line directly above it.
+        previous_line = lines[line_num - 2] if line_num >= 2 else ""
+        warning_suppressed = IGNORE_MARKER in line or IGNORE_MARKER in previous_line
+        if not line_has_violation and not warning_suppressed:
             for pattern, desc in LEGACY_WARNING_PATTERNS:
                 if re.search(pattern, line, re.IGNORECASE):
                     violations.append(

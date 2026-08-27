@@ -164,6 +164,7 @@ Rationale: <1 short paragraph grounded in critic statuses + mismatch check>
 
 ## Routing guidance (how to fill Machine Summary)
 
+<!-- lint-routing-ignore: names the legacy fields to contrast them with the V3 vocabulary -->
 The new routing vocabulary uses **intent** and **target** instead of legacy `route_to_flow`/`route_to_agent`:
 
 | Intent | Meaning |
