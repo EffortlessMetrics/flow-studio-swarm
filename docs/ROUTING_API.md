@@ -15,9 +15,45 @@ from swarm.runtime.stepwise.routing import route_step, RoutingOutcome
 from swarm.runtime.types import RoutingMode, RoutingDecision, RoutingCandidate
 ```
 
-**Deprecated aliases** (for backwards compatibility only):
-- `route_step_unified` → Use `route_step` instead
-- `route_step_legacy` → Legacy signature, avoid in new code
+### Deprecated aliases
+
+| Alias | Replacement | Status | Removed in |
+|-------|-------------|--------|------------|
+| `route_step_unified` | `route_step` | Deprecated - emits `FutureWarning` on access | v4.0 |
+| `route_step_legacy` | `route_step` | Legacy signature; avoid in new code | not scheduled |
+
+#### Migrating off `route_step_unified`
+
+`route_step_unified` is a pure alias for `route_step` - same function, same
+signature - so migration is a rename with no behavioral change:
+
+```python
+# Before (warns)
+from swarm.runtime.stepwise.routing import route_step_unified
+outcome = route_step_unified(...)
+
+# After
+from swarm.runtime.stepwise.routing import route_step
+outcome = route_step(...)
+```
+
+Accessing or importing the alias emits a `FutureWarning` naming the
+replacement. To find remaining usages:
+
+```bash
+grep -rn "route_step_unified" --include="*.py" .
+```
+
+To fail the build on any remaining usage while migrating:
+
+```bash
+uv run python -W error::FutureWarning -m pytest
+```
+
+`route_step_legacy` is a *different* function (the receipt-based legacy
+signature from `_routing_legacy.py`), not an alias. It is still re-exported by
+`swarm.runtime.stepwise` and has no removal date; prefer `route_step` in new
+code.
 
 ---
 

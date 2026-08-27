@@ -595,7 +595,7 @@ from swarm.runtime.stepwise.routing import route_step, RoutingOutcome
 from swarm.runtime.types import RoutingMode, RoutingDecision, RoutingCandidate
 ```
 
-**Deprecated:** `route_step_unified` is an alias for backwards compatibility. Use `route_step` directly.
+**Deprecated:** `route_step_unified` is an alias for backwards compatibility. It emits a `FutureWarning` on access and is removed in v4.0 - use `route_step` directly. See the migration table in [ROUTING_API.md](./ROUTING_API.md#deprecated-aliases).
 
 ### RoutingOutcome vs RoutingSignal
 
