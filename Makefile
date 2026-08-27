@@ -1163,16 +1163,14 @@ profiles-help:
 # ============================================================================
 
 .PHONY: check-agent-sdk
+# Single logical line: make runs each recipe line in its own shell, so a
+# multi-line heredoc here would leave the redirect unterminated and feed its
+# body to the shell as commands. Backslash continuations are joined by make
+# before the shell sees them.
 check-agent-sdk:
-	@uv run --extra dev --group dev python - <<-'PY'
-		import sys
-		try:
-		    import claude_agent_sdk  # noqa: F401
-		except Exception:
-		    print("ERROR: claude-agent-sdk not installed. Run: uv sync --extra dev", file=sys.stderr)
-		    sys.exit(1)
-		print("OK: claude-agent-sdk installed.")
-	PY
+	@uv run --extra dev --group dev python -c "import claude_agent_sdk" >/dev/null 2>&1 \
+		&& echo "OK: claude-agent-sdk installed." \
+		|| { echo "ERROR: claude-agent-sdk not installed. Run: uv sync --extra dev" >&2; exit 1; }
 
 .PHONY: vendor-agent-sdk
 vendor-agent-sdk:

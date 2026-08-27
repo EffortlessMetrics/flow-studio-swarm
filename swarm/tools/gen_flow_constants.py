@@ -20,7 +20,14 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-from swarm.utils.yaml_utils import load_yaml
+# Add repo root to path for library imports. Must run before importing swarm.*,
+# since this script is executed by path (e.g. `uv run swarm/tools/gen_flow_constants.py`)
+# rather than as a module, so the repo root is not on sys.path.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from swarm.utils.yaml_utils import load_yaml  # noqa: E402
 
 # Project root (two levels up from this script)
 PROJECT_ROOT = Path(__file__).parent.parent.parent
