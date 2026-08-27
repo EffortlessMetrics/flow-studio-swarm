@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Copy button on artifact details path**: Quick path copying for file navigation
 - **Copy button for dev-check command**: One-click copy of `make dev-check` in header
 
+#### Audit Trail
+- **Routing context digest** (#219): Navigator routing now receives and records a bounded forensic digest (status, verification, file changes, forensic verdict, loop state, candidate count) instead of an empty string. Persisted to the routing envelope so a decision can be explained without re-reading full context.
+- **Prompt fragment manifest** (#218): `PromptReceipt.fragment_manifest` is now populated with `path@hash` entries for every fragment that contributed to a compiled prompt, including inline `{{fragment:...}}` includes. Prompts are traceable to their sources from the receipt alone.
+
 ### Changed
 
 #### Performance Optimizations
@@ -38,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Legend toggle**: Semantic button for accessibility
 - **NodeInspector**: ARIA labels on icon buttons
 
+### Deprecated
+
+- **`route_step_unified`** (#220): Deprecated alias for `route_step`. Accessing or importing it emits a `FutureWarning` naming the replacement; removal is scheduled for v4.0. The two are the same function, so migration is a rename. See the migration table in [docs/ROUTING_API.md](./docs/ROUTING_API.md#deprecated-aliases).
+
 ### Fixed
 
 #### Security
@@ -49,10 +57,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Bug Fixes
 - **Boundary review**: Robust detour detection with normalization for decision handling (handles None, non-strings, whitespace, case variations)
+- **Blocking event loop in runs list** (#223): `RunStateManager.list_runs()` is now async and offloads its directory walk to a worker thread. Previously the synchronous implementation was called from an async FastAPI endpoint, stalling the event loop on disk I/O for large run histories.
+
+#### Repository Health
+- **Flow order guardrail**: Corrected a drifted line number in the complexity allowlist for `json_output.py` (the allowlisted registry-import fallback moved from line 126 to 139)
+- **Flow Studio UIID contracts**: The run detail re-run button is rendered at runtime by `run_detail_modal.ts`, not authored in the static HTML shell. Its UIID assertion moved from the static-DOM tests to the compiled-JS tests, matching how the sibling exemplar and events UIIDs are covered.
+- **Shadow fork tests**: Rewrote two tests that encoded a stale `create()` call order. `create()` resolves the base ref before checking working-tree status and falls back through a candidate ladder rather than raising on a missing base branch; the tests now assert that documented contract and patch semantic seams instead of sequencing raw git results.
 
 #### Documentation
 - **Definition of Done**: Updated to v3.0.0-rc.1, clarified purpose and acceptance criteria
 - **GETTING_STARTED.md**: Fixed flow count to accurately reflect 7 core flows
+- **ROUTING_API.md**: Added a deprecated-alias migration table with a worked `route_step_unified` → `route_step` example
+
+#### Test Coverage
+- **`tests/test_run_state.py`** (#222): Dedicated `RunStateManager` suite covering create/get/update, ETag preconditions, atomic tmp→rename writes, per-run lock serialization, list ordering and limits, and malformed-state tolerance
+- **`tests/test_routing_context_digest.py`**: Digest bounds, omission of unmeasured signals, and tolerance of partial or hostile context
+- **`tests/test_prompt_fragment_manifest.py`**: Manifest rendering, inline include tracking, and propagation into `PromptReceipt`
+- **`tests/test_routing_deprecations.py`**: Deprecation warning contract and a guard against internal use of the deprecated alias
 
 ---
 
