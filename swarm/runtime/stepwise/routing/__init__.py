@@ -49,6 +49,8 @@ See Also:
 
 from __future__ import annotations
 
+import warnings
+
 # =============================================================================
 # Canonical routing API (from driver.py)
 # =============================================================================
@@ -59,9 +61,38 @@ from swarm.runtime.stepwise.routing.driver import (  # noqa: E402
     route_step,  # Canonical routing function
 )
 
-# Backwards-compat alias for code that used route_step_unified
-# TODO: Deprecate in future version
-route_step_unified = route_step
+# =============================================================================
+# Deprecated aliases
+# =============================================================================
+# Deprecated in favour of the canonical names. Resolved lazily through
+# module __getattr__ (PEP 562) so that importing or otherwise touching the
+# name raises a FutureWarning naming its replacement, while the alias keeps
+# working. Scheduled for removal in v4.0.
+#
+# Format: { "deprecated_name": "canonical_name" }
+_DEPRECATED_ALIASES = {
+    "route_step_unified": "route_step",
+}
+
+
+def __getattr__(name: str):
+    """Resolve deprecated aliases, warning about their replacement.
+
+    Raises:
+        AttributeError: If the name is neither a real attribute nor a
+            known deprecated alias.
+    """
+    canonical = _DEPRECATED_ALIASES.get(name)
+    if canonical is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    warnings.warn(
+        f"{__name__}.{name} is deprecated and will be removed in v4.0; "
+        f"use {__name__}.{canonical} instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
+    return globals()[canonical]
 
 # =============================================================================
 # Legacy routing re-exports (backwards compatibility)
@@ -96,7 +127,7 @@ __all__ = [
     # ==========================================================================
     "route_step",  # Canonical routing function
     "RoutingOutcome",
-    "route_step_unified",  # Backwards-compat alias (TODO: deprecate)
+    "route_step_unified",  # Deprecated alias for route_step; removed in v4.0
     # ==========================================================================
     # Legacy exports (backwards compatibility)
     # ==========================================================================

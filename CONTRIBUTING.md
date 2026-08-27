@@ -2,10 +2,14 @@
 
 Thanks for contributing to Flow Studio. This project uses an agentic SDLC with strict governance gates.
 
+By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
+
 > **Quick Links:**
 > - [Definition of Done](docs/DEFINITION_OF_DONE.md) — What "done" means for merging
 > - [Merge Checklist](docs/MERGE_CHECKLIST.md) — Pre-merge verification checklist
 > - [CI Troubleshooting](docs/CI_TROUBLESHOOTING.md) — Fixing CI failures
+> - [Code of Conduct](CODE_OF_CONDUCT.md) — Expected community behavior
+> - [Security Policy](SECURITY.md) — Reporting vulnerabilities (never open a public issue)
 
 All contributions go through seven flows:
 

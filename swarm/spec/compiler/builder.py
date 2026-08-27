@@ -84,12 +84,16 @@ class StepPlanBuilder:
             previous_envelopes=previous_envelopes,
         )
 
-        system_prompt = self._process_fragment_includes(system_prompt)
-        user_prompt = self._process_fragment_includes(user_prompt)
+        inline_fragments: List[str] = []
+        system_prompt = self._process_fragment_includes(system_prompt, inline_fragments)
+        user_prompt = self._process_fragment_includes(user_prompt, inline_fragments)
 
         fragment_paths = list(station.runtime_prompt.fragments)
         if policy_invariants_ref:
             fragment_paths.extend(policy_invariants_ref)
+        # Inline {{fragment:...}} includes contribute to the compiled prompt too,
+        # so the manifest must name them or a receipt cannot reproduce the prompt.
+        fragment_paths.extend(inline_fragments)
         fragment_paths = _dedupe_preserve_order(fragment_paths)
         fragments_used = self._collect_fragment_references(fragment_paths)
 
@@ -417,8 +421,24 @@ class StepPlanBuilder:
             "sandbox_enabled": overrides.get("sandbox_enabled", sdk.sandbox.enabled),
         }
 
-    def _process_fragment_includes(self, content: str) -> str:
-        """Resolve {{fragment:...}} includes in prompt content."""
+    def _process_fragment_includes(
+        self,
+        content: str,
+        collected: Optional[List[str]] = None,
+    ) -> str:
+        """Resolve {{fragment:...}} includes in prompt content.
+
+        Args:
+            content: Prompt text possibly containing {{fragment:...}} markers.
+            collected: Optional list that resolved fragment paths are appended
+                to, so inline includes reach the audit manifest alongside the
+                station's declared fragments. Only fragments that actually
+                loaded are recorded - a missing include is a warning, not an
+                audit entry.
+
+        Returns:
+            The content with includes resolved.
+        """
         pattern = r"\{\{fragment:([^}]+)\}\}"
 
         def replace_fragment(match: re.Match) -> str:
@@ -426,10 +446,14 @@ class StepPlanBuilder:
             if not frag_path.endswith(".md"):
                 frag_path = f"{frag_path}.md"
             try:
-                return load_fragment(frag_path, self.repo_root)
+                resolved = load_fragment(frag_path, self.repo_root)
             except FileNotFoundError:
                 logger.warning("Fragment include not found: %s", frag_path)
                 return f"[Fragment not found: {frag_path}]"
+
+            if collected is not None:
+                collected.append(frag_path)
+            return resolved
 
         return re.sub(pattern, replace_fragment, content)
 

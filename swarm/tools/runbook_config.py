@@ -22,10 +22,18 @@ See: docs/designs/RUNBOOK_AUTOMATION_DESIGN.md
 """
 
 import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from swarm.utils.yaml_utils import load_yaml
+# Add repo root to path for library imports. Must run before importing swarm.*,
+# since this script is executed by path (e.g. `uv run swarm/tools/runbook_config.py`)
+# rather than as a module, so the repo root is not on sys.path.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from swarm.utils.yaml_utils import load_yaml  # noqa: E402
 
 # Default configuration - used when config file is missing or incomplete
 DEFAULT_CONFIG: Dict[str, Any] = {

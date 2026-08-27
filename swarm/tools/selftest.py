@@ -313,6 +313,84 @@ class SelfTestResult:
         return result
 
 
+
+def _run_command_sequence(
+    commands: List[str],
+    timeout: int,
+) -> Tuple[int, str, str, bool]:
+    """Run commands in order, stopping at the first failure.
+
+    A step declares its commands as a list. They were previously joined with
+    " && " into one string and handed to shlex.split() with shell=False, so the
+    "&&" and every token after it arrived as *arguments to the first command*
+    rather than as a shell operator - which is why a two-command step failed
+    with the second command's flags reported as unexpected arguments to the
+    first.
+
+    This reproduces "&&" semantics without a shell, keeping the no-shell
+    property the commands are executed under: each command runs as its own
+    argv, and a non-zero exit stops the sequence.
+
+    The timeout is a budget for the whole step, not per command, so a step
+    cannot exceed its declared limit by splitting work across commands.
+
+    Args:
+        commands: Commands to run in order, each a shell-style string.
+        timeout: Total seconds allowed for the whole sequence.
+
+    Returns:
+        (exit_code, stdout, stderr, timed_out) where stdout/stderr are the
+        concatenated output of the commands that ran.
+    """
+    stdout_parts: List[str] = []
+    stderr_parts: List[str] = []
+    deadline = time.time() + timeout
+
+    for command in commands:
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            return (
+                -1,
+                "".join(stdout_parts),
+                "".join(stderr_parts) + f"Command timed out after {timeout} seconds",
+                True,
+            )
+
+        # Popen with start_new_session=True creates a new process group so a
+        # timeout can kill the whole tree, not just the direct child.
+        proc = subprocess.Popen(
+            shlex.split(command),
+            shell=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+        try:
+            out, err = proc.communicate(timeout=remaining)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, OSError):
+                proc.kill()
+            proc.wait()
+            return (
+                -1,
+                "".join(stdout_parts),
+                "".join(stderr_parts) + f"Command timed out after {timeout} seconds",
+                True,
+            )
+
+        if out:
+            stdout_parts.append(out)
+        if err:
+            stderr_parts.append(err)
+
+        if proc.returncode != 0:
+            return proc.returncode, "".join(stdout_parts), "".join(stderr_parts), False
+
+    return 0, "".join(stdout_parts), "".join(stderr_parts), False
+
 class SelfTestRunner:
     """Orchestrates selftest execution."""
 
@@ -611,40 +689,22 @@ class SelfTestRunner:
 
         result.timestamp_start = time.time()
         try:
-            # Use Popen with start_new_session=True to create a new process group.
-            # This ensures we can kill all child processes on timeout, not just the shell.
-            # Parse command string into list for safe execution (avoids shell injection)
-            cmd_args = shlex.split(step.full_command())
-            proc = subprocess.Popen(
-                cmd_args,
-                shell=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                start_new_session=True,  # Create new process group for proper cleanup
+            # Each command runs as its own argv with shell=False; the sequence
+            # stops at the first failure, reproducing "&&" without a shell.
+            exit_code, stdout, stderr, timed_out = _run_command_sequence(
+                step.commands(), step.timeout
             )
-            try:
-                stdout, stderr = proc.communicate(timeout=step.timeout)
-                result.exit_code = proc.returncode
-                result.stdout = stdout
-                result.stderr = stderr
-                if proc.returncode == 0:
-                    result.status = StepStatus.PASS
-                else:
-                    result.status = StepStatus.FAIL
-                    result.reason = "nonzero_exit"
-            except subprocess.TimeoutExpired:
-                # Kill the entire process group, not just the shell
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                except (ProcessLookupError, OSError):
-                    # Process may have already terminated
-                    proc.kill()
-                proc.wait()  # Clean up zombie process
+            result.exit_code = exit_code
+            result.stdout = stdout
+            result.stderr = stderr
+            if timed_out:
                 result.status = StepStatus.TIMEOUT
                 result.reason = "timeout"
-                result.exit_code = -1
-                result.stderr = f"Command timed out after {step.timeout} seconds"
+            elif exit_code == 0:
+                result.status = StepStatus.PASS
+            else:
+                result.status = StepStatus.FAIL
+                result.reason = "nonzero_exit"
         except Exception as e:
             result.status = StepStatus.FAIL
             result.reason = "exception"
@@ -1120,34 +1180,12 @@ def _run_step_in_process(step_data: Dict[str, Any]) -> Dict[str, Any]:
 
     timestamp_start = time.time()
     try:
-        # Use Popen with start_new_session=True for proper timeout handling.
-        # This ensures child processes are killed when timeout fires.
-        # Parse command string into list for safe execution (avoids shell injection)
-        cmd_args = shlex.split(step.full_command())
-        proc = subprocess.Popen(
-            cmd_args,
-            shell=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            start_new_session=True,  # Create new process group for proper cleanup
+        # Each command runs as its own argv with shell=False; the sequence
+        # stops at the first failure, reproducing "&&" without a shell.
+        exit_code, stdout, stderr, _timed_out = _run_command_sequence(
+            step.commands(), step.timeout
         )
-        try:
-            stdout, stderr = proc.communicate(timeout=step.timeout)
-            exit_code = proc.returncode
-            passed = proc.returncode == 0
-        except subprocess.TimeoutExpired:
-            # Kill the entire process group, not just the shell
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except (ProcessLookupError, OSError):
-                # Process may have already terminated
-                proc.kill()
-            proc.wait()  # Clean up zombie process
-            exit_code = -1
-            stdout = ""
-            stderr = f"Command timed out after {step.timeout} seconds"
-            passed = False
+        passed = exit_code == 0
     except Exception as e:
         exit_code = -1
         stdout = ""

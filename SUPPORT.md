@@ -40,6 +40,11 @@ Include:
 - Steps to reproduce
 - `make selftest` output (if relevant)
 
+### Found a Security Vulnerability?
+
+**Do not open a public issue.** Report it privately — see
+[SECURITY.md](./SECURITY.md).
+
 ### Have a Question?
 
 Open an issue using the **[Adoption Question template](../../issues/new?template=adoption_question.md)**.

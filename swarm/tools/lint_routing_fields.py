@@ -57,7 +57,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 # =============================================================================
 # LEGACY PATTERNS - These indicate deprecated routing vocabulary (violations)
@@ -195,6 +195,33 @@ NEW_ROUTING_VALID_PATTERNS = [
 VIOLATION_PATTERNS = LEGACY_VIOLATION_PATTERNS
 WARNING_PATTERNS = LEGACY_WARNING_PATTERNS
 
+# Files that legitimately document the deprecation itself.
+#
+# The bare-mention warning patterns above exist to ask "verify this is
+# deprecation documentation". These files are that documentation: naming the
+# retired fields is the point. Only the *warning* patterns are suppressed here
+# - LEGACY_VIOLATION_PATTERNS still apply, so an actual reintroduction of
+# `route_to_flow: 3` or `route_to_agent: some-agent` is still an error.
+#
+# Format: { "path/suffix": "why this file names the deprecated fields" }
+DEPRECATION_DOC_ALLOWLIST: Dict[str, str] = {
+    "swarm/prompts/agentic_steps/self-reviewer.md": (
+        "Teaches the V3 vocabulary by contrasting it with the retired "
+        "route_to_flow/route_to_agent fields"
+    ),
+    "docs/RELEASE_CHECKLIST.md": (
+        "Release step that greps for the retired fields; the field names are "
+        "the check itself"
+    ),
+}
+
+
+def is_deprecation_doc(file_path: Path) -> bool:
+    """Check if a file is allowlisted as documentation of the deprecation."""
+    path_str = str(file_path).replace("\\", "/")
+    return any(path_str.endswith(allowed) for allowed in DEPRECATION_DOC_ALLOWLIST)
+
+
 # Files/directories to skip
 SKIP_PATTERNS = [
     "**/node_modules/**",
@@ -289,7 +316,7 @@ def check_file(
         # Check legacy warning patterns (only if not already matched as violation)
         # Skip warnings if the line already has a violation to avoid duplicates
         line_has_violation = any(v.line_num == line_num for v in violations)
-        if not line_has_violation:
+        if not line_has_violation and not is_deprecation_doc(file_path):
             for pattern, desc in LEGACY_WARNING_PATTERNS:
                 if re.search(pattern, line, re.IGNORECASE):
                     violations.append(

@@ -28,6 +28,12 @@ from typing import Any, Dict, List
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 
+# Add repo root to path for library imports. This script is executed by path
+# (`uv run swarm/tools/gen_capabilities_doc.py`) rather than as a module, so
+# the repo root is not on sys.path.
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Paths
 REGISTRY_PATH = REPO_ROOT / "specs" / "capabilities.yaml"
 OUTPUT_PATH = REPO_ROOT / "docs" / "reference" / "CAPABILITIES.md"
@@ -61,10 +67,15 @@ def parse_yaml_simple(content: str) -> Dict[str, Any]:
         from swarm.utils.yaml_utils import load_yaml
 
         return load_yaml(content)
-    except ImportError:
-        # Fallback to a basic parser if yaml not available
-        # This won't handle complex YAML but works for simple cases
-        raise ImportError("PyYAML required: pip install pyyaml")
+    except ImportError as exc:
+        # Distinguish a genuinely missing dependency from a broken import path -
+        # reporting the latter as "PyYAML required" sends readers after an
+        # uninstalled package that is in fact already present.
+        raise ImportError(
+            f"Could not import swarm.utils.yaml_utils ({exc}). "
+            f"Check that the repo root is on sys.path and PyYAML is installed "
+            f"(uv sync --extra dev)."
+        ) from exc
 
 
 def status_badge(status: str) -> str:

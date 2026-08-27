@@ -326,6 +326,9 @@ class PromptPlan:
     # V2: Flow key for routing (e.g., "build" from "3-build")
     flow_key: str = ""
 
+    # Fragment paths that contributed to the compiled prompt (audit manifest)
+    fragment_manifest: Tuple[str, ...] = ()
+
 
 @dataclass(frozen=True)
 class PromptReceipt:
@@ -352,7 +355,7 @@ def create_prompt_receipt(plan: PromptPlan, context_pack_hash: str = "") -> Prom
     """Create a PromptReceipt from a compiled PromptPlan."""
     return PromptReceipt(
         prompt_hash=plan.prompt_hash,
-        fragment_manifest=(),  # TODO: Track fragments in compiler
+        fragment_manifest=plan.fragment_manifest,
         context_pack_hash=context_pack_hash,
         model_tier=plan.model.split("-")[1] if "-" in plan.model else plan.model,
         tool_profile=plan.allowed_tools,

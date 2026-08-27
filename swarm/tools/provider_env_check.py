@@ -36,7 +36,15 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-# Add parent to path for relative imports
+# Add repo root to path so `swarm.config.*` resolves. This script is executed
+# by path rather than as a module, so the repo root is not on sys.path and the
+# preferred package import below would otherwise always fall through.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+# Kept for the direct-execution fallback below, which imports runtime_config
+# as a top-level module.
 sys.path.insert(0, str(Path(__file__).parent.parent / "config"))
 
 try:

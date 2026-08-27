@@ -38,9 +38,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from swarm.utils.yaml_utils import load_yaml
-
+# Add repo root to path for library imports. Must run before importing swarm.*,
+# since this script is executed by path (`uv run swarm/tools/gen_flows.py`)
+# rather than as a module, so the repo root is not on sys.path.
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from swarm.utils.yaml_utils import load_yaml  # noqa: E402
+
 AGENT_CONFIG_DIR = REPO_ROOT / "swarm" / "config" / "agents"
 FLOW_CONFIG_DIR = REPO_ROOT / "swarm" / "config" / "flows"
 FLOW_DOC_DIR = REPO_ROOT / "swarm" / "flows"
