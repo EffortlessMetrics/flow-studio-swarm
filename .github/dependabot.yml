@@ -1,0 +1,97 @@
+# Dependabot configuration
+#
+# Keeps Python, npm, and GitHub Actions dependencies current. Triage follows
+# the ladder in SECURITY.md: reachability decides priority, so a CVE in a
+# package no repo code calls is SEV4, not SEV1.
+#
+# Updates are grouped so a routine bump week is one or two reviewable PRs
+# rather than a dozen. Security updates are deliberately left ungrouped by
+# Dependabot so they arrive as isolated, fast-reviewable PRs.
+version: 2
+
+updates:
+  # --------------------------------------------------------------------------
+  # Python (pyproject.toml + uv.lock)
+  # --------------------------------------------------------------------------
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      python-dev:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      python-runtime:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # --------------------------------------------------------------------------
+  # Flow Studio UI (TypeScript)
+  # --------------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/swarm/tools/flow_studio_ui"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "area:ui"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      ui-dependencies:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # --------------------------------------------------------------------------
+  # Agent SDK TypeScript example
+  # --------------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/examples/agent-sdk-ts"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      example-dependencies:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # --------------------------------------------------------------------------
+  # GitHub Actions
+  # --------------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      github-actions:
+        update-types:
+          - "minor"
+          - "patch"
