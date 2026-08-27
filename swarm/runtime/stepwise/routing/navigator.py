@@ -28,7 +28,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from swarm.runtime.forensic_comparator import (
     compare_claim_vs_evidence,
@@ -56,6 +56,93 @@ if TYPE_CHECKING:
     from swarm.runtime.types import RunSpec, RunState
 
 logger = logging.getLogger(__name__)
+
+
+def build_context_digest(
+    step_id: str,
+    iteration: int,
+    step_result: Dict[str, Any],
+    verification_result: Optional[Dict[str, Any]] = None,
+    file_changes: Optional[Dict[str, Any]] = None,
+    forensic_verdict: Optional[Dict[str, Any]] = None,
+    loop_state: Optional[Dict[str, int]] = None,
+) -> str:
+    """Build a compact digest of the context that informed a routing decision.
+
+    The digest is a single line of ``key=value`` clauses covering the signals
+    the Navigator actually routes on: where we are, whether verification
+    passed, what changed on disk, and whether the forensic comparator trusts
+    the step's claims. It is fed to the Navigator as ``context`` and persisted
+    alongside the candidate set so a routing decision can be audited without
+    re-reading the full step output.
+
+    Every field is optional. Signals that were not measured are omitted rather
+    than defaulted, so an absent clause means "not measured", not "zero".
+
+    Args:
+        step_id: The step being routed away from.
+        iteration: Current iteration count for this step.
+        step_result: Step execution result (status, duration_ms).
+        verification_result: Verification check results, if any were run.
+        file_changes: Diff scan output, if a scan ran.
+        forensic_verdict: Claim-vs-evidence verdict, if one was computed.
+        loop_state: Microloop iteration state, if this step loops.
+
+    Returns:
+        A compact single-line digest. Never raises; on unexpected input shapes
+        the affected clause is dropped.
+    """
+    parts: List[str] = [f"step={step_id}", f"iter={iteration}"]
+
+    status = step_result.get("status")
+    if status:
+        parts.append(f"status={status}")
+
+    duration_ms = step_result.get("duration_ms")
+    if duration_ms:
+        parts.append(f"duration_ms={duration_ms}")
+
+    if verification_result:
+        checks = verification_result.get("checks", []) or []
+        failed = [c for c in checks if not c.get("passed", True)]
+        parts.append(f"verify={'pass' if verification_result.get('passed', True) else 'fail'}")
+        if checks:
+            parts.append(f"checks={len(checks) - len(failed)}/{len(checks)}")
+        if failed:
+            names = [str(c.get("name") or c.get("message") or "unknown") for c in failed[:3]]
+            suffix = f" (+{len(failed) - 3})" if len(failed) > 3 else ""
+            parts.append(f"failed=[{', '.join(names)}{suffix}]")
+
+    if file_changes:
+        files = file_changes.get("files", []) or []
+        insertions = file_changes.get("total_insertions", 0)
+        deletions = file_changes.get("total_deletions", 0)
+        parts.append(f"files={len(files)}")
+        parts.append(f"lines=+{insertions}/-{deletions}")
+        untracked = file_changes.get("untracked", []) or []
+        if untracked:
+            parts.append(f"untracked={len(untracked)}")
+        if file_changes.get("scan_error"):
+            parts.append("scan=error")
+
+    if forensic_verdict:
+        parts.append(f"claim={'ok' if forensic_verdict.get('claim_verified', True) else 'suspect'}")
+        confidence = forensic_verdict.get("confidence")
+        if confidence is not None:
+            parts.append(f"confidence={float(confidence):.2f}")
+        recommendation = forensic_verdict.get("recommendation")
+        if recommendation:
+            parts.append(f"verdict={recommendation}")
+        flags = forensic_verdict.get("reward_hacking_flags", []) or []
+        if flags:
+            parts.append(f"flags=[{', '.join(str(f) for f in flags[:3])}]")
+
+    if loop_state:
+        loops = loop_state.get(step_id)
+        if loops:
+            parts.append(f"loops={loops}")
+
+    return " ".join(parts)
 
 
 def route_via_navigator(
@@ -250,6 +337,20 @@ def route_via_navigator(
         [c["candidate_id"] for c in routing_candidates],
     )
 
+    # Build a compact digest of the signals that informed this decision.
+    # Passed to the Navigator as `context` and persisted for audit below.
+    context_digest = build_context_digest(
+        step_id=step.id,
+        iteration=iteration,
+        step_result=step_result_dict,
+        verification_result=verification_result,
+        file_changes=file_changes,
+        forensic_verdict=forensic_verdict,
+        loop_state=loop_state,
+    )
+
+    logger.debug("Context digest for step %s: %s", step.id, context_digest)
+
     # Call NavigationOrchestrator.navigate() with candidates
     nav_result = navigation_orchestrator.navigate(
         run_id=run_id,
@@ -261,7 +362,7 @@ def route_via_navigator(
         verification_result=verification_result,
         file_changes=file_changes,
         run_state=run_state,
-        context_digest="",  # TODO: Implement context digest
+        context_digest=context_digest,
         previous_envelope=previous_envelope,
         no_human_mid_flow=spec.no_human_mid_flow,
         routing_candidates=routing_candidates,
@@ -298,6 +399,7 @@ def route_via_navigator(
                 json.dump(
                     {
                         "step_id": step.id,
+                        "context_digest": context_digest,
                         "candidate_count": len(routing_candidates),
                         "candidates": routing_candidates,
                     },
@@ -326,6 +428,7 @@ def route_via_navigator(
         "candidate_ids": [c.get("candidate_id") for c in routing_candidates],
         "candidate_set_path": candidate_set_path,
         "routing_source": routing_source,
+        "context_digest": context_digest,
     }
     updated = update_envelope_routing(
         run_base=run_base,
