@@ -23,7 +23,7 @@ from swarm.spec.types import (
 
 from .builder import StepPlanBuilder
 from .intent_adapters import intent_from_flow_node, intent_from_flow_step
-from .models import CompileContext, StepIntent, StepPlan
+from .models import CompileContext, StepIntent, StepPlan, fragment_manifest_from_plan
 
 if TYPE_CHECKING:
     from swarm.runtime.context_pack import ContextPack
@@ -210,6 +210,7 @@ class SpecCompiler:
             verification=step_plan.verification,
             handoff=handoff,
             flow_key=flow_key,
+            fragment_manifest=fragment_manifest_from_plan(step_plan),
         )
 
     def compile_from_context(

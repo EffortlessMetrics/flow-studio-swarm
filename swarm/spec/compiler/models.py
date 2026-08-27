@@ -208,6 +208,23 @@ class StepPlan:
         }
 
 
+def fragment_manifest_from_plan(plan: StepPlan) -> Tuple[str, ...]:
+    """Render a StepPlan's fragment references as an audit manifest.
+
+    Each entry is ``path@hash`` so a receipt identifies not just which
+    fragments were used but the exact content that was injected. Fragments
+    without a recorded hash degrade to the bare path rather than being
+    dropped.
+
+    Args:
+        plan: The compiled step plan.
+
+    Returns:
+        Tuple of manifest entries in prompt-construction order.
+    """
+    return tuple(f"{f.path}@{f.hash}" if f.hash else f.path for f in plan.fragments_used)
+
+
 @dataclass
 class CompileContext:
     """Context for compilation including run information."""
