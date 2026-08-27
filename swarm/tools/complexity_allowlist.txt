@@ -1,4 +1,24 @@
 # Path | expires (YYYY-MM-DD) | reason
 # Example:
 # swarm/runtime/types/state_types.py | 2026-03-31 | Temporary during refactor (SWARM-123)
-swarm/runtime/backends.py | 2026-02-28 | Large backend implementations, needs splitting (REF-001)
+#
+# Every entry must name a durable GitHub issue that owns the debt, and must
+# carry an expiry. CI fails again on the expiry date unless the issue is
+# resolved and the entry removed. Entries cover pre-existing debt only - new
+# code is expected to land under the thresholds.
+
+# Runtime backends: combines backend implementations, lifecycle handling and
+# Stepwise adapters. Split tracked by #1445.
+swarm/runtime/backends.py | 2026-10-31 | Combines backend implementations, lifecycle handling and Stepwise adapters; split tracked by #1445
+
+# Repository-contract test modules: mix reusable helpers, contract fixtures and
+# several unrelated test classes. Decomposition tracked by #1446.
+tests/test_flow_order_guardrail.py | 2026-09-30 | Scanner helpers plus guardrail and pattern self-tests in one module; decomposition tracked by #1446
+tests/test_flow_studio_ui_ids.py | 2026-09-30 | UIID parser, static DOM contracts and dynamic template contracts in one module; decomposition tracked by #1446
+tests/test_shadow_fork.py | 2026-09-30 | Creation, checkpoint, push-guard and workflow contracts in one module; decomposition tracked by #1446
+
+# Spec compiler and routing linter modules. Decomposition tracked by #1451.
+swarm/spec/compiler_legacy.py | 2026-11-30 | Legacy compiler duplicating swarm/spec/compiler seams; decomposition tracked by #1451
+swarm/spec/types.py | 2026-11-30 | 21 spec dataclasses in one module; split by contract group tracked by #1451
+swarm/spec/compiler/builder.py | 2026-11-30 | Complexity concentrated in StepPlanBuilder.build and the SDK option merge; extraction tracked by #1451
+swarm/tools/lint_routing_fields.py | 2026-11-30 | Pattern tables and allowlist inline with the CLI; extraction tracked by #1451
