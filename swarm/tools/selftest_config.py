@@ -127,9 +127,25 @@ class SelfTestStep:
         if self.ac_ids is None:
             self.ac_ids = []
 
+    def commands(self) -> List[str]:
+        """Return this step's commands, in execution order.
+
+        Use this to *run* a step. Commands execute sequentially, each as its
+        own argv without a shell, stopping at the first failure.
+        """
+        if isinstance(self.command, str):
+            return [self.command]
+        return list(self.command)
+
     def full_command(self) -> str:
-        """Return the full command as a single string (commands joined with &&)."""
-        return " && ".join(self.command)
+        """Return the commands joined with && for display and reporting.
+
+        Display only. This string is not safe to execute without a shell: the
+        "&&" is a shell operator, so splitting it with shlex and running it
+        with shell=False passes the operator and the second command as
+        arguments to the first.
+        """
+        return " && ".join(self.commands())
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""

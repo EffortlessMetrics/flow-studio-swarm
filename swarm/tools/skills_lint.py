@@ -9,7 +9,15 @@ from pathlib import Path
 from typing import List, Tuple
 
 import yaml
-from swarm.utils.yaml_utils import load_yaml
+
+# Add repo root to path for library imports. Must run before importing swarm.*,
+# since this script is executed by path (`uv run swarm/tools/skills_lint.py`)
+# rather than as a module, so the repo root is not on sys.path.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from swarm.utils.yaml_utils import load_yaml  # noqa: E402
 
 
 class SkillsValidator:

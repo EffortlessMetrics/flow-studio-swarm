@@ -46,6 +46,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from swarm.utils.yaml_utils import load_yaml  # noqa: E402
+
 AGENT_CONFIG_DIR = REPO_ROOT / "swarm" / "config" / "agents"
 FLOW_CONFIG_DIR = REPO_ROOT / "swarm" / "config" / "flows"
 FLOW_DOC_DIR = REPO_ROOT / "swarm" / "flows"
