@@ -206,6 +206,21 @@ SKIP_PATTERNS = [
     "**/run_state.json",  # Stepwise state machine uses advance/terminate/error/loop
 ]
 
+# Inline suppression marker for legitimate deprecation documentation.
+#
+# Docs that explain the V3 migration (and the release checklist that greps for
+# regressions) must name the deprecated fields to do their job. Placing this
+# marker on the flagged line, or on the line immediately above it, suppresses
+# the "mention of deprecated ..." warning for that line only.
+#
+# This suppresses warnings ONLY. Real violations (legacy field usage, malformed
+# V3 patterns) are still reported, so the marker cannot hide a regression.
+#
+# Use a comment form natural to the file, e.g.:
+#   <!-- lint-routing: allow-legacy-mention -->   (markdown)
+#   # lint-routing: allow-legacy-mention          (shell / python / yaml)
+ALLOW_LEGACY_MENTION_MARKER = "lint-routing: allow-legacy-mention"
+
 # File extensions to check
 CHECK_EXTENSIONS = {".md", ".yaml", ".yml", ".json", ".py", ".ts", ".tsx"}
 
@@ -289,7 +304,11 @@ def check_file(
         # Check legacy warning patterns (only if not already matched as violation)
         # Skip warnings if the line already has a violation to avoid duplicates
         line_has_violation = any(v.line_num == line_num for v in violations)
-        if not line_has_violation:
+        prev_line = lines[line_num - 2] if line_num >= 2 else ""
+        mention_allowed = (
+            ALLOW_LEGACY_MENTION_MARKER in line or ALLOW_LEGACY_MENTION_MARKER in prev_line
+        )
+        if not line_has_violation and not mention_allowed:
             for pattern, desc in LEGACY_WARNING_PATTERNS:
                 if re.search(pattern, line, re.IGNORECASE):
                     violations.append(
