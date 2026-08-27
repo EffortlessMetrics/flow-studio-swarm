@@ -103,8 +103,13 @@ class TestShadowForkCreate:
         assert "nonexistent" in caplog.text
 
         # The shadow branch must be cut from the resolved ref, not the missing one.
-        checkout_call = mock_git.call_args_list[-1].args[0]
-        assert checkout_call[:2] == ["checkout", "-b"]
+        # Select the checkout explicitly rather than assuming it is the last
+        # call, so the assertion survives a later git call being appended.
+        checkout_call = next(
+            call.args[0]
+            for call in mock_git.call_args_list
+            if call.args[0][:2] == ["checkout", "-b"]
+        )
         assert checkout_call[-1] == "HEAD"
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):

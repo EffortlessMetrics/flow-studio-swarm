@@ -50,6 +50,7 @@ See Also:
 from __future__ import annotations
 
 import warnings
+from typing import Any
 
 # =============================================================================
 # Canonical routing API (from driver.py)
@@ -125,7 +126,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Resolve deprecated aliases, warning on use.
 
     Module-level ``__getattr__`` (PEP 562) is only consulted for names that are
@@ -144,3 +145,13 @@ def __getattr__(name: str):
         )
         return target
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Include lazily-resolved deprecated aliases in dir().
+
+    PEP 562 __getattr__ does not affect dir(), so without this the alias would
+    look absent to reflection-based consumers even though it is a public
+    __all__ export. Mirrors swarm/spec/compiler/__init__.py.
+    """
+    return sorted(list(globals().keys()) + list(_DEPRECATED_ALIASES.keys()))

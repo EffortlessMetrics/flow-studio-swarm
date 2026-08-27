@@ -157,6 +157,56 @@ def _is_allowed_violation(filepath: Path, line: str, project_root: Path) -> bool
     return line.strip() in anchors
 
 
+def _anchor_problems(content: str, anchors: Dict[str, str]) -> List[Tuple[str, str]]:
+    """Report why each allowlist anchor is no longer valid for this content.
+
+    An anchor is valid only when it matches exactly one line and that line
+    still contains a hardcoded flow list. Requiring exactly one match keeps an
+    entry as narrow as the line-number scheme it replaced: without it, a second
+    copy of the same line elsewhere in the file would inherit the exemption.
+
+    Returns:
+        List of (anchor, reason) tuples. Empty when every anchor is valid.
+    """
+    stripped_lines = [line.strip() for line in content.split("\n")]
+    problems: List[Tuple[str, str]] = []
+
+    for anchor, justification in anchors.items():
+        occurrences = stripped_lines.count(anchor)
+
+        if occurrences == 0:
+            problems.append(
+                (anchor, f"Anchor line no longer present (justification: {justification})")
+            )
+            continue
+
+        if occurrences > 1:
+            problems.append(
+                (
+                    anchor,
+                    f"Anchor matches {occurrences} lines; it must identify exactly one "
+                    f"(justification: {justification})",
+                )
+            )
+            continue
+
+        has_pattern = any(
+            p.search(anchor)
+            for p in [
+                FLOW_LIST_START_PATTERN,
+                FLOW_LIST_6_PATTERN,
+                FLOW_LIST_7_PATTERN,
+                FLOW_TUPLE_START_PATTERN,
+            ]
+        )
+        if not has_pattern:
+            problems.append(
+                (anchor, f"No flow list pattern found (justification: {justification})")
+            )
+
+    return problems
+
+
 def _find_violations(
     content: str,
     filepath: Path,
@@ -444,12 +494,11 @@ class TestFlowOrderGuardrailAllowlist:
             pytest.fail(msg)
 
     def test_allowlist_lines_still_have_violations(self):
-        """Allowed anchors should still be present and still contain a violation.
+        """Allowed anchors must match exactly one line that still violates.
 
         This prevents stale allowlist entries from accumulating when the
-        underlying code is refactored. An anchor is stale if its source line no
-        longer appears in the file, or if that line no longer contains a
-        hardcoded flow list (meaning the exception is no longer needed).
+        underlying code is refactored, and keeps each entry as narrow as the
+        line number it replaced.
         """
         project_root = _get_project_root()
         stale_entries: List[Tuple[str, str, str]] = []
@@ -464,38 +513,8 @@ class TestFlowOrderGuardrailAllowlist:
             except (OSError, UnicodeDecodeError):
                 continue
 
-            stripped_lines = {line.strip() for line in content.split("\n")}
-
-            for anchor, justification in anchors.items():
-                if anchor not in stripped_lines:
-                    stale_entries.append(
-                        (
-                            relative_path,
-                            anchor,
-                            f"Anchor line no longer present (justification: {justification})",
-                        )
-                    )
-                    continue
-
-                # Check that the anchored line still has a flow list pattern
-                has_pattern = any(
-                    p.search(anchor)
-                    for p in [
-                        FLOW_LIST_START_PATTERN,
-                        FLOW_LIST_6_PATTERN,
-                        FLOW_LIST_7_PATTERN,
-                        FLOW_TUPLE_START_PATTERN,
-                    ]
-                )
-
-                if not has_pattern:
-                    stale_entries.append(
-                        (
-                            relative_path,
-                            anchor,
-                            f"No flow list pattern found (justification: {justification})",
-                        )
-                    )
+            for anchor, reason in _anchor_problems(content, anchors):
+                stale_entries.append((relative_path, anchor, reason))
 
         if stale_entries:
             msg = "Stale entries in ALLOWED_VIOLATIONS - anchors no longer valid:\n"
@@ -538,6 +557,45 @@ class TestFlowOrderGuardrailAllowlist:
                 content, filepath, project_root=project_root, check_allowlist=True
             )
             assert violations == [], f"anchor should be allowed at offset {padding}"
+
+    def test_duplicate_anchor_is_rejected(self):
+        """An anchor matching more than one line is invalid.
+
+        Anchoring by source text is only as narrow as a line number while each
+        anchor identifies a single line. If a hardcoded flow list were copied
+        verbatim elsewhere in an allowlisted file, the copy would silently
+        inherit the exemption, so the allowlist must reject the ambiguity.
+        """
+        anchor = 'flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]'
+        anchors = {anchor: "test justification"}
+
+        single = "        " + anchor + "\n"
+        assert _anchor_problems(single, anchors) == [], "one occurrence should be valid"
+
+        duplicated = single + "\nsome_other_line = 1\n" + single
+        problems = _anchor_problems(duplicated, anchors)
+        assert len(problems) == 1
+        assert "matches 2 lines" in problems[0][1]
+
+    def test_missing_anchor_is_rejected(self):
+        """An anchor whose line is gone is stale and must be reported."""
+        anchor = 'flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]'
+
+        problems = _anchor_problems("unrelated = 1\n", {anchor: "test justification"})
+
+        assert len(problems) == 1
+        assert "no longer present" in problems[0][1]
+
+    def test_anchor_without_violation_is_rejected(self):
+        """An anchor that no longer holds a flow list needs no exemption."""
+        anchor = "flow_keys = get_flow_keys()"
+
+        problems = _anchor_problems(
+            "        " + anchor + "\n", {anchor: "test justification"}
+        )
+
+        assert len(problems) == 1
+        assert "No flow list pattern found" in problems[0][1]
 
     def test_allowlist_does_not_suppress_other_violations(self):
         """The allowlist must stay narrow: same file, exact line only."""
