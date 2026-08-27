@@ -96,9 +96,11 @@ Legacy patterns should be rejected.
 
 ```bash
 # This should find only the linter tool and educational references
+# lint-routing-ignore: the grep pattern names the deprecated fields by design
 grep -r "route_to_flow\|route_to_agent" swarm/
 ```
 
+<!-- lint-routing-ignore: checklist item asserting the deprecated fields are unused -->
 - [ ] No active uses of `route_to_flow` or `route_to_agent`
 - [ ] Linter rule exists to prevent reintroduction
 - [ ] V3 routing vocabulary is used everywhere (CONTINUE, DETOUR, INJECT_FLOW, INJECT_NODES, EXTEND_GRAPH)

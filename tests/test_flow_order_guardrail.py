@@ -19,8 +19,12 @@ The flow_registry is the single source of truth for flow ordering.
 
 To add a new exception, add an entry to ALLOWED_VIOLATIONS with:
   - file path (relative to project root)
-  - line number
+  - the exact source line (stripped of surrounding whitespace) as the anchor
   - justification comment
+
+Entries are anchored to source text rather than line numbers, so unrelated
+edits elsewhere in a file cannot invalidate them. Changing the allowlisted
+line itself still invalidates the entry, which forces a fresh review.
 """
 
 import re
@@ -48,24 +52,34 @@ EXCLUDE_PATTERNS = [
 ]
 
 # Allowed violations with justifications
-# Format: { "relative/path/to/file.py": {line_number: "justification", ...} }
+# Format: { "relative/path/to/file.py": {"exact source line": "justification", ...} }
 # Add entries here when there's a legitimate reason for a hardcoded list
 #
-# NOTE: Line numbers must match exactly. If code changes, update the line numbers
-# or the test_allowlist_lines_still_have_violations test will fail.
-ALLOWED_VIOLATIONS: Dict[str, Dict[int, str]] = {
+# NOTE: Anchors are matched against the stripped text of each source line, not
+# against line numbers. Refactors that move code around a file therefore keep
+# working, while editing an allowlisted line invalidates its entry and the
+# test_allowlist_lines_still_have_violations test forces a fresh review.
+ALLOWED_VIOLATIONS: Dict[str, Dict[str, str]] = {
     # Fallback in _get_default_flow_sequence() when registry import fails
     "swarm/runtime/types/macro_types.py": {
-        17: "Fallback constant when flow_registry import fails in _get_default_flow_sequence()",
+        'return ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]': (
+            "Fallback constant when flow_registry import fails in _get_default_flow_sequence()"
+        ),
     },
     # Fallback when registry import fails - acceptable since it tries registry first
     "swarm/tools/validation/reporting/json_output.py": {
-        126: "Fallback constant when flow_registry import fails",
+        'flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]': (
+            "Fallback constant when flow_registry import fails"
+        ),
     },
     # Run plan defaults - defines example configurations
     "swarm/runtime/run_plan_api.py": {
-        27: "Example default configuration for gated mode",
-        258: "Example default configuration for signal-to-gate mode",
+        'flow_sequence=["signal", "plan", "build", "gate"],': (
+            "Example default configuration for gated mode"
+        ),
+        'flow_sequence=["signal", "plan", "build", "review", "gate"],': (
+            "Example default configuration for signal-to-gate mode"
+        ),
     },
 }
 
@@ -117,12 +131,16 @@ def _normalize_path(path: Path) -> str:
     return str(path).replace("\\", "/")
 
 
-def _is_allowed_violation(filepath: Path, line_num: int, project_root: Path) -> bool:
+def _is_allowed_violation(filepath: Path, line: str, project_root: Path) -> bool:
     """Check if a violation is in the allowlist.
+
+    Matching is done on the source text of the offending line rather than its
+    line number, so unrelated edits elsewhere in the file cannot invalidate a
+    documented exception.
 
     Args:
         filepath: Absolute path to the file
-        line_num: Line number of the violation
+        line: Source text of the line containing the violation
         project_root: Project root directory
 
     Returns:
@@ -133,9 +151,60 @@ def _is_allowed_violation(filepath: Path, line_num: int, project_root: Path) -> 
     except ValueError:
         return False
 
-    if relative_path in ALLOWED_VIOLATIONS:
-        return line_num in ALLOWED_VIOLATIONS[relative_path]
-    return False
+    anchors = ALLOWED_VIOLATIONS.get(relative_path)
+    if not anchors:
+        return False
+    return line.strip() in anchors
+
+
+def _anchor_problems(content: str, anchors: Dict[str, str]) -> List[Tuple[str, str]]:
+    """Report why each allowlist anchor is no longer valid for this content.
+
+    An anchor is valid only when it matches exactly one line and that line
+    still contains a hardcoded flow list. Requiring exactly one match keeps an
+    entry as narrow as the line-number scheme it replaced: without it, a second
+    copy of the same line elsewhere in the file would inherit the exemption.
+
+    Returns:
+        List of (anchor, reason) tuples. Empty when every anchor is valid.
+    """
+    stripped_lines = [line.strip() for line in content.split("\n")]
+    problems: List[Tuple[str, str]] = []
+
+    for anchor, justification in anchors.items():
+        occurrences = stripped_lines.count(anchor)
+
+        if occurrences == 0:
+            problems.append(
+                (anchor, f"Anchor line no longer present (justification: {justification})")
+            )
+            continue
+
+        if occurrences > 1:
+            problems.append(
+                (
+                    anchor,
+                    f"Anchor matches {occurrences} lines; it must identify exactly one "
+                    f"(justification: {justification})",
+                )
+            )
+            continue
+
+        has_pattern = any(
+            p.search(anchor)
+            for p in [
+                FLOW_LIST_START_PATTERN,
+                FLOW_LIST_6_PATTERN,
+                FLOW_LIST_7_PATTERN,
+                FLOW_TUPLE_START_PATTERN,
+            ]
+        )
+        if not has_pattern:
+            problems.append(
+                (anchor, f"No flow list pattern found (justification: {justification})")
+            )
+
+    return problems
 
 
 def _find_violations(
@@ -173,7 +242,7 @@ def _find_violations(
 
         # Check allowlist if requested
         if check_allowlist and project_root:
-            if _is_allowed_violation(filepath, line_num, project_root):
+            if _is_allowed_violation(filepath, line, project_root):
                 continue
 
         for pattern, pattern_name in patterns:
@@ -425,15 +494,16 @@ class TestFlowOrderGuardrailAllowlist:
             pytest.fail(msg)
 
     def test_allowlist_lines_still_have_violations(self):
-        """Allowed lines should still contain the violation pattern.
+        """Allowed anchors must match exactly one line that still violates.
 
-        This prevents stale allowlist entries from accumulating when
-        the underlying code is refactored.
+        This prevents stale allowlist entries from accumulating when the
+        underlying code is refactored, and keeps each entry as narrow as the
+        line number it replaced.
         """
         project_root = _get_project_root()
-        stale_entries: List[Tuple[str, int, str]] = []
+        stale_entries: List[Tuple[str, str, str]] = []
 
-        for relative_path, line_numbers in ALLOWED_VIOLATIONS.items():
+        for relative_path, anchors in ALLOWED_VIOLATIONS.items():
             full_path = project_root / relative_path
             if not full_path.exists():
                 continue  # Already caught by test_allowlist_files_exist
@@ -443,54 +513,105 @@ class TestFlowOrderGuardrailAllowlist:
             except (OSError, UnicodeDecodeError):
                 continue
 
-            # Check each allowed line number
-            lines = content.split("\n")
-            for line_num, justification in line_numbers.items():
-                if line_num > len(lines):
-                    stale_entries.append((relative_path, line_num, "Line number out of range"))
-                    continue
-
-                line = lines[line_num - 1]  # Convert to 0-based index
-
-                # Check if this line still has a flow list pattern
-                has_pattern = any(
-                    p.search(line)
-                    for p in [
-                        FLOW_LIST_START_PATTERN,
-                        FLOW_LIST_6_PATTERN,
-                        FLOW_LIST_7_PATTERN,
-                        FLOW_TUPLE_START_PATTERN,
-                    ]
-                )
-
-                if not has_pattern:
-                    stale_entries.append(
-                        (
-                            relative_path,
-                            line_num,
-                            f"No flow list pattern found (justification: {justification})",
-                        )
-                    )
+            for anchor, reason in _anchor_problems(content, anchors):
+                stale_entries.append((relative_path, anchor, reason))
 
         if stale_entries:
-            msg = "Stale entries in ALLOWED_VIOLATIONS - lines no longer have flow lists:\n"
-            for path, line_num, reason in stale_entries:
-                msg += f"  - {path}:{line_num} - {reason}\n"
-            msg += "\nRemove these stale entries from ALLOWED_VIOLATIONS."
+            msg = "Stale entries in ALLOWED_VIOLATIONS - anchors no longer valid:\n"
+            for path, anchor, reason in stale_entries:
+                msg += f"  - {path}: {anchor!r} - {reason}\n"
+            msg += "\nUpdate or remove these stale entries in ALLOWED_VIOLATIONS."
             pytest.fail(msg)
 
     def test_allowlist_has_justifications(self):
         """All allowlist entries should have non-empty justifications."""
         missing_justifications = []
 
-        for relative_path, line_numbers in ALLOWED_VIOLATIONS.items():
-            for line_num, justification in line_numbers.items():
+        for relative_path, anchors in ALLOWED_VIOLATIONS.items():
+            for anchor, justification in anchors.items():
                 if not justification or not justification.strip():
-                    missing_justifications.append((relative_path, line_num))
+                    missing_justifications.append((relative_path, anchor))
 
         if missing_justifications:
             msg = "ALLOWED_VIOLATIONS entries missing justifications:\n"
-            for path, line_num in missing_justifications:
-                msg += f"  - {path}:{line_num}\n"
+            for path, anchor in missing_justifications:
+                msg += f"  - {path}: {anchor!r}\n"
             msg += "\nAll allowlist entries must have a justification explaining why the hardcoded list is acceptable."
             pytest.fail(msg)
+
+    def test_allowlist_matching_is_line_number_independent(self):
+        """Allowlist entries survive code moving around within their file.
+
+        Regression guard: entries used to be keyed by line number, so any edit
+        that shifted an allowlisted line broke CI for unrelated PRs (issue #180).
+        """
+        project_root = _get_project_root()
+        relative_path = "swarm/tools/validation/reporting/json_output.py"
+        anchor = next(iter(ALLOWED_VIOLATIONS[relative_path]))
+        filepath = project_root / relative_path
+
+        # The same anchored line is allowed no matter where it appears.
+        for padding in (0, 1, 200):
+            content = "\n" * padding + "        " + anchor + "\n"
+            violations = _find_violations(
+                content, filepath, project_root=project_root, check_allowlist=True
+            )
+            assert violations == [], f"anchor should be allowed at offset {padding}"
+
+    def test_duplicate_anchor_is_rejected(self):
+        """An anchor matching more than one line is invalid.
+
+        Anchoring by source text is only as narrow as a line number while each
+        anchor identifies a single line. If a hardcoded flow list were copied
+        verbatim elsewhere in an allowlisted file, the copy would silently
+        inherit the exemption, so the allowlist must reject the ambiguity.
+        """
+        anchor = 'flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]'
+        anchors = {anchor: "test justification"}
+
+        single = "        " + anchor + "\n"
+        assert _anchor_problems(single, anchors) == [], "one occurrence should be valid"
+
+        duplicated = single + "\nsome_other_line = 1\n" + single
+        problems = _anchor_problems(duplicated, anchors)
+        assert len(problems) == 1
+        assert "matches 2 lines" in problems[0][1]
+
+    def test_missing_anchor_is_rejected(self):
+        """An anchor whose line is gone is stale and must be reported."""
+        anchor = 'flow_keys = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]'
+
+        problems = _anchor_problems("unrelated = 1\n", {anchor: "test justification"})
+
+        assert len(problems) == 1
+        assert "no longer present" in problems[0][1]
+
+    def test_anchor_without_violation_is_rejected(self):
+        """An anchor that no longer holds a flow list needs no exemption."""
+        anchor = "flow_keys = get_flow_keys()"
+
+        problems = _anchor_problems(
+            "        " + anchor + "\n", {anchor: "test justification"}
+        )
+
+        assert len(problems) == 1
+        assert "No flow list pattern found" in problems[0][1]
+
+    def test_allowlist_does_not_suppress_other_violations(self):
+        """The allowlist must stay narrow: same file, exact line only."""
+        project_root = _get_project_root()
+        relative_path = "swarm/tools/validation/reporting/json_output.py"
+        anchor = next(iter(ALLOWED_VIOLATIONS[relative_path]))
+
+        # A different file with identical text is NOT covered by the allowlist.
+        other_file = project_root / "swarm/runtime/_guardrail_probe.py"
+        assert _find_violations(
+            "        " + anchor + "\n", other_file, project_root=project_root, check_allowlist=True
+        ), "allowlist must not leak across files"
+
+        # A brand-new hardcoded list in an allowlisted file is still reported.
+        allowlisted_file = project_root / relative_path
+        novel = 'FLOWS = ["signal", "plan", "build", "review", "gate", "deploy", "wisdom"]'
+        assert _find_violations(
+            novel + "\n", allowlisted_file, project_root=project_root, check_allowlist=True
+        ), "allowlist must not blanket-exempt its file"

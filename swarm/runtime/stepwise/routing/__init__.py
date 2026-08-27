@@ -49,6 +49,9 @@ See Also:
 
 from __future__ import annotations
 
+import warnings
+from typing import Any
+
 # =============================================================================
 # Canonical routing API (from driver.py)
 # =============================================================================
@@ -59,9 +62,14 @@ from swarm.runtime.stepwise.routing.driver import (  # noqa: E402
     route_step,  # Canonical routing function
 )
 
-# Backwards-compat alias for code that used route_step_unified
-# TODO: Deprecate in future version
-route_step_unified = route_step
+# Backwards-compat alias for code that used route_step_unified.
+#
+# Deprecated since v3.0, scheduled for removal in v4.0. It is resolved lazily
+# through the module __getattr__ below so that accessing it raises a
+# DeprecationWarning; use route_step instead.
+_DEPRECATED_ALIASES = {
+    "route_step_unified": ("route_step", route_step),
+}
 
 # =============================================================================
 # Legacy routing re-exports (backwards compatibility)
@@ -96,7 +104,7 @@ __all__ = [
     # ==========================================================================
     "route_step",  # Canonical routing function
     "RoutingOutcome",
-    "route_step_unified",  # Backwards-compat alias (TODO: deprecate)
+    "route_step_unified",  # Deprecated alias for route_step; removal in v4.0
     # ==========================================================================
     # Legacy exports (backwards compatibility)
     # ==========================================================================
@@ -116,3 +124,34 @@ __all__ = [
     # Candidate-set pattern
     "generate_routing_candidates",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve deprecated aliases, warning on use.
+
+    Module-level ``__getattr__`` (PEP 562) is only consulted for names that are
+    not already module globals, so the alias stays out of the namespace until
+    something actually asks for it. That makes the access point observable and
+    lets us warn exactly once per call site.
+    """
+    alias = _DEPRECATED_ALIASES.get(name)
+    if alias is not None:
+        canonical_name, target = alias
+        warnings.warn(
+            f"{__name__}.{name} is deprecated and will be removed in v4.0; "
+            f"use {__name__}.{canonical_name} instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return target
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Include lazily-resolved deprecated aliases in dir().
+
+    PEP 562 __getattr__ does not affect dir(), so without this the alias would
+    look absent to reflection-based consumers even though it is a public
+    __all__ export. Mirrors swarm/spec/compiler/__init__.py.
+    """
+    return sorted(list(globals().keys()) + list(_DEPRECATED_ALIASES.keys()))
