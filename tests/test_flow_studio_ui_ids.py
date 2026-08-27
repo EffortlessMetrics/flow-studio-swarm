@@ -750,30 +750,53 @@ class TestRunDetailModalUIIDs:
         )
 
     def test_run_detail_rerun_button_has_uiid(self):
-        """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        """Run detail modal re-run button should have data-uiid.
+
+        The re-run button lives in the modal body, which is rendered at runtime
+        by run_detail_modal.ts (the static fragment only ships the shell). So the
+        UIID contract is enforced against the compiled module, the same way the
+        other dynamically rendered run detail UIIDs are.
+        """
+        js_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "js" / "run_detail_modal.js"
+        assert js_file.exists(), "run_detail_modal.js should exist"
+
+        content = js_file.read_text(encoding="utf-8")
 
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
+        assert uiid in content, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
             "This UIID is required for test automation to trigger re-runs."
         )
 
     def test_run_detail_modal_elements_have_uiids(self):
-        """All key run detail modal elements should have data-uiid."""
+        """All key run detail modal elements should have data-uiid.
+
+        The modal shell (container, close, body) is static markup; the re-run
+        button is rendered into the body at runtime, so it is asserted against
+        the compiled module instead of the static DOM.
+        """
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
-        # Expected run detail modal UIIDs
-        expected_modal = [
+        # Static modal shell UIIDs
+        expected_static = [
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
 
-        missing = [e for e in expected_modal if e not in uiids]
+        missing = [e for e in expected_static if e not in uiids]
+
+        # Dynamically rendered modal body UIIDs
+        js_file = repo_root / "swarm" / "tools" / "flow_studio_ui" / "js" / "run_detail_modal.js"
+        assert js_file.exists(), "run_detail_modal.js should exist"
+        js_content = js_file.read_text(encoding="utf-8")
+
+        expected_dynamic = [
+            "flow_studio.modal.run_detail.rerun",
+        ]
+        missing += [e for e in expected_dynamic if e not in js_content]
+
         if missing:
             pytest.fail(f"Missing expected run detail modal UIIDs: {', '.join(missing)}")
 
