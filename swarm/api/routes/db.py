@@ -20,6 +20,23 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/db", tags=["database"])
 
+# Tables that /db/stats is allowed to count.
+#
+# SQL identifiers cannot be bound as parameters, so the stats query
+# interpolates the table name. Constraining it to this frozen set keeps the
+# interpolated value a fixed literal and makes the query provably safe to
+# static analysis as well as to review.
+COUNTABLE_TABLES = frozenset(
+    {
+        "runs",
+        "steps",
+        "tool_calls",
+        "file_changes",
+        "events",
+        "facts",
+    }
+)
+
 
 # =============================================================================
 # Pydantic Models
@@ -240,8 +257,16 @@ async def get_db_stats():
 
         conn = stats_db.connection
 
-        # Query counts from each table
+        # Query counts from each table.
+        #
+        # Table names cannot be passed as query parameters, so they are
+        # interpolated. Every name is checked against COUNTABLE_TABLES first so
+        # the interpolated value is always one of a fixed set of literals and
+        # can never carry caller-controlled input.
         def safe_count(table: str) -> int:
+            if table not in COUNTABLE_TABLES:
+                logger.error("Refusing to count unknown table: %r", table)
+                return 0
             try:
                 result = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
                 return result[0] if result else 0
