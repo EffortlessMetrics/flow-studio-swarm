@@ -750,27 +750,42 @@ class TestRunDetailModalUIIDs:
         )
 
     def test_run_detail_rerun_button_has_uiid(self):
-        """Run detail modal re-run button should have data-uiid."""
-        html = get_flow_studio_html()
-        uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
+        """Run detail modal re-run button should have data-uiid.
 
+        The re-run button is rendered at runtime by run_detail_modal.ts rather
+        than shipped in the static shell, so it is verified against the source
+        that renders it. This mirrors TestEventsTimelineUIIDs, which checks the
+        other dynamically-rendered run detail UIIDs the same way.
+        """
         uiid = "flow_studio.modal.run_detail.rerun"
-        assert uiid in uiids, (
-            f"Run detail re-run button missing data-uiid='{uiid}'. "
+
+        domain_ts = repo_root / "swarm" / "tools" / "flow_studio_ui" / "src" / "domain.ts"
+        assert uiid in domain_ts.read_text(encoding="utf-8"), (
+            f"domain.ts FlowStudioUIID should declare '{uiid}'"
+        )
+
+        modal_ts = (
+            repo_root / "swarm" / "tools" / "flow_studio_ui" / "src" / "run_detail_modal.ts"
+        )
+        assert f'data-uiid="{uiid}"' in modal_ts.read_text(encoding="utf-8"), (
+            f"run_detail_modal.ts should render the re-run button with data-uiid='{uiid}'. "
             "This UIID is required for test automation to trigger re-runs."
         )
 
     def test_run_detail_modal_elements_have_uiids(self):
-        """All key run detail modal elements should have data-uiid."""
+        """All key run detail modal elements should have data-uiid.
+
+        Only the statically-shipped shell is checked here; dynamically rendered
+        controls are covered by their own tests against the rendering source.
+        """
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
-        # Expected run detail modal UIIDs
+        # Expected run detail modal UIIDs present in the static shell
         expected_modal = [
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
 
         missing = [e for e in expected_modal if e not in uiids]
