@@ -5,6 +5,7 @@ These tests verify the Shadow Fork isolation layer for safe speculative
 execution, including branch creation, checkpointing, rollback, and cleanup.
 """
 
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -72,36 +73,59 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_falls_back_when_base_branch_missing(self, tmp_path):
+        """A missing base branch falls back to the next resolvable ref.
+
+        `_resolve_base_ref` deliberately degrades through a candidate list
+        (preferred -> origin/preferred -> main -> origin/main -> master ->
+        origin/master -> HEAD) so that a missing base branch cannot hard-fail
+        shadow fork creation. Here "nonexistent" is absent but "main" resolves,
+        so the shadow branch must be based on "main".
+        """
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        existing_refs = {"main"}
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+        def fake_git(args, **kwargs):
+            if args[:2] == ["rev-parse", "--abbrev-ref"]:
+                return (True, "main", "")
+            if args[:2] == ["rev-parse", "--verify"]:
+                return (args[2] in existing_refs, "", "")
+            if args[:1] == ["status"]:
+                return (True, "", "")
+            if args[:1] == ["checkout"]:
+                return (True, "", "")
+            raise AssertionError(f"unexpected git call: {args}")
+
+        with patch.object(fork, "_run_git", side_effect=fake_git):
+            (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+            branch = fork.create(base_branch="nonexistent")
+
+            assert branch.startswith(SHADOW_BRANCH_PREFIX)
+            assert fork.base_branch == "main"
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
         """Test that create warns about uncommitted changes."""
         fork = ShadowFork(repo_root=tmp_path)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+        def fake_git(args, **kwargs):
+            if args[:2] == ["rev-parse", "--abbrev-ref"]:
+                return (True, "main", "")
+            if args[:2] == ["rev-parse", "--verify"]:
+                return (True, "", "")
+            if args[:1] == ["status"]:
+                return (True, " M file.txt", "")
+            if args[:1] == ["checkout"]:
+                return (True, "", "")
+            raise AssertionError(f"unexpected git call: {args}")
 
+        with patch.object(fork, "_run_git", side_effect=fake_git):
             # Create hooks directory for the test
             (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
-            fork.create()
+            with caplog.at_level(logging.WARNING, logger="swarm.runtime.shadow_fork"):
+                fork.create()
 
             assert "uncommitted changes" in caplog.text.lower()
 
