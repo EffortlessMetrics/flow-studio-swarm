@@ -210,6 +210,7 @@ class SpecCompiler:
             verification=step_plan.verification,
             handoff=handoff,
             flow_key=flow_key,
+            fragment_manifest=tuple(f.path for f in step_plan.fragments_used),
         )
 
     def compile_from_context(
