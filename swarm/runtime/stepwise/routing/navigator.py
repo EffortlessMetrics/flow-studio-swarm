@@ -43,6 +43,7 @@ from swarm.runtime.types import (
     handoff_envelope_to_dict,
 )
 
+from .context_digest import build_context_digest
 from .driver import RoutingOutcome
 
 # Import from utility_candidates.py to avoid circular imports with driver.py
@@ -250,6 +251,22 @@ def route_via_navigator(
         [c["candidate_id"] for c in routing_candidates],
     )
 
+    # Compress the signals that informed this decision into a bounded digest.
+    # The Navigator receives forensics, not raw step output.
+    context_digest = build_context_digest(
+        flow_key=flow_key,
+        step_id=step.id,
+        iteration=iteration,
+        step_result=step_result_dict,
+        verification_result=verification_result,
+        file_changes=file_changes,
+        previous_envelope=previous_envelope,
+        forensic_verdict=forensic_verdict,
+        loop_state=loop_state,
+        candidate_count=len(routing_candidates),
+    )
+    logger.debug("Routing context digest for step %s: %s", step.id, context_digest)
+
     # Call NavigationOrchestrator.navigate() with candidates
     nav_result = navigation_orchestrator.navigate(
         run_id=run_id,
@@ -261,7 +278,7 @@ def route_via_navigator(
         verification_result=verification_result,
         file_changes=file_changes,
         run_state=run_state,
-        context_digest="",  # TODO: Implement context digest
+        context_digest=context_digest,
         previous_envelope=previous_envelope,
         no_human_mid_flow=spec.no_human_mid_flow,
         routing_candidates=routing_candidates,
@@ -326,6 +343,7 @@ def route_via_navigator(
         "candidate_ids": [c.get("candidate_id") for c in routing_candidates],
         "candidate_set_path": candidate_set_path,
         "routing_source": routing_source,
+        "context_digest": context_digest,
     }
     updated = update_envelope_routing(
         run_base=run_base,
