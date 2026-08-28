@@ -1,4 +1,30 @@
 # Path | expires (YYYY-MM-DD) | reason
 # Example:
 # swarm/runtime/types/state_types.py | 2026-03-31 | Temporary during refactor (SWARM-123)
-swarm/runtime/backends.py | 2026-02-28 | Large backend implementations, needs splitting (REF-001)
+#
+# Every entry needs an expiry date and a follow-up issue. complexity-check runs
+# against CHANGED files, so a module that is already over threshold blocks any
+# unrelated correction to it until the underlying debt is paid. These entries
+# keep the gate meaningful for new code while the decomposition work is tracked.
+#
+# All files below were already over threshold when their entry was added.
+
+# Backend implementations, process lifecycle, capability reporting, and Stepwise
+# adapters concentrated in one module. Split into protocol/harness/stepwise/
+# registry/lifecycle modules.
+swarm/runtime/backends.py | 2026-10-31 | Large backend implementations, needs splitting into protocol/harness/stepwise/registry/lifecycle modules (#1445)
+
+# Spec compiler modules and the routing linter, all above threshold before any
+# recent change. Decomposition tracked separately.
+swarm/spec/compiler_legacy.py | 2026-10-31 | Legacy compiler shim pending retirement in favor of swarm/spec/compiler/ (#1450)
+swarm/spec/types.py | 2026-10-31 | Spec dataclasses need splitting by lifecycle stage (#1450)
+swarm/spec/compiler/models.py | 2026-10-31 | Plan and context models need separating (#1450)
+swarm/spec/compiler/builder.py | 2026-10-31 | Prompt assembly and SDK option resolution need separating (#1450)
+swarm/tools/lint_routing_fields.py | 2026-10-31 | Pattern definitions, scanner, and reporter need separating (#1450)
+
+# Repository-contract test modules combining helpers, fixtures, and multiple
+# unrelated test classes. Short window: these are test-organization debts, not
+# production compatibility constraints.
+tests/test_flow_order_guardrail.py | 2026-09-30 | Scanner helpers, guardrail tests, and allowlist self-tests need separating (#1446)
+tests/test_flow_studio_ui_ids.py | 2026-09-30 | UIID parser, static DOM contracts, and dynamic template contracts need separating (#1446)
+tests/test_shadow_fork.py | 2026-09-30 | Creation, checkpoint, push-guard, and workflow contracts need separating (#1446)

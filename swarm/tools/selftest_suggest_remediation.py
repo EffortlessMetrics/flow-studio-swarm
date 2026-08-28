@@ -22,7 +22,12 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from swarm.utils.yaml_utils import load_yaml
+# Add swarm package to path for library imports
+_SWARM_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_SWARM_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SWARM_ROOT))
+
+from swarm.utils.yaml_utils import load_yaml  # noqa: E402
 
 
 class RemediationPattern:

@@ -121,12 +121,14 @@ graph TD
   gate_contract["2. contract\n(contract-enforcer)"]
   gate_security["3. security\n(security-scanner)"]
   gate_coverage["4. coverage\n(coverage-enforcer)"]
-  gate_gate_fix["5. gate_fix\n(gate-fixer)"]
-  gate_merge_decision["6. merge_decision\n(merge-decider)"]
+  gate_policy_check["5. policy_check\n(policy-analyst)"]
+  gate_gate_fix["6. gate_fix\n(gate-fixer)"]
+  gate_merge_decision["7. merge_decision\n(merge-decider)"]
   gate_receipt --> gate_contract
   gate_contract --> gate_security
   gate_security --> gate_coverage
-  gate_coverage --> gate_gate_fix
+  gate_coverage --> gate_policy_check
+  gate_policy_check --> gate_gate_fix
   gate_gate_fix --> gate_merge_decision
 ```
 
@@ -138,8 +140,9 @@ graph TD
 | 2 | `contract` | `contract-enforcer` — Check API changes versus contracts | Check API changes versus contracts → contract_audit.md. |
 | 3 | `security` | `security-scanner` — Run SAST and secret scans | Run SAST and secret scans → security_audit.md. |
 | 4 | `coverage` | `coverage-enforcer` — Verify test coverage meets thresholds | Verify test coverage meets thresholds → coverage_audit.md. |
-| 5 | `gate_fix` | `gate-fixer` — Mechanical fixes only (lint/format/docs) → gate_fix_summary.md. | Apply mechanical fixes only → gate_fix_summary.md. |
-| 6 | `merge_decision` | `merge-decider` — Synthesize all checks into merge decision | Synthesize all checks into merge decision → merge_decision.md. |
+| 5 | `policy_check` | `policy-analyst` — Interpret policy docs vs change, assess policy implications. | Check policy compliance → policy_audit.md. |
+| 6 | `gate_fix` | `gate-fixer` — Mechanical fixes only (lint/format/docs) → gate_fix_summary.md. | Apply mechanical fixes only → gate_fix_summary.md. |
+| 7 | `merge_decision` | `merge-decider` — Synthesize all checks into merge decision | Synthesize all checks into merge decision → merge_decision.md. |
 <!-- FLOW AUTOGEN END -->
 
 ---

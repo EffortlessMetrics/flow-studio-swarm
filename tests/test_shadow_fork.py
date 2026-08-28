@@ -5,6 +5,7 @@ These tests verify the Shadow Fork isolation layer for safe speculative
 execution, including branch creation, checkpointing, rollback, and cleanup.
 """
 
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -72,38 +73,71 @@ class TestShadowForkCreate:
         with pytest.raises(RuntimeError, match="Shadow fork already active"):
             fork.create()
 
-    def test_create_fails_if_base_branch_missing(self, tmp_path):
-        """Test that create fails if base branch doesn't exist."""
+    def test_create_falls_back_when_base_branch_missing(self, tmp_path, caplog):
+        """Test that a missing base branch resolves to a fallback ref.
+
+        create() resolves the base through a candidate ladder
+        (preferred -> origin/preferred -> main -> ... -> HEAD) so a shadow
+        fork can still be created in a repo without `main` or in detached
+        HEAD. When no named candidate exists, HEAD is used.
+        """
         fork = ShadowFork(repo_root=tmp_path)
+        (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
-            ]
+        with (
+            patch.object(fork, "_get_current_branch", return_value="main"),
+            patch.object(fork, "_ref_exists", return_value=False) as mock_ref_exists,
+            patch.object(fork, "_run_git", return_value=(True, "", "")),
+            caplog.at_level(logging.INFO, logger="swarm.runtime.shadow_fork"),
+        ):
+            fork.create(base_branch="nonexistent")
 
-            with pytest.raises(RuntimeError, match="does not exist"):
-                fork.create(base_branch="nonexistent")
+        assert mock_ref_exists.called, "create() should probe candidate base refs"
+        assert fork.base_branch == "HEAD"
+        assert "nonexistent" in caplog.text
+
+    def test_create_fails_if_checkout_fails(self, tmp_path):
+        """Test that create raises when the shadow branch cannot be created."""
+        fork = ShadowFork(repo_root=tmp_path)
+        (tmp_path / ".git" / "hooks").mkdir(parents=True)
+
+        def fake_git(args, **kwargs):
+            if args[:2] == ["checkout", "-b"]:
+                return (False, "", "fatal: cannot create branch")
+            return (True, "", "")
+
+        with (
+            patch.object(fork, "_get_current_branch", return_value="main"),
+            patch.object(fork, "_ref_exists", return_value=True),
+            patch.object(fork, "_run_git", side_effect=fake_git),
+        ):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
+                fork.create()
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
-        """Test that create warns about uncommitted changes."""
+        """Test that create warns about uncommitted changes.
+
+        Patches the semantic seams rather than sequencing raw _run_git
+        results, so the assertion survives internal reordering of the
+        git calls create() makes.
+        """
         fork = ShadowFork(repo_root=tmp_path)
+        (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
-        with patch.object(fork, "_run_git") as mock_git:
-            mock_git.side_effect = [
-                (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
-            ]
+        def fake_git(args, **kwargs):
+            if args[:2] == ["status", "--porcelain"]:
+                return (True, " M file.txt", "")
+            return (True, "", "")
 
-            # Create hooks directory for the test
-            (tmp_path / ".git" / "hooks").mkdir(parents=True)
-
+        with (
+            patch.object(fork, "_get_current_branch", return_value="main"),
+            patch.object(fork, "_ref_exists", return_value=True),
+            patch.object(fork, "_run_git", side_effect=fake_git),
+            caplog.at_level(logging.WARNING, logger="swarm.runtime.shadow_fork"),
+        ):
             fork.create()
 
-            assert "uncommitted changes" in caplog.text.lower()
+        assert "uncommitted changes" in caplog.text.lower()
 
 
 class TestShadowForkGetDiff:

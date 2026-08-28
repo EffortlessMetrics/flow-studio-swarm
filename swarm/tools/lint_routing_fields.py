@@ -42,6 +42,16 @@ ARCHITECTURE:
 
 See docs/ROUTING_PROTOCOL.md for the full V3 routing contract.
 
+Suppressing intentional mentions:
+Deprecation docs must name the deprecated field, which necessarily trips the
+bare-mention warnings. Mark such a line with the pragma:
+
+    <!-- routing-lint: allow-legacy-mention -->
+
+The pragma covers the line it sits on and the line immediately after it.
+Actual reintroduction (e.g. `route_to_flow: 3`) remains a violation and still
+fails, pragma or not.
+
 Usage:
     python swarm/tools/lint_routing_fields.py [--strict] [--check-new]
 
@@ -149,8 +159,10 @@ NEW_ROUTING_VALIDATION_PATTERNS = [
     (
         r"^\s*[-*]?\s*routing:\s*([A-Z][A-Z_]+)\s*(?:,|$|\()",
         "routing_field_yaml",
-        lambda m: m.group(1) not in VALID_ROUTING_DECISIONS
-        and m.group(1) not in {"MERGE", "SKIP", "NULL"},
+        lambda m: (
+            m.group(1) not in VALID_ROUTING_DECISIONS
+            and m.group(1) not in {"MERGE", "SKIP", "NULL"}
+        ),
         "invalid routing value (must be CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)",
     ),
     # routing field in JSON format
@@ -208,6 +220,22 @@ SKIP_PATTERNS = [
 
 # File extensions to check
 CHECK_EXTENSIONS = {".md", ".yaml", ".yml", ".json", ".py", ".ts", ".tsx"}
+
+# Inline pragma marking a line as intentional deprecation documentation.
+#
+# Documenting a deprecation requires naming the deprecated field, so the bare
+# mention warnings above necessarily fire on correct migration docs. This
+# pragma suppresses those WARNINGS on a single line.
+#
+# It never suppresses a VIOLATION: an actual reintroduction such as
+# `route_to_flow: 3` still fails, pragma or not. The guardrail keeps its teeth.
+#
+# The pragma applies to the line it appears on and to the line immediately
+# after it, so prose and code samples stay clean:
+#
+#     <!-- routing-lint: allow-legacy-mention -->
+#     Legacy `route_to_flow` is replaced by intent + target.
+ALLOW_LEGACY_MENTION_PRAGMA = "routing-lint: allow-legacy-mention"
 
 
 @dataclass
@@ -287,9 +315,15 @@ def check_file(
                 )
 
         # Check legacy warning patterns (only if not already matched as violation)
-        # Skip warnings if the line already has a violation to avoid duplicates
+        # Skip warnings if the line already has a violation to avoid duplicates.
+        # An explicit pragma also suppresses warnings on intentional deprecation
+        # documentation (violations above are unaffected).
         line_has_violation = any(v.line_num == line_num for v in violations)
-        if not line_has_violation:
+        previous_line = lines[line_num - 2] if line_num >= 2 else ""
+        allowed_mention = (
+            ALLOW_LEGACY_MENTION_PRAGMA in line or ALLOW_LEGACY_MENTION_PRAGMA in previous_line
+        )
+        if not line_has_violation and not allowed_mention:
             for pattern, desc in LEGACY_WARNING_PATTERNS:
                 if re.search(pattern, line, re.IGNORECASE):
                     violations.append(

@@ -145,8 +145,24 @@ class RunStateManager:
 
         self._cache[run_id] = state
 
-    def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
+    async def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
         """List recent runs.
+
+        Async for consistency with the rest of the public surface. The
+        directory walk and per-run reads are blocking file I/O, so they are
+        offloaded to a worker thread to avoid stalling the event loop when
+        called from an async request handler.
+
+        Args:
+            limit: Maximum number of runs to return.
+
+        Returns:
+            List of run summaries, newest first.
+        """
+        return await asyncio.to_thread(self._list_runs_sync, limit)
+
+    def _list_runs_sync(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Blocking implementation of :meth:`list_runs`.
 
         Uses os.scandir for efficient directory traversal.
         Optimized to sort by mtime BEFORE checking file existence,

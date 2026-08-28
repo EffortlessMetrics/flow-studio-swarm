@@ -24,6 +24,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
+# Add swarm package to path for library imports
+_SWARM_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_SWARM_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SWARM_ROOT))
+
 # Find repo root
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
@@ -61,10 +66,14 @@ def parse_yaml_simple(content: str) -> Dict[str, Any]:
         from swarm.utils.yaml_utils import load_yaml
 
         return load_yaml(content)
-    except ImportError:
-        # Fallback to a basic parser if yaml not available
-        # This won't handle complex YAML but works for simple cases
-        raise ImportError("PyYAML required: pip install pyyaml")
+    except ImportError as exc:
+        # Report the real cause. This most often means the repo root is not on
+        # sys.path (so `swarm` is unimportable), not that PyYAML is missing.
+        raise ImportError(
+            f"Could not load YAML support via swarm.utils.yaml_utils: {exc}. "
+            "Ensure the repo root is on sys.path and PyYAML is installed "
+            "(uv sync --extra dev)."
+        ) from exc
 
 
 def status_badge(status: str) -> str:

@@ -416,6 +416,7 @@ class _LegacySpecCompiler:
         )
 
         from .compiler.builder import StepPlanBuilder
+        from .compiler.models import fragment_manifest_from_plan
 
         builder = StepPlanBuilder(self.repo_root)
         step_plan = builder.build(
@@ -454,6 +455,7 @@ class _LegacySpecCompiler:
             verification=step_plan.verification,
             handoff=handoff,
             flow_key=flow_key,
+            fragment_manifest=fragment_manifest_from_plan(step_plan),
         )
 
     def compile_from_context(

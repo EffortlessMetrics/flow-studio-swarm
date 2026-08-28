@@ -84,12 +84,17 @@ class StepPlanBuilder:
             previous_envelopes=previous_envelopes,
         )
 
-        system_prompt = self._process_fragment_includes(system_prompt)
-        user_prompt = self._process_fragment_includes(user_prompt)
+        system_prompt, system_includes = self._process_fragment_includes(system_prompt)
+        user_prompt, user_includes = self._process_fragment_includes(user_prompt)
 
+        # Audit manifest: station-declared fragments, policy invariants, and any
+        # inline {{fragment:...}} includes that actually resolved. Order is
+        # declaration-first so the manifest reads the way the prompt is built.
         fragment_paths = list(station.runtime_prompt.fragments)
         if policy_invariants_ref:
             fragment_paths.extend(policy_invariants_ref)
+        fragment_paths.extend(system_includes)
+        fragment_paths.extend(user_includes)
         fragment_paths = _dedupe_preserve_order(fragment_paths)
         fragments_used = self._collect_fragment_references(fragment_paths)
 
@@ -417,21 +422,30 @@ class StepPlanBuilder:
             "sandbox_enabled": overrides.get("sandbox_enabled", sdk.sandbox.enabled),
         }
 
-    def _process_fragment_includes(self, content: str) -> str:
-        """Resolve {{fragment:...}} includes in prompt content."""
+    def _process_fragment_includes(self, content: str) -> Tuple[str, List[str]]:
+        """Resolve {{fragment:...}} includes in prompt content.
+
+        Returns:
+            Tuple of (rendered content, fragment paths that were successfully
+            resolved). The resolved paths feed the audit manifest so a receipt
+            records inline includes, not just station-declared fragments.
+        """
         pattern = r"\{\{fragment:([^}]+)\}\}"
+        resolved: List[str] = []
 
         def replace_fragment(match: re.Match) -> str:
             frag_path = match.group(1).strip()
             if not frag_path.endswith(".md"):
                 frag_path = f"{frag_path}.md"
             try:
-                return load_fragment(frag_path, self.repo_root)
+                rendered = load_fragment(frag_path, self.repo_root)
             except FileNotFoundError:
                 logger.warning("Fragment include not found: %s", frag_path)
                 return f"[Fragment not found: {frag_path}]"
+            resolved.append(frag_path)
+            return rendered
 
-        return re.sub(pattern, replace_fragment, content)
+        return re.sub(pattern, replace_fragment, content), resolved
 
     def _collect_fragment_references(
         self,

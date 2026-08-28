@@ -130,7 +130,7 @@ graph TD
 
 | # | Step | Agents | Role |
 | - | ---- | ------ | ---- |
-| 1 | `decide` | `repo-operator` — Git workflows: branch, commit, merge, tag. Safe Bash only. | Merge PR to target branch, create git tag and GitHub release. Record actions in deployment_log.md. |
+| 1 | `decide` | `repo-operator` — Git workflows: branch, commit, merge, tag, reset operations. Safe Bash only. | Merge PR to target branch, create git tag and GitHub release. Record actions in deployment_log.md. |
 | 2 | `monitor` | `deploy-monitor` — Watch CI and deployment events | Watch CI/deployment events for the merge commit. Record CI status and deployment events in verification_report.md. |
 | 3 | `smoke` | `smoke-verifier` — Run health checks and verify artifacts | Run health checks if endpoints available. Verify artifact/release existence. Append results to verification_report.md. |
 | 4 | `finalize` | `deploy-decider` — Verify operationalization FRs (FR-OP-001..005) and issue deployment decision | Synthesize CI + smoke results into deployment_decision.md with status: STABLE/INVESTIGATE/ROLLBACK/NOT_DEPLOYED. |

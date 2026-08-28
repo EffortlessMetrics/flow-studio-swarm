@@ -38,7 +38,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from swarm.utils.yaml_utils import load_yaml
+# Add swarm package to path for library imports
+_SWARM_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_SWARM_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SWARM_ROOT))
+
+from swarm.utils.yaml_utils import load_yaml  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CONFIG_DIR = REPO_ROOT / "swarm" / "config" / "agents"
