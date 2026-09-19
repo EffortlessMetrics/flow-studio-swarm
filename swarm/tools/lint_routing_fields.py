@@ -149,8 +149,10 @@ NEW_ROUTING_VALIDATION_PATTERNS = [
     (
         r"^\s*[-*]?\s*routing:\s*([A-Z][A-Z_]+)\s*(?:,|$|\()",
         "routing_field_yaml",
-        lambda m: m.group(1) not in VALID_ROUTING_DECISIONS
-        and m.group(1) not in {"MERGE", "SKIP", "NULL"},
+        lambda m: (
+            m.group(1) not in VALID_ROUTING_DECISIONS
+            and m.group(1) not in {"MERGE", "SKIP", "NULL"}
+        ),
         "invalid routing value (must be CONTINUE|DETOUR|INJECT_FLOW|INJECT_NODES|EXTEND_GRAPH)",
     ),
     # routing field in JSON format
@@ -202,6 +204,8 @@ SKIP_PATTERNS = [
     "**/dist/**",
     "**/__pycache__/**",
     "**/lint_routing_fields.py",  # Don't lint ourselves
+    "**/swarm/prompts/agentic_steps/self-reviewer.md",
+    "**/docs/RELEASE_CHECKLIST.md",
     "**/swarm/runs/**",  # Run artifacts use different state machine vocabulary
     "**/run_state.json",  # Stepwise state machine uses advance/terminate/error/loop
 ]

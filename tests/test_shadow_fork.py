@@ -80,7 +80,16 @@ class TestShadowForkCreate:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (
+                    False,
+                    "",
+                    "fatal: branch 'nonexistent' does not exist",
+                ),  # Verify base branch exists
+                (
+                    False,
+                    "",
+                    "fatal: branch 'nonexistent' does not exist",
+                ),  # fallback checkout -b fails
             ]
 
             with pytest.raises(RuntimeError, match="does not exist"):
@@ -94,8 +103,9 @@ class TestShadowForkCreate:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
                 (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
+                (True, "main", ""),  # Verify base branch exists (returns sha or branch name)
                 (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # One more to avoid StopIteration just in case
             ]
 
             # Create hooks directory for the test
