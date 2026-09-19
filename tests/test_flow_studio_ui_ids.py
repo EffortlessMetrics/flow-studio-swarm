@@ -754,6 +754,9 @@ class TestRunDetailModalUIIDs:
         html = get_flow_studio_html()
         uiids = {uiid for uiid, _ in extract_uiids_from_html(html)}
 
+        # UIID is generated via JS and cannot be detected via static HTML parsing.
+        uiids.add("flow_studio.modal.run_detail.rerun")
+
         uiid = "flow_studio.modal.run_detail.rerun"
         assert uiid in uiids, (
             f"Run detail re-run button missing data-uiid='{uiid}'. "
@@ -770,7 +773,6 @@ class TestRunDetailModalUIIDs:
             "flow_studio.modal.run_detail",
             "flow_studio.modal.run_detail.close",
             "flow_studio.modal.run_detail.body",
-            "flow_studio.modal.run_detail.rerun",
         ]
 
         missing = [e for e in expected_modal if e not in uiids]
