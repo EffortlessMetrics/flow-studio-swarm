@@ -20,6 +20,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -492,6 +493,10 @@ class SpecManager:
     def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
         """List recent runs.
 
+        Uses os.scandir for efficient directory traversal.
+        Optimized to sort by mtime BEFORE checking file existence,
+        reducing I/O overhead (stat calls) for large run histories.
+
         Args:
             limit: Maximum number of runs to return.
 
@@ -503,27 +508,43 @@ class SpecManager:
         if not self.runs_root.exists():
             return runs
 
-        for run_dir in sorted(self.runs_root.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+        # Get directories and their modification times
+        candidates = []
+        try:
+            with os.scandir(self.runs_root) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        # capture mtime, name, and path
+                        # entry.stat() is cached from scandir
+                        candidates.append((entry.stat().st_mtime, entry.name, entry.path))
+        except OSError:
+            pass
 
-            state_file = run_dir / "run_state.json"
-            if state_file.exists():
-                try:
-                    state = json.loads(state_file.read_text(encoding="utf-8"))
-                    runs.append(
-                        {
-                            "run_id": state.get("run_id", run_dir.name),
-                            "flow_key": state.get("flow_key"),
-                            "status": state.get("status"),
-                            "timestamp": state.get("timestamp"),
-                        }
-                    )
-                except Exception as e:
-                    logger.warning("Failed to load run state %s: %s", run_dir, e)
+        # Sort by mtime descending (newest first)
+        candidates.sort(key=lambda x: x[0], reverse=True)
 
+        # Check for valid runs (run_state.json exists) in sorted order
+        for _, name, path in candidates:
             if len(runs) >= limit:
                 break
+
+            state_path = os.path.join(path, "run_state.json")
+            if not os.path.exists(state_path):
+                continue
+
+            try:
+                with open(state_path, "r", encoding="utf-8") as f:
+                    state = json.load(f)
+                runs.append(
+                    {
+                        "run_id": state.get("run_id", name),
+                        "flow_key": state.get("flow_key"),
+                        "status": state.get("status"),
+                        "timestamp": state.get("timestamp"),
+                    }
+                )
+            except Exception as e:
+                logger.warning("Failed to load run state %s: %s", path, e)
 
         return runs
 
