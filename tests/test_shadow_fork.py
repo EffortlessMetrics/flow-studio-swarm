@@ -77,13 +77,21 @@ class TestShadowForkCreate:
         fork = ShadowFork(repo_root=tmp_path)
 
         with patch.object(fork, "_run_git") as mock_git:
+            # We need to mock all _ref_exists checks in _resolve_base_ref (up to 6 times)
+            # plus the get current branch and uncommitted changes check
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
+                (False, "", "fatal"), # preferred check
+                (False, "", "fatal"), # origin/preferred check
+                (False, "", "fatal"), # main check
+                (False, "", "fatal"), # origin/main check
+                (False, "", "fatal"), # master check
+                (False, "", "fatal"), # origin/master check
                 (True, "", ""),  # Check for uncommitted changes
-                (False, "", "fatal"),  # Base branch doesn't exist
+                (False, "", "fatal: 'nonexistent' is not a commit and a branch 'shadow/...' cannot be created from it"),  # Base branch doesn't exist (checkout fails)
             ]
 
-            with pytest.raises(RuntimeError, match="does not exist"):
+            with pytest.raises(RuntimeError, match="Failed to create shadow branch"):
                 fork.create(base_branch="nonexistent")
 
     def test_create_warns_on_uncommitted_changes(self, tmp_path, caplog):
@@ -93,9 +101,10 @@ class TestShadowForkCreate:
         with patch.object(fork, "_run_git") as mock_git:
             mock_git.side_effect = [
                 (True, "main", ""),  # Get current branch
-                (True, " M file.txt", ""),  # Uncommitted changes exist
-                (True, "", ""),  # Verify base branch exists
-                (True, "", ""),  # Create and switch to shadow branch
+                (True, "", ""),  # _ref_exists returns True for preferred
+                (True, " M file.py\n", ""),  # Uncommitted changes
+                (True, "", ""),  # checkout success
+                (True, "", ""),  # commit marker
             ]
 
             # Create hooks directory for the test
