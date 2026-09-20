@@ -149,28 +149,27 @@ class RunStateManager:
         """List recent runs.
 
         Uses os.scandir for efficient directory traversal.
-        Optimized to sort by mtime BEFORE checking file existence,
-        reducing I/O overhead (stat calls) for large run histories.
+        Optimized by using lexical sorting on chronological run IDs (YYYYMMDDHHMMSS)
+        instead of st_mtime to avoid O(N) stat syscalls for large run histories.
         """
         runs = []
 
         if not self.runs_root.exists():
             return runs
 
-        # Get directories and their modification times
+        # Get directory names (run IDs)
         candidates = []
         with os.scandir(self.runs_root) as it:
             for entry in it:
                 if entry.is_dir():
-                    # capture mtime and path
-                    # entry.stat() is cached from scandir
-                    candidates.append((entry.stat().st_mtime, Path(entry.path)))
+                    candidates.append(entry.name)
 
-        # Sort by mtime descending (newest first)
-        candidates.sort(key=lambda x: x[0], reverse=True)
+        # Sort lexically descending (newest first, since names contain timestamps)
+        candidates.sort(reverse=True)
 
         # Check for valid runs (run_state.json exists) in sorted order
-        for _, run_dir in candidates:
+        for run_name in candidates:
+            run_dir = self.runs_root / run_name
             if len(runs) >= limit:
                 break
 
