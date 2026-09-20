@@ -157,20 +157,21 @@ class RunStateManager:
         if not self.runs_root.exists():
             return runs
 
-        # Get directories and their modification times
+        # Get directories
+        # Run directories contain timestamps (e.g. run-YYYYMMDD-HHMMSS-xxxxxx)
+        # Lexical sorting is identical to mtime sort but avoids stat syscalls
         candidates = []
         with os.scandir(self.runs_root) as it:
             for entry in it:
                 if entry.is_dir():
-                    # capture mtime and path
-                    # entry.stat() is cached from scandir
-                    candidates.append((entry.stat().st_mtime, Path(entry.path)))
+                    candidates.append(entry.name)
 
-        # Sort by mtime descending (newest first)
-        candidates.sort(key=lambda x: x[0], reverse=True)
+        # Sort by name descending (newest first based on timestamp in run_id)
+        candidates.sort(reverse=True)
 
         # Check for valid runs (run_state.json exists) in sorted order
-        for _, run_dir in candidates:
+        for run_name in candidates:
+            run_dir = self.runs_root / run_name
             if len(runs) >= limit:
                 break
 
